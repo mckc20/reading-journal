@@ -258,38 +258,36 @@ export default function BookDetailModal({
                     <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
                       <p className="text-sm font-medium">Update progress</p>
                       <div className="grid grid-cols-2 gap-3">
-                        {book.total_pages && (
-                          <div className="space-y-1">
-                            <Label htmlFor="current_page" className="text-xs">
-                              Current page
-                              {book.total_pages && (
-                                <span className="text-muted-foreground"> / {book.total_pages}</span>
-                              )}
-                            </Label>
-                            <Input
-                              id="current_page"
-                              type="number"
-                              min={0}
-                              max={book.total_pages}
-                              {...register("current_page")}
-                            />
-                          </div>
-                        )}
-                        {book.total_chapters && (
-                          <div className="space-y-1">
-                            <Label htmlFor="current_chapter" className="text-xs">
-                              Current chapter
+                        <div className="space-y-1">
+                          <Label htmlFor="current_page" className="text-xs">
+                            Current page
+                            {book.total_pages != null && (
+                              <span className="text-muted-foreground"> / {book.total_pages}</span>
+                            )}
+                          </Label>
+                          <Input
+                            id="current_page"
+                            type="number"
+                            min={0}
+                            max={book.total_pages ?? undefined}
+                            {...register("current_page")}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="current_chapter" className="text-xs">
+                            Current chapter
+                            {book.total_chapters != null && (
                               <span className="text-muted-foreground"> / {book.total_chapters}</span>
-                            </Label>
-                            <Input
-                              id="current_chapter"
-                              type="number"
-                              min={0}
-                              max={book.total_chapters}
-                              {...register("current_chapter")}
-                            />
-                          </div>
-                        )}
+                            )}
+                          </Label>
+                          <Input
+                            id="current_chapter"
+                            type="number"
+                            min={0}
+                            max={book.total_chapters ?? undefined}
+                            {...register("current_chapter")}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
