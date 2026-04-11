@@ -215,7 +215,7 @@ export default function BookDetailModal({
               </DialogTitle>
               <p className="text-sm text-muted-foreground">{book.author}</p>
               <div className="flex items-center gap-2">
-                <Badge variant={statusVariant(book.status)}>{book.status}</Badge>
+                <Badge variant={statusVariant(status)}>{status}</Badge>
                 <button
                   type="button"
                   onClick={toggleFavorite}
