@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import BookCard from "@/components/BookCard";
 import BookDetailModal from "@/components/BookDetailModal";
@@ -19,7 +20,7 @@ function SkeletonGrid() {
 }
 
 export default function Dashboard() {
-  const { books, loading, updateBook, deleteBook } = useBooksContext();
+  const { books, loading, error, updateBook, deleteBook, reload } = useBooksContext();
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -36,6 +37,21 @@ export default function Dashboard() {
       <div className="space-y-8">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <SkeletonGrid />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => reload()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }

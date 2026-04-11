@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, RefreshCw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
@@ -30,7 +31,7 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void
 }
 
 export default function Library() {
-  const { books, loading, updateBook, deleteBook } = useBooksContext();
+  const { books, loading, error, updateBook, deleteBook, reload } = useBooksContext();
   const { series } = useSeries();
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -64,6 +65,16 @@ export default function Library() {
           {loading ? "…" : `${books.length} book${books.length !== 1 ? "s" : ""}`}
         </span>
       </div>
+
+      {error && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => reload()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try again
+          </Button>
+        </div>
+      )}
 
       <Tabs defaultValue="all">
         <TabsList className="w-full">
