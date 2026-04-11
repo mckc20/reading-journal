@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Plus, LogOut, BookMarked, LayoutDashboard, Library } from "lucide-react";
+import { Plus, LogOut, BookMarked, LayoutDashboard, Library, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
 import { useAuth } from "@/context";
 import AddBookDialog from "./AddBookDialog";
+import SetPasswordDialog from "./SetPasswordDialog";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -16,6 +17,7 @@ export default function AppLayout() {
   const { signOut } = useAuth();
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <BooksProvider>
@@ -68,6 +70,14 @@ export default function AppLayout() {
               <Button
                 size="icon"
                 variant="ghost"
+                onClick={() => setPasswordOpen(true)}
+                aria-label="Set password"
+              >
+                <KeyRound className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
                 onClick={() => signOut()}
                 aria-label="Sign out"
               >
@@ -109,6 +119,7 @@ export default function AppLayout() {
       </div>
 
       <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
+      <SetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </BooksProvider>
   );
 }
