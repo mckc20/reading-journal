@@ -86,6 +86,7 @@ export default function BookDetailModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     register,
@@ -102,6 +103,7 @@ export default function BookDetailModal({
       setIsFavorite(book.is_favorite);
       setLocalRating(book.rating ?? null);
       setConfirmDelete(false);
+      setErrorMsg(null);
       reset({
         title: book.title,
         author: book.author,
@@ -131,7 +133,11 @@ export default function BookDetailModal({
     if (!book) return;
     const next = !isFavorite;
     setIsFavorite(next);
-    await onUpdated(book.id, { is_favorite: next });
+    try {
+      await onUpdated(book.id, { is_favorite: next });
+    } catch {
+      setIsFavorite(!next);
+    }
   }
 
   async function handleRating(rating: number) {
@@ -166,8 +172,11 @@ export default function BookDetailModal({
 
     try {
       setSaving(true);
+      setErrorMsg(null);
       await onUpdated(book.id, payload);
       reset(values); // reset dirty state
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setSaving(false);
     }
@@ -181,8 +190,11 @@ export default function BookDetailModal({
     }
     try {
       setDeleting(true);
+      setErrorMsg(null);
       await onDeleted(book.id);
       onOpenChange(false);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to delete book");
     } finally {
       setDeleting(false);
     }
@@ -487,6 +499,9 @@ export default function BookDetailModal({
                 </div>
               </ScrollArea>
 
+              {errorMsg && (
+                <p className="text-sm text-destructive mt-2">{errorMsg}</p>
+              )}
               <div className="mt-3 shrink-0 flex justify-between gap-2 border-t pt-3">
                 <Button
                   type="button"
