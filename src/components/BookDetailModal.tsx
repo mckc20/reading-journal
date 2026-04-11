@@ -82,6 +82,7 @@ export default function BookDetailModal({
 }: BookDetailModalProps) {
   const { series } = useSeries();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [localRating, setLocalRating] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -99,6 +100,7 @@ export default function BookDetailModal({
   useEffect(() => {
     if (book) {
       setIsFavorite(book.is_favorite);
+      setLocalRating(book.rating ?? null);
       setConfirmDelete(false);
       reset({
         title: book.title,
@@ -134,7 +136,9 @@ export default function BookDetailModal({
 
   async function handleRating(rating: number) {
     if (!book) return;
-    await onUpdated(book.id, { rating });
+    const next = localRating === rating ? null : rating;
+    setLocalRating(next);
+    await onUpdated(book.id, { rating: next ?? undefined });
   }
 
   async function onSubmit(values: FormValues) {
@@ -304,7 +308,7 @@ export default function BookDetailModal({
                         >
                           <Star
                             className={`h-5 w-5 ${
-                              book.rating && n <= book.rating
+                              localRating && n <= localRating
                                 ? "fill-amber-400 text-amber-400"
                                 : "text-muted-foreground"
                             }`}
