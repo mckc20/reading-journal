@@ -1,23 +1,9 @@
 import { createBrowserRouter } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AppLayout from "@/components/AppLayout";
 import Login from "@/pages/Login";
-
-// Stub components — replaced with real page imports in Phase 3
-function Dashboard() {
-  return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
-    </div>
-  );
-}
-
-function Library() {
-  return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold">Library</h1>
-    </div>
-  );
-}
+import Dashboard from "@/pages/Dashboard";
+import Library from "@/pages/Library";
 
 function NotFound() {
   return (
@@ -34,12 +20,17 @@ export const router = createBrowserRouter([
     element: <Login />,
   },
 
-  // Protected layout — ProtectedRoute wraps all children via <Outlet />
+  // Protected layout: ProtectedRoute → AppLayout → page
   {
     element: <ProtectedRoute />,
     children: [
-      { path: "/", element: <Dashboard /> },
-      { path: "/library", element: <Library /> },
+      {
+        element: <AppLayout />,
+        children: [
+          { path: "/", element: <Dashboard /> },
+          { path: "/library", element: <Library /> },
+        ],
+      },
     ],
   },
 
