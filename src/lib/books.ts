@@ -49,12 +49,17 @@ function coverPath(userId: string, bookId: string, ext: string): string {
   return `covers/${userId}/${bookId}.${ext}`;
 }
 
+const VALID_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif"];
+
 export async function uploadCover(
   userId: string,
   bookId: string,
   file: File
 ): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!VALID_IMAGE_EXTENSIONS.includes(ext)) {
+    throw new Error(`Invalid file type ".${ext}". Allowed: ${VALID_IMAGE_EXTENSIONS.join(", ")}`);
+  }
   const path = coverPath(userId, bookId, ext);
   const { error } = await supabase.storage
     .from("covers")
