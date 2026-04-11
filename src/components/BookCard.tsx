@@ -2,16 +2,8 @@ import { BookOpen, Heart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import type { Book, BookStatus } from "@/types";
-
-function statusVariant(
-  status: BookStatus
-): "default" | "secondary" | "outline" | "destructive" {
-  if (status === "Reading") return "default";
-  if (status === "DNF") return "destructive";
-  if (status === "Up Next") return "secondary";
-  return "outline";
-}
+import { statusVariant } from "@/lib/utils";
+import type { Book } from "@/types";
 
 interface BookCardProps {
   book: Book;

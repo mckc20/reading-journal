@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSeries } from "@/hooks/useSeries";
+import { statusVariant } from "@/lib/utils";
 import type {
   Book,
   BookStatus,
@@ -63,15 +64,6 @@ const STATUS_OPTIONS: BookStatus[] = [
   "Finished",
   "DNF",
 ];
-
-function statusVariant(
-  status: BookStatus
-): "default" | "secondary" | "outline" | "destructive" {
-  if (status === "Reading") return "default";
-  if (status === "DNF") return "destructive";
-  if (status === "Up Next") return "secondary";
-  return "outline";
-}
 
 export default function BookDetailModal({
   book,
