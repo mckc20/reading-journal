@@ -253,8 +253,8 @@ export default function BookDetailModal({
           </TabsList>
 
           {/* Properties tab */}
-          <TabsContent value="properties" className="flex-1 min-h-0">
-            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
+          <TabsContent value="properties" className="flex-1 min-h-0 flex flex-col">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
               <ScrollArea className="flex-1 min-h-0 pr-2">
                 <div className="space-y-4 py-1">
                   {/* Progress update (Reading only) */}
