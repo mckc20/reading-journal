@@ -548,7 +548,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                   <Input
                     id="volume_number"
                     type="number"
-                    min={1}
+                    min={0.5}
+                    step="any"
                     {...register("volume_number")}
                   />
                 </div>

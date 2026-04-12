@@ -497,7 +497,7 @@ export default function BookDetailModal({
                   {seriesId && (
                     <div className="space-y-1.5">
                       <Label htmlFor="detail-volume_number">Volume number</Label>
-                      <Input id="detail-volume_number" type="number" min={1} {...register("volume_number")} />
+                      <Input id="detail-volume_number" type="number" min={0.5} step="any" {...register("volume_number")} />
                     </div>
                   )}
                 </div>

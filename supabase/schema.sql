@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS books (
   format          text CHECK (format IN ('eBook','Audiobook','Paperback','Hardcover')),
   isbn            text,
   series_id       uuid REFERENCES series(id) ON DELETE SET NULL,
-  volume_number   integer CHECK (volume_number > 0),
+  volume_number   numeric CHECK (volume_number > 0),
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
