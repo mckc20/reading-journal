@@ -60,6 +60,20 @@ export function useBooks() {
     []
   );
 
+  const updateCover = useCallback(
+    async (id: string, file: File): Promise<void> => {
+      if (!user) throw new Error("Not authenticated");
+      // Delete old cover files (best-effort)
+      await deleteCover(user.id, id).catch(() => {});
+      // Upload new cover
+      const cover_url = await uploadCover(user.id, id, file);
+      // Update book record in DB
+      const updated = await updateBookDb(id, { cover_url });
+      setBooks((prev) => prev.map((b) => (b.id === id ? updated : b)));
+    },
+    [user]
+  );
+
   const deleteBook = useCallback(
     async (id: string): Promise<void> => {
       if (!user) throw new Error("Not authenticated");
@@ -71,5 +85,5 @@ export function useBooks() {
     [user]
   );
 
-  return { books, loading, error, addBook, updateBook, deleteBook, reload: load };
+  return { books, loading, error, addBook, updateBook, updateCover, deleteBook, reload: load };
 }

@@ -31,13 +31,14 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void
 }
 
 export default function Library() {
-  const { books, loading, error, updateBook, deleteBook, reload } = useBooksContext();
+  const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
   const { series } = useSeries();
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const selectedBook = selectedBookId ? books.find((b) => b.id === selectedBookId) ?? null : null;
 
   function openBook(book: Book) {
-    setSelectedBook(book);
+    setSelectedBookId(book.id);
     setModalOpen(true);
   }
 
@@ -157,6 +158,7 @@ export default function Library() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         onUpdated={updateBook}
+        onCoverChanged={updateCover}
         onDeleted={deleteBook}
       />
     </div>

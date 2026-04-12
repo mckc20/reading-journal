@@ -8,6 +8,7 @@ interface BooksContextValue {
   error: string | null;
   addBook: (payload: AddBookPayload, coverFile?: File) => Promise<void>;
   updateBook: (id: string, payload: Partial<Book>) => Promise<void>;
+  updateCover: (id: string, file: File) => Promise<void>;
   deleteBook: (id: string) => Promise<void>;
   reload: () => Promise<void>;
 }
