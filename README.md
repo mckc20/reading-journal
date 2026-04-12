@@ -100,5 +100,54 @@ Data visualizations displayed on the Start Page and dedicated wrap-ups:
   - Reading habit analytics (e.g., "You read mostly on Sunday mornings").
   - Total hours read and pages turned.
 
+### Supabase Configuration
+
+#### Database Schema
+
+Run `supabase/schema.sql` in the Supabase SQL Editor (Dashboard > SQL Editor > New query) to create all tables, indexes, and RLS policies.
+
+#### Storage: `covers` Bucket
+
+Cover images are stored in Supabase Storage. The bucket must be created manually:
+
+1. **Dashboard > Storage > New bucket**
+   - Name: `covers`
+   - Public: **yes** (cover URLs are used directly in `<img src>` tags, no signed URLs needed)
+
+2. **Add RLS policies** — run in the SQL Editor:
+
+```sql
+-- Allow authenticated users to upload covers to their own folder
+CREATE POLICY "covers: owner insert"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'covers'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Allow authenticated users to delete/replace their own covers
+CREATE POLICY "covers: owner delete"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'covers'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
+```
+
+The upload path format is `covers/{user_id}/{book_id}.{ext}`, so these policies ensure users can only write to their own folder. No SELECT policy is needed since the bucket is public.
+
+#### Environment Variables
+
+Create a `.env` file in the project root with your Supabase credentials:
+
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
 ---
 *Generated for coding agent context based on the user's Reading Journal UI/UX specifications and technical requirements.*
