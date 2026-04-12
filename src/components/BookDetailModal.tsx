@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { Heart, Star, BookOpen, ImagePlus } from "lucide-react";
+import { Heart, Star, BookOpen, ImagePlus, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -258,6 +258,17 @@ export default function BookDetailModal({
                 {book.title}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">{book.author}</p>
+              {book.isbn && (
+                <a
+                  href={`https://openlibrary.org/isbn/${book.isbn}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Open Library
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
               <div className="flex items-center gap-2">
                 <Badge variant={statusVariant(status)}>{status}</Badge>
                 <button

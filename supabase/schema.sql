@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS books (
   language        text CHECK (language IN ('German','Spanish','English')),
   belongs_to      text CHECK (belongs_to IN ('Me','Family','Friends','Library')),
   format          text CHECK (format IN ('eBook','Audiobook','Paperback','Hardcover')),
+  isbn            text,
   series_id       uuid REFERENCES series(id) ON DELETE SET NULL,
   volume_number   integer CHECK (volume_number > 0),
   created_at      timestamptz NOT NULL DEFAULT now()

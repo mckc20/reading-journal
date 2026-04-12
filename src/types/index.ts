@@ -38,6 +38,7 @@ export interface Book {
   language?: BookLanguage;
   belongs_to?: BookBelongsTo;
   format?: BookFormat;
+  isbn?: string;
   series_id?: string;
   volume_number?: number;
   user_id: string;

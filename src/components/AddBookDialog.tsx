@@ -1,6 +1,8 @@
 import { useRef, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, ScanBarcode, Loader2 } from "lucide-react";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { fetchBookByISBN } from "@/lib/openLibrary";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +67,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [addingNewSeries, setAddingNewSeries] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [showScanner, setShowScanner] = useState(false);
+  const [manualIsbn, setManualIsbn] = useState("");
+  const [isbnStatus, setIsbnStatus] = useState<"idle" | "looking-up" | "error">("idle");
+  const [isbnError, setIsbnError] = useState<string | null>(null);
+  const [scannedIsbn, setScannedIsbn] = useState<string | null>(null);
+
   const {
     register,
     control,
@@ -94,6 +102,53 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+  }
+
+  async function handleIsbnLookup(isbn: string) {
+    setShowScanner(false);
+    setIsbnStatus("looking-up");
+    setIsbnError(null);
+
+    try {
+      const bookData = await fetchBookByISBN(isbn.trim());
+      if (!bookData) {
+        setIsbnStatus("error");
+        setIsbnError(`No book found for ISBN ${isbn}`);
+        return;
+      }
+
+      setScannedIsbn(isbn.trim());
+      setValue("title", bookData.title);
+      setValue("author", bookData.author);
+      if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
+      if (bookData.genre) setValue("genre", bookData.genre);
+      if (bookData.language) setValue("language", bookData.language as BookLanguage);
+      if (bookData.format) setValue("format", bookData.format as BookFormat);
+
+      // Download cover image as a File for the existing upload flow
+      if (bookData.coverUrl) {
+        try {
+          const res = await fetch(bookData.coverUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            // Only use the cover if it's a real image (not a 1x1 placeholder)
+            if (blob.size > 1000) {
+              const file = new File([blob], `cover-${isbn}.jpg`, { type: "image/jpeg" });
+              if (coverPreview) URL.revokeObjectURL(coverPreview);
+              setCoverFile(file);
+              setCoverPreview(URL.createObjectURL(file));
+            }
+          }
+        } catch {
+          // Non-critical — text fields are still filled
+        }
+      }
+
+      setIsbnStatus("idle");
+    } catch {
+      setIsbnStatus("error");
+      setIsbnError("Failed to look up book. Please try again or enter details manually.");
+    }
   }
 
   async function handleAddNewSeries() {
@@ -127,6 +182,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           date_finished: values.date_finished || undefined,
           series_id: values.series_id || undefined,
           volume_number: values.volume_number ? Number(values.volume_number) : undefined,
+          isbn: scannedIsbn || undefined,
           is_favorite: false,
         },
         coverFile ?? undefined
@@ -134,6 +190,11 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       reset();
       setCoverFile(null);
       setCoverPreview(null);
+      setShowScanner(false);
+      setManualIsbn("");
+      setIsbnStatus("idle");
+      setIsbnError(null);
+      setScannedIsbn(null);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -149,8 +210,24 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
   const showDateFinished = ["Finished", "DNF"].includes(status);
 
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      reset();
+      setCoverFile(null);
+      setCoverPreview(null);
+      setShowScanner(false);
+      setManualIsbn("");
+      setIsbnStatus("idle");
+      setIsbnError(null);
+      setScannedIsbn(null);
+      setAddingNewSeries(false);
+      setNewSeriesName("");
+    }
+    onOpenChange(nextOpen);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Book</DialogTitle>
@@ -159,6 +236,59 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         <form onSubmit={handleSubmit(onSubmit)}>
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-1">
+              {/* ISBN Scanner */}
+              {showScanner ? (
+                <BarcodeScanner
+                  onScan={handleIsbnLookup}
+                  onClose={() => setShowScanner(false)}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => { setShowScanner(true); setIsbnError(null); }}
+                    disabled={isbnStatus === "looking-up"}
+                  >
+                    <ScanBarcode className="h-4 w-4" />
+                    Scan ISBN barcode
+                  </Button>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Or enter ISBN manually"
+                      value={manualIsbn}
+                      onChange={(e) => setManualIsbn(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
+                      onClick={() => handleIsbnLookup(manualIsbn)}
+                    >
+                      Look up
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {isbnStatus === "looking-up" && (
+                <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Looking up book…
+                </p>
+              )}
+
+              {isbnError && (
+                <p className="text-sm text-destructive text-center">{isbnError}</p>
+              )}
+
               {/* Cover upload */}
               <div className="flex items-center gap-4">
                 <label
