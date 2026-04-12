@@ -20,12 +20,13 @@ function SkeletonGrid() {
 }
 
 export default function Dashboard() {
-  const { books, loading, error, updateBook, deleteBook, reload } = useBooksContext();
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const selectedBook = selectedBookId ? books.find((b) => b.id === selectedBookId) ?? null : null;
 
   function openBook(book: Book) {
-    setSelectedBook(book);
+    setSelectedBookId(book.id);
     setModalOpen(true);
   }
 
@@ -101,6 +102,7 @@ export default function Dashboard() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         onUpdated={updateBook}
+        onCoverChanged={updateCover}
         onDeleted={deleteBook}
       />
     </div>

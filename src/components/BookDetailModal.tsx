@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { Heart, Star, BookOpen } from "lucide-react";
+import { Heart, Star, BookOpen, ImagePlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +53,7 @@ interface BookDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: (id: string, payload: Partial<Book>) => Promise<void>;
+  onCoverChanged: (id: string, file: File) => Promise<void>;
   onDeleted: (id: string) => Promise<void>;
 }
 
@@ -70,6 +71,7 @@ export default function BookDetailModal({
   open,
   onOpenChange,
   onUpdated,
+  onCoverChanged,
   onDeleted,
 }: BookDetailModalProps) {
   const { series } = useSeries();
@@ -78,7 +80,9 @@ export default function BookDetailModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -137,6 +141,23 @@ export default function BookDetailModal({
     const next = localRating === rating ? null : rating;
     setLocalRating(next);
     await onUpdated(book.id, { rating: next ?? undefined });
+  }
+
+  async function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!book) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingCover(true);
+      setErrorMsg(null);
+      await onCoverChanged(book.id, file);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to update cover");
+    } finally {
+      setUploadingCover(false);
+      // Reset input so the same file can be re-selected
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
   }
 
   async function onSubmit(values: FormValues) {
@@ -200,7 +221,10 @@ export default function BookDetailModal({
         {/* Fixed header */}
         <DialogHeader className="shrink-0">
           <div className="flex items-start gap-3">
-            <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
+            <label
+              htmlFor="cover-change"
+              className="relative h-20 w-14 shrink-0 overflow-hidden rounded-md bg-muted cursor-pointer group"
+            >
               {book.cover_url ? (
                 <img
                   src={book.cover_url}
@@ -212,7 +236,23 @@ export default function BookDetailModal({
                   <BookOpen className="h-6 w-6 text-muted-foreground/40" />
                 </div>
               )}
-            </div>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploadingCover ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <ImagePlus className="h-4 w-4 text-white" />
+                )}
+              </div>
+              <input
+                id="cover-change"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                ref={coverInputRef}
+                onChange={handleCoverChange}
+                disabled={uploadingCover}
+              />
+            </label>
             <div className="min-w-0 flex-1 space-y-1">
               <DialogTitle className="line-clamp-2 leading-tight">
                 {book.title}
