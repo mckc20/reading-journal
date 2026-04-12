@@ -18,7 +18,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
 
   return (
     <Card
-      className="cursor-pointer overflow-hidden hover:ring-2 hover:ring-primary/40 transition-shadow"
+      className="cursor-pointer overflow-hidden pt-0 hover:ring-2 hover:ring-primary/40 transition-shadow"
       onClick={() => onClick(book)}
     >
       {/* Cover */}
