@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useSeries } from "@/hooks/useSeries";
 import { statusVariant } from "@/lib/utils";
+import ReadingProgressPanel from "@/components/ReadingProgressPanel";
 import type {
   Book,
   BookStatus,
@@ -39,7 +40,6 @@ interface FormValues {
   format: BookFormat | "";
   belongs_to: BookBelongsTo | "";
   total_pages: string;
-  current_page: string;
   date_started: string;
   date_finished: string;
   series_id: string;
@@ -107,7 +107,6 @@ export default function BookDetailModal({
         format: book.format ?? "",
         belongs_to: book.belongs_to ?? "",
         total_pages: book.total_pages?.toString() ?? "",
-        current_page: book.current_page?.toString() ?? "",
         date_started: book.date_started ?? "",
         date_finished: book.date_finished ?? "",
         series_id: book.series_id ?? "",
@@ -169,7 +168,6 @@ export default function BookDetailModal({
     if (dirtyFields.format) payload.format = (values.format as BookFormat) || undefined;
     if (dirtyFields.belongs_to) payload.belongs_to = (values.belongs_to as BookBelongsTo) || undefined;
     if (dirtyFields.total_pages) payload.total_pages = values.total_pages ? Number(values.total_pages) : undefined;
-    if (dirtyFields.current_page) payload.current_page = values.current_page ? Number(values.current_page) : undefined;
     if (dirtyFields.date_started) payload.date_started = values.date_started || undefined;
     if (dirtyFields.date_finished) payload.date_finished = values.date_finished || undefined;
     if (dirtyFields.series_id) payload.series_id = values.series_id || undefined;
@@ -304,26 +302,12 @@ export default function BookDetailModal({
                 <div className="space-y-4 py-1">
                   {/* Progress update (Reading only) */}
                   {status === "Reading" && (
-                    <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
-                      <p className="text-sm font-medium">Update progress</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="current_page" className="text-xs">
-                            Current page
-                            {book.total_pages != null && (
-                              <span className="text-muted-foreground"> / {book.total_pages}</span>
-                            )}
-                          </Label>
-                          <Input
-                            id="current_page"
-                            type="number"
-                            min={0}
-                            max={book.total_pages ?? undefined}
-                            {...register("current_page")}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <ReadingProgressPanel
+                      book={book}
+                      onProgressSaved={async (newPage) => {
+                        await onUpdated(book.id, { current_page: newPage });
+                      }}
+                    />
                   )}
 
                   {/* Rating */}

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Book, Series } from "@/types";
+import type { Book, Series, ReadingLog } from "@/types";
 
 // ── Books ──────────────────────────────────────────────────────────────────
 
@@ -99,4 +99,40 @@ export async function createSeries(userId: string, name: string): Promise<Series
     .single();
   if (error) throw error;
   return data as Series;
+}
+
+// ── Reading Logs ──────────────────────────────────────────────────────────
+
+export async function createReadingLog(
+  bookId: string,
+  userId: string,
+  currentPage: number,
+  readingTimeMinutes?: number
+): Promise<ReadingLog> {
+  const { data, error } = await supabase
+    .from("reading_logs")
+    .insert({
+      book_id: bookId,
+      user_id: userId,
+      current_page: currentPage,
+      reading_time_minutes: readingTimeMinutes,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ReadingLog;
+}
+
+export async function fetchLastReadingLog(
+  bookId: string
+): Promise<ReadingLog | null> {
+  const { data, error } = await supabase
+    .from("reading_logs")
+    .select("*")
+    .eq("book_id", bookId)
+    .order("logged_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as ReadingLog | null;
 }
