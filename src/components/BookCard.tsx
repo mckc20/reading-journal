@@ -22,7 +22,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
       onClick={() => onClick(book)}
     >
       {/* Cover */}
-      <div className="relative aspect-[2/3] w-full bg-muted">
+      <div className="relative aspect-[2/3] w-full bg-muted flex-shrink-0">
         {book.cover_url ? (
           <img
             src={book.cover_url}
@@ -42,7 +42,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         )}
       </div>
 
-      <CardContent className="p-2 space-y-1">
+      <CardContent className="p-2 space-y-1 flex-1">
         <p className="text-sm font-medium leading-tight line-clamp-2">{book.title}</p>
         <p className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
         <Badge variant={statusVariant(book.status)} className="text-xs">
