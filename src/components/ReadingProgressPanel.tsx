@@ -13,24 +13,9 @@ interface ReadingProgressPanelProps {
 }
 
 function buildPageItems(min: number, max: number) {
-  const range = max - min;
-  let step = 1;
-  if (range > 1000) step = 10;
-  else if (range > 200) step = 5;
-
   const items: { value: number; label: string }[] = [];
-  // Always include the first page
-  items.push({ value: min, label: String(min) });
-  // Then step from the next clean multiple of step
-  const firstStep = step > 1 ? Math.ceil((min + 1) / step) * step : min + 1;
-  for (let p = firstStep; p <= max; p += step) {
-    if (p > min) {
-      items.push({ value: p, label: String(p) });
-    }
-  }
-  // Ensure max is always included
-  if (items[items.length - 1].value !== max) {
-    items.push({ value: max, label: String(max) });
+  for (let p = min; p <= max; p++) {
+    items.push({ value: p, label: String(p) });
   }
   return items;
 }
