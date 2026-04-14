@@ -16,10 +16,11 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const inviteRedirectUrl = process.env.INVITE_REDIRECT_URL;
 
-if (!supabaseUrl || !serviceRoleKey) {
+if (!supabaseUrl || !serviceRoleKey || !inviteRedirectUrl) {
   console.error(
-    "Missing env vars. Ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env",
+    "Missing env vars. Ensure VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and INVITE_REDIRECT_URL are set in .env",
   );
   process.exit(1);
 }
@@ -40,7 +41,7 @@ if (!email) {
   process.exit(1);
 }
 
-const redirectTo = `${process.env.INVITE_REDIRECT_URL ?? "http://localhost:5173"}/login`;
+const redirectTo = `${inviteRedirectUrl}/login`;
 
 const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo });
 
