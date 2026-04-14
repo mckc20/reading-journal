@@ -18,7 +18,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
 
   return (
     <Card
-      className="cursor-pointer overflow-hidden pt-0 hover:ring-2 hover:ring-primary/40 transition-shadow"
+      className="cursor-pointer overflow-hidden pt-0 gap-0 pb-2 hover:ring-2 hover:ring-primary/40 transition-shadow"
       onClick={() => onClick(book)}
     >
       {/* Cover */}
@@ -42,7 +42,7 @@ export default function BookCard({ book, onClick }: BookCardProps) {
         )}
       </div>
 
-      <CardContent className="p-2 space-y-1 flex-1">
+      <CardContent className="p-2 space-y-1">
         <p className="text-sm font-medium leading-tight line-clamp-2">{book.title}</p>
         <p className="text-xs text-muted-foreground line-clamp-1">{book.author}</p>
         <Badge variant={statusVariant(book.status)} className="text-xs">
