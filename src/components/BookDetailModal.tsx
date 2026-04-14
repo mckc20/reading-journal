@@ -76,6 +76,7 @@ export default function BookDetailModal({
   const { series } = useSeries();
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -97,6 +98,7 @@ export default function BookDetailModal({
     if (book) {
       setIsFavorite(book.is_favorite);
       setLocalRating(book.rating ?? null);
+      setIsEditMode(false);
       setConfirmDelete(false);
       setErrorMsg(null);
       reset({
@@ -117,10 +119,40 @@ export default function BookDetailModal({
     }
   }, [book, reset]);
 
+  useEffect(() => {
+    if (!open) {
+      setIsEditMode(false);
+      setConfirmDelete(false);
+      setErrorMsg(null);
+    }
+  }, [open]);
+
   const status = watch("status");
   const seriesId = watch("series_id");
   const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
   const showDateFinished = ["Finished", "DNF"].includes(status);
+
+  function exitEditMode() {
+    if (!book) return;
+    reset({
+      title: book.title,
+      author: book.author,
+      status: book.status,
+      genre: book.genre ?? "",
+      isbn: book.isbn ?? "",
+      language: book.language ?? "",
+      format: book.format ?? "",
+      belongs_to: book.belongs_to ?? "",
+      total_pages: book.total_pages?.toString() ?? "",
+      date_started: book.date_started ?? "",
+      date_finished: book.date_finished ?? "",
+      series_id: book.series_id ?? "",
+      volume_number: book.volume_number?.toString() ?? "",
+    });
+    setConfirmDelete(false);
+    setErrorMsg(null);
+    setIsEditMode(false);
+  }
 
   async function toggleFavorite() {
     if (!book) return;
@@ -183,6 +215,8 @@ export default function BookDetailModal({
       setErrorMsg(null);
       await onUpdated(book.id, payload);
       reset(values); // reset dirty state
+      setIsEditMode(false);
+      setConfirmDelete(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
@@ -218,7 +252,9 @@ export default function BookDetailModal({
           <div className="flex items-start gap-3">
             <label
               htmlFor="cover-change"
-              className="relative h-20 w-14 shrink-0 overflow-hidden rounded-md bg-muted cursor-pointer group"
+              className={`relative h-20 w-14 shrink-0 overflow-hidden rounded-md bg-muted group ${
+                isEditMode ? "cursor-pointer" : "cursor-default"
+              }`}
             >
               {book.cover_url ? (
                 <img
@@ -231,7 +267,11 @@ export default function BookDetailModal({
                   <BookOpen className="h-6 w-6 text-muted-foreground/40" />
                 </div>
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
+                  isEditMode ? "opacity-0 group-hover:opacity-100" : "opacity-0"
+                }`}
+              >
                 {uploadingCover ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
@@ -245,7 +285,7 @@ export default function BookDetailModal({
                 className="sr-only"
                 ref={coverInputRef}
                 onChange={handleCoverChange}
-                disabled={uploadingCover}
+                disabled={uploadingCover || !isEditMode}
               />
             </label>
             <div className="min-w-0 flex-1 space-y-1">
@@ -340,13 +380,21 @@ export default function BookDetailModal({
                   {/* Title */}
                   <div className="space-y-1.5">
                     <Label htmlFor="detail-title">Title</Label>
-                    <Input id="detail-title" {...register("title", { required: true })} />
+                    <Input
+                      id="detail-title"
+                      readOnly={!isEditMode}
+                      {...register("title", { required: true })}
+                    />
                   </div>
 
                   {/* Author */}
                   <div className="space-y-1.5">
                     <Label htmlFor="detail-author">Author</Label>
-                    <Input id="detail-author" {...register("author", { required: true })} />
+                    <Input
+                      id="detail-author"
+                      readOnly={!isEditMode}
+                      {...register("author", { required: true })}
+                    />
                   </div>
 
                   {/* Status */}
@@ -356,7 +404,11 @@ export default function BookDetailModal({
                       name="status"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          disabled={!isEditMode}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -375,7 +427,7 @@ export default function BookDetailModal({
                   {/* Genre */}
                   <div className="space-y-1.5">
                     <Label htmlFor="detail-genre">Genre</Label>
-                    <Input id="detail-genre" {...register("genre")} />
+                    <Input id="detail-genre" readOnly={!isEditMode} {...register("genre")} />
                   </div>
 
                   {/* Language */}
@@ -385,7 +437,11 @@ export default function BookDetailModal({
                       name="language"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <Select
+                          value={field.value || "__none__"}
+                          onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                          disabled={!isEditMode}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Not set" />
                           </SelectTrigger>
@@ -409,7 +465,11 @@ export default function BookDetailModal({
                       name="format"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <Select
+                          value={field.value || "__none__"}
+                          onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                          disabled={!isEditMode}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Not set" />
                           </SelectTrigger>
@@ -435,7 +495,11 @@ export default function BookDetailModal({
                       name="belongs_to"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <Select
+                          value={field.value || "__none__"}
+                          onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                          disabled={!isEditMode}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Not set" />
                           </SelectTrigger>
@@ -455,20 +519,36 @@ export default function BookDetailModal({
                   {/* Pages */}
                   <div className="space-y-1.5">
                     <Label htmlFor="detail-total_pages">Total pages</Label>
-                    <Input id="detail-total_pages" type="number" min={1} {...register("total_pages")} />
+                    <Input
+                      id="detail-total_pages"
+                      type="number"
+                      min={1}
+                      readOnly={!isEditMode}
+                      {...register("total_pages")}
+                    />
                   </div>
 
                   {/* Dates */}
                   {showDateStarted && (
                     <div className="space-y-1.5">
                       <Label htmlFor="detail-date_started">Date started</Label>
-                      <Input id="detail-date_started" type="date" {...register("date_started")} />
+                      <Input
+                        id="detail-date_started"
+                        type="date"
+                        readOnly={!isEditMode}
+                        {...register("date_started")}
+                      />
                     </div>
                   )}
                   {showDateFinished && (
                     <div className="space-y-1.5">
                       <Label htmlFor="detail-date_finished">Date finished</Label>
-                      <Input id="detail-date_finished" type="date" {...register("date_finished")} />
+                      <Input
+                        id="detail-date_finished"
+                        type="date"
+                        readOnly={!isEditMode}
+                        {...register("date_finished")}
+                      />
                     </div>
                   )}
 
@@ -479,7 +559,11 @@ export default function BookDetailModal({
                       name="series_id"
                       control={control}
                       render={({ field }) => (
-                        <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <Select
+                          value={field.value || "__none__"}
+                          onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                          disabled={!isEditMode}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="None" />
                           </SelectTrigger>
@@ -500,7 +584,14 @@ export default function BookDetailModal({
                   {seriesId && (
                     <div className="space-y-1.5">
                       <Label htmlFor="detail-volume_number">Volume number</Label>
-                      <Input id="detail-volume_number" type="number" min={0.5} step="any" {...register("volume_number")} />
+                      <Input
+                        id="detail-volume_number"
+                        type="number"
+                        min={0.5}
+                        step="any"
+                        readOnly={!isEditMode}
+                        {...register("volume_number")}
+                      />
                     </div>
                   )}
 
@@ -512,6 +603,7 @@ export default function BookDetailModal({
                       inputMode="numeric"
                       autoComplete="off"
                       placeholder="978..."
+                      readOnly={!isEditMode}
                       {...register("isbn")}
                     />
                   </div>
@@ -522,22 +614,49 @@ export default function BookDetailModal({
                 <p className="text-sm text-destructive mt-2">{errorMsg}</p>
               )}
               <div className="mt-3 shrink-0 flex justify-between gap-2 border-t pt-3">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  disabled={deleting}
-                  onClick={handleDelete}
-                >
-                  {deleting ? "Deleting…" : confirmDelete ? "Are you sure?" : "Delete"}
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={saving || !isDirty}
-                >
-                  {saving ? "Saving…" : "Save Changes"}
-                </Button>
+                {isEditMode ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={deleting}
+                      onClick={handleDelete}
+                    >
+                      {deleting ? "Deleting…" : confirmDelete ? "Are you sure?" : "Delete"}
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={saving || !isDirty}
+                    >
+                      {saving ? "Saving…" : "Save Changes"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={saving || deleting}
+                      onClick={exitEditMode}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex w-full justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmDelete(false);
+                        setErrorMsg(null);
+                        setIsEditMode(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </div>
+                )}
               </div>
             </form>
           </TabsContent>
