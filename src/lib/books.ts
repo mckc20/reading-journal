@@ -136,3 +136,15 @@ export async function fetchLastReadingLog(
   if (error) throw error;
   return data as ReadingLog | null;
 }
+
+export async function fetchReadingLogsForBook(
+  bookId: string
+): Promise<ReadingLog[]> {
+  const { data, error } = await supabase
+    .from("reading_logs")
+    .select("*")
+    .eq("book_id", bookId)
+    .order("logged_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ReadingLog[];
+}

@@ -23,6 +23,7 @@ import {
 import { useSeries } from "@/hooks/useSeries";
 import { statusVariant } from "@/lib/utils";
 import ReadingProgressPanel from "@/components/ReadingProgressPanel";
+import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
 import type {
   Book,
   BookStatus,
@@ -668,11 +669,8 @@ export default function BookDetailModal({
             </div>
           </TabsContent>
 
-          {/* Analytics stub */}
-          <TabsContent value="analytics" className="flex-1">
-            <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-              Analytics coming in Phase 5
-            </div>
+          <TabsContent value="analytics" className="flex-1 min-h-0 flex flex-col">
+            <BookAnalyticsPanel book={book} />
           </TabsContent>
         </Tabs>
       </DialogContent>
