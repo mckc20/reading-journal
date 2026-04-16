@@ -23,13 +23,14 @@ import {
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
+import { formatGenresInput, parseGenresInput } from "@/lib/utils";
 import type { BookStatus, BookLanguage, BookBelongsTo, BookFormat } from "@/types";
 
 interface FormValues {
   title: string;
   author: string;
   status: BookStatus;
-  genre: string;
+  genresInput: string;
   language: BookLanguage | "";
   format: BookFormat | "";
   belongs_to: BookBelongsTo | "";
@@ -119,7 +120,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setValue("title", bookData.title);
       setValue("author", bookData.author);
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
-      if (bookData.genre) setValue("genre", bookData.genre);
+      if (bookData.genres) setValue("genresInput", formatGenresInput(bookData.genres));
       if (bookData.language) setValue("language", bookData.language as BookLanguage);
       if (bookData.format) setValue("format", bookData.format as BookFormat);
 
@@ -163,12 +164,13 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
   async function onSubmit(values: FormValues) {
     try {
+      const genres = parseGenresInput(values.genresInput);
       await addBook(
         {
           title: values.title,
           author: values.author,
           status: values.status,
-          genre: values.genre || undefined,
+          genres: genres.length > 0 ? genres : undefined,
           language: (values.language as BookLanguage) || undefined,
           format: (values.format as BookFormat) || undefined,
           belongs_to: (values.belongs_to as BookBelongsTo) || undefined,
@@ -366,10 +368,13 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                 />
               </div>
 
-              {/* Genre */}
+              {/* Genres */}
               <div className="space-y-1.5">
-                <Label htmlFor="genre">Genre</Label>
-                <Input id="genre" {...register("genre")} />
+                <Label htmlFor="genresInput">Genres</Label>
+                <Input
+                  id="genresInput"
+                  {...register("genresInput")}
+                />
               </div>
 
               {/* Language */}

@@ -1,6 +1,39 @@
 import { supabase } from "./supabase";
 import type { Book, Series, ReadingLog } from "@/types";
 
+type LegacyBookRow = Book & { genre?: string | null };
+
+function parseLegacyGenre(genre?: string | null): string[] | undefined {
+  if (!genre) return undefined;
+  const parsed = genre
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? Array.from(new Set(parsed)) : undefined;
+}
+
+function normalizeBook(row: LegacyBookRow): Book {
+  const genres = row.genres ?? parseLegacyGenre(row.genre);
+  return {
+    ...row,
+    genres,
+  };
+}
+
+function toLegacyGenrePayload<T extends { genres?: string[] }>(payload: T): Omit<T, "genres"> & { genre?: string } {
+  const { genres, ...rest } = payload;
+  return {
+    ...rest,
+    genre: genres?.length ? genres.join(", ") : undefined,
+  };
+}
+
+function isMissingGenresColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message) : "";
+  return message.toLowerCase().includes("genres") && message.toLowerCase().includes("column");
+}
+
 // ── Books ──────────────────────────────────────────────────────────────────
 
 export async function fetchBooks(): Promise<Book[]> {
@@ -9,7 +42,7 @@ export async function fetchBooks(): Promise<Book[]> {
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data as Book[];
+  return ((data ?? []) as LegacyBookRow[]).map(normalizeBook);
 }
 
 export type BookInsert = Omit<Book, "created_at">;
@@ -20,8 +53,17 @@ export async function createBook(payload: BookInsert): Promise<Book> {
     .insert(payload)
     .select()
     .single();
-  if (error) throw error;
-  return data as Book;
+  if (!error) return normalizeBook(data as LegacyBookRow);
+
+  if (!isMissingGenresColumnError(error)) throw error;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("books")
+    .insert(toLegacyGenrePayload(payload))
+    .select()
+    .single();
+  if (legacyError) throw legacyError;
+  return normalizeBook(legacyData as LegacyBookRow);
 }
 
 export async function updateBook(
@@ -34,8 +76,18 @@ export async function updateBook(
     .eq("id", id)
     .select()
     .single();
-  if (error) throw error;
-  return data as Book;
+  if (!error) return normalizeBook(data as LegacyBookRow);
+
+  if (!isMissingGenresColumnError(error)) throw error;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("books")
+    .update(toLegacyGenrePayload(payload))
+    .eq("id", id)
+    .select()
+    .single();
+  if (legacyError) throw legacyError;
+  return normalizeBook(legacyData as LegacyBookRow);
 }
 
 export async function deleteBook(id: string): Promise<void> {

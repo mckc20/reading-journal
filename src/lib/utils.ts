@@ -14,3 +14,18 @@ export function statusVariant(
   if (status === "Up Next") return "secondary";
   return "outline";
 }
+
+export function parseGenresInput(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(/[,\n]/)
+        .map((genre) => genre.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+export function formatGenresInput(genres?: string[]): string {
+  return genres?.join(", ") ?? ""
+}

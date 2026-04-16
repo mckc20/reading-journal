@@ -2,7 +2,7 @@ export interface BookLookupResult {
   title: string;
   author: string;
   totalPages?: number;
-  genre?: string;
+  genres?: string[];
   language?: string;
   format?: string;
   coverUrl?: string;
@@ -66,7 +66,7 @@ export async function fetchBookByISBN(
     title: info.title ?? "Untitled",
     author: info.authors?.[0] ?? "Unknown",
     totalPages: info.pageCount,
-    genre: info.categories?.[0],
+    genres: info.categories?.map((genre) => genre.trim()).filter(Boolean),
     language: info.language ? languageMap[info.language] : undefined,
     coverUrl: coverUrl ?? undefined,
   };

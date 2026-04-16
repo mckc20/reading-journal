@@ -24,7 +24,7 @@ export interface Book {
   id: string;
   title: string;
   author: string;
-  genre?: string;
+  genres?: string[];
   status: BookStatus;
   cover_url?: string;
   rating?: number; // 1–5

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSeries } from "@/hooks/useSeries";
-import { statusVariant } from "@/lib/utils";
+import { formatGenresInput, parseGenresInput, statusVariant } from "@/lib/utils";
 import ReadingProgressPanel from "@/components/ReadingProgressPanel";
 import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
 import type {
@@ -36,7 +36,7 @@ interface FormValues {
   title: string;
   author: string;
   status: BookStatus;
-  genre: string;
+  genresInput: string;
   isbn: string;
   language: BookLanguage | "";
   format: BookFormat | "";
@@ -106,7 +106,7 @@ export default function BookDetailModal({
         title: book.title,
         author: book.author,
         status: book.status,
-        genre: book.genre ?? "",
+        genresInput: formatGenresInput(book.genres),
         isbn: book.isbn ?? "",
         language: book.language ?? "",
         format: book.format ?? "",
@@ -130,6 +130,8 @@ export default function BookDetailModal({
 
   const status = watch("status");
   const seriesId = watch("series_id");
+  const genresInput = watch("genresInput") ?? "";
+  const parsedGenres = parseGenresInput(genresInput);
   const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
   const showDateFinished = ["Finished", "DNF"].includes(status);
 
@@ -139,7 +141,7 @@ export default function BookDetailModal({
       title: book.title,
       author: book.author,
       status: book.status,
-      genre: book.genre ?? "",
+      genresInput: formatGenresInput(book.genres),
       isbn: book.isbn ?? "",
       language: book.language ?? "",
       format: book.format ?? "",
@@ -198,7 +200,10 @@ export default function BookDetailModal({
     if (dirtyFields.title) payload.title = values.title;
     if (dirtyFields.author) payload.author = values.author;
     if (dirtyFields.status) payload.status = values.status;
-    if (dirtyFields.genre) payload.genre = values.genre || undefined;
+    if (dirtyFields.genresInput) {
+      const genres = parseGenresInput(values.genresInput);
+      payload.genres = genres.length > 0 ? genres : undefined;
+    }
     if (dirtyFields.isbn) payload.isbn = values.isbn.trim() || undefined;
     if (dirtyFields.language) payload.language = (values.language as BookLanguage) || undefined;
     if (dirtyFields.format) payload.format = (values.format as BookFormat) || undefined;
@@ -425,10 +430,25 @@ export default function BookDetailModal({
                     />
                   </div>
 
-                  {/* Genre */}
+                  {/* Genres */}
                   <div className="space-y-1.5">
-                    <Label htmlFor="detail-genre">Genre</Label>
-                    <Input id="detail-genre" readOnly={!isEditMode} {...register("genre")} />
+                    <Label htmlFor="detail-genresInput">Genres</Label>
+                    {isEditMode ? (
+                      <Input
+                        id="detail-genresInput"
+                        {...register("genresInput")}
+                      />
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {parsedGenres.length > 0 ? (
+                          parsedGenres.map((genre) => (
+                            <Badge key={genre} variant="outline">
+                              {genre}
+                            </Badge>
+                          ))
+                        ) : null}
+                      </div>
+                    )}
                   </div>
 
                   {/* Language */}
