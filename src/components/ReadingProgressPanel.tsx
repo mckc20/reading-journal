@@ -3,6 +3,7 @@ import { BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
@@ -49,6 +50,10 @@ export default function ReadingProgressPanel({
 
   const currentPage = book.current_page ?? 0;
   const totalPages = book.total_pages ?? 0;
+  const progressPercent =
+    totalPages > 0
+      ? Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)))
+      : 0;
 
   // Initial page value: start one step above current
   const minPage = Math.max(currentPage, lastLog?.current_page ?? 0);
@@ -156,6 +161,12 @@ export default function ReadingProgressPanel({
           <p className="text-xs text-muted-foreground">
             Page {currentPage} of {totalPages}
           </p>
+          <div className="mt-2 flex items-center gap-2">
+            <Progress value={progressPercent} className="h-1.5" />
+            <span className="text-xs font-medium text-muted-foreground tabular-nums">
+              {progressPercent}%
+            </span>
+          </div>
         </div>
         {!expanded && (
           <Button
