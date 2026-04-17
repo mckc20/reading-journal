@@ -3,6 +3,7 @@ import { BarChart3, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ReadingHeatmap from "@/components/ReadingHeatmap";
+import GenreDistributionChart from "@/components/GenreDistributionChart";
 import { useBooksContext } from "@/context/BooksContext";
 import { fetchReadingLogsInRange } from "@/lib/books";
 import type { ReadingLog } from "@/types";
@@ -18,23 +19,23 @@ function getHeatmapRangeIso(): { startIso: string; endIso: string } {
 }
 
 export default function Analytics() {
-  const { books } = useBooksContext();
+  const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const finishedBooks = books.filter((book) => book.status === "Finished").length;
   const readingBooks = books.filter((book) => book.status === "Reading").length;
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
 
   const range = useMemo(() => getHeatmapRangeIso(), []);
 
   async function loadHeatmapLogs() {
     try {
       setLoading(true);
-      setError(null);
+      setHeatmapError(null);
       const data = await fetchReadingLogsInRange(range.startIso, range.endIso);
       setLogs(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reading activity");
+      setHeatmapError(err instanceof Error ? err.message : "Failed to load reading activity");
     } finally {
       setLoading(false);
     }
@@ -77,15 +78,25 @@ export default function Analytics() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Genre distribution</CardTitle>
+          <CardDescription>See how your library is split across genres.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GenreDistributionChart books={books} loading={booksLoading} error={booksError} />
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-6">
           {loading ? (
             <div className="space-y-3">
               <div className="h-5 w-48 animate-pulse rounded bg-muted/50" />
               <div className="h-44 animate-pulse rounded-lg border bg-muted/30" />
             </div>
-          ) : error ? (
+          ) : heatmapError ? (
             <div className="space-y-3 py-1">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive">{heatmapError}</p>
               <Button type="button" variant="outline" size="sm" onClick={loadHeatmapLogs}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Retry
