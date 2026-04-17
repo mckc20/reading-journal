@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Plus, LogOut, BookMarked, LayoutDashboard, Library, KeyRound } from "lucide-react";
+import { Plus, LogOut, LayoutDashboard, Library, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
 import { useAuth } from "@/context";
 import AddBookDialog from "./AddBookDialog";
 import SetPasswordDialog from "./SetPasswordDialog";
 import { cn } from "@/lib/utils";
+import readingJournalLogo from "@/assets/reading-journal-logo.png";
 
 const navLinks = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -30,7 +31,11 @@ export default function AppLayout() {
               to="/"
               className="flex items-center gap-2 font-semibold text-foreground"
             >
-              <BookMarked className="h-5 w-5" />
+              <img
+                src={readingJournalLogo}
+                alt="Reading Journal logo"
+                className="h-6 w-6 rounded-sm object-cover"
+              />
               <span className="hidden sm:inline">Reading Journal</span>
             </Link>
 
