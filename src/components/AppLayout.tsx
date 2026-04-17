@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Plus, LogOut, LayoutDashboard, Library, KeyRound } from "lucide-react";
+import {
+  Plus,
+  LogOut,
+  LayoutDashboard,
+  Library,
+  KeyRound,
+  BarChart3,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
 import { useAuth } from "@/context";
@@ -12,6 +19,7 @@ import readingJournalLogo from "@/assets/reading-journal-logo.png";
 const navLinks = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/library", label: "Library", icon: Library },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 export default function AppLayout() {
