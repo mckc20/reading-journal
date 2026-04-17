@@ -202,3 +202,18 @@ export async function fetchReadingLogsForBook(
   if (error) throw error;
   return (data ?? []) as ReadingLog[];
 }
+
+export async function fetchReadingLogsInRange(
+  startIso: string,
+  endIso: string
+): Promise<ReadingLog[]> {
+  const { data, error } = await supabase
+    .from("reading_logs")
+    .select("*")
+    .gte("logged_at", startIso)
+    .lte("logged_at", endIso)
+    .order("logged_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as ReadingLog[];
+}
