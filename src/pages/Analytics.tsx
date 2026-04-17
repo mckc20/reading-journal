@@ -78,17 +78,7 @@ export default function Analytics() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Genre distribution</CardTitle>
-          <CardDescription>See how your library is split across genres.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GenreDistributionChart books={books} loading={booksLoading} error={booksError} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
+        <CardContent className="">
           {loading ? (
             <div className="space-y-3">
               <div className="h-5 w-48 animate-pulse rounded bg-muted/50" />
@@ -105,6 +95,16 @@ export default function Analytics() {
           ) : (
             <ReadingHeatmap logs={logs} />
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Genre distribution</CardTitle>
+          <CardDescription>See how your library is split across genres.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GenreDistributionChart books={books} loading={booksLoading} error={booksError} />
         </CardContent>
       </Card>
     </div>
