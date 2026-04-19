@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import BookCard from "@/components/BookCard";
-import BookDetailModal from "@/components/BookDetailModal";
 import type { Book } from "@/types";
 
 function EmptyTab({ message }: { message: string }) {
@@ -31,15 +30,12 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void
 }
 
 export default function Library() {
-  const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
+  const { books, loading, error, reload } = useBooksContext();
   const { series } = useSeries();
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const selectedBook = selectedBookId ? books.find((b) => b.id === selectedBookId) ?? null : null;
+  const navigate = useNavigate();
 
   function openBook(book: Book) {
-    setSelectedBookId(book.id);
-    setModalOpen(true);
+    navigate(`/books/${book.id}`);
   }
 
   const allBooks = [...books].sort((a, b) =>
@@ -156,15 +152,6 @@ export default function Library() {
           </ScrollArea>
         </TabsContent>
       </Tabs>
-
-      <BookDetailModal
-        book={selectedBook}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        onUpdated={updateBook}
-        onCoverChanged={updateCover}
-        onDeleted={deleteBook}
-      />
     </div>
   );
 }

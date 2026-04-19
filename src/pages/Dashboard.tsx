@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import BookCard from "@/components/BookCard";
-import BookDetailModal from "@/components/BookDetailModal";
 import type { Book } from "@/types";
 
 function SkeletonGrid() {
@@ -20,14 +19,11 @@ function SkeletonGrid() {
 }
 
 export default function Dashboard() {
-  const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const selectedBook = selectedBookId ? books.find((b) => b.id === selectedBookId) ?? null : null;
+  const { books, loading, error, reload } = useBooksContext();
+  const navigate = useNavigate();
 
   function openBook(book: Book) {
-    setSelectedBookId(book.id);
-    setModalOpen(true);
+    navigate(`/books/${book.id}`);
   }
 
   const currentlyReading = books.filter((b) => b.status === "Reading");
@@ -96,15 +92,6 @@ export default function Dashboard() {
           )}
         </>
       )}
-
-      <BookDetailModal
-        book={selectedBook}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        onUpdated={updateBook}
-        onCoverChanged={updateCover}
-        onDeleted={deleteBook}
-      />
     </div>
   );
 }

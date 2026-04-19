@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Library from "@/pages/Library";
 import Analytics from "@/pages/Analytics";
+import BookDetails from "@/pages/BookDetails";
 
 function NotFound() {
   return (
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: <Dashboard /> },
           { path: "/library", element: <Library /> },
+          { path: "/books/:bookId", element: <BookDetails /> },
           { path: "/analytics", element: <Analytics /> },
         ],
       },
