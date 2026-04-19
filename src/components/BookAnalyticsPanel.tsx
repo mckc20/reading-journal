@@ -254,60 +254,62 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
             ))}
           </div>
 
-          <div className="space-y-2">
-            <div className="relative h-44 overflow-x-auto">
-              <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                <div className="border-t border-border/70" />
-                <div className="border-t border-border/50" />
-                <div className="border-t border-border/70" />
-              </div>
-
-              <div className="relative flex h-full min-w-max items-end gap-2 px-1">
-                {activePoint && activePointIndex >= 0 && (
-                  <div
-                    className="pointer-events-none absolute top-2 z-10 -translate-x-1/2 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                    style={{ left: `${tooltipLeft}px` }}
-                  >
-                    {formatFullDayLabel(activePoint.dayKey)}: {activePoint.pagesRead} page{activePoint.pagesRead === 1 ? "" : "s"}
+          <div className="min-w-0">
+            <div className="overflow-x-auto overflow-y-hidden">
+              <div className="min-w-max space-y-2 px-1">
+                <div className="relative h-44">
+                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                    <div className="border-t border-border/70" />
+                    <div className="border-t border-border/50" />
+                    <div className="border-t border-border/70" />
                   </div>
-                )}
-                {chartPoints.map((point) => {
-                  const chartHeightPx = 176; // h-44 = 11rem = 176px
-                  const normalizedHeight = Math.round((point.pagesRead / yAxisMax) * chartHeightPx);
-                  const barHeight = point.pagesRead > 0 ? Math.max(normalizedHeight, 4) : 0;
-                  return (
-                    <button
-                      key={point.dayKey}
-                      type="button"
-                      className="w-8 shrink-0 flex items-end rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                      onMouseEnter={() => setActiveDayKey(point.dayKey)}
-                      onMouseLeave={() => setActiveDayKey(null)}
-                      onFocus={() => setActiveDayKey(point.dayKey)}
-                      onBlur={() => setActiveDayKey(null)}
-                      aria-label={`${formatFullDayLabel(point.dayKey)}: ${point.pagesRead} page${point.pagesRead === 1 ? "" : "s"} read`}
-                    >
-                      <div
-                        className="w-full rounded-t-sm bg-primary/85 hover:bg-primary transition-colors"
-                        style={{ height: `${barHeight}px` }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <div className="min-w-max flex gap-2 px-1">
-                {chartPoints.map((point, index) => (
-                  <span
-                    key={point.dayKey}
-                    className="w-8 shrink-0 text-center text-[10px] text-muted-foreground"
-                  >
-                    {chartPoints.length <= 10 || index === 0 || index === chartPoints.length - 1 || index % labelStep === 0
-                      ? point.dayLabel
-                      : ""}
-                  </span>
-                ))}
+                  <div className="relative flex h-full items-end gap-2">
+                    {activePoint && activePointIndex >= 0 && (
+                      <div
+                        className="pointer-events-none absolute top-2 z-10 -translate-x-1/2 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
+                        style={{ left: `${tooltipLeft}px` }}
+                      >
+                        {formatFullDayLabel(activePoint.dayKey)}: {activePoint.pagesRead} page{activePoint.pagesRead === 1 ? "" : "s"}
+                      </div>
+                    )}
+                    {chartPoints.map((point) => {
+                      const chartHeightPx = 176; // h-44 = 11rem = 176px
+                      const normalizedHeight = Math.round((point.pagesRead / yAxisMax) * chartHeightPx);
+                      const barHeight = point.pagesRead > 0 ? Math.max(normalizedHeight, 4) : 0;
+                      return (
+                        <button
+                          key={point.dayKey}
+                          type="button"
+                          className="flex w-8 shrink-0 items-end rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                          onMouseEnter={() => setActiveDayKey(point.dayKey)}
+                          onMouseLeave={() => setActiveDayKey(null)}
+                          onFocus={() => setActiveDayKey(point.dayKey)}
+                          onBlur={() => setActiveDayKey(null)}
+                          aria-label={`${formatFullDayLabel(point.dayKey)}: ${point.pagesRead} page${point.pagesRead === 1 ? "" : "s"} read`}
+                        >
+                          <div
+                            className="w-full rounded-t-sm bg-primary/85 transition-colors hover:bg-primary"
+                            style={{ height: `${barHeight}px` }}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  {chartPoints.map((point, index) => (
+                    <span
+                      key={point.dayKey}
+                      className="w-8 shrink-0 text-center text-[10px] text-muted-foreground"
+                    >
+                      {chartPoints.length <= 10 || index === 0 || index === chartPoints.length - 1 || index % labelStep === 0
+                        ? point.dayLabel
+                        : ""}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -322,12 +324,12 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
             return (
               <div
                 key={entry.id || `${entry.logged_at}-${entry.current_page}`}
-                className="rounded-md border bg-background/80 p-2.5"
+                className="w-full min-w-0 rounded-md border bg-background/80 p-2.5"
               >
                 <p className="text-xs text-muted-foreground">{formatDateTime(entry.logged_at)}</p>
-                <div className="mt-1 flex items-center justify-between gap-2">
+                <div className="mt-1 flex flex-wrap items-start justify-between gap-1.5">
                   <p className="text-sm">Reached page {entry.current_page}</p>
-                  <p className="text-sm font-medium">+{entry.pagesReadDelta} pages</p>
+                  <p className="text-sm font-medium sm:text-right">+{entry.pagesReadDelta} pages</p>
                 </div>
                 {timeLabel && (
                   <p className="mt-0.5 text-xs text-muted-foreground">Reading time: {timeLabel}</p>
