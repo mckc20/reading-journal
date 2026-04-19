@@ -11,6 +11,8 @@ import type { Book, ReadingLog } from "@/types";
 interface ReadingProgressPanelProps {
   book: Book;
   onProgressSaved: (newCurrentPage: number) => void;
+  defaultExpanded?: boolean;
+  hideTrigger?: boolean;
 }
 
 function buildPageItems(min: number, max: number) {
@@ -39,9 +41,11 @@ const MINUTE_ITEMS = Array.from({ length: 12 }, (_, i) => ({
 export default function ReadingProgressPanel({
   book,
   onProgressSaved,
+  defaultExpanded = false,
+  hideTrigger = false,
 }: ReadingProgressPanelProps) {
   const { user } = useAuth();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [lastLog, setLastLog] = useState<ReadingLog | null>(null);
   const [loadingLog, setLoadingLog] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -148,7 +152,7 @@ export default function ReadingProgressPanel({
 
   return (
     <div className="space-y-3">
-      {!expanded && (
+      {!expanded && !hideTrigger && (
         <Button
           type="button"
           variant="outline"

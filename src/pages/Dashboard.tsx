@@ -74,7 +74,12 @@ export default function Dashboard() {
               <h2 className="text-lg font-medium">Currently Reading</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {currentlyReading.map((book) => (
-                  <BookCard key={book.id} book={book} onClick={openBook} />
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    onClick={openBook}
+                    showQuickProgress
+                  />
                 ))}
               </div>
             </section>
