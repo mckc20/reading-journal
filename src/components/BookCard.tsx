@@ -83,9 +83,9 @@ export default function BookCard({
       {showDashboardQuickProgress && (
         <div className="border-t px-2 pb-2 pt-1.5 space-y-1.5">
           <Progress value={progressPercent} className="h-1" />
-          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+          <div className="grid grid-cols-[auto_auto] items-center gap-2 sm:grid-cols-[auto_1fr_auto]">
             <p className="text-[11px] text-muted-foreground">{progressPercent}%</p>
-            <p className="text-[11px] text-center text-muted-foreground truncate">
+            <p className="hidden text-[11px] text-center text-muted-foreground truncate sm:block">
               {currentPage} / {hasTotalPages ? totalPages : "-"}
             </p>
             <Button
