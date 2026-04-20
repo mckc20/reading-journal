@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -92,7 +91,7 @@ export default function Library() {
 
         {/* All Books */}
         <TabsContent value="all">
-          <ScrollArea className="mt-3">
+          <div className="mt-3">
             {loading ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -104,23 +103,23 @@ export default function Library() {
             ) : (
               <BooksGrid books={allBooks} onBook={openBook} />
             )}
-          </ScrollArea>
+          </div>
         </TabsContent>
 
         {/* TBR */}
         <TabsContent value="tbr">
-          <ScrollArea className="mt-3">
+          <div className="mt-3">
             {loading ? null : tbrBooks.length === 0 ? (
               <EmptyTab message="No books in your reading list." />
             ) : (
               <BooksGrid books={tbrBooks} onBook={openBook} />
             )}
-          </ScrollArea>
+          </div>
         </TabsContent>
 
         {/* Series */}
         <TabsContent value="series">
-          <ScrollArea className="mt-3">
+          <div className="mt-3">
             {loading ? null : seriesWithBooks.length === 0 && standaloneBooks.length === 0 ? (
               <EmptyTab message="No books yet." />
             ) : (
@@ -149,7 +148,7 @@ export default function Library() {
                 )}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
