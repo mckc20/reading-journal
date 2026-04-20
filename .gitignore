@@ -6,6 +6,9 @@ node_modules/
 dist/
 dist-ssr/
 
+# Local database backups
+backups/
+
 # Vite cache
 .vite/
 

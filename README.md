@@ -173,5 +173,27 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+#### Manual Database Backup (Schema + Data)
+
+You can create a local SQL backup (structure + data) from the project root:
+
+```bash
+SUPABASE_DB_URL=postgresql://postgres:password@db.your-project-ref.supabase.co:5432/postgres npm run backup:db
+```
+
+Prerequisites:
+- provide the Postgres connection string as `SUPABASE_DB_URL` (or pass it as first argument)
+- `pg_dump` is installed and available in your `PATH`
+
+The script creates both files in `backups/db/` using your local timestamp in `YYYY-MM-DD-HH-MM` format:
+- `structure-YYYY-MM-DD-HH-MM.sql`
+- `data-YYYY-MM-DD-HH-MM.sql`
+
+Example output files:
+- `backups/db/structure-2026-04-19-14-30.sql`
+- `backups/db/data-2026-04-19-14-30.sql`
+
+Credentials are read from runtime input/environment only. Do not commit real connection strings.
+
 ---
 *Generated for coding agent context based on the user's Reading Journal UI/UX specifications and technical requirements.*
