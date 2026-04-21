@@ -64,6 +64,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [newSeriesName, setNewSeriesName] = useState("");
   const [addingNewSeries, setAddingNewSeries] = useState(false);
+  const [isCreatingSeries, setIsCreatingSeries] = useState(false);
+  const [pendingSeriesSelectionId, setPendingSeriesSelectionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showScanner, setShowScanner] = useState(false);
@@ -80,6 +82,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     setValue,
     reset,
     setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: { status: "Not Started" },
@@ -94,6 +97,19 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       if (coverPreview) URL.revokeObjectURL(coverPreview);
     };
   }, [coverPreview]);
+
+  useEffect(() => {
+    if (!pendingSeriesSelectionId) return;
+    if (!series.some((item) => item.id === pendingSeriesSelectionId)) return;
+
+    setValue("series_id", pendingSeriesSelectionId, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    clearErrors("root");
+    setPendingSeriesSelectionId(null);
+  }, [pendingSeriesSelectionId, series, setValue, clearErrors]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -151,14 +167,21 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   }
 
   async function handleAddNewSeries() {
-    if (!newSeriesName.trim()) return;
+    const trimmedSeriesName = newSeriesName.trim();
+    if (!trimmedSeriesName || isCreatingSeries) return;
+
+    setIsCreatingSeries(true);
     try {
-      const created = await addSeries(newSeriesName.trim());
-      setValue("series_id", created.id);
+      const created = await addSeries(trimmedSeriesName);
+      setPendingSeriesSelectionId(created.id);
       setNewSeriesName("");
       setAddingNewSeries(false);
-    } catch {
-      // ignore — series list will just not update
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to create series. Please try again.";
+      setError("root", { message });
+    } finally {
+      setIsCreatingSeries(false);
     }
   }
 
@@ -220,6 +243,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(null);
       setAddingNewSeries(false);
       setNewSeriesName("");
+      setIsCreatingSeries(false);
+      setPendingSeriesSelectionId(null);
     }
     onOpenChange(nextOpen);
   }
@@ -531,13 +556,19 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                       onChange={(e) => setNewSeriesName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddNewSeries())}
                     />
-                    <Button type="button" size="sm" onClick={handleAddNewSeries}>
-                      Add
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddNewSeries}
+                      disabled={isCreatingSeries || !newSeriesName.trim()}
+                    >
+                      {isCreatingSeries ? "Adding..." : "Add"}
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
+                      disabled={isCreatingSeries}
                       onClick={() => setAddingNewSeries(false)}
                     >
                       Cancel
