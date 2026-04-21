@@ -1,6 +1,6 @@
 export interface BookLookupResult {
   title: string;
-  author: string;
+  authors: string[];
   totalPages?: number;
   genres?: string[];
   language?: string;
@@ -61,10 +61,13 @@ export async function fetchBookByISBN(
   if (!items || items.length === 0) return null;
 
   const info = items[0].volumeInfo;
+  const authors = Array.from(
+    new Set((info.authors ?? []).map((author) => author.trim()).filter(Boolean)),
+  );
 
   return {
     title: info.title ?? "Untitled",
-    author: info.authors?.[0] ?? "Unknown",
+    authors: authors.length > 0 ? authors : ["Unknown"],
     totalPages: info.pageCount,
     genres: info.categories?.map((genre) => genre.trim()).filter(Boolean),
     language: info.language ? languageMap[info.language] : undefined,

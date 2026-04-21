@@ -23,7 +23,7 @@ export interface Series {
 export interface Book {
   id: string;
   title: string;
-  author: string;
+  authors: string[];
   genres?: string[];
   status: BookStatus;
   cover_url?: string;

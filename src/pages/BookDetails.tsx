@@ -26,7 +26,13 @@ import {
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { formatGenresInput, parseGenresInput, statusVariant } from "@/lib/utils";
+import {
+  formatAuthorsInput,
+  formatGenresInput,
+  parseAuthorsInput,
+  parseGenresInput,
+  statusVariant,
+} from "@/lib/utils";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
 import GenreTags from "@/components/GenreTags";
@@ -40,7 +46,7 @@ import type {
 
 interface FormValues {
   title: string;
-  author: string;
+  authorsInput: string;
   status: BookStatus;
   genresInput: string;
   isbn: string;
@@ -66,7 +72,7 @@ const STATUS_OPTIONS: BookStatus[] = [
 function bookToFormValues(book: Book): FormValues {
   return {
     title: book.title,
-    author: book.author,
+    authorsInput: formatAuthorsInput(book.authors),
     status: book.status,
     genresInput: formatGenresInput(book.genres),
     isbn: book.isbn ?? "",
@@ -108,7 +114,7 @@ export default function BookDetails() {
     handleSubmit,
     watch,
     reset,
-    formState: { isDirty, dirtyFields },
+    formState: { isDirty, dirtyFields, errors },
   } = useForm<FormValues>();
 
   useEffect(() => {
@@ -182,7 +188,14 @@ export default function BookDetails() {
     const payload: Partial<Book> = {};
 
     if (dirtyFields.title) payload.title = values.title;
-    if (dirtyFields.author) payload.author = values.author;
+    if (dirtyFields.authorsInput) {
+      const authors = parseAuthorsInput(values.authorsInput);
+      if (authors.length === 0) {
+        setErrorMsg("At least one author is required");
+        return;
+      }
+      payload.authors = authors;
+    }
     if (dirtyFields.status) payload.status = values.status;
     if (dirtyFields.genresInput) {
       const genres = parseGenresInput(values.genresInput);
@@ -329,7 +342,7 @@ export default function BookDetails() {
             )}
 
             <h1 className="text-3xl font-semibold leading-tight">{book.title}</h1>
-            <p className="text-base text-muted-foreground">{book.author}</p>
+            <p className="text-base text-muted-foreground">{book.authors.join(", ")}</p>
 
             {book.isbn && (
               <a
@@ -446,12 +459,18 @@ export default function BookDetails() {
                   </div>
 
                   <div className="space-y-1.5 md:col-span-2">
-                    <Label htmlFor="detail-author">Author</Label>
+                    <Label htmlFor="detail-authors">Authors</Label>
                     <Input
-                      id="detail-author"
+                      id="detail-authors"
                       readOnly={!isEditMode}
-                      {...register("author", { required: true })}
+                      {...register("authorsInput", {
+                        validate: (value) =>
+                          parseAuthorsInput(value).length > 0 || "At least one author is required",
+                      })}
                     />
+                    {errors.authorsInput && (
+                      <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

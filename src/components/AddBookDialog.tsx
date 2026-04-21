@@ -23,12 +23,17 @@ import {
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { formatGenresInput, parseGenresInput } from "@/lib/utils";
+import {
+  formatAuthorsInput,
+  formatGenresInput,
+  parseAuthorsInput,
+  parseGenresInput,
+} from "@/lib/utils";
 import type { BookStatus, BookLanguage, BookBelongsTo, BookFormat } from "@/types";
 
 interface FormValues {
   title: string;
-  author: string;
+  authorsInput: string;
   status: BookStatus;
   genresInput: string;
   language: BookLanguage | "";
@@ -85,7 +90,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { status: "Not Started" },
+    defaultValues: { status: "Not Started", authorsInput: "" },
   });
 
   const status = watch("status");
@@ -134,7 +139,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
       setScannedIsbn(isbn.trim());
       setValue("title", bookData.title);
-      setValue("author", bookData.author);
+      setValue("authorsInput", formatAuthorsInput(bookData.authors), { shouldValidate: true });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
       if (bookData.genres) setValue("genresInput", formatGenresInput(bookData.genres));
       if (bookData.language) setValue("language", bookData.language as BookLanguage);
@@ -187,11 +192,16 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
   async function onSubmit(values: FormValues) {
     try {
+      const authors = parseAuthorsInput(values.authorsInput);
+      if (authors.length === 0) {
+        setError("authorsInput", { message: "At least one author is required" });
+        return;
+      }
       const genres = parseGenresInput(values.genresInput);
       await addBook(
         {
           title: values.title,
-          author: values.author,
+          authors,
           status: values.status,
           genres: genres.length > 0 ? genres : undefined,
           language: (values.language as BookLanguage) || undefined,
@@ -357,16 +367,19 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                 )}
               </div>
 
-              {/* Author */}
+              {/* Authors */}
               <div className="space-y-1.5">
-                <Label htmlFor="author">Author *</Label>
+                <Label htmlFor="authorsInput">Authors *</Label>
                 <Input
-                  id="author"
-                  {...register("author", { required: "Author is required" })}
-                  aria-invalid={!!errors.author}
+                  id="authorsInput"
+                  {...register("authorsInput", {
+                    validate: (value) =>
+                      parseAuthorsInput(value).length > 0 || "At least one author is required",
+                  })}
+                  aria-invalid={!!errors.authorsInput}
                 />
-                {errors.author && (
-                  <p className="text-xs text-destructive">{errors.author.message}</p>
+                {errors.authorsInput && (
+                  <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
                 )}
               </div>
 

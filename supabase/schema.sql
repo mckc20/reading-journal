@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS books (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title           text NOT NULL,
-  author          text NOT NULL,
+  authors         text[] NOT NULL CHECK (cardinality(authors) > 0),
   genres          text[],
   status          text NOT NULL DEFAULT 'Wishlist'
                     CHECK (status IN ('Wishlist','Not Started','Up Next','Reading','Finished','DNF')),

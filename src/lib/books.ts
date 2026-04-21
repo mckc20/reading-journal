@@ -1,7 +1,11 @@
 import { supabase } from "./supabase";
 import type { Book, Series, ReadingLog } from "@/types";
 
-type LegacyBookRow = Book & { genre?: string | null };
+type LegacyAuthorBookRow = Omit<Book, "authors"> & {
+  authors?: string[] | null;
+  author?: string | null;
+  genre?: string | null;
+};
 
 function parseLegacyGenre(genre?: string | null): string[] | undefined {
   if (!genre) return undefined;
@@ -12,10 +16,32 @@ function parseLegacyGenre(genre?: string | null): string[] | undefined {
   return parsed.length > 0 ? Array.from(new Set(parsed)) : undefined;
 }
 
-function normalizeBook(row: LegacyBookRow): Book {
+function parseLegacyAuthorList(author?: string | null): string[] {
+  if (!author) return [];
+  return Array.from(
+    new Set(
+      author
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function normalizeBook(row: LegacyAuthorBookRow): Book {
   const genres = row.genres ?? parseLegacyGenre(row.genre);
+  const normalizedAuthors = row.authors?.map((value) => value.trim()).filter(Boolean) ?? [];
+  const legacyAuthors = parseLegacyAuthorList(row.author);
+  const authors =
+    normalizedAuthors.length > 0
+      ? normalizedAuthors
+      : legacyAuthors.length > 0
+        ? legacyAuthors
+        : ["Unknown"];
+
   return {
     ...row,
+    authors,
     genres,
   };
 }
@@ -34,6 +60,28 @@ function isMissingGenresColumnError(error: unknown): boolean {
   return message.toLowerCase().includes("genres") && message.toLowerCase().includes("column");
 }
 
+function toLegacyAuthorPayload<T extends { authors?: string[] }>(
+  payload: T,
+): Omit<T, "authors"> & { author?: string } {
+  const { authors, ...rest } = payload;
+  if (!authors) {
+    return {
+      ...rest,
+    };
+  }
+
+  return {
+    ...rest,
+    author: authors.join(", "),
+  };
+}
+
+function isMissingAuthorsColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message) : "";
+  return message.toLowerCase().includes("authors") && message.toLowerCase().includes("column");
+}
+
 // ── Books ──────────────────────────────────────────────────────────────────
 
 export async function fetchBooks(): Promise<Book[]> {
@@ -42,7 +90,7 @@ export async function fetchBooks(): Promise<Book[]> {
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as LegacyBookRow[]).map(normalizeBook);
+  return ((data ?? []) as LegacyAuthorBookRow[]).map(normalizeBook);
 }
 
 export type BookInsert = Omit<Book, "created_at">;
@@ -53,7 +101,17 @@ export async function createBook(payload: BookInsert): Promise<Book> {
     .insert(payload)
     .select()
     .single();
-  if (!error) return normalizeBook(data as LegacyBookRow);
+  if (!error) return normalizeBook(data as LegacyAuthorBookRow);
+
+  if (isMissingAuthorsColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("books")
+      .insert(toLegacyAuthorPayload(payload))
+      .select()
+      .single();
+    if (legacyError) throw legacyError;
+    return normalizeBook(legacyData as LegacyAuthorBookRow);
+  }
 
   if (!isMissingGenresColumnError(error)) throw error;
 
@@ -63,7 +121,7 @@ export async function createBook(payload: BookInsert): Promise<Book> {
     .select()
     .single();
   if (legacyError) throw legacyError;
-  return normalizeBook(legacyData as LegacyBookRow);
+  return normalizeBook(legacyData as LegacyAuthorBookRow);
 }
 
 export async function updateBook(
@@ -76,7 +134,18 @@ export async function updateBook(
     .eq("id", id)
     .select()
     .single();
-  if (!error) return normalizeBook(data as LegacyBookRow);
+  if (!error) return normalizeBook(data as LegacyAuthorBookRow);
+
+  if (isMissingAuthorsColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("books")
+      .update(toLegacyAuthorPayload(payload))
+      .eq("id", id)
+      .select()
+      .single();
+    if (legacyError) throw legacyError;
+    return normalizeBook(legacyData as LegacyAuthorBookRow);
+  }
 
   if (!isMissingGenresColumnError(error)) throw error;
 
@@ -87,7 +156,7 @@ export async function updateBook(
     .select()
     .single();
   if (legacyError) throw legacyError;
-  return normalizeBook(legacyData as LegacyBookRow);
+  return normalizeBook(legacyData as LegacyAuthorBookRow);
 }
 
 export async function deleteBook(id: string): Promise<void> {

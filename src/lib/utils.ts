@@ -29,3 +29,18 @@ export function parseGenresInput(input: string): string[] {
 export function formatGenresInput(genres?: string[]): string {
   return genres?.join(", ") ?? ""
 }
+
+export function parseAuthorsInput(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(/[\n,]/)
+        .map((author) => author.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+export function formatAuthorsInput(authors?: string[]): string {
+  return authors?.join(", ") ?? ""
+}
