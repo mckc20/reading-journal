@@ -91,6 +91,15 @@ function getWeekSpan(startIso: string, endIso: string): number {
   return Math.max(1, diffDays / 7);
 }
 
+function getEffectiveWeekSpan(logs: ReadingLog[], startIso: string, endIso: string): number {
+  if (logs.length === 0) return getWeekSpan(startIso, endIso);
+
+  const rangeStart = startOfLocalDay(new Date(startIso));
+  const firstLogStart = startOfLocalDay(new Date(logs[0].logged_at));
+  const effectiveStart = firstLogStart > rangeStart ? firstLogStart : rangeStart;
+  return getWeekSpan(effectiveStart.toISOString(), endIso);
+}
+
 function allocateMinutesByHour(
   end: Date,
   totalMinutes: number,
@@ -241,7 +250,7 @@ export function calculateReadingHabits(
   const dominantHour =
     maxHourCount > 0 ? hourMinutes.findIndex((count) => count === maxHourCount) : null;
 
-  const weekSpan = getWeekSpan(startIso, endIso);
+  const weekSpan = getEffectiveWeekSpan(sortedLogs, startIso, endIso);
   const weekdayStats: WeekdayStats[] = WEEKDAY_LABELS.map((weekdayLabel, index) => ({
     weekdayLabel,
     avgMinutesPerWeek: weekdayMinutesTotal[index] / weekSpan,

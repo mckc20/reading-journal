@@ -111,5 +111,5 @@ test("normalizes weekday metrics per week and uses sessions as tie-breaker", () 
 
   assert.equal(metrics.weekdays.highest?.weekdayLabel, "Monday");
   assert.equal(metrics.weekdays.lowest?.weekdayLabel, "Thursday");
-  assert.ok(metrics.weekdays.weekSpan > 4);
+  assert.equal(metrics.weekdays.weekSpan.toFixed(2), "3.86");
 });
