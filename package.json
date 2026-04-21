@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
     "invite": "tsx scripts/invite-user.ts",
     "backup:db": "tsx scripts/backup-db.ts"
   },
