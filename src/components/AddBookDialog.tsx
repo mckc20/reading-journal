@@ -173,6 +173,11 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     setIsCreatingSeries(true);
     try {
       const created = await addSeries(trimmedSeriesName);
+      setValue("series_id", created.id, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
       setPendingSeriesSelectionId(created.id);
       setNewSeriesName("");
       setAddingNewSeries(false);
@@ -522,6 +527,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                   control={control}
                   render={({ field }) => (
                     <Select
+                      key={`series-select-${series.length}`}
                       value={field.value || "__none__"}
                       onValueChange={(v) => {
                         if (v === "__new__") {
