@@ -29,6 +29,7 @@ import { useSeries } from "@/hooks/useSeries";
 import { formatGenresInput, parseGenresInput, statusVariant } from "@/lib/utils";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
+import GenreTags from "@/components/GenreTags";
 import type {
   Book,
   BookStatus,
@@ -495,14 +496,8 @@ export default function BookDetails() {
                     {isEditMode ? (
                       <Input id="detail-genresInput" {...register("genresInput")} />
                     ) : (
-                      <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-3 py-1.5">
-                        {parsedGenres.length > 0
-                          ? parsedGenres.map((genre) => (
-                              <Badge key={genre} variant="outline">
-                                {genre}
-                              </Badge>
-                            ))
-                          : <span className="text-sm text-muted-foreground">No genres</span>}
+                      <div className="min-h-9 rounded-md px-0.5 py-1">
+                        <GenreTags genres={parsedGenres} />
                       </div>
                     )}
                   </div>
