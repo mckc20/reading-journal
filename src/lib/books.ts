@@ -118,7 +118,8 @@ export async function uploadCover(
     .upload(path, file, { upsert: true });
   if (error) throw error;
   const { data } = supabase.storage.from("covers").getPublicUrl(path);
-  return data.publicUrl;
+  const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${data.publicUrl}?v=${cacheBuster}`;
 }
 
 export async function deleteCover(
