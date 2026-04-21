@@ -192,8 +192,8 @@ export default function Analytics() {
                       <p className="text-xs text-muted-foreground">
                         {part.label} ({DAY_PART_HOUR_RANGES[part.label]})
                       </p>
-                      <p className="text-base font-medium">{part.sessions}</p>
-                      <p className="text-[11px] text-muted-foreground">{part.percentage.toFixed(0)}% of sessions</p>
+                      <p className="text-base font-medium">{formatMinutesCompact(part.minutes)}</p>
+                      <p className="text-[11px] text-muted-foreground">{part.percentage.toFixed(0)}% of tracked minutes</p>
                     </div>
                   ))}
                 </div>

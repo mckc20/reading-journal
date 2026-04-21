@@ -83,8 +83,20 @@ test("computes usual reading time and dominant hour in local time", () => {
 
   assert.equal(metrics.usualTime.dominantHourLabel, "06:00-07:00");
   assert.ok(morning);
-  assert.equal(morning?.sessions, 2);
+  assert.equal(morning?.minutes, 30);
   assert.equal(Math.round(morning?.percentage ?? 0), 40);
+});
+
+test("splits reading minutes across day-part boundaries", () => {
+  const logs: ReadingLog[] = [makeLog("l1", "book-a", "2026-01-08T18:15:00", 120, 30)];
+
+  const metrics = calculateReadingHabits(logs, "2026-01-01T00:00:00", "2026-01-31T23:59:59");
+  const afternoon = metrics.usualTime.dayParts.find((part) => part.label === "Afternoon");
+  const evening = metrics.usualTime.dayParts.find((part) => part.label === "Evening");
+
+  assert.equal(afternoon?.minutes, 15);
+  assert.equal(evening?.minutes, 15);
+  assert.equal(metrics.usualTime.dominantHourLabel, "17:00-18:00");
 });
 
 test("normalizes weekday metrics per week and uses sessions as tie-breaker", () => {

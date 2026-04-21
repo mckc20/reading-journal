@@ -21,7 +21,7 @@ type DayPartLabel = (typeof DAY_PARTS)[number]["label"];
 
 export interface DayPartStats {
   label: DayPartLabel;
-  sessions: number;
+  minutes: number;
   percentage: number;
 }
 
@@ -91,6 +91,30 @@ function getWeekSpan(startIso: string, endIso: string): number {
   return Math.max(1, diffDays / 7);
 }
 
+function allocateMinutesByHour(
+  end: Date,
+  totalMinutes: number,
+  onChunk: (chunkStart: Date, chunkMinutes: number) => void
+) {
+  let remaining = totalMinutes;
+  let cursor = new Date(end.getTime() - totalMinutes * 60 * 1000);
+
+  while (remaining > 0) {
+    const nextHour = new Date(cursor);
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+
+    const minutesUntilHourBoundary = (nextHour.getTime() - cursor.getTime()) / (60 * 1000);
+    const chunkMinutes = Math.min(remaining, minutesUntilHourBoundary);
+    if (chunkMinutes <= 0) break;
+
+    onChunk(cursor, chunkMinutes);
+
+    remaining -= chunkMinutes;
+    cursor = new Date(cursor.getTime() + chunkMinutes * 60 * 1000);
+  }
+}
+
 export function calculateReadingHabits(
   logs: ReadingLog[],
   startIso: string,
@@ -112,7 +136,7 @@ export function calculateReadingHabits(
       usualTime: {
         dayParts: DAY_PARTS.map((part) => ({
           label: part.label,
-          sessions: 0,
+          minutes: 0,
           percentage: 0,
         })),
         dominantHour: null,
@@ -139,8 +163,8 @@ export function calculateReadingHabits(
 
   let durationMinutesTotal = 0;
   let durationSessions = 0;
-  const dayPartSessionCounts = new Map<DayPartLabel, number>();
-  const hourCounts = new Array<number>(24).fill(0);
+  const dayPartMinutes = new Map<DayPartLabel, number>();
+  const hourMinutes = new Array<number>(24).fill(0);
 
   const weekdayMinutesTotal = new Array<number>(7).fill(0);
   const weekdaySessionsTotal = new Array<number>(7).fill(0);
@@ -149,11 +173,6 @@ export function calculateReadingHabits(
 
   for (const log of sortedLogs) {
     const loggedAt = new Date(log.logged_at);
-    const hour = loggedAt.getHours();
-    const dayPart = getDayPartLabel(hour);
-    dayPartSessionCounts.set(dayPart, (dayPartSessionCounts.get(dayPart) ?? 0) + 1);
-    hourCounts[hour] += 1;
-
     const weekdayIndex = toMondayFirstWeekdayIndex(loggedAt.getDay());
     weekdaySessionsTotal[weekdayIndex] += 1;
 
@@ -161,7 +180,16 @@ export function calculateReadingHabits(
     if (readingMinutes > 0) {
       durationMinutesTotal += readingMinutes;
       durationSessions += 1;
-      weekdayMinutesTotal[weekdayIndex] += readingMinutes;
+
+      allocateMinutesByHour(loggedAt, readingMinutes, (chunkStart, chunkMinutes) => {
+        const chunkHour = chunkStart.getHours();
+        const chunkDayPart = getDayPartLabel(chunkHour);
+        const chunkWeekdayIndex = toMondayFirstWeekdayIndex(chunkStart.getDay());
+
+        dayPartMinutes.set(chunkDayPart, (dayPartMinutes.get(chunkDayPart) ?? 0) + chunkMinutes);
+        hourMinutes[chunkHour] += chunkMinutes;
+        weekdayMinutesTotal[chunkWeekdayIndex] += chunkMinutes;
+      });
     }
 
     const list = logsByBook.get(log.book_id) ?? [];
@@ -197,18 +225,21 @@ export function calculateReadingHabits(
   }
 
   const totalSessions = sortedLogs.length;
+  const totalTrackedMinutes = dayPartMinutes.size
+    ? [...dayPartMinutes.values()].reduce((sum, minutes) => sum + minutes, 0)
+    : 0;
   const dayPartStats: DayPartStats[] = DAY_PARTS.map((part) => {
-    const sessions = dayPartSessionCounts.get(part.label) ?? 0;
+    const minutes = dayPartMinutes.get(part.label) ?? 0;
     return {
       label: part.label,
-      sessions,
-      percentage: totalSessions > 0 ? (sessions / totalSessions) * 100 : 0,
+      minutes,
+      percentage: totalTrackedMinutes > 0 ? (minutes / totalTrackedMinutes) * 100 : 0,
     };
   });
 
-  const maxHourCount = Math.max(...hourCounts);
+  const maxHourCount = Math.max(...hourMinutes);
   const dominantHour =
-    maxHourCount > 0 ? hourCounts.findIndex((count) => count === maxHourCount) : null;
+    maxHourCount > 0 ? hourMinutes.findIndex((count) => count === maxHourCount) : null;
 
   const weekSpan = getWeekSpan(startIso, endIso);
   const weekdayStats: WeekdayStats[] = WEEKDAY_LABELS.map((weekdayLabel, index) => ({
