@@ -8,6 +8,31 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>Reading Journal</title>
+    <script>
+      (function () {
+        var storageKey = "reading-journal-theme";
+        var root = document.documentElement;
+        var storedTheme;
+
+        try {
+          storedTheme = localStorage.getItem(storageKey);
+        } catch {
+          storedTheme = null;
+        }
+
+        var theme =
+          storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
+            ? storedTheme
+            : "system";
+        var prefersDark =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var resolvedTheme = theme === "system" ? (prefersDark ? "dark" : "light") : theme;
+
+        root.classList.toggle("dark", resolvedTheme === "dark");
+        root.style.colorScheme = resolvedTheme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

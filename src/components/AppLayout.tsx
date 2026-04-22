@@ -7,10 +7,13 @@ import {
   Library,
   KeyRound,
   BarChart3,
+  Monitor,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
-import { useAuth } from "@/context";
+import { useAuth, useTheme } from "@/context";
 import AddBookDialog from "./AddBookDialog";
 import SetPasswordDialog from "./SetPasswordDialog";
 import { cn } from "@/lib/utils";
@@ -22,11 +25,25 @@ const navLinks = [
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
+const themeCycle = ["system", "light", "dark"] as const;
+
 export default function AppLayout() {
   const { signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+
+  const currentThemeIndex = themeCycle.indexOf(theme);
+  const nextTheme = themeCycle[(currentThemeIndex + 1) % themeCycle.length];
+
+  const ThemeIcon =
+    theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+
+  const currentThemeLabel =
+    theme === "system" ? "System" : theme === "light" ? "Light" : "Dark";
+  const nextThemeLabel =
+    nextTheme === "system" ? "System" : nextTheme === "light" ? "Light" : "Dark";
 
   return (
     <BooksProvider>
@@ -42,7 +59,7 @@ export default function AppLayout() {
               <img
                 src={readingJournalLogo}
                 alt="Reading Journal logo"
-                className="h-6 w-6 rounded-sm object-cover"
+                className="h-6 w-6 rounded-sm object-cover dark:brightness-0 dark:invert"
               />
               <span className="hidden sm:inline">Reading Journal</span>
             </Link>
@@ -87,6 +104,15 @@ export default function AppLayout() {
                 aria-label="Set password"
               >
                 <KeyRound className="h-5 w-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setTheme(nextTheme)}
+                aria-label={`Theme: ${currentThemeLabel}. Switch to ${nextThemeLabel}.`}
+                title={`Theme: ${currentThemeLabel} (click to switch to ${nextThemeLabel})`}
+              >
+                <ThemeIcon className="h-5 w-5" />
               </Button>
               <Button
                 size="icon"

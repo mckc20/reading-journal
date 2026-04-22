@@ -24,8 +24,8 @@ export default function GenreTags({
         <span
           key={genre}
           className={cn(
-            "inline-flex pb-0.5 text-sm font-semibold leading-none text-black transition-shadow duration-150",
-            "shadow-[inset_0_-1px_0_0_rgb(0_0_0)] hover:shadow-[inset_0_-2px_0_0_rgb(0_0_0)]",
+            "inline-flex pb-0.5 text-sm font-semibold leading-none text-foreground transition-shadow duration-150",
+            "shadow-[inset_0_-1px_0_0_currentColor] hover:shadow-[inset_0_-2px_0_0_currentColor]",
             tagClassName
           )}
         >
