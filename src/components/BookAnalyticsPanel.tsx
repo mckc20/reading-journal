@@ -3,6 +3,12 @@ import { BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchReadingLogsForBook } from "@/lib/books";
+import {
+  formatCalendarSpan,
+  formatTotalReadingTime,
+  getReadingDuration,
+  sumReadingMinutes,
+} from "@/lib/bookAnalytics";
 import type { Book, ReadingLog } from "@/types";
 
 interface BookAnalyticsPanelProps {
@@ -153,6 +159,27 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     [chartPoints]
   );
 
+  const totalReadingMinutes = useMemo(() => sumReadingMinutes(logs), [logs]);
+
+  const totalReadingTimeLabel = useMemo(
+    () => formatTotalReadingTime(totalReadingMinutes),
+    [totalReadingMinutes]
+  );
+
+  const readingDuration = useMemo(
+    () =>
+      getReadingDuration({
+        dateStarted: book.date_started,
+        dateFinished: book.date_finished,
+      }),
+    [book.date_finished, book.date_started]
+  );
+
+  const readingDurationLabel = useMemo(() => {
+    if (!readingDuration.isAvailable || !readingDuration.span) return "Not available";
+    return formatCalendarSpan(readingDuration.span);
+  }, [readingDuration.isAvailable, readingDuration.span]);
+
   const activeDays = useMemo(
     () => chartPoints.filter((point) => point.pagesRead > 0).length,
     [chartPoints]
@@ -227,6 +254,25 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   return (
     <ScrollArea className="flex-1 min-h-0 pr-2">
       <div className="space-y-3 py-2">
+      <section className="rounded-lg border bg-muted/20 p-3">
+        <p className="text-sm font-medium">Time-based stats</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-md border bg-background/80 px-2 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Total time spent reading
+            </p>
+            <p className="mt-1 text-sm font-medium">{totalReadingTimeLabel}</p>
+          </div>
+          <div className="rounded-md border bg-background/80 px-2 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reading duration</p>
+            <p className="mt-1 text-sm font-medium">{readingDurationLabel}</p>
+            {readingDuration.isAvailable && readingDuration.isInProgress && (
+              <p className="mt-0.5 text-xs text-muted-foreground">In progress (to today)</p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
         <div>
           <p className="text-sm font-medium">Pages read per day</p>
