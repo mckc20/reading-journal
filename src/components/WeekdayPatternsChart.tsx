@@ -30,7 +30,10 @@ function getActivityMarker(label: string | null): string | null {
 }
 
 export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartProps) {
-  if (!weekdays.highest || !weekdays.lowest) {
+  const highest = weekdays.highest;
+  const lowest = weekdays.lowest;
+
+  if (!highest || !lowest) {
     return (
       <p className="mt-2 text-sm text-muted-foreground">
         Add more reading sessions to establish weekday trends.
@@ -64,7 +67,7 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
 
       <ul className="overflow-hidden rounded-md border" aria-label="Weekday rows from Monday to Sunday">
         {weekdays.all.map((day) => {
-          const activityLabel = getActivityLabel(day, weekdays.highest, weekdays.lowest);
+          const activityLabel = getActivityLabel(day, highest, lowest);
           const activityMarker = getActivityMarker(activityLabel);
           const minutesPerWeek = day.avgMinutesPerWeek.toFixed(1);
           const sessionsPerWeek = day.avgSessionsPerWeek.toFixed(1);
