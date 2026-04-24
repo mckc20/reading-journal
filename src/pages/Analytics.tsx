@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,14 +78,9 @@ export default function Analytics() {
       <h1 className="text-2xl font-semibold">Analytics</h1>
 
       <Card>
-        <CardHeader className="space-y-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div>
-            <CardTitle>Reading overview</CardTitle>
-            <CardDescription>High-level stats from your library.</CardDescription>
-          </div>
+        <CardHeader>
+          <CardTitle>Reading overview</CardTitle>
+          <CardDescription>High-level stats from your library.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
