@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
-import GenreTags from "@/components/GenreTags";
 import { useBooksContext } from "@/context/BooksContext";
 import { statusVariant } from "@/lib/utils";
 import type { Book } from "@/types";
@@ -65,12 +64,6 @@ export default function BookCard({
       <CardContent className="p-2 space-y-1">
         <p className="text-sm font-medium leading-tight line-clamp-2">{book.title}</p>
         <p className="text-xs text-muted-foreground line-clamp-1">{book.authors.join(", ")}</p>
-        <GenreTags
-          genres={book.genres}
-          className="gap-x-2 gap-y-1"
-          tagClassName="text-[11px] font-semibold"
-          emptyLabel=""
-        />
         <Badge variant={statusVariant(book.status)} className="text-xs">
           {book.status}
         </Badge>
