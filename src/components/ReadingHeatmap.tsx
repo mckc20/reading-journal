@@ -1,4 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { ReadingLog } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +18,9 @@ interface HeatmapCell {
   inRange: boolean;
 }
 
+const WINDOW_MONTHS = 12;
+const PAGE_MONTHS = 12;
+
 function toLocalDayKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -27,10 +32,22 @@ function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
 function getIntensityLevel(minutes: number): 0 | 1 | 2 | 3 | 4 {
@@ -49,36 +66,59 @@ function formatDate(date: Date): string {
   });
 }
 
-function buildRange() {
-  const today = startOfLocalDay(new Date());
-  const start = new Date(today);
-  start.setFullYear(start.getFullYear() - 1);
-  start.setDate(start.getDate() + 1);
-  return { start, end: today };
+function clampMonthStart(date: Date, min: Date, max: Date): Date {
+  if (date.getTime() < min.getTime()) return min;
+  if (date.getTime() > max.getTime()) return max;
+  return startOfMonth(date);
+}
+
+function getOldestLogMonth(logs: ReadingLog[], fallback: Date): Date {
+  if (logs.length === 0) return fallback;
+  let oldest = new Date(logs[0].logged_at);
+  for (const log of logs) {
+    const loggedAt = new Date(log.logged_at);
+    if (loggedAt.getTime() < oldest.getTime()) {
+      oldest = loggedAt;
+    }
+  }
+  return startOfMonth(oldest);
 }
 
 export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
   const columnWidthPx = 16;
-  const { weeks, monthLabels, hasAnyReading } = useMemo(() => {
-    const { start, end } = buildRange();
+  const currentMonthStart = useMemo(() => startOfMonth(new Date()), []);
+  const latestWindowStart = useMemo(
+    () => addMonths(currentMonthStart, -(WINDOW_MONTHS - 1)),
+    [currentMonthStart]
+  );
+  const oldestLogMonthStart = useMemo(
+    () => getOldestLogMonth(logs, currentMonthStart),
+    [currentMonthStart, logs]
+  );
+
+  const [windowStartMonth, setWindowStartMonth] = useState<Date>(latestWindowStart);
+  const activeWindowStart = useMemo(
+    () => clampMonthStart(windowStartMonth, oldestLogMonthStart, latestWindowStart),
+    [latestWindowStart, oldestLogMonthStart, windowStartMonth]
+  );
+
+  const canPageOlder = activeWindowStart.getTime() > oldestLogMonthStart.getTime();
+  const canPageNewer = activeWindowStart.getTime() < latestWindowStart.getTime();
+
+  const { weeks, monthLabels, hasAnyReading, windowEnd } = useMemo(() => {
+    const start = activeWindowStart;
+    const end = endOfMonth(addMonths(start, WINDOW_MONTHS - 1));
 
     const dayTotals = new Map<string, number>();
     const dayLogCounts = new Map<string, number>();
     for (const log of logs) {
       const minutes = log.reading_time_minutes ?? 0;
-      const key = toLocalDayKey(new Date(log.logged_at));
+      const key = toLocalDayKey(startOfLocalDay(new Date(log.logged_at)));
       dayLogCounts.set(key, (dayLogCounts.get(key) ?? 0) + 1);
       if (minutes > 0) {
         dayTotals.set(key, (dayTotals.get(key) ?? 0) + minutes);
       }
     }
-
-    const hasAnyReadingInRange = Array.from(dayLogCounts.entries()).some(([key, count]) => {
-      if (count <= 0) return false;
-      const [year, month, day] = key.split("-").map(Number);
-      const date = new Date(year, month - 1, day);
-      return date >= start && date <= end;
-    });
 
     const gridStart = addDays(start, -start.getDay());
     const daysToSaturday = 6 - end.getDay();
@@ -125,9 +165,10 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
     return {
       weeks: weekColumns,
       monthLabels: labels,
-      hasAnyReading: hasAnyReadingInRange,
+      hasAnyReading: dayLogCounts.size > 0,
+      windowEnd: end,
     };
-  }, [logs]);
+  }, [activeWindowStart, logs]);
 
   const intensityClassByLevel: Record<HeatmapCell["level"], string> = {
     0: "bg-muted border-border/70",
@@ -137,11 +178,19 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
     4: "bg-emerald-600 border-emerald-700",
   };
 
+  const windowRangeLabel = `${activeWindowStart.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  })} - ${windowEnd.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  })}`;
+
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-base font-semibold">Reading activity</h2>
-        <p className="text-sm text-muted-foreground">Last 12 months by day (minutes read)</p>
+        <p className="text-sm text-muted-foreground">12-month view by day (minutes read)</p>
       </div>
 
       {hasAnyReading ? (
@@ -214,7 +263,60 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
           </div>
 
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <p>Hover a day to see details.</p>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7",
+                  canPageOlder
+                    ? "text-foreground hover:bg-muted/80"
+                    : "text-muted-foreground/40 hover:bg-transparent"
+                )}
+                onClick={() =>
+                  setWindowStartMonth((current) => {
+                    const bounded = clampMonthStart(current, oldestLogMonthStart, latestWindowStart);
+                    return clampMonthStart(
+                      addMonths(bounded, -PAGE_MONTHS),
+                      oldestLogMonthStart,
+                      latestWindowStart
+                    );
+                  })
+                }
+                disabled={!canPageOlder}
+                aria-label="Show previous 12 months"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7",
+                  canPageNewer
+                    ? "text-foreground hover:bg-muted/80"
+                    : "text-muted-foreground/40 hover:bg-transparent"
+                )}
+                onClick={() =>
+                  setWindowStartMonth((current) => {
+                    const bounded = clampMonthStart(current, oldestLogMonthStart, latestWindowStart);
+                    return clampMonthStart(
+                      addMonths(bounded, PAGE_MONTHS),
+                      oldestLogMonthStart,
+                      latestWindowStart
+                    );
+                  })
+                }
+                disabled={!canPageNewer}
+                aria-label="Show next 12 months"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="text-[11px]">{windowRangeLabel}</span>
+            </div>
+
             <div className="flex items-center gap-1.5">
               <span>Less</span>
               <span className={cn("h-3 w-3 rounded-[3px] border", intensityClassByLevel[0])} />

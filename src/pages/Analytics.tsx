@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import ReadingHeatmap from "@/components/ReadingHeatmap";
 import GenreDistributionChart from "@/components/GenreDistributionChart";
 import { useBooksContext } from "@/context/BooksContext";
-import { fetchReadingLogsInRange } from "@/lib/books";
+import { fetchReadingLogs } from "@/lib/books";
 import {
   calculateReadingHabits,
   formatDurationMinutes,
@@ -22,7 +22,7 @@ const DAY_PART_HOUR_RANGES: Record<string, string> = {
   Night: "23:00-05:59",
 };
 
-function getHeatmapRangeIso(): { startIso: string; endIso: string } {
+function getHabitsRangeIso(): { startIso: string; endIso: string } {
   const now = new Date();
   const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
   const startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
@@ -40,17 +40,27 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [heatmapError, setHeatmapError] = useState<string | null>(null);
 
-  const range = useMemo(() => getHeatmapRangeIso(), []);
+  const habitsRange = useMemo(() => getHabitsRangeIso(), []);
+  const habitsStartMs = useMemo(() => new Date(habitsRange.startIso).getTime(), [habitsRange.startIso]);
+  const habitsEndMs = useMemo(() => new Date(habitsRange.endIso).getTime(), [habitsRange.endIso]);
+  const habitsLogs = useMemo(
+    () =>
+      logs.filter((log) => {
+        const loggedAt = new Date(log.logged_at).getTime();
+        return loggedAt >= habitsStartMs && loggedAt <= habitsEndMs;
+      }),
+    [habitsEndMs, habitsStartMs, logs]
+  );
   const habits = useMemo(
-    () => calculateReadingHabits(logs, range.startIso, range.endIso),
-    [logs, range.endIso, range.startIso]
+    () => calculateReadingHabits(habitsLogs, habitsRange.startIso, habitsRange.endIso),
+    [habitsLogs, habitsRange.endIso, habitsRange.startIso]
   );
 
   async function loadHeatmapLogs() {
     try {
       setLoading(true);
       setHeatmapError(null);
-      const data = await fetchReadingLogsInRange(range.startIso, range.endIso);
+      const data = await fetchReadingLogs();
       setLogs(data);
     } catch (err) {
       setHeatmapError(err instanceof Error ? err.message : "Failed to load reading activity");
