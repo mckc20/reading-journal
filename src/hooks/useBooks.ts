@@ -14,6 +14,18 @@ import type { Book } from "@/types";
 export interface AddBookPayload
   extends Omit<BookInsert, "id" | "cover_url" | "user_id"> {}
 
+export interface AddBookResult {
+  warning?: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return fallback;
+}
+
 export function useBooks() {
   const { user } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
@@ -39,15 +51,26 @@ export function useBooks() {
   }, [load]);
 
   const addBook = useCallback(
-    async (payload: AddBookPayload, coverFile?: File): Promise<void> => {
+    async (payload: AddBookPayload, coverFile?: File): Promise<AddBookResult> => {
       if (!user) throw new Error("Not authenticated");
       const bookId = crypto.randomUUID();
-      let cover_url: string | undefined;
-      if (coverFile) {
-        cover_url = await uploadCover(user.id, bookId, coverFile);
-      }
-      const book = await createBook({ ...payload, id: bookId, cover_url, user_id: user.id });
+
+      const book = await createBook({ ...payload, id: bookId, user_id: user.id });
       setBooks((prev) => [book, ...prev]);
+
+      if (!coverFile) return {};
+
+      try {
+        const cover_url = await uploadCover(user.id, bookId, coverFile);
+        const updated = await updateBookDb(bookId, { cover_url });
+        setBooks((prev) => prev.map((b) => (b.id === bookId ? updated : b)));
+        return {};
+      } catch (error) {
+        const detail = getErrorMessage(error, "Upload request failed.");
+        return {
+          warning: `Book saved, but cover upload failed: ${detail} You can add the cover later from book details.`,
+        };
+      }
     },
     [user]
   );

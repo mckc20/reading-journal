@@ -198,7 +198,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         return;
       }
       const genres = parseGenresInput(values.genresInput);
-      await addBook(
+      const result = await addBook(
         {
           title: values.title,
           authors,
@@ -218,6 +218,24 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         },
         coverFile ?? undefined
       );
+
+      if (result.warning) {
+        reset({ status: "Not Started", authorsInput: "" });
+        setCoverFile(null);
+        setCoverPreview(null);
+        setShowScanner(false);
+        setManualIsbn("");
+        setIsbnStatus("idle");
+        setIsbnError(null);
+        setScannedIsbn(null);
+        setAddingNewSeries(false);
+        setNewSeriesName("");
+        setIsCreatingSeries(false);
+        setPendingSeriesSelectionId(null);
+        setError("root", { message: result.warning });
+        return;
+      }
+
       reset();
       setCoverFile(null);
       setCoverPreview(null);
