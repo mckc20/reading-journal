@@ -340,9 +340,16 @@ export default function BookDetails() {
         <div className="space-y-4">
           <div className="space-y-2">
             {seriesName && (
-              <Badge variant="outline" className="w-fit">
-                {seriesName}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="w-fit">
+                  {seriesName}
+                </Badge>
+                {book.volume_number != null && (
+                  <Badge variant="secondary" className="w-fit">
+                    Vol. {book.volume_number}
+                  </Badge>
+                )}
+              </div>
             )}
 
             <h1 className="text-3xl font-heading leading-snug font-medium">{book.title}</h1>
