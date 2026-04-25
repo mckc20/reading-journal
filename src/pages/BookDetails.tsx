@@ -735,52 +735,53 @@ export default function BookDetails() {
                   )}
                 </div>
               </ScrollArea>
+            </div>
 
-              {errorMsg && <p className="mt-3 text-sm text-destructive">{errorMsg}</p>}
+            {errorMsg && <p className="text-sm text-destructive">{errorMsg}</p>}
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-4">
-                {isEditMode ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      disabled={deleting}
-                      onClick={handleDelete}
-                    >
-                      {deleting ? "Deleting..." : confirmDelete ? "Are you sure?" : "Delete"}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {isEditMode ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleting}
+                    onClick={handleDelete}
+                  >
+                    {deleting ? "Deleting..." : confirmDelete ? "Are you sure?" : "Delete"}
+                  </Button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button type="submit" size="sm" disabled={saving || !isDirty}>
+                      {saving ? "Saving..." : "Save Changes"}
                     </Button>
-                    <div className="ml-auto flex items-center gap-2">
-                      <Button type="submit" size="sm" disabled={saving || !isDirty}>
-                        {saving ? "Saving..." : "Save Changes"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={saving || deleting}
-                        onClick={exitEditMode}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="ml-auto">
                     <Button
                       type="button"
+                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setConfirmDelete(false);
-                        setErrorMsg(null);
-                        setIsEditMode(true);
-                      }}
+                      disabled={saving || deleting}
+                      onClick={exitEditMode}
                     >
-                      Edit
+                      Cancel
                     </Button>
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <div className="ml-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setConfirmDelete(false);
+                      setErrorMsg(null);
+                      setIsEditMode(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </div>
+              )}
             </div>
           </form>
         </TabsContent>
