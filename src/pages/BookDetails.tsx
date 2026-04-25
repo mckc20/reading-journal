@@ -31,7 +31,6 @@ import {
   formatGenresInput,
   parseAuthorsInput,
   parseGenresInput,
-  statusVariant,
 } from "@/lib/utils";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
@@ -352,7 +351,23 @@ export default function BookDetails() {
               </div>
             )}
 
-            <h1 className="text-3xl font-heading leading-snug font-medium">{book.title}</h1>
+            <div className="flex flex-wrap items-start gap-2">
+              <h1 className="text-3xl font-heading leading-snug font-medium">
+                {book.title}
+              </h1>
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                className="mt-2 shrink-0 rounded p-0.5 hover:bg-muted transition-colors"
+              >
+                <Heart
+                  className={`h-5 w-5 ${
+                    isFavorite ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
+                  }`}
+                />
+              </button>
+            </div>
             <p className="text-base text-muted-foreground">{book.authors.join(", ")}</p>
 
             {book.isbn && (
@@ -366,22 +381,6 @@ export default function BookDetails() {
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={statusVariant(status)}>{status}</Badge>
-              <button
-                type="button"
-                onClick={toggleFavorite}
-                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                className="rounded p-0.5 hover:bg-muted transition-colors"
-              >
-                <Heart
-                  className={`h-5 w-5 ${
-                    isFavorite ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
-                  }`}
-                />
-              </button>
-            </div>
 
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
