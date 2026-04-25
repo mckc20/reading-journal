@@ -770,7 +770,7 @@ export default function BookDetails() {
                 <div className="ml-auto">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => {
                       setConfirmDelete(false);
