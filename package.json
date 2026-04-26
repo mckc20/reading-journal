@@ -13,11 +13,11 @@
     "backup:db": "tsx scripts/backup-db.ts"
   },
   "dependencies": {
+    "@ericblade/quagga2": "^1.12.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@supabase/supabase-js": "^2.103.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.8.0",
     "radix-ui": "^1.4.3",
     "react": "^18.3.1",

@@ -1,126 +1,225 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  QuaggaJSConfigObject,
+  QuaggaJSResultCallbackFunction,
+  QuaggaJSResultObject,
+  QuaggaJSStatic,
+} from "@ericblade/quagga2";
 import { Button } from "@/components/ui/button";
+import { normalizeScannedIsbn } from "@/lib/isbnScan";
 
 interface BarcodeScannerProps {
   onScan: (isbn: string) => void;
   onClose: () => void;
 }
 
-function stopScanner(scanner: any): Promise<void> {
+type ScannerStatus = "starting" | "scanning" | "detected" | "hint";
+
+const NO_DETECTION_HINT_DELAY_MS = 7000;
+
+function buildScannerConfig(
+  target: HTMLDivElement,
+  constraints: MediaTrackConstraints,
+): QuaggaJSConfigObject {
+  return {
+    inputStream: {
+      type: "LiveStream",
+      target,
+      constraints,
+      area: {
+        top: "25%",
+        right: "5%",
+        bottom: "25%",
+        left: "5%",
+      },
+      willReadFrequently: true,
+    },
+    locate: true,
+    frequency: 10,
+    numOfWorkers: navigator.hardwareConcurrency
+      ? Math.min(4, Math.max(1, navigator.hardwareConcurrency - 1))
+      : 2,
+    decoder: {
+      readers: ["ean_reader"],
+      multiple: false,
+    },
+    locator: {
+      halfSample: true,
+      patchSize: "small",
+      willReadFrequently: true,
+    },
+  };
+}
+
+async function stopScanner(
+  quagga: QuaggaJSStatic | null,
+  onDetected: QuaggaJSResultCallbackFunction | null,
+): Promise<void> {
+  if (!quagga) return;
+
   try {
-    const result = scanner.stop();
-    if (result && typeof result.catch === "function") {
-      return result.catch(() => {});
+    if (onDetected) {
+      quagga.offDetected(onDetected);
     }
-    return Promise.resolve();
+    await quagga.stop();
   } catch {
-    return Promise.resolve();
+    // Stopping is best-effort because Quagga can throw if initialization failed.
   }
+}
+
+function getCameraErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  if (/permission|denied|notallowed/i.test(message)) {
+    return "Camera permission was denied. Please allow camera access and try again.";
+  }
+
+  return "Could not access camera. You can enter the ISBN manually instead.";
 }
 
 export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<any>(null);
+  const quaggaRef = useRef<QuaggaJSStatic | null>(null);
+  const detectedCallbackRef = useRef<QuaggaJSResultCallbackFunction | null>(null);
   const scannedRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Stable ref so the effect doesn't re-run when onScan changes identity
+  const hintTimerRef = useRef<number | null>(null);
   const onScanRef = useRef(onScan);
+
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<ScannerStatus>("starting");
+  const [scanMessage, setScanMessage] = useState("Starting camera...");
+
   onScanRef.current = onScan;
 
-  const startScanner = useCallback(async (stopped: () => boolean) => {
-    const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
-      "html5-qrcode"
-    );
+  const clearHintTimer = useCallback(() => {
+    if (hintTimerRef.current !== null) {
+      window.clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+  }, []);
 
-    if (stopped() || !containerRef.current) return;
-
-    const scannerId = containerRef.current.id;
-    const scanner = new Html5Qrcode(scannerId, {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-      ],
-      verbose: false,
-    });
-    scannerRef.current = scanner;
-
-    const config = { fps: 10, qrbox: { width: 280, height: 160 } };
-
-    const onSuccess = async (decodedText: string) => {
-      // Guard against multiple firings
-      if (scannedRef.current) return;
-      scannedRef.current = true;
-
-      await stopScanner(scanner);
-      onScanRef.current(decodedText);
-    };
-
-    try {
-      await scanner.start(
-        { facingMode: { exact: "environment" } },
-        config,
-        onSuccess,
-        () => {},
-      );
-    } catch {
-      try {
-        await scanner.start(
-          { facingMode: "environment" },
-          config,
-          onSuccess,
-          () => {},
+  const scheduleNoDetectionHint = useCallback(() => {
+    clearHintTimer();
+    hintTimerRef.current = window.setTimeout(() => {
+      if (!scannedRef.current) {
+        setStatus("hint");
+        setScanMessage(
+          "No ISBN barcode yet. Try better light, hold steady, and fit the barcode inside the frame.",
         );
-      } catch (err) {
-        if (!stopped()) {
-          setError(
-            err instanceof Error && err.message.includes("Permission")
-              ? "Camera permission was denied. Please allow camera access and try again."
-              : "Could not access camera. You can enter the ISBN manually instead.",
+      }
+    }, NO_DETECTION_HINT_DELAY_MS);
+  }, [clearHintTimer]);
+
+  const startScanner = useCallback(
+    async (stopped: () => boolean) => {
+      setStatus("starting");
+      setScanMessage("Starting camera...");
+      setError(null);
+
+      const { default: Quagga } = await import("@ericblade/quagga2");
+
+      if (stopped() || !containerRef.current) return;
+
+      quaggaRef.current = Quagga;
+      const onDetected = async (result: QuaggaJSResultObject) => {
+        if (scannedRef.current) return;
+
+        const code = result.codeResult?.code ?? "";
+        const isbn = normalizeScannedIsbn(code);
+
+        if (!isbn) {
+          setStatus("hint");
+          setScanMessage(
+            "Barcode detected, but it is not a book ISBN. Look for an EAN-13 barcode starting with 978 or 979.",
           );
+          scheduleNoDetectionHint();
+          return;
+        }
+
+        scannedRef.current = true;
+        clearHintTimer();
+        setStatus("detected");
+        setScanMessage("ISBN barcode detected. Looking up book...");
+
+        await stopScanner(Quagga, onDetected);
+        onScanRef.current(isbn);
+      };
+
+      detectedCallbackRef.current = onDetected;
+
+      try {
+        await Quagga.start(
+          buildScannerConfig(containerRef.current, {
+            facingMode: { exact: "environment" },
+          }),
+        );
+      } catch {
+        try {
+          if (stopped() || !containerRef.current) return;
+          await Quagga.start(
+            buildScannerConfig(containerRef.current, {
+              facingMode: "environment",
+            }),
+          );
+        } catch (err) {
+          if (!stopped()) {
+            setError(getCameraErrorMessage(err));
+          }
+          return;
         }
       }
-    }
 
-    if (!stopped()) setLoading(false);
-  }, []);
+      if (stopped()) {
+        await stopScanner(Quagga, onDetected);
+        return;
+      }
+
+      Quagga.onDetected(onDetected);
+      setStatus("scanning");
+      setScanMessage("Looking for an ISBN barcode...");
+      scheduleNoDetectionHint();
+    },
+    [clearHintTimer, scheduleNoDetectionHint],
+  );
 
   useEffect(() => {
     let isStopped = false;
     scannedRef.current = false;
 
-    startScanner(() => isStopped);
+    startScanner(() => isStopped).catch((err: unknown) => {
+      if (!isStopped) {
+        setError(getCameraErrorMessage(err));
+      }
+    });
 
     return () => {
       isStopped = true;
-      if (scannerRef.current) {
-        stopScanner(scannerRef.current);
-      }
+      clearHintTimer();
+      void stopScanner(quaggaRef.current, detectedCallbackRef.current);
     };
-  }, [startScanner]);
+  }, [clearHintTimer, startScanner]);
 
   return (
     <div className="space-y-3">
-      <div
-        id="isbn-scanner"
-        ref={containerRef}
-        className="relative w-full aspect-[4/3] bg-black rounded-lg overflow-hidden"
-      />
+      <div className="relative w-full aspect-[4/3] bg-black rounded-lg overflow-hidden">
+        <div
+          ref={containerRef}
+          className="absolute inset-0 [&_canvas]:hidden [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+        />
+        <div className="pointer-events-none absolute inset-x-[8%] top-1/2 h-32 -translate-y-1/2 rounded-md border-2 border-primary/80 shadow-[0_0_0_999px_rgba(0,0,0,0.28)]" />
+      </div>
 
-      {loading && !error && (
-        <p className="text-sm text-muted-foreground text-center">
-          Starting camera…
-        </p>
-      )}
-
-      {error && (
+      {error ? (
         <p className="text-sm text-destructive text-center">{error}</p>
-      )}
-
-      {!loading && !error && (
-        <p className="text-xs text-muted-foreground text-center">
-          Point your camera at the book's barcode
+      ) : (
+        <p
+          className={
+            status === "hint"
+              ? "text-sm text-amber-600 dark:text-amber-400 text-center"
+              : "text-sm text-muted-foreground text-center"
+          }
+        >
+          {scanMessage}
         </p>
       )}
 
