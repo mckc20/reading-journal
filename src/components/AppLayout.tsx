@@ -7,6 +7,7 @@ import {
   Library,
   KeyRound,
   BarChart3,
+  UserRound,
   Monitor,
   Sun,
   Moon,
@@ -24,6 +25,7 @@ const navLinks = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/library", label: "Library", icon: Library },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/account", label: "Account", icon: UserRound },
 ];
 
 const themeCycle = ["system", "light", "dark"] as const;

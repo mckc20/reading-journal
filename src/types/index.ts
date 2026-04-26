@@ -55,3 +55,35 @@ export interface ReadingLog {
   reading_time_minutes?: number;
   logged_at: string;
 }
+
+export interface Profile {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  timezone?: string;
+  language?: string;
+  created_at: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  created_by: string;
+  created_at: string;
+}
+
+export type GroupMembershipRole = "owner" | "admin" | "member";
+
+export type GroupMembershipStatus = "active" | "invited";
+
+export interface GroupMembership {
+  group_id: string;
+  user_id: string;
+  role: GroupMembershipRole;
+  status: GroupMembershipStatus;
+  joined_at: string;
+}
