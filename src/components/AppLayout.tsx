@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Plus,
@@ -14,10 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
 import { useAuth, useTheme } from "@/context";
-import AddBookDialog from "./AddBookDialog";
-import SetPasswordDialog from "./SetPasswordDialog";
 import { cn } from "@/lib/utils";
 import readingJournalLogo from "@/assets/reading-journal-logo.png";
+
+const AddBookDialog = lazy(() => import("./AddBookDialog"));
+const SetPasswordDialog = lazy(() => import("./SetPasswordDialog"));
 
 const navLinks = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -157,8 +158,14 @@ export default function AppLayout() {
         </nav>
       </div>
 
-      <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
-      <SetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+      <Suspense fallback={null}>
+        {addBookOpen && (
+          <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
+        )}
+        {passwordOpen && (
+          <SetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+        )}
+      </Suspense>
     </BooksProvider>
   );
 }

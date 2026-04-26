@@ -1,11 +1,17 @@
+import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
-import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import Library from "@/pages/Library";
-import Analytics from "@/pages/Analytics";
-import BookDetails from "@/pages/BookDetails";
+
+const Login = lazy(() => import("@/pages/Login"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Library = lazy(() => import("@/pages/Library"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const BookDetails = lazy(() => import("@/pages/BookDetails"));
+
+function lazyRoute(element: ReactNode) {
+  return <Suspense fallback={null}>{element}</Suspense>;
+}
 
 function NotFound() {
   return (
@@ -19,7 +25,7 @@ export const router = createBrowserRouter([
   // Public route — no auth required
   {
     path: "/login",
-    element: <Login />,
+    element: lazyRoute(<Login />),
   },
 
   // Protected layout: ProtectedRoute → AppLayout → page
@@ -29,10 +35,10 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: "/", element: <Dashboard /> },
-          { path: "/library", element: <Library /> },
-          { path: "/books/:bookId", element: <BookDetails /> },
-          { path: "/analytics", element: <Analytics /> },
+          { path: "/", element: lazyRoute(<Dashboard />) },
+          { path: "/library", element: lazyRoute(<Library />) },
+          { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
+          { path: "/analytics", element: lazyRoute(<Analytics />) },
         ],
       },
     ],
