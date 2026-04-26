@@ -29,7 +29,7 @@ import {
   parseAuthorsInput,
   parseGenresInput,
 } from "@/lib/utils";
-import type { BookStatus, BookLanguage, BookBelongsTo, BookFormat } from "@/types";
+import type { BookStatus, BookLanguage, BookBelongsTo, BookFormat, BookMetadataSource } from "@/types";
 
 interface FormValues {
   title: string;
@@ -78,6 +78,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [isbnStatus, setIsbnStatus] = useState<"idle" | "looking-up" | "error">("idle");
   const [isbnError, setIsbnError] = useState<string | null>(null);
   const [scannedIsbn, setScannedIsbn] = useState<string | null>(null);
+  const [metadataSource, setMetadataSource] = useState<BookMetadataSource | null>(null);
+  const [metadataSourceUrl, setMetadataSourceUrl] = useState<string | null>(null);
 
   const {
     register,
@@ -128,6 +130,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     setShowScanner(false);
     setIsbnStatus("looking-up");
     setIsbnError(null);
+    setMetadataSource(null);
+    setMetadataSourceUrl(null);
 
     try {
       const bookData = await fetchBookByISBN(isbn.trim());
@@ -138,6 +142,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       }
 
       setScannedIsbn(isbn.trim());
+      setMetadataSource(bookData.metadataSource);
+      setMetadataSourceUrl(bookData.metadataSourceUrl);
       setValue("title", bookData.title);
       setValue("authorsInput", formatAuthorsInput(bookData.authors), { shouldValidate: true });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
@@ -214,6 +220,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           series_id: values.series_id || undefined,
           volume_number: values.volume_number ? Number(values.volume_number) : undefined,
           isbn: scannedIsbn || undefined,
+          metadata_source: metadataSource || undefined,
+          metadata_source_url: metadataSourceUrl || undefined,
           is_favorite: false,
         },
         coverFile ?? undefined
@@ -228,6 +236,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         setIsbnStatus("idle");
         setIsbnError(null);
         setScannedIsbn(null);
+        setMetadataSource(null);
+        setMetadataSourceUrl(null);
         setAddingNewSeries(false);
         setNewSeriesName("");
         setIsCreatingSeries(false);
@@ -244,6 +254,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setIsbnStatus("idle");
       setIsbnError(null);
       setScannedIsbn(null);
+      setMetadataSource(null);
+      setMetadataSourceUrl(null);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -269,6 +281,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setIsbnStatus("idle");
       setIsbnError(null);
       setScannedIsbn(null);
+      setMetadataSource(null);
+      setMetadataSourceUrl(null);
       setAddingNewSeries(false);
       setNewSeriesName("");
       setIsCreatingSeries(false);

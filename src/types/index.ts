@@ -12,6 +12,8 @@ export type BookBelongsTo = "Me" | "Family" | "Friends" | "Library";
 
 export type BookFormat = "eBook" | "Audiobook" | "Paperback" | "Hardcover";
 
+export type BookMetadataSource = "open_library" | "google_books";
+
 export interface Series {
   id: string;
   name: string;
@@ -37,6 +39,8 @@ export interface Book {
   belongs_to?: BookBelongsTo;
   format?: BookFormat;
   isbn?: string;
+  metadata_source?: BookMetadataSource | null;
+  metadata_source_url?: string | null;
   series_id?: string;
   volume_number?: number;
   user_id: string;

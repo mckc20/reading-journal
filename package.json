@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
     "invite": "tsx scripts/invite-user.ts",
-    "backup:db": "tsx scripts/backup-db.ts"
+    "backup:db": "tsx scripts/backup-db.ts",
+    "backfill:metadata-source": "tsx scripts/backfill-book-metadata-source.ts"
   },
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",

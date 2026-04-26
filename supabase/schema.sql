@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS books (
   belongs_to      text CHECK (belongs_to IN ('Me','Family','Friends','Library')),
   format          text CHECK (format IN ('eBook','Audiobook','Paperback','Hardcover')),
   isbn            text,
+  metadata_source text CHECK (metadata_source IN ('open_library','google_books')),
+  metadata_source_url text,
   series_id       uuid REFERENCES series(id) ON DELETE SET NULL,
   volume_number   numeric CHECK (volume_number > 0),
   created_at      timestamptz NOT NULL DEFAULT now()

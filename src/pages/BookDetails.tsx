@@ -68,6 +68,17 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
+function metadataSourceLabel(source: Book["metadata_source"]): string {
+  switch (source) {
+    case "open_library":
+      return "Open in Open Library";
+    case "google_books":
+      return "Open in Google Books";
+    default:
+      return "Open in Google Books";
+  }
+}
+
 function bookToFormValues(book: Book): FormValues {
   return {
     title: book.title,
@@ -225,7 +236,11 @@ export default function BookDetails() {
       const genres = parseGenresInput(values.genresInput);
       payload.genres = genres.length > 0 ? genres : undefined;
     }
-    if (dirtyFields.isbn) payload.isbn = values.isbn.trim() || undefined;
+    if (dirtyFields.isbn) {
+      payload.isbn = values.isbn.trim() || undefined;
+      payload.metadata_source = null;
+      payload.metadata_source_url = null;
+    }
     if (dirtyFields.language) payload.language = (values.language as BookLanguage) || undefined;
     if (dirtyFields.format) payload.format = (values.format as BookFormat) || undefined;
     if (dirtyFields.belongs_to) payload.belongs_to = (values.belongs_to as BookBelongsTo) || undefined;
@@ -391,14 +406,14 @@ export default function BookDetails() {
             </div>
             <p className="text-base text-muted-foreground">{book.authors.join(", ")}</p>
 
-            {book.isbn && (
+            {(book.metadata_source_url || book.isbn) && (
               <a
-                href={`https://books.google.com/books?vid=ISBN${book.isbn}`}
+                href={book.metadata_source_url ?? `https://books.google.com/books?vid=ISBN${book.isbn}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                Open in Google Books
+                {book.metadata_source_url ? metadataSourceLabel(book.metadata_source) : "Open in Google Books"}
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}

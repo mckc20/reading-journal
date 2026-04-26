@@ -60,6 +60,23 @@ function isMissingGenresColumnError(error: unknown): boolean {
   return message.toLowerCase().includes("genres") && message.toLowerCase().includes("column");
 }
 
+function withoutMetadataSourcePayload<
+  T extends { metadata_source?: unknown; metadata_source_url?: unknown },
+>(payload: T): Omit<T, "metadata_source" | "metadata_source_url"> {
+  const { metadata_source: _metadataSource, metadata_source_url: _metadataSourceUrl, ...rest } = payload;
+  return rest;
+}
+
+function isMissingMetadataSourceColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message) : "";
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("metadata_source") || normalized.includes("metadata_source_url"))
+  );
+}
+
 function toLegacyAuthorPayload<T extends { authors?: string[] }>(
   payload: T,
 ): Omit<T, "authors"> & { author?: string } {
@@ -95,7 +112,7 @@ export async function fetchBooks(): Promise<Book[]> {
 
 export type BookInsert = Omit<Book, "created_at">;
 
-export async function createBook(payload: BookInsert): Promise<Book> {
+async function insertBookPayload(payload: BookInsert): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
     .insert(payload)
@@ -124,9 +141,33 @@ export async function createBook(payload: BookInsert): Promise<Book> {
   return normalizeBook(legacyData as LegacyAuthorBookRow);
 }
 
+export async function createBook(payload: BookInsert): Promise<Book> {
+  try {
+    return await insertBookPayload(payload);
+  } catch (error) {
+    if (!isMissingMetadataSourceColumnError(error)) throw error;
+    return insertBookPayload(withoutMetadataSourcePayload(payload) as BookInsert);
+  }
+}
+
 export async function updateBook(
   id: string,
   payload: Partial<Omit<Book, "id" | "user_id" | "created_at">>
+): Promise<Book> {
+  try {
+    return await updateBookPayload(id, payload);
+  } catch (error) {
+    if (!isMissingMetadataSourceColumnError(error)) throw error;
+    return updateBookPayload(
+      id,
+      withoutMetadataSourcePayload(payload) as Partial<Omit<Book, "id" | "user_id" | "created_at">>,
+    );
+  }
+}
+
+async function updateBookPayload(
+  id: string,
+  payload: Partial<Omit<Book, "id" | "user_id" | "created_at">>,
 ): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
