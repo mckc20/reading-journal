@@ -13,17 +13,28 @@ interface ReadingProgressDialogProps {
   book: Book;
   trigger: ReactNode;
   onProgressSaved: (newCurrentPage: number) => Promise<void> | void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export default function ReadingProgressDialog({
   book,
   trigger,
   onProgressSaved,
+  open,
+  onOpenChange,
 }: ReadingProgressDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = typeof open === "boolean";
+  const resolvedOpen = isControlled ? open : internalOpen;
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!isControlled) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={resolvedOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent
         className="sm:max-w-md"
@@ -36,10 +47,10 @@ export default function ReadingProgressDialog({
           book={book}
           defaultExpanded
           hideTrigger
-          onCancel={() => setOpen(false)}
+          onCancel={() => handleOpenChange(false)}
           onProgressSaved={async (newPage) => {
             await onProgressSaved(newPage);
-            setOpen(false);
+            handleOpenChange(false);
           }}
         />
       </DialogContent>

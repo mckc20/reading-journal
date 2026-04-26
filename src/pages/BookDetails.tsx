@@ -107,6 +107,7 @@ export default function BookDetails() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -125,6 +126,7 @@ export default function BookDetails() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    setIsProgressDialogOpen(false);
   }, [bookId]);
 
   useEffect(() => {
@@ -433,11 +435,39 @@ export default function BookDetails() {
               </PropertyBox>
             </div>
             <Progress value={progressPercent} className="h-1.5" />
+            {status === "Up Next" && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    setErrorMsg(null);
+                    await updateBook(book.id, { status: "Reading" });
+                    setIsProgressDialogOpen(true);
+                  } catch (err) {
+                    setErrorMsg(err instanceof Error ? err.message : "Failed to start reading");
+                  }
+                }}
+              >
+                Start Reading
+              </Button>
+            )}
             {status === "Reading" && (
               <ReadingProgressDialog
                 book={book}
+                open={isProgressDialogOpen}
+                onOpenChange={setIsProgressDialogOpen}
                 onProgressSaved={async (newPage) => {
-                  await updateBook(book.id, { current_page: newPage });
+                  const shouldFinish =
+                    typeof book.total_pages === "number" &&
+                    book.total_pages > 0 &&
+                    newPage >= book.total_pages;
+
+                  await updateBook(book.id, {
+                    current_page: newPage,
+                    ...(shouldFinish ? { status: "Finished" } : {}),
+                  });
                 }}
                 trigger={
                   <Button type="button" variant="outline" size="sm">
