@@ -5,6 +5,7 @@ import {
   LogOut,
   LayoutDashboard,
   Library,
+  Search,
   KeyRound,
   BarChart3,
   UserRound,
@@ -99,6 +100,11 @@ export default function AppLayout() {
                 aria-label="Add book"
               >
                 <Plus className="h-5 w-5" />
+              </Button>
+              <Button size="icon" variant="ghost" asChild>
+                <Link to="/search" aria-label="Search">
+                  <Search className="h-5 w-5" />
+                </Link>
               </Button>
               <Button
                 size="icon"

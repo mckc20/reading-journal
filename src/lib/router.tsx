@@ -6,6 +6,7 @@ import AppLayout from "@/components/AppLayout";
 const Login = lazy(() => import("@/pages/Login"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
+const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
 const Account = lazy(() => import("@/pages/Account"));
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: lazyRoute(<Dashboard />) },
           { path: "/library", element: lazyRoute(<Library />) },
+          { path: "/search", element: lazyRoute(<Search />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
           { path: "/account", element: lazyRoute(<Account />) },
