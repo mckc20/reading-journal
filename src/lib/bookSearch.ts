@@ -50,7 +50,10 @@ export interface BookSearchSection {
   matches: BookSearchMatch[];
 }
 
-export const BOOK_SEARCH_PROPERTIES: BookSearchProperty[] = [
+export const BOOK_SEARCH_PROPERTIES: Array<{
+  key: BookSearchPropertyKey;
+  label: string;
+}> = [
   { key: "title", label: "Title" },
   { key: "authors", label: "Authors" },
   { key: "genres", label: "Genres" },
