@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 
@@ -9,7 +9,9 @@ const Library = lazy(() => import("@/pages/Library"));
 const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
-const Account = lazy(() => import("@/pages/Account"));
+const Groups = lazy(() => import("@/pages/Groups"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Settings = lazy(() => import("@/pages/Settings"));
 
 function lazyRoute(element: ReactNode) {
   return <Suspense fallback={null}>{element}</Suspense>;
@@ -42,7 +44,11 @@ export const router = createBrowserRouter([
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
-          { path: "/account", element: lazyRoute(<Account />) },
+          { path: "/account", element: <Navigate to="/settings/profile" replace /> },
+          { path: "/groups", element: lazyRoute(<Groups />) },
+          { path: "/profile", element: lazyRoute(<Profile />) },
+          { path: "/settings", element: lazyRoute(<Settings />) },
+          { path: "/settings/:tab", element: lazyRoute(<Settings />) },
         ],
       },
     ],
