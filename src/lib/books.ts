@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Book, Series, ReadingLog } from "@/types";
+import type { Book, BookUpdate, Series, ReadingLog } from "@/types";
 
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
   authors?: string[] | null;
@@ -152,7 +152,7 @@ export async function createBook(payload: BookInsert): Promise<Book> {
 
 export async function updateBook(
   id: string,
-  payload: Partial<Omit<Book, "id" | "user_id" | "created_at">>
+  payload: BookUpdate,
 ): Promise<Book> {
   try {
     return await updateBookPayload(id, payload);
@@ -160,14 +160,14 @@ export async function updateBook(
     if (!isMissingMetadataSourceColumnError(error)) throw error;
     return updateBookPayload(
       id,
-      withoutMetadataSourcePayload(payload) as Partial<Omit<Book, "id" | "user_id" | "created_at">>,
+      withoutMetadataSourcePayload(payload) as BookUpdate,
     );
   }
 }
 
 async function updateBookPayload(
   id: string,
-  payload: Partial<Omit<Book, "id" | "user_id" | "created_at">>,
+  payload: BookUpdate,
 ): Promise<Book> {
   const { data, error } = await supabase
     .from("books")

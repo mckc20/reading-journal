@@ -9,7 +9,7 @@ import {
   deleteCover,
   type BookInsert,
 } from "@/lib/books";
-import type { Book } from "@/types";
+import type { Book, BookUpdate } from "@/types";
 
 export interface AddBookPayload
   extends Omit<BookInsert, "id" | "cover_url" | "user_id"> {}
@@ -76,7 +76,7 @@ export function useBooks() {
   );
 
   const updateBook = useCallback(
-    async (id: string, payload: Partial<Book>): Promise<void> => {
+    async (id: string, payload: BookUpdate): Promise<void> => {
       const updated = await updateBookDb(id, payload);
       setBooks((prev) => prev.map((b) => (b.id === id ? updated : b)));
     },

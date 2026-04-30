@@ -199,7 +199,7 @@ export default function BookDetails() {
     if (!book) return;
     const next = localRating === rating ? null : rating;
     setLocalRating(next);
-    await updateBook(book.id, { rating: next ?? undefined });
+    await updateBook(book.id, { rating: next });
   }
 
   async function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {

@@ -29,7 +29,7 @@ export interface Book {
   genres?: string[];
   status: BookStatus;
   cover_url?: string;
-  rating?: number; // 1–5
+  rating?: number | null; // 1-5, or null when unrated
   is_favorite: boolean;
   current_page?: number;
   total_pages?: number;
@@ -46,6 +46,8 @@ export interface Book {
   user_id: string;
   created_at: string;
 }
+
+export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at">>;
 
 export interface ReadingLog {
   id: string;

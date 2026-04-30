@@ -1,13 +1,13 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useBooks, type AddBookPayload, type AddBookResult } from "@/hooks/useBooks";
-import type { Book } from "@/types";
+import type { Book, BookUpdate } from "@/types";
 
 interface BooksContextValue {
   books: Book[];
   loading: boolean;
   error: string | null;
   addBook: (payload: AddBookPayload, coverFile?: File) => Promise<AddBookResult>;
-  updateBook: (id: string, payload: Partial<Book>) => Promise<void>;
+  updateBook: (id: string, payload: BookUpdate) => Promise<void>;
   updateCover: (id: string, file: File) => Promise<void>;
   deleteBook: (id: string) => Promise<void>;
   reload: () => Promise<void>;
