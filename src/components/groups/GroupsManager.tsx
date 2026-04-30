@@ -25,6 +25,22 @@ import {
 } from "@/lib/profiles";
 import type { Group, GroupMembership, GroupMembershipRole } from "@/types";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getAddMemberErrorMessage(error: unknown): string {
+  const message = getErrorMessage(error, "Could not add member.");
+
+  if (
+    message.includes("group_memberships_user_id_fkey") ||
+    message.includes("violates foreign key constraint")
+  ) {
+    return "No app user exists for that UUID. Make sure the user has accepted their invite.";
+  }
+
+  return message;
+}
+
 export function GroupsManager() {
   const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -114,6 +130,11 @@ export function GroupsManager() {
     setError(null);
     setMessage(null);
 
+    if (!UUID_PATTERN.test(nextUserId)) {
+      setError("Enter a valid user UUID.");
+      return;
+    }
+
     try {
       const member = await addGroupMember(selectedGroupId, nextUserId);
       setMembers((current) => [
@@ -123,7 +144,7 @@ export function GroupsManager() {
       setMemberUserId("");
       setMessage("Member added.");
     } catch (memberError) {
-      setError(getErrorMessage(memberError, "Could not add member."));
+      setError(getAddMemberErrorMessage(memberError));
     }
   }
 
