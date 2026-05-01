@@ -320,14 +320,14 @@ function LibraryShelfList({
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
-              <span className="min-w-0 flex-1">{shelf.label}</span>
+              <span className={cn("min-w-0", !mobile && "flex-1")}>{shelf.label}</span>
               {count !== undefined && (
                 <span className={cn("text-muted-foreground", mobile ? "text-sm" : "text-xs")}>
                   {count}
                 </span>
               )}
               {mobile && (
-                <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" aria-hidden="true" />
               )}
             </Link>
           );
