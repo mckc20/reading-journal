@@ -6,7 +6,9 @@ import { fetchReadingLogsForBook } from "@/lib/books";
 import {
   formatCalendarSpan,
   formatTotalReadingTime,
+  getEstimatedFinish,
   getReadingDuration,
+  MIN_READING_LOGS_FOR_ESTIMATED_FINISH,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import type { Book, ReadingLog } from "@/types";
@@ -63,6 +65,21 @@ function formatReadingTime(minutes?: number): string | null {
   if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
   if (hours > 0) return `${hours}h`;
   return `${mins}m`;
+}
+
+function formatFinishDate(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatEstimateConfidence(confidence: "low" | "medium" | "high" | null): string {
+  if (confidence === "high") return "High confidence";
+  if (confidence === "medium") return "Medium confidence";
+  if (confidence === "low") return "Low confidence";
+  return "Confidence unavailable";
 }
 
 export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
@@ -170,6 +187,17 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     [totalReadingMinutes]
   );
 
+  const estimatedFinish = useMemo(
+    () =>
+      getEstimatedFinish({
+        status: book.status,
+        currentPage: book.current_page,
+        totalPages: book.total_pages,
+        logs,
+      }),
+    [book.current_page, book.status, book.total_pages, logs]
+  );
+
   const readingDuration = useMemo(
     () =>
       getReadingDuration({
@@ -245,12 +273,14 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
 
   if (logsWithDelta.length === 0) {
     return (
-      <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
-        <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
-        <p className="text-sm font-medium">No reading progress entries yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Log progress in the Properties tab to see analytics.
-        </p>
+      <div className="space-y-3 py-2">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
+          <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm font-medium">No reading progress entries yet.</p>
+          <p className="text-xs text-muted-foreground">
+            Log progress in the Properties tab to see analytics.
+          </p>
+        </div>
       </div>
     );
   }
@@ -258,6 +288,50 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   return (
     <ScrollArea className="flex-1 min-h-0 pr-2">
       <div className="space-y-3 py-2">
+        {estimatedFinish.shouldShow && (
+          <section className="rounded-lg border bg-muted/20 p-3">
+            <p className="text-sm font-medium">Estimated finish</p>
+            {estimatedFinish.isAvailable && estimatedFinish.finishDate ? (
+              <>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border bg-background/80 px-2 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Finish date
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {formatFinishDate(estimatedFinish.finishDate)}
+                    </p>
+                  </div>
+                  <div className="rounded-md border bg-background/80 px-2 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Reading time left
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {estimatedFinish.remainingMinutes
+                        ? formatReadingTime(estimatedFinish.remainingMinutes)
+                        : "Not enough timed sessions"}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {formatEstimateConfidence(estimatedFinish.confidence)} · Based on{" "}
+                  {estimatedFinish.readingSessionCount} reading session
+                  {estimatedFinish.readingSessionCount === 1 ? "" : "s"} and your average pace for
+                  this book.
+                </p>
+              </>
+            ) : (
+              <div className="mt-3 rounded-md border bg-background/80 px-2 py-2">
+                <p className="text-sm font-medium">Not enough data yet</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Log at least {MIN_READING_LOGS_FOR_ESTIMATED_FINISH} progress updates to
+                  estimate this.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
       <section className="rounded-lg border bg-muted/20 p-3">
         <p className="text-sm font-medium">Time-based stats</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">

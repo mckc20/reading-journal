@@ -1,4 +1,4 @@
-import type { ReadingLog } from "@/types";
+import type { BookStatus, ReadingLog } from "@/types";
 
 export interface CalendarSpan {
   months: number;
@@ -12,12 +12,36 @@ export interface ReadingDurationResult {
   span: CalendarSpan | null;
 }
 
+export interface EstimatedFinishResult {
+  shouldShow: boolean;
+  isAvailable: boolean;
+  finishDate: Date | null;
+  remainingMinutes: number | null;
+  confidence: "low" | "medium" | "high" | null;
+  readingSessionCount: number;
+}
+
+export const MIN_READING_LOGS_FOR_ESTIMATED_FINISH = 3;
+
+function getEstimateConfidence(readingSessionCount: number): EstimatedFinishResult["confidence"] {
+  if (readingSessionCount >= 10) return "high";
+  if (readingSessionCount >= 6) return "medium";
+  if (readingSessionCount >= MIN_READING_LOGS_FOR_ESTIMATED_FINISH) return "low";
+  return null;
+}
+
 function isValidDate(date: Date): boolean {
   return !Number.isNaN(date.getTime());
 }
 
 function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function wholeDaysBetween(startDate: Date, endDate: Date): number {
+  const start = startOfLocalDay(startDate);
+  const end = startOfLocalDay(endDate);
+  return Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
 }
 
 function addMonthsClamped(date: Date, months: number): Date {
@@ -145,5 +169,99 @@ export function getReadingDuration(params: {
     isAvailable: true,
     isInProgress,
     span: calculateCalendarSpan(started, endDate),
+  };
+}
+
+export function getEstimatedFinish(params: {
+  status: BookStatus;
+  currentPage?: number;
+  totalPages?: number;
+  logs: ReadingLog[];
+  now?: Date;
+}): EstimatedFinishResult {
+  if (params.status !== "Reading") {
+    return {
+      shouldShow: false,
+      isAvailable: false,
+      finishDate: null,
+      remainingMinutes: null,
+      confidence: null,
+      readingSessionCount: 0,
+    };
+  }
+
+  const currentPage = params.currentPage ?? 0;
+  const totalPages = params.totalPages ?? 0;
+  const remainingPages = totalPages - currentPage;
+  const sortedLogs = [...params.logs].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+  );
+
+  if (
+    sortedLogs.length < MIN_READING_LOGS_FOR_ESTIMATED_FINISH ||
+    totalPages <= 0 ||
+    currentPage < 0 ||
+    remainingPages <= 0
+  ) {
+    return {
+      shouldShow: true,
+      isAvailable: false,
+      finishDate: null,
+      remainingMinutes: null,
+      confidence: null,
+      readingSessionCount: sortedLogs.length,
+    };
+  }
+
+  const firstLog = sortedLogs[0];
+  const lastLog = sortedLogs[sortedLogs.length - 1];
+  const firstLogDate = new Date(firstLog.logged_at);
+  const lastLogDate = new Date(lastLog.logged_at);
+  const loggedDays = wholeDaysBetween(firstLogDate, lastLogDate);
+  const loggedProgress = lastLog.current_page - firstLog.current_page;
+
+  if (!isValidDate(firstLogDate) || !isValidDate(lastLogDate) || loggedDays <= 0 || loggedProgress <= 0) {
+    return {
+      shouldShow: true,
+      isAvailable: false,
+      finishDate: null,
+      remainingMinutes: null,
+      confidence: null,
+      readingSessionCount: sortedLogs.length,
+    };
+  }
+
+  const pagesPerDay = loggedProgress / loggedDays;
+  const daysRemaining = Math.ceil(remainingPages / pagesPerDay);
+  const now = startOfLocalDay(params.now ?? new Date());
+  const finishDate = new Date(now);
+  finishDate.setDate(finishDate.getDate() + daysRemaining);
+
+  let previousPage = 0;
+  let pagesWithTime = 0;
+  let minutesWithProgress = 0;
+
+  for (const log of sortedLogs) {
+    const pagesRead = Math.max(0, log.current_page - previousPage);
+    const minutes = log.reading_time_minutes ?? 0;
+    if (pagesRead > 0 && minutes > 0) {
+      pagesWithTime += pagesRead;
+      minutesWithProgress += minutes;
+    }
+    previousPage = log.current_page;
+  }
+
+  const remainingMinutes =
+    pagesWithTime > 0 && minutesWithProgress > 0
+      ? Math.ceil(remainingPages / (pagesWithTime / minutesWithProgress))
+      : null;
+
+  return {
+    shouldShow: true,
+    isAvailable: true,
+    finishDate,
+    remainingMinutes,
+    confidence: getEstimateConfidence(sortedLogs.length),
+    readingSessionCount: sortedLogs.length,
   };
 }
