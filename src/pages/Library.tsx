@@ -137,6 +137,19 @@ function uniqueCleanValues(values: string[] | undefined) {
   return Array.from(new Set(values?.map((value) => value.trim()).filter(Boolean)));
 }
 
+function countUniqueBookValues(
+  books: Book[],
+  getValues: (book: Book) => string[] | undefined
+) {
+  const values = new Set<string>();
+
+  books.forEach((book) => {
+    uniqueCleanValues(getValues(book)).forEach((value) => values.add(value));
+  });
+
+  return values.size;
+}
+
 function buildMultiValueGroups(
   books: Book[],
   getValues: (book: Book) => string[] | undefined
@@ -235,10 +248,12 @@ function groupCountLabel(count: number) {
 function LibraryShelfList({
   activeView,
   counts,
+  categoryCounts,
   mobile = false,
 }: {
   activeView?: LibraryView;
   counts: Partial<Record<LibraryView, number>>;
+  categoryCounts: Partial<Record<LibraryView, number>>;
   mobile?: boolean;
 }) {
   return (
@@ -287,6 +302,7 @@ function LibraryShelfList({
         </p>
         {categoryShelves.map((shelf) => {
           const active = activeView === shelf.value;
+          const count = categoryCounts[shelf.value];
 
           return (
             <Link
@@ -300,9 +316,14 @@ function LibraryShelfList({
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
-              <span>{shelf.label}</span>
+              <span className="min-w-0 flex-1">{shelf.label}</span>
+              {count !== undefined && (
+                <span className={cn("text-muted-foreground", mobile ? "text-sm" : "text-xs")}>
+                  {count}
+                </span>
+              )}
               {mobile && (
-                <ChevronRight className="ml-auto h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
               )}
             </Link>
           );
@@ -382,6 +403,15 @@ export default function Library() {
     [books]
   );
 
+  const categoryCounts = useMemo(
+    () => ({
+      series: series.filter((item) => books.some((book) => book.series_id === item.id)).length,
+      authors: countUniqueBookValues(books, (book) => book.authors),
+      genres: countUniqueBookValues(books, (book) => book.genres),
+    }),
+    [books, series]
+  );
+
   const activePrimaryShelf = primaryShelves.find((shelf) => shelf.value === contentView);
   const visibleBooks = useMemo(() => {
     if (!activePrimaryShelf) return [];
@@ -402,7 +432,7 @@ export default function Library() {
 
   const displayedBookCount = activePrimaryShelf
     ? visibleBooks.length
-    : groupedBooks.reduce((count, group) => count + group.books.length, 0);
+    : books.length;
 
   return (
     <div className="space-y-4 md:flex md:h-[calc(100svh-6.5rem)] md:min-h-0 md:flex-col">
@@ -431,6 +461,7 @@ export default function Library() {
           <LibraryShelfList
             activeView={activeView}
             counts={primaryCounts}
+            categoryCounts={categoryCounts}
             mobile
           />
         ) : (
@@ -450,7 +481,11 @@ export default function Library() {
         )}
       >
         <aside className="hidden md:block md:min-h-0 md:overflow-y-auto md:pr-1">
-          <LibraryShelfList activeView={activeView} counts={primaryCounts} />
+          <LibraryShelfList
+            activeView={activeView}
+            counts={primaryCounts}
+            categoryCounts={categoryCounts}
+          />
         </aside>
 
         <section className="min-w-0 md:min-h-0 md:overflow-y-auto md:pr-1">
