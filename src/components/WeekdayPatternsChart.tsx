@@ -1,4 +1,4 @@
-import { ChartScatter } from "lucide-react";
+import { ChartScatter, Clock } from "lucide-react";
 import { useState } from "react";
 
 import { formatMinutesCompact, type ReadingHabitsMetrics, type WeekdayStats } from "@/lib/readingHabits";
@@ -150,7 +150,16 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
 
                 <div className="mt-2 flex min-h-8 flex-col items-center justify-start text-center">
                   <span className="text-sm font-medium leading-tight">{day.weekdayLabel.slice(0, 3)}</span>
-                  <span className="text-[11px] leading-tight text-muted-foreground">
+                  <span className="inline-flex items-center justify-center gap-0.5 text-[10px] leading-tight text-muted-foreground sm:hidden">
+                    {activityMarker ? <span aria-hidden="true">{activityMarker}</span> : null}
+                    <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                    <span>{day.totalSessions}</span>
+                    <span className="sr-only">
+                      {" "}
+                      session{day.totalSessions === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <span className="hidden text-[11px] leading-tight text-muted-foreground sm:inline">
                     {activityMarker ? `${activityMarker} ` : ""}
                     {day.totalSessions} session{day.totalSessions === 1 ? "" : "s"}
                   </span>
