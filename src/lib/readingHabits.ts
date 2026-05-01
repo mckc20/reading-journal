@@ -282,13 +282,13 @@ export function calculateReadingHabits(
       (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
     );
 
-    for (let index = 1; index < sortedBookLogs.length; index += 1) {
+    for (let index = 0; index < sortedBookLogs.length; index += 1) {
       const current = sortedBookLogs[index];
-      const previous = sortedBookLogs[index - 1];
+      const previousPage = index > 0 ? sortedBookLogs[index - 1].current_page : 0;
       const readingMinutes = current.reading_time_minutes ?? 0;
       if (readingMinutes <= 0) continue;
 
-      const pagesReadDelta = current.current_page - previous.current_page;
+      const pagesReadDelta = current.current_page - previousPage;
       if (pagesReadDelta <= 0) continue;
 
       const hours = readingMinutes / 60;

@@ -113,7 +113,11 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
 
   const logsWithDelta = useMemo<ReadingLogWithDelta[]>(() => {
     let previousPage = 0;
-    return logs.map((log) => {
+    const sortedLogs = [...logs].sort(
+      (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+    );
+
+    return sortedLogs.map((log) => {
       const pagesReadDelta = Math.max(0, log.current_page - previousPage);
       previousPage = log.current_page;
       return {

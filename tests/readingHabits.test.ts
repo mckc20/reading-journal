@@ -31,7 +31,7 @@ test("returns empty metrics for no logs", () => {
   assert.equal(metrics.weekdays.lowest, null);
 });
 
-test("computes weighted speed and excludes each book's first in-range log", () => {
+test("computes weighted speed and includes each book's first in-range log", () => {
   const logs: ReadingLog[] = [
     makeLog("a1", "book-a", "2026-01-01T08:00:00", 50, 30),
     makeLog("a2", "book-a", "2026-01-02T08:00:00", 80, 30),
@@ -45,12 +45,23 @@ test("computes weighted speed and excludes each book's first in-range log", () =
   assert.equal(metrics.duration.averageMinutes, 36);
   assert.equal(metrics.duration.sessionsUsed, 5);
 
-  assert.equal(metrics.speed.sessionsUsed, 3);
-  assert.equal(metrics.speed.totalPages, 110);
+  assert.equal(metrics.speed.sessionsUsed, 5);
+  assert.equal(metrics.speed.totalPages, 280);
   assert.ok(metrics.speed.totalHours);
   assert.ok(metrics.speed.averagePagesPerHour);
-  assert.equal(metrics.speed.totalHours.toFixed(2), "2.17");
-  assert.equal(metrics.speed.averagePagesPerHour.toFixed(1), "50.8");
+  assert.equal(metrics.speed.totalHours.toFixed(2), "3.00");
+  assert.equal(metrics.speed.averagePagesPerHour.toFixed(1), "93.3");
+});
+
+test("computes speed from a single reading log", () => {
+  const logs: ReadingLog[] = [makeLog("a1", "book-a", "2026-01-01T08:00:00", 50, 30)];
+
+  const metrics = calculateReadingHabits(logs, "2026-01-01T00:00:00", "2026-01-31T23:59:59");
+
+  assert.equal(metrics.speed.sessionsUsed, 1);
+  assert.equal(metrics.speed.totalPages, 50);
+  assert.equal(metrics.speed.totalHours, 0.5);
+  assert.equal(metrics.speed.averagePagesPerHour, 100);
 });
 
 test("ignores zero minutes and non-positive page deltas for speed", () => {
@@ -63,10 +74,10 @@ test("ignores zero minutes and non-positive page deltas for speed", () => {
 
   const metrics = calculateReadingHabits(logs, "2026-01-01T00:00:00", "2026-01-31T23:59:59");
 
-  assert.equal(metrics.speed.sessionsUsed, 1);
-  assert.equal(metrics.speed.totalPages, 12);
-  assert.equal(metrics.speed.totalHours, 0.5);
-  assert.equal(metrics.speed.averagePagesPerHour, 24);
+  assert.equal(metrics.speed.sessionsUsed, 2);
+  assert.equal(metrics.speed.totalPages, 62);
+  assert.equal(metrics.speed.totalHours.toFixed(2), "0.92");
+  assert.equal(metrics.speed.averagePagesPerHour?.toFixed(1), "67.6");
 });
 
 test("computes usual reading time and dominant hour in local time", () => {
