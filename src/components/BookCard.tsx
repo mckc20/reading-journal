@@ -12,12 +12,14 @@ interface BookCardProps {
   book: Book;
   onClick: (book: Book) => void;
   showQuickProgress?: boolean;
+  textSize?: "default" | "compact";
 }
 
 export default function BookCard({
   book,
   onClick,
   showQuickProgress = false,
+  textSize = "default",
 }: BookCardProps) {
   const { updateBook } = useBooksContext();
 
@@ -62,9 +64,13 @@ export default function BookCard({
       </div>
 
       <CardContent className="p-2 space-y-1">
-        <p className="text-sm font-medium leading-tight line-clamp-2">{book.title}</p>
-        <p className="text-xs text-muted-foreground line-clamp-1">{book.authors.join(", ")}</p>
-        <Badge variant={statusVariant(book.status)} className="text-xs">
+        <p className={textSize === "compact" ? "text-xs font-medium leading-tight line-clamp-2" : "text-sm font-medium leading-tight line-clamp-2"}>
+          {book.title}
+        </p>
+        <p className={textSize === "compact" ? "text-[11px] text-muted-foreground line-clamp-1" : "text-xs text-muted-foreground line-clamp-1"}>
+          {book.authors.join(", ")}
+        </p>
+        <Badge variant={statusVariant(book.status)} className={textSize === "compact" ? "text-[10px]" : "text-xs"}>
           {book.status}
         </Badge>
         {!showDashboardQuickProgress && progress !== null && (
