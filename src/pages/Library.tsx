@@ -400,6 +400,10 @@ export default function Library() {
     return [];
   }, [contentView, books, series]);
 
+  const displayedBookCount = activePrimaryShelf
+    ? visibleBooks.length
+    : groupedBooks.reduce((count, group) => count + group.books.length, 0);
+
   return (
     <div className="space-y-4 md:flex md:h-[calc(100svh-6.5rem)] md:min-h-0 md:flex-col">
       <div className="flex items-center justify-between">
@@ -408,7 +412,7 @@ export default function Library() {
           <span className="hidden md:inline">Library</span>
         </h1>
         <span className="text-sm text-muted-foreground">
-          {loading ? "..." : `${books.length} book${books.length !== 1 ? "s" : ""}`}
+          {loading ? "..." : `${displayedBookCount} book${displayedBookCount !== 1 ? "s" : ""}`}
         </span>
       </div>
 
