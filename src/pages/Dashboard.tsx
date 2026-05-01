@@ -88,9 +88,14 @@ export default function Dashboard() {
           {upNext.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-lg font-heading leading-snug font-medium">Up Next</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
                 {upNext.map((book) => (
-                  <BookCard key={book.id} book={book} onClick={openBook} />
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    onClick={openBook}
+                    textSize="compact"
+                  />
                 ))}
               </div>
             </section>
