@@ -245,6 +245,10 @@ function groupCountLabel(count: number) {
   return `${count} book${count !== 1 ? "s" : ""}`;
 }
 
+function itemCountLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function LibraryShelfList({
   activeView,
   counts,
@@ -430,9 +434,13 @@ export default function Library() {
     return [];
   }, [contentView, books, series]);
 
-  const displayedBookCount = activePrimaryShelf
-    ? visibleBooks.length
-    : books.length;
+  const displayedCountLabel = (() => {
+    if (activePrimaryShelf) return itemCountLabel(visibleBooks.length, "book");
+    if (contentView === "series") return itemCountLabel(categoryCounts.series ?? 0, "series", "series");
+    if (contentView === "authors") return itemCountLabel(categoryCounts.authors ?? 0, "author");
+    if (contentView === "genres") return itemCountLabel(categoryCounts.genres ?? 0, "genre");
+    return itemCountLabel(books.length, "book");
+  })();
 
   return (
     <div className="space-y-4 md:flex md:h-[calc(100svh-6.5rem)] md:min-h-0 md:flex-col">
@@ -442,7 +450,7 @@ export default function Library() {
           <span className="hidden md:inline">Library</span>
         </h1>
         <span className="text-sm text-muted-foreground">
-          {loading ? "..." : `${displayedBookCount} book${displayedBookCount !== 1 ? "s" : ""}`}
+          {loading ? "..." : displayedCountLabel}
         </span>
       </div>
 
