@@ -7,7 +7,6 @@ import {
   List,
   Plus,
   RefreshCw,
-  Search,
   Star,
   X,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -85,7 +83,7 @@ type CategoryShelf = {
 
 type LibrarySort = "date-added" | "title" | "author" | "date-finished";
 
-type LibraryDisplay = "grid" | "table";
+type LibraryDisplay = "grid" | "compact" | "table";
 
 type LibraryFilterKey =
   | "genre"
@@ -125,7 +123,7 @@ const filterLabels: Record<LibraryFilterKey, string> = {
 const allFilterValue = "__all__";
 
 const validSorts = new Set<LibrarySort>(["date-added", "title", "author", "date-finished"]);
-const validDisplays = new Set<LibraryDisplay>(["grid", "table"]);
+const validDisplays = new Set<LibraryDisplay>(["grid", "compact", "table"]);
 const primaryShelves: PrimaryShelf[] = [
   {
     value: "all",
@@ -336,6 +334,74 @@ function BooksView({
     <BooksTable books={books} onBook={onBook} />
   ) : (
     <BooksGrid books={books} onBook={onBook} />
+  );
+}
+
+function LibraryViewModeSwitcher({
+  display,
+  onDisplayChange,
+}: {
+  display: LibraryDisplay;
+  onDisplayChange: (display: LibraryDisplay) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+      <Button
+        type="button"
+        size="icon-sm"
+        variant={display === "grid" ? "secondary" : "ghost"}
+        aria-label="Grid view"
+        aria-pressed={display === "grid"}
+        onClick={() => onDisplayChange("grid")}
+      >
+        <Grid2X2 className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon-sm"
+        variant={display === "table" ? "secondary" : "ghost"}
+        aria-label="Table view"
+        aria-pressed={display === "table"}
+        onClick={() => onDisplayChange("table")}
+      >
+        <List className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+function LibrarySection({
+  title,
+  countLabel,
+  action,
+  children,
+}: {
+  title: string;
+  countLabel?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-heading text-xl font-medium leading-snug">{title}</h2>
+          {countLabel && (
+            <p className="text-xs text-muted-foreground">{countLabel}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function LibraryPlaceholder({ message }: { message: string }) {
+  return (
+    <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
+      {message}
+    </div>
   );
 }
 
@@ -703,40 +769,24 @@ function StatusFilterSelect({
   );
 }
 
-function LibraryToolbar({
-  title,
-  countLabel,
-  query,
+function LibraryControlsBar({
   sort,
-  display,
   activeView,
   filters,
   filterOptions,
   activeFilterChips,
-  loading,
-  onAddBook,
-  onQueryChange,
   onSortChange,
-  onDisplayChange,
   onViewChange,
   onFilterChange,
   onRemoveFilter,
   onClearFilters,
 }: {
-  title: string;
-  countLabel: string;
-  query: string;
   sort: LibrarySort;
-  display: LibraryDisplay;
   activeView?: LibraryView;
   filters: LibraryFilters;
   filterOptions: LibraryFilterOptions;
   activeFilterChips: ActiveFilterChip[];
-  loading: boolean;
-  onAddBook: () => void;
-  onQueryChange: (query: string) => void;
   onSortChange: (sort: LibrarySort) => void;
-  onDisplayChange: (display: LibraryDisplay) => void;
   onViewChange: (view: LibraryView) => void;
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
   onRemoveFilter: (keys: LibraryFilterKey[]) => void;
@@ -746,32 +796,8 @@ function LibraryToolbar({
   const hasActiveFilters = activeFilterChips.length > 0;
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-heading leading-snug font-medium">{title}</h1>
-          <p className="text-sm text-muted-foreground">{loading ? "..." : countLabel}</p>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
-          <div className="relative min-w-0 sm:w-72 lg:w-80">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Search books..."
-              className="pl-8"
-            />
-          </div>
-
-          <Button type="button" onClick={onAddBook} className="sm:w-auto">
-            <Plus className="h-4 w-4" />
-            Add Book
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 border-y py-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 border-y py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {activeView && (
             <StatusFilterSelect activeView={activeView} onViewChange={onViewChange} />
@@ -785,6 +811,15 @@ function LibraryToolbar({
             emptyLabel="Genre"
             triggerClassName="w-[8.5rem]"
           />
+          <Button
+            type="button"
+            variant="outline"
+            className="w-[8.5rem] justify-between text-muted-foreground"
+            disabled
+            title="Dedicated tags are planned for a later step."
+          >
+            Tags
+          </Button>
           <FilterSelect
             label="Rating"
             value={filters.rating}
@@ -822,29 +857,6 @@ function LibraryToolbar({
               <SelectItem value="date-finished">Date finished</SelectItem>
             </SelectContent>
           </Select>
-
-          <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
-            <Button
-              type="button"
-              size="icon-sm"
-              variant={display === "grid" ? "secondary" : "ghost"}
-              aria-label="Grid view"
-              aria-pressed={display === "grid"}
-              onClick={() => onDisplayChange("grid")}
-            >
-              <Grid2X2 className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant={display === "table" ? "secondary" : "ghost"}
-              aria-label="Table view"
-              aria-pressed={display === "table"}
-              onClick={() => onDisplayChange("table")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -891,6 +903,36 @@ function LibraryToolbar({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function LibraryToolbar({
+  title,
+  countLabel,
+  loading,
+  onAddBook,
+}: {
+  title: string;
+  countLabel: string;
+  loading: boolean;
+  onAddBook: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <h1 className="font-heading text-4xl font-bold leading-tight">{title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {title === "My Books" ? "Your library, your stories." : loading ? "..." : countLabel}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
+        <Button type="button" onClick={onAddBook} className="sm:w-auto">
+          <Plus className="h-4 w-4" />
+          Add Book
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1043,6 +1085,87 @@ function activePrimaryShelfForView(view: LibraryView) {
   return primaryShelves.find((shelf) => shelf.value === view);
 }
 
+function readingShelfBooks(books: Book[], series: Series[], query: string, sort: LibrarySort) {
+  return filterAndSortBooks({
+    books: books.filter((book) => book.status === "Reading"),
+    series,
+    query,
+    sort,
+  });
+}
+
+function MyBooksOverview({
+  books,
+  continueReadingBooks,
+  display,
+  loading,
+  hasActiveFilters,
+  query,
+  countLabel,
+  controls,
+  onDisplayChange,
+  onBook,
+}: {
+  books: Book[];
+  continueReadingBooks: Book[];
+  display: LibraryDisplay;
+  loading: boolean;
+  hasActiveFilters: boolean;
+  query: string;
+  countLabel: string;
+  controls: ReactNode;
+  onDisplayChange: (display: LibraryDisplay) => void;
+  onBook: (book: Book) => void;
+}) {
+  const hasSearch = Boolean(normalizeSearchText(query));
+
+  return (
+    <div className="space-y-8">
+      <LibrarySection title="Continue Reading">
+        {loading ? (
+          <LoadingGrid />
+        ) : continueReadingBooks.length > 0 ? (
+          <BooksGrid books={continueReadingBooks.slice(0, 6)} onBook={onBook} />
+        ) : (
+          <LibraryPlaceholder message="Books you are currently reading will appear here first." />
+        )}
+      </LibrarySection>
+
+      <LibrarySection title="Your Shelves">
+        <LibraryPlaceholder message="Smart shelf rows for Currently Reading, Want to Read, Recently Finished, and Favorites will be added in the next step." />
+      </LibrarySection>
+
+      <LibrarySection
+        title="All Books"
+        countLabel={loading ? "..." : countLabel}
+        action={
+          <LibraryViewModeSwitcher
+            display={display}
+            onDisplayChange={onDisplayChange}
+          />
+        }
+      >
+        {controls}
+        {loading ? (
+          <LoadingGrid />
+        ) : books.length === 0 ? (
+          <EmptyLibraryView
+            message={
+              hasSearch
+                ? "No books match your search."
+                : hasActiveFilters
+                  ? "No books match your filters."
+                  : "No books yet. Tap + to add one."
+            }
+          />
+        ) : (
+          <BooksView books={books} display={display} onBook={onBook} />
+        )}
+      </LibrarySection>
+    </div>
+  );
+}
+
 type AppLayoutOutletContext = {
   onAddBookClick: () => void;
 };
@@ -1089,14 +1212,6 @@ export default function Library() {
       navigate("/library", { replace: true });
     }
   }, [navigate, viewParam]);
-
-  useEffect(() => {
-    if (displayParam === "compact") {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("display");
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [displayParam, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!shouldLoadNotes || notesLoaded) return;
@@ -1194,6 +1309,17 @@ export default function Library() {
     });
   }, [activePrimaryShelf, books, libraryFilters, libraryQuery, librarySort, series]);
 
+  const continueReadingBooks = useMemo(
+    () =>
+      readingShelfBooks(
+        applyLibraryFilters(books, libraryFilters),
+        series,
+        libraryQuery,
+        librarySort,
+      ),
+    [books, libraryFilters, libraryQuery, librarySort, series],
+  );
+
   const filteredBooks = useMemo(() => {
     if (!activeValueShelf || !selectedValue || activeValueShelf === "notes") return [];
     return filterAndSortBooks({
@@ -1262,6 +1388,21 @@ export default function Library() {
   const toolbarStatusView = statusFilterOptions.some((option) => option.value === contentView)
     ? contentView
     : undefined;
+  const isMyBooksOverview = activePrimaryShelf?.value === "all";
+  const controlsBar = (
+    <LibraryControlsBar
+      sort={librarySort}
+      activeView={toolbarStatusView}
+      filters={libraryFilters}
+      filterOptions={filterOptions}
+      activeFilterChips={activeFilterChips}
+      onSortChange={(sort) => updateLibraryParam("sort", sort)}
+      onViewChange={updateLibraryView}
+      onFilterChange={updateLibraryFilter}
+      onRemoveFilter={removeLibraryFilters}
+      onClearFilters={clearLibraryFilters}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -1269,22 +1410,8 @@ export default function Library() {
         <LibraryToolbar
           title={pageTitle}
           countLabel={displayedCountLabel}
-          query={libraryQuery}
-          sort={librarySort}
-          display={libraryDisplay}
-          activeView={toolbarStatusView}
-          filters={libraryFilters}
-          filterOptions={filterOptions}
-          activeFilterChips={activeFilterChips}
           loading={loading}
           onAddBook={onAddBookClick}
-          onQueryChange={(query) => updateLibraryParam("q", query)}
-          onSortChange={(sort) => updateLibraryParam("sort", sort)}
-          onDisplayChange={(display) => updateLibraryParam("display", display)}
-          onViewChange={updateLibraryView}
-          onFilterChange={updateLibraryFilter}
-          onRemoveFilter={removeLibraryFilters}
-          onClearFilters={clearLibraryFilters}
         />
       )}
 
@@ -1319,43 +1446,61 @@ export default function Library() {
         </div>
       )}
 
-      <section className="min-w-0">
-        {loading ? (
-          <LoadingGrid />
-        ) : activePrimaryShelf ? (
-          visibleBooks.length === 0 ? (
-            <EmptyLibraryView
-              message={
-                normalizeSearchText(libraryQuery)
-                  ? "No books match your search."
-                  : hasActiveFilters
-                    ? "No books match your filters."
-                  : activePrimaryShelf.emptyMessage
-              }
-            />
-          ) : (
-            <BooksView books={visibleBooks} display={libraryDisplay} onBook={openBook} />
-          )
-        ) : selectedValue && activeValueShelf && activeValueShelf !== "notes" ? (
-          filteredBooks.length === 0 ? (
-            <EmptyLibraryView
-              message={
-                normalizeSearchText(libraryQuery)
-                  ? `No books match your search in ${selectedValue}.`
-                  : hasActiveFilters
-                    ? `No books match your filters in ${selectedValue}.`
-                  : `No books found for ${selectedValue}.`
-              }
-            />
-          ) : (
-            <BooksView books={filteredBooks} display={libraryDisplay} onBook={openBook} />
-          )
-        ) : isNotesView ? (
-          notesError ? null : <GroupedNotesView groups={groupedNotes} onBook={openBook} />
-        ) : (
-          <GroupedBooksView groups={groupedBooks} onBook={openBook} />
-        )}
-      </section>
+      {isMyBooksOverview ? (
+        <MyBooksOverview
+          books={visibleBooks}
+          continueReadingBooks={continueReadingBooks}
+          display={libraryDisplay}
+          loading={loading}
+          hasActiveFilters={hasActiveFilters}
+          query={libraryQuery}
+          countLabel={displayedCountLabel}
+          controls={controlsBar}
+          onDisplayChange={(display) => updateLibraryParam("display", display)}
+          onBook={openBook}
+        />
+      ) : (
+        <>
+          {showLibraryToolbar && controlsBar}
+          <section className="min-w-0">
+            {loading ? (
+              <LoadingGrid />
+            ) : activePrimaryShelf ? (
+              visibleBooks.length === 0 ? (
+                <EmptyLibraryView
+                  message={
+                    normalizeSearchText(libraryQuery)
+                      ? "No books match your search."
+                      : hasActiveFilters
+                        ? "No books match your filters."
+                      : activePrimaryShelf.emptyMessage
+                  }
+                />
+              ) : (
+                <BooksView books={visibleBooks} display={libraryDisplay} onBook={openBook} />
+              )
+            ) : selectedValue && activeValueShelf && activeValueShelf !== "notes" ? (
+              filteredBooks.length === 0 ? (
+                <EmptyLibraryView
+                  message={
+                    normalizeSearchText(libraryQuery)
+                      ? `No books match your search in ${selectedValue}.`
+                      : hasActiveFilters
+                        ? `No books match your filters in ${selectedValue}.`
+                      : `No books found for ${selectedValue}.`
+                  }
+                />
+              ) : (
+                <BooksView books={filteredBooks} display={libraryDisplay} onBook={openBook} />
+              )
+            ) : isNotesView ? (
+              notesError ? null : <GroupedNotesView groups={groupedNotes} onBook={openBook} />
+            ) : (
+              <GroupedBooksView groups={groupedBooks} onBook={openBook} />
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
