@@ -223,7 +223,6 @@ function AppShell({
         <DesktopSidebar
           pathname={pathname}
           search={search}
-          onAddBookClick={appHeaderProps.onAddBookClick}
         />
 
         <div className="flex min-h-svh min-w-0 flex-1 flex-col">
@@ -231,7 +230,7 @@ function AppShell({
           <DesktopUtilityBar profileMenuProps={desktopProfileMenuProps} />
 
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 pb-24 sm:px-6 md:px-8 md:py-8 md:pb-8 lg:px-10">
-            <Outlet />
+            <Outlet context={{ onAddBookClick: appHeaderProps.onAddBookClick }} />
           </main>
 
           <MobileBottomNav pathname={pathname} search={search} />
@@ -250,11 +249,9 @@ function AppShell({
 function DesktopSidebar({
   pathname,
   search,
-  onAddBookClick,
 }: {
   pathname: string;
   search: string;
-  onAddBookClick: () => void;
 }) {
   return (
     <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex md:flex-col">
@@ -265,13 +262,6 @@ function DesktopSidebar({
           className="h-7 w-7 rounded-sm object-cover dark:brightness-0 dark:invert"
         />
         <span className="font-heading text-sm font-medium">Reading Journal</span>
-      </div>
-
-      <div className="px-4 pb-4">
-        <Button className="w-full justify-start gap-2" onClick={onAddBookClick}>
-          <Plus className="h-4 w-4" />
-          Add Book
-        </Button>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">

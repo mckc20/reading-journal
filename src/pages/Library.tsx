@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
-  Filter,
   Grid2X2,
   Heart,
   List,
+  Plus,
   RefreshCw,
   Search,
   Star,
@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -84,9 +83,9 @@ type CategoryShelf = {
   label: string;
 };
 
-type LibrarySort = "title" | "newest" | "rating" | "progress";
+type LibrarySort = "date-added" | "title" | "author" | "date-finished";
 
-type LibraryDisplay = "grid" | "compact";
+type LibraryDisplay = "grid" | "table";
 
 type LibraryFilterKey =
   | "genre"
@@ -125,8 +124,8 @@ const filterLabels: Record<LibraryFilterKey, string> = {
 
 const allFilterValue = "__all__";
 
-const validSorts = new Set<LibrarySort>(["title", "newest", "rating", "progress"]);
-const validDisplays = new Set<LibraryDisplay>(["grid", "compact"]);
+const validSorts = new Set<LibrarySort>(["date-added", "title", "author", "date-finished"]);
+const validDisplays = new Set<LibraryDisplay>(["grid", "table"]);
 const primaryShelves: PrimaryShelf[] = [
   {
     value: "all",
@@ -177,8 +176,8 @@ const categoryShelves: CategoryShelf[] = [
   { value: "belongs-to", label: "Belongs to" },
 ];
 
-const statusTabs: Array<Pick<PrimaryShelf, "value" | "label">> = [
-  { value: "all", label: "All" },
+const statusFilterOptions: Array<Pick<PrimaryShelf, "value" | "label">> = [
+  { value: "all", label: "Status" },
   { value: "reading", label: "Currently Reading" },
   { value: "tbr", label: "Want to Read" },
   { value: "finished", label: "Read" },
@@ -232,81 +231,95 @@ function LoadingGrid() {
   );
 }
 
-function CompactBookRow({ book, onBook }: { book: Book; onBook: (b: Book) => void }) {
-  const progress = getBookProgress(book);
-  const hasProgress = book.status === "Reading" && book.total_pages && book.total_pages > 0;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onBook(book)}
-      className="grid w-full grid-cols-[3rem_minmax(0,1fr)] gap-3 rounded-lg border bg-background p-2 text-left transition-colors hover:bg-muted/50 dark:bg-card sm:grid-cols-[3.5rem_minmax(0,1fr)_auto]"
-    >
-      <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="h-5 w-5 text-muted-foreground/40" />
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 space-y-1">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium leading-snug">{book.title}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {book.authors.join(", ")}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={statusVariant(book.status)} className="text-[10px]">
-            {book.status}
-          </Badge>
-          {book.rating ? (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Star className="h-3 w-3 fill-current" />
-              {book.rating}
-            </span>
-          ) : null}
-          {book.is_favorite && (
-            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" aria-label="Favorite" />
-          )}
-        </div>
-        {hasProgress && (
-          <div className="flex items-center gap-2 pt-1">
-            <Progress value={progress} className="h-1.5 flex-1" />
-            <span className="text-xs text-muted-foreground">{progress}%</span>
-          </div>
-        )}
-      </div>
-
-      <div className="hidden min-w-24 text-right text-xs text-muted-foreground sm:block">
-        {book.current_page && book.total_pages ? (
-          <span>
-            {book.current_page} / {book.total_pages} pages
-          </span>
-        ) : (
-          <span>{book.format ?? book.language ?? ""}</span>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function CompactBooksList({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
+function BooksTable({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
   if (books.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      {books.map((book) => (
-        <CompactBookRow key={book.id} book={book} onBook={onBook} />
-      ))}
+    <div className="overflow-x-auto rounded-lg border bg-background dark:bg-card">
+      <table className="w-full min-w-[48rem] text-left text-sm">
+        <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2">Book</th>
+            <th className="px-3 py-2">Status</th>
+            <th className="px-3 py-2">Rating</th>
+            <th className="px-3 py-2">Progress</th>
+            <th className="px-3 py-2">Format</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {books.map((book) => (
+            <BookTableRow key={book.id} book={book} onBook={onBook} />
+          ))}
+        </tbody>
+      </table>
     </div>
+  );
+}
+
+function BookTableRow({ book, onBook }: { book: Book; onBook: (b: Book) => void }) {
+  const progress = getBookProgress(book);
+
+  return (
+    <tr
+      tabIndex={0}
+      role="button"
+      onClick={() => onBook(book)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onBook(book);
+        }
+      }}
+      className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+    >
+      <td className="px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+            {book.cover_url ? (
+              <img
+                src={book.cover_url}
+                alt={book.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <BookOpen className="h-4 w-4 text-muted-foreground/40" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="max-w-72 truncate font-medium leading-snug">{book.title}</p>
+            <p className="max-w-72 truncate text-xs text-muted-foreground">
+              {book.authors.join(", ")}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-2">
+        <Badge variant={statusVariant(book.status)} className="text-[10px]">
+          {book.status}
+        </Badge>
+      </td>
+      <td className="px-3 py-2">
+        {book.rating ? (
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Star className="h-3.5 w-3.5 fill-current" />
+            {book.rating}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+        {book.is_favorite && (
+          <Heart className="ml-2 inline h-3.5 w-3.5 fill-rose-500 text-rose-500" aria-label="Favorite" />
+        )}
+      </td>
+      <td className="px-3 py-2">
+        <span className="text-muted-foreground">{progress}%</span>
+      </td>
+      <td className="px-3 py-2 text-muted-foreground">
+        {book.format ?? book.language ?? "-"}
+      </td>
+    </tr>
   );
 }
 
@@ -319,11 +332,11 @@ function BooksView({
   display: LibraryDisplay;
   onBook: (b: Book) => void;
 }) {
-  if (display === "compact") {
-    return <CompactBooksList books={books} onBook={onBook} />;
-  }
-
-  return <BooksGrid books={books} onBook={onBook} />;
+  return display === "table" ? (
+    <BooksTable books={books} onBook={onBook} />
+  ) : (
+    <BooksGrid books={books} onBook={onBook} />
+  );
 }
 
 function groupCountLabel(count: number) {
@@ -443,6 +456,9 @@ function buildActiveFilterChips(filters: LibraryFilters): ActiveFilterChip[] {
 }
 
 function getBookProgress(book: Book): number {
+  if (book.status === "Finished") return 100;
+  if (["Wishlist", "Not Started", "Up Next"].includes(book.status)) return 0;
+
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
 
@@ -473,16 +489,20 @@ function matchesLibrarySearch(book: Book, series: Series[], query: string): bool
 
 function sortLibraryBooks(books: Book[], sort: LibrarySort): Book[] {
   return [...books].sort((a, b) => {
-    if (sort === "newest") {
+    if (sort === "date-added") {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     }
 
-    if (sort === "rating") {
-      return (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title);
+    if (sort === "author") {
+      const firstAuthorA = a.authors[0] ?? "";
+      const firstAuthorB = b.authors[0] ?? "";
+      return firstAuthorA.localeCompare(firstAuthorB) || a.title.localeCompare(b.title);
     }
 
-    if (sort === "progress") {
-      return getBookProgress(b) - getBookProgress(a) || a.title.localeCompare(b.title);
+    if (sort === "date-finished") {
+      const finishedA = a.date_finished ? new Date(a.date_finished).getTime() : 0;
+      const finishedB = b.date_finished ? new Date(b.date_finished).getTime() : 0;
+      return finishedB - finishedA || a.title.localeCompare(b.title);
     }
 
     return a.title.localeCompare(b.title);
@@ -583,25 +603,33 @@ function FilterSelect({
   options,
   onChange,
   formatOption = (option) => option,
+  showLabel = true,
+  emptyLabel,
+  triggerClassName,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
   formatOption?: (option: string) => string;
+  showLabel?: boolean;
+  emptyLabel?: string;
+  triggerClassName?: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+    <div className={cn(showLabel && "space-y-1.5")}>
+      {showLabel && <Label className="text-xs text-muted-foreground">{label}</Label>}
       <Select
         value={value || allFilterValue}
         onValueChange={(nextValue) => onChange(nextValue === allFilterValue ? "" : nextValue)}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger aria-label={label} className={cn("w-full", triggerClassName)}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={allFilterValue}>Any</SelectItem>
+          <SelectItem value={allFilterValue}>
+            {emptyLabel ?? `Any ${label.toLowerCase()}`}
+          </SelectItem>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
               {formatOption(option)}
@@ -613,7 +641,7 @@ function FilterSelect({
   );
 }
 
-function LibraryFilterFields({
+function AdvancedFilterFields({
   filters,
   filterOptions,
   onFilterChange,
@@ -623,19 +651,7 @@ function LibraryFilterFields({
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <FilterSelect
-        label="Genre"
-        value={filters.genre}
-        options={filterOptions.genre}
-        onChange={(value) => onFilterChange("genre", value)}
-      />
-      <FilterSelect
-        label="Rating"
-        value={filters.rating}
-        options={filterOptions.rating}
-        onChange={(value) => onFilterChange("rating", value)}
-      />
+    <div className="grid gap-3 sm:grid-cols-2">
       <FilterSelect
         label="Year"
         value={filters.year}
@@ -664,7 +680,7 @@ function LibraryFilterFields({
   );
 }
 
-function LibraryStatusTabs({
+function StatusFilterSelect({
   activeView,
   onViewChange,
 }: {
@@ -672,212 +688,188 @@ function LibraryStatusTabs({
   onViewChange: (view: LibraryView) => void;
 }) {
   return (
-    <div className="overflow-x-auto border-b">
-      <div className="flex min-w-max items-center gap-6 px-0.5">
-        {statusTabs.map((tab) => {
-          const isActive = activeView === tab.value;
-
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              className={cn(
-                "relative py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                isActive && "text-foreground",
-              )}
-              aria-current={isActive ? "page" : undefined}
-              onClick={() => onViewChange(tab.value)}
-            >
-              {tab.label}
-              <span
-                className={cn(
-                  "absolute inset-x-0 bottom-[-1px] h-0.5 rounded-full bg-foreground opacity-0 transition-opacity",
-                  isActive && "opacity-100",
-                )}
-              />
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <Select value={activeView} onValueChange={(value) => onViewChange(value as LibraryView)}>
+      <SelectTrigger aria-label="Status" className="w-[8.75rem]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {statusFilterOptions.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
 function LibraryToolbar({
+  title,
+  countLabel,
   query,
   sort,
   display,
+  activeView,
   filters,
   filterOptions,
   activeFilterChips,
+  loading,
+  onAddBook,
   onQueryChange,
   onSortChange,
   onDisplayChange,
+  onViewChange,
   onFilterChange,
   onRemoveFilter,
   onClearFilters,
 }: {
+  title: string;
+  countLabel: string;
   query: string;
   sort: LibrarySort;
   display: LibraryDisplay;
+  activeView?: LibraryView;
   filters: LibraryFilters;
   filterOptions: LibraryFilterOptions;
   activeFilterChips: ActiveFilterChip[];
+  loading: boolean;
+  onAddBook: () => void;
   onQueryChange: (query: string) => void;
   onSortChange: (sort: LibrarySort) => void;
   onDisplayChange: (display: LibraryDisplay) => void;
+  onViewChange: (view: LibraryView) => void;
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
   onRemoveFilter: (keys: LibraryFilterKey[]) => void;
   onClearFilters: () => void;
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const desktopFiltersRef = useRef<HTMLDivElement>(null);
   const hasActiveFilters = activeFilterChips.length > 0;
 
-  useEffect(() => {
-    if (!filtersOpen) return;
-
-    function closeDesktopFiltersOnOutsideClick(event: PointerEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (desktopFiltersRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest("[data-slot='select-content']")) return;
-      setFiltersOpen(false);
-    }
-
-    document.addEventListener("pointerdown", closeDesktopFiltersOnOutsideClick);
-    return () => {
-      document.removeEventListener("pointerdown", closeDesktopFiltersOnOutsideClick);
-    };
-  }, [filtersOpen]);
-
   return (
-    <div className="space-y-2">
-      <div ref={desktopFiltersRef} className="relative">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant={hasActiveFilters ? "secondary" : "outline"}
-              className="hidden lg:inline-flex"
-              onClick={() => setFiltersOpen((open) => !open)}
-              aria-expanded={filtersOpen}
-            >
-              <Filter className="h-4 w-4" />
-              Filter
-              {hasActiveFilters && (
-                <span className="ml-0.5 rounded-full bg-background px-1.5 text-xs text-muted-foreground">
-                  {activeFilterChips.length}
-                </span>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant={hasActiveFilters ? "secondary" : "outline"}
-              className="lg:hidden"
-              onClick={() => setMobileFiltersOpen(true)}
-              aria-expanded={mobileFiltersOpen}
-            >
-              <Filter className="h-4 w-4" />
-              Filter
-              {hasActiveFilters && (
-                <span className="ml-0.5 rounded-full bg-background px-1.5 text-xs text-muted-foreground">
-                  {activeFilterChips.length}
-                </span>
-              )}
-            </Button>
-
-            <Select value={sort} onValueChange={(value) => onSortChange(value as LibrarySort)}>
-              <SelectTrigger className="w-[10.5rem]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="title">Title A-Z</SelectItem>
-                <SelectItem value="newest">Recently added</SelectItem>
-                <SelectItem value="rating">Rating high to low</SelectItem>
-                <SelectItem value="progress">Progress high to low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
-            <div className="relative min-w-0 sm:w-64 lg:w-72">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => onQueryChange(event.target.value)}
-                placeholder="Search books, authors, genres..."
-                className="pl-8"
-              />
-            </div>
-
-            <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
-              <Button
-                type="button"
-                size="icon-sm"
-                variant={display === "grid" ? "secondary" : "ghost"}
-                aria-label="Grid view"
-                aria-pressed={display === "grid"}
-                onClick={() => onDisplayChange("grid")}
-              >
-                <Grid2X2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant={display === "compact" ? "secondary" : "ghost"}
-                aria-label="Compact view"
-                aria-pressed={display === "compact"}
-                onClick={() => onDisplayChange("compact")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-heading leading-snug font-medium">{title}</h1>
+          <p className="text-sm text-muted-foreground">{loading ? "..." : countLabel}</p>
         </div>
 
-        {filtersOpen && (
-          <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 hidden rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg lg:block">
-            <LibraryFilterFields
-              filters={filters}
-              filterOptions={filterOptions}
-              onFilterChange={onFilterChange}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
+          <div className="relative min-w-0 sm:w-72 lg:w-80">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Search books..."
+              className="pl-8"
             />
-            {hasActiveFilters && (
-              <div className="mt-3 flex justify-end">
-                <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
-                  Clear filters
-                </Button>
-              </div>
-            )}
           </div>
-        )}
 
-        <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-          <DialogContent className="max-h-[min(42rem,calc(100%-2rem))] overflow-y-auto sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Filters</DialogTitle>
-            </DialogHeader>
-            <LibraryFilterFields
-              filters={filters}
-              filterOptions={filterOptions}
-              onFilterChange={onFilterChange}
-            />
-            <DialogFooter>
-              {hasActiveFilters && (
-                <Button type="button" variant="ghost" onClick={onClearFilters}>
-                  Clear filters
-                </Button>
-              )}
-              <Button type="button" onClick={() => setMobileFiltersOpen(false)}>
-                Done
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          <Button type="button" onClick={onAddBook} className="sm:w-auto">
+            <Plus className="h-4 w-4" />
+            Add Book
+          </Button>
+        </div>
       </div>
+
+      <div className="flex flex-col gap-2 border-y py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeView && (
+            <StatusFilterSelect activeView={activeView} onViewChange={onViewChange} />
+          )}
+          <FilterSelect
+            label="Genre"
+            value={filters.genre}
+            options={filterOptions.genre}
+            onChange={(value) => onFilterChange("genre", value)}
+            showLabel={false}
+            emptyLabel="Genre"
+            triggerClassName="w-[8.5rem]"
+          />
+          <FilterSelect
+            label="Rating"
+            value={filters.rating}
+            options={filterOptions.rating}
+            onChange={(value) => onFilterChange("rating", value)}
+            showLabel={false}
+            emptyLabel="Rating"
+            triggerClassName="w-[8.5rem]"
+          />
+          <Button
+            type="button"
+            variant={hasActiveFilters ? "secondary" : "outline"}
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
+          >
+            More filters
+            {hasActiveFilters && (
+              <span className="ml-0.5 rounded-full bg-background px-1.5 text-xs text-muted-foreground">
+                {activeFilterChips.length}
+              </span>
+            )}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Select value={sort} onValueChange={(value) => onSortChange(value as LibrarySort)}>
+            <SelectTrigger className="w-[12.5rem] justify-start gap-1.5" aria-label="Sort books">
+              <span className="text-muted-foreground">Sort by:</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="author">Author</SelectItem>
+              <SelectItem value="date-added">Date added</SelectItem>
+              <SelectItem value="date-finished">Date finished</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={display === "grid" ? "secondary" : "ghost"}
+              aria-label="Grid view"
+              aria-pressed={display === "grid"}
+              onClick={() => onDisplayChange("grid")}
+            >
+              <Grid2X2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={display === "table" ? "secondary" : "ghost"}
+              aria-label="Table view"
+              aria-pressed={display === "table"}
+              onClick={() => onDisplayChange("table")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="left-auto right-0 top-0 h-svh max-h-svh max-w-full translate-x-0 translate-y-0 content-start overflow-y-auto rounded-none border-l p-4 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>More filters</DialogTitle>
+          </DialogHeader>
+          <AdvancedFilterFields
+            filters={filters}
+            filterOptions={filterOptions}
+            onFilterChange={onFilterChange}
+          />
+          <DialogFooter>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={onClearFilters}>
+                Clear filters
+              </Button>
+            )}
+            <Button type="button" onClick={() => setFiltersOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2">
@@ -1051,9 +1043,14 @@ function activePrimaryShelfForView(view: LibraryView) {
   return primaryShelves.find((shelf) => shelf.value === view);
 }
 
+type AppLayoutOutletContext = {
+  onAddBookClick: () => void;
+};
+
 export default function Library() {
   const { books, loading: booksLoading, error, reload } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
+  const { onAddBookClick } = useOutletContext<AppLayoutOutletContext>();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
@@ -1072,7 +1069,7 @@ export default function Library() {
   const activeView = hasExplicitView ? viewParam : undefined;
   const contentView = activeView ?? "all";
   const libraryQuery = queryParam;
-  const librarySort: LibrarySort = isLibrarySort(sortParam) ? sortParam : "title";
+  const librarySort: LibrarySort = isLibrarySort(sortParam) ? sortParam : "date-added";
   const libraryDisplay: LibraryDisplay = isLibraryDisplay(displayParam) ? displayParam : "grid";
   const isNotesView = contentView === "notes";
   const activeCategoryShelf = categoryShelves.find((shelf) => shelf.value === contentView);
@@ -1083,7 +1080,8 @@ export default function Library() {
   );
   const shouldLoadNotes = isNotesView;
   const loading = booksLoading || seriesLoading || (isNotesView && notesLoading);
-  const pageTitle = selectedValue ?? getViewLabel(contentView);
+  const isPrimaryShelfView = Boolean(activePrimaryShelfForView(contentView));
+  const pageTitle = isPrimaryShelfView ? "My Books" : selectedValue ?? getViewLabel(contentView);
   const filterOptions = useMemo(() => buildLibraryFilterOptions(books), [books]);
 
   useEffect(() => {
@@ -1091,6 +1089,14 @@ export default function Library() {
       navigate("/library", { replace: true });
     }
   }, [navigate, viewParam]);
+
+  useEffect(() => {
+    if (displayParam === "compact") {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("display");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [displayParam, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!shouldLoadNotes || notesLoaded) return;
@@ -1133,7 +1139,7 @@ export default function Library() {
     const normalizedValue = key === "q" ? value.trim() : value;
     const isDefaultValue =
       !normalizedValue ||
-      (key === "sort" && normalizedValue === "title") ||
+      (key === "sort" && normalizedValue === "date-added") ||
       (key === "display" && normalizedValue === "grid");
 
     if (isDefaultValue) {
@@ -1253,38 +1259,44 @@ export default function Library() {
     return itemCountLabel(books.length, "book");
   })();
   const hasActiveFilters = activeFilterChips.length > 0;
-  const showStatusTabs = statusTabs.some((tab) => tab.value === contentView);
+  const toolbarStatusView = statusFilterOptions.some((option) => option.value === contentView)
+    ? contentView
+    : undefined;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-heading leading-snug font-medium">
-          {pageTitle}
-        </h1>
-        <span className="text-sm text-muted-foreground">
-          {loading ? "..." : displayedCountLabel}
-        </span>
-      </div>
-
-      {showStatusTabs && (
-        <LibraryStatusTabs activeView={contentView} onViewChange={updateLibraryView} />
-      )}
-
       {showLibraryToolbar && (
         <LibraryToolbar
+          title={pageTitle}
+          countLabel={displayedCountLabel}
           query={libraryQuery}
           sort={librarySort}
           display={libraryDisplay}
+          activeView={toolbarStatusView}
           filters={libraryFilters}
           filterOptions={filterOptions}
           activeFilterChips={activeFilterChips}
+          loading={loading}
+          onAddBook={onAddBookClick}
           onQueryChange={(query) => updateLibraryParam("q", query)}
           onSortChange={(sort) => updateLibraryParam("sort", sort)}
           onDisplayChange={(display) => updateLibraryParam("display", display)}
+          onViewChange={updateLibraryView}
           onFilterChange={updateLibraryFilter}
           onRemoveFilter={removeLibraryFilters}
           onClearFilters={clearLibraryFilters}
         />
+      )}
+
+      {!showLibraryToolbar && (
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-heading leading-snug font-medium">
+            {pageTitle}
+          </h1>
+          <span className="text-sm text-muted-foreground">
+            {loading ? "..." : displayedCountLabel}
+          </span>
+        </div>
       )}
 
       {error && (
