@@ -39,8 +39,17 @@ export default function BookCard({
 
   return (
     <Card
-      className="cursor-pointer overflow-hidden pt-0 gap-0 pb-2 hover:ring-2 hover:ring-primary/40 transition-shadow"
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer overflow-hidden pt-0 gap-0 pb-2 transition-shadow hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={() => onClick(book)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick(book);
+        }
+      }}
     >
       {/* Cover */}
       <div className="relative aspect-[2/3] w-full bg-muted flex-shrink-0">
@@ -48,6 +57,7 @@ export default function BookCard({
           <img
             src={book.cover_url}
             alt={book.title}
+            loading="lazy"
             className="h-full w-full object-cover"
           />
         ) : (
