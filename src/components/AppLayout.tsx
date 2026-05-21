@@ -41,9 +41,9 @@ type NavLink = {
 
 const sidebarNavLinks: NavLink[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/library?view=all", label: "My Books", icon: Library },
-  { to: "/library?view=series", label: "Series", icon: BookMarked },
-  { to: "/library?view=authors", label: "Authors", icon: UserRound },
+  { to: "/library", label: "My Books", icon: Library },
+  { to: "/library/explore?view=series", label: "Series", icon: BookMarked },
+  { to: "/library/explore?view=authors", label: "Authors", icon: UserRound },
   { to: "/analytics", label: "Stats", icon: BarChart3 },
   { to: "/shelves", label: "Shelves", icon: Bookmark },
   { to: "/settings/profile", label: "Settings", icon: Settings },
@@ -57,9 +57,9 @@ const mobilePrimaryLinks: NavLink[] = [
 
 const mobileMenuLinks: NavLink[] = [
   { to: "/search", label: "Search", icon: Search },
-  { to: "/library?view=all", label: "My Books", icon: Library },
-  { to: "/library?view=series", label: "Series", icon: BookMarked },
-  { to: "/library?view=authors", label: "Authors", icon: UserRound },
+  { to: "/library", label: "My Books", icon: Library },
+  { to: "/library/explore?view=series", label: "Series", icon: BookMarked },
+  { to: "/library/explore?view=authors", label: "Authors", icon: UserRound },
   { to: "/shelves", label: "Shelves", icon: Bookmark },
   { to: "/groups", label: "Groups", icon: Users },
   { to: "/settings/profile", label: "Settings", icon: Settings },
@@ -76,7 +76,7 @@ function isActiveRoute(pathname: string, search: string, to: string): boolean {
   const targetParams = new URLSearchParams(targetSearch);
   const targetView = targetParams.get("view");
 
-  if (!targetView) return pathname === targetPathname || pathname.startsWith(`${targetPathname}/`);
+  if (!targetView) return pathname === targetPathname;
 
   const currentParams = new URLSearchParams(search);
   const currentView = currentParams.get("view") ?? "all";
