@@ -4,10 +4,11 @@ import {
   BookOpen,
   Grid2X2,
   Heart,
-  List,
   Plus,
   RefreshCw,
+  Rows3,
   Star,
+  Table2,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,10 @@ import {
 } from "@/lib/libraryShelves";
 import { cn, statusVariant } from "@/lib/utils";
 import BookCard from "@/components/BookCard";
+import BookShelf from "@/pages/library/BookShelf";
+import CompactBookCard from "@/pages/library/CompactBookCard";
+import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
+import ShelfCarousel from "@/pages/library/ShelfCarousel";
 import type { Book, BookNote, Series } from "@/types";
 
 type LibraryView =
@@ -60,6 +65,7 @@ type LibraryView =
   | "finished"
   | "wishlist"
   | "dnf"
+  | "favorites"
   | "series"
   | "authors"
   | "genres"
@@ -100,6 +106,14 @@ type LibraryFilterOptions = Record<LibraryFilterKey, string[]>;
 type ActiveFilterChip = {
   keys: LibraryFilterKey[];
   label: string;
+};
+
+type SmartShelf = {
+  key: "currently-reading" | "want-to-read" | "recently-finished" | "favorites";
+  title: string;
+  books: Book[];
+  view: LibraryView;
+  emptyMessage: string;
 };
 
 const filterKeys: LibraryFilterKey[] = [
@@ -161,6 +175,12 @@ const primaryShelves: PrimaryShelf[] = [
     matches: (book) => book.status === "DNF",
     emptyMessage: "No DNF books yet.",
   },
+  {
+    value: "favorites",
+    label: "Favorites",
+    matches: (book) => book.is_favorite,
+    emptyMessage: "No favorite books yet.",
+  },
 ];
 
 const categoryShelves: CategoryShelf[] = [
@@ -211,9 +231,20 @@ function EmptyLibraryView({ message }: { message: string }) {
 function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
   if (books.length === 0) return null;
   return (
-    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-[repeat(auto-fill,110px)] justify-start gap-3 sm:grid-cols-[repeat(auto-fill,140px)]">
       {books.map((book) => (
         <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" />
+      ))}
+    </div>
+  );
+}
+
+function CompactBooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
+  if (books.length === 0) return null;
+  return (
+    <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+      {books.map((book) => (
+        <CompactBookCard key={book.id} book={book} onBook={onBook} />
       ))}
     </div>
   );
@@ -277,6 +308,7 @@ function BookTableRow({ book, onBook }: { book: Book; onBook: (b: Book) => void 
               <img
                 src={book.cover_url}
                 alt={book.title}
+                loading="lazy"
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -330,11 +362,18 @@ function BooksView({
   display: LibraryDisplay;
   onBook: (b: Book) => void;
 }) {
-  return display === "table" ? (
-    <BooksTable books={books} onBook={onBook} />
-  ) : (
-    <BooksGrid books={books} onBook={onBook} />
-  );
+  if (display === "table") {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg border bg-muted/20 p-4">
+          <h3 className="font-heading text-base font-medium leading-snug">Management Mode</h3>
+        </div>
+        <BooksTable books={books} onBook={onBook} />
+      </div>
+    );
+  }
+  if (display === "compact") return <CompactBooksGrid books={books} onBook={onBook} />;
+  return <BooksGrid books={books} onBook={onBook} />;
 }
 
 function LibraryViewModeSwitcher({
@@ -359,12 +398,22 @@ function LibraryViewModeSwitcher({
       <Button
         type="button"
         size="icon-sm"
+        variant={display === "compact" ? "secondary" : "ghost"}
+        aria-label="Compact view"
+        aria-pressed={display === "compact"}
+        onClick={() => onDisplayChange("compact")}
+      >
+        <Rows3 className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon-sm"
         variant={display === "table" ? "secondary" : "ghost"}
         aria-label="Table view"
         aria-pressed={display === "table"}
         onClick={() => onDisplayChange("table")}
       >
-        <List className="h-4 w-4" />
+        <Table2 className="h-4 w-4" />
       </Button>
     </div>
   );
@@ -403,6 +452,32 @@ function LibraryPlaceholder({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+function libraryResultsEmptyMessage({
+  hasSearch,
+  hasActiveFilters,
+  fallback,
+}: {
+  hasSearch: boolean;
+  hasActiveFilters: boolean;
+  fallback: string;
+}) {
+  if (hasSearch) return "No books match your search.";
+  if (hasActiveFilters) return "No books match your filters.";
+  return fallback;
+}
+
+function continueReadingEmptyMessage({
+  hasSearch,
+  hasActiveFilters,
+}: {
+  hasSearch: boolean;
+  hasActiveFilters: boolean;
+}) {
+  if (hasSearch) return "No current reads match your search.";
+  if (hasActiveFilters) return "No current reads match your filters.";
+  return "Books you are currently reading will appear here first.";
 }
 
 function groupCountLabel(count: number) {
@@ -1094,9 +1169,61 @@ function readingShelfBooks(books: Book[], series: Series[], query: string, sort:
   });
 }
 
+function compareRecentlyFinishedBooks(a: Book, b: Book): number {
+  const finishedA = a.date_finished ? new Date(a.date_finished).getTime() : 0;
+  const finishedB = b.date_finished ? new Date(b.date_finished).getTime() : 0;
+  const addedA = new Date(a.created_at).getTime();
+  const addedB = new Date(b.created_at).getTime();
+
+  return finishedB - finishedA || addedB - addedA || a.title.localeCompare(b.title);
+}
+
+function buildSmartShelves(books: Book[]): SmartShelf[] {
+  const currentlyReading = books.filter((book) => book.status === "Reading");
+  const wantToRead = books.filter((book) =>
+    ["Wishlist", "Not Started", "Up Next"].includes(book.status),
+  );
+  const recentlyFinished = books
+    .filter((book) => book.status === "Finished")
+    .sort(compareRecentlyFinishedBooks);
+  const favorites = books.filter((book) => book.is_favorite);
+
+  return [
+    {
+      key: "currently-reading",
+      title: "Currently Reading",
+      books: currentlyReading,
+      view: "reading",
+      emptyMessage: "Books you are currently reading will appear here.",
+    },
+    {
+      key: "want-to-read",
+      title: "Want to Read",
+      books: wantToRead,
+      view: "tbr",
+      emptyMessage: "Wishlist, Not Started, and Up Next books will appear here.",
+    },
+    {
+      key: "recently-finished",
+      title: "Recently Finished",
+      books: recentlyFinished,
+      view: "finished",
+      emptyMessage: "Finished books will appear here.",
+    },
+    {
+      key: "favorites",
+      title: "Favorites",
+      books: favorites,
+      view: "favorites",
+      emptyMessage: "Tap the heart on a book to collect favorites here.",
+    },
+  ];
+}
+
 function MyBooksOverview({
   books,
   continueReadingBooks,
+  smartShelves,
   display,
   loading,
   hasActiveFilters,
@@ -1104,10 +1231,12 @@ function MyBooksOverview({
   countLabel,
   controls,
   onDisplayChange,
+  onViewAll,
   onBook,
 }: {
   books: Book[];
   continueReadingBooks: Book[];
+  smartShelves: SmartShelf[];
   display: LibraryDisplay;
   loading: boolean;
   hasActiveFilters: boolean;
@@ -1115,6 +1244,7 @@ function MyBooksOverview({
   countLabel: string;
   controls: ReactNode;
   onDisplayChange: (display: LibraryDisplay) => void;
+  onViewAll: (view: LibraryView) => void;
   onBook: (book: Book) => void;
 }) {
   const hasSearch = Boolean(normalizeSearchText(query));
@@ -1125,14 +1255,39 @@ function MyBooksOverview({
         {loading ? (
           <LoadingGrid />
         ) : continueReadingBooks.length > 0 ? (
-          <BooksGrid books={continueReadingBooks.slice(0, 6)} onBook={onBook} />
+          <ShelfCarousel
+            ariaLabel="Continue reading books"
+            itemClassName="w-[72vw] max-w-[18rem] shrink-0 sm:w-[15rem] lg:w-[13.5rem]"
+            className="gap-4"
+          >
+            {continueReadingBooks.slice(0, 8).map((book) => (
+              <ContinueReadingCard key={book.id} book={book} onBook={onBook} />
+            ))}
+          </ShelfCarousel>
         ) : (
-          <LibraryPlaceholder message="Books you are currently reading will appear here first." />
+          <LibraryPlaceholder
+            message={continueReadingEmptyMessage({ hasSearch, hasActiveFilters })}
+          />
         )}
       </LibrarySection>
 
       <LibrarySection title="Your Shelves">
-        <LibraryPlaceholder message="Smart shelf rows for Currently Reading, Want to Read, Recently Finished, and Favorites will be added in the next step." />
+        {loading ? (
+          <LoadingGrid />
+        ) : (
+          <div className="space-y-7">
+            {smartShelves.map((shelf) => (
+              <BookShelf
+                key={shelf.key}
+                title={shelf.title}
+                books={shelf.books}
+                onBook={onBook}
+                onViewAll={() => onViewAll(shelf.view)}
+                emptyMessage={shelf.emptyMessage}
+              />
+            ))}
+          </div>
+        )}
       </LibrarySection>
 
       <LibrarySection
@@ -1150,13 +1305,11 @@ function MyBooksOverview({
           <LoadingGrid />
         ) : books.length === 0 ? (
           <EmptyLibraryView
-            message={
-              hasSearch
-                ? "No books match your search."
-                : hasActiveFilters
-                  ? "No books match your filters."
-                  : "No books yet. Tap + to add one."
-            }
+            message={libraryResultsEmptyMessage({
+              hasSearch,
+              hasActiveFilters,
+              fallback: "No books yet. Tap + to add one.",
+            })}
           />
         ) : (
           <BooksView books={books} display={display} onBook={onBook} />
@@ -1320,6 +1473,11 @@ export default function Library() {
     [books, libraryFilters, libraryQuery, librarySort, series],
   );
 
+  const smartShelves = useMemo(
+    () => buildSmartShelves(visibleBooks),
+    [visibleBooks],
+  );
+
   const filteredBooks = useMemo(() => {
     if (!activeValueShelf || !selectedValue || activeValueShelf === "notes") return [];
     return filterAndSortBooks({
@@ -1450,6 +1608,7 @@ export default function Library() {
         <MyBooksOverview
           books={visibleBooks}
           continueReadingBooks={continueReadingBooks}
+          smartShelves={smartShelves}
           display={libraryDisplay}
           loading={loading}
           hasActiveFilters={hasActiveFilters}
@@ -1457,6 +1616,7 @@ export default function Library() {
           countLabel={displayedCountLabel}
           controls={controlsBar}
           onDisplayChange={(display) => updateLibraryParam("display", display)}
+          onViewAll={updateLibraryView}
           onBook={openBook}
         />
       ) : (
@@ -1468,13 +1628,11 @@ export default function Library() {
             ) : activePrimaryShelf ? (
               visibleBooks.length === 0 ? (
                 <EmptyLibraryView
-                  message={
-                    normalizeSearchText(libraryQuery)
-                      ? "No books match your search."
-                      : hasActiveFilters
-                        ? "No books match your filters."
-                      : activePrimaryShelf.emptyMessage
-                  }
+                  message={libraryResultsEmptyMessage({
+                    hasSearch: Boolean(normalizeSearchText(libraryQuery)),
+                    hasActiveFilters,
+                    fallback: activePrimaryShelf.emptyMessage,
+                  })}
                 />
               ) : (
                 <BooksView books={visibleBooks} display={libraryDisplay} onBook={openBook} />
