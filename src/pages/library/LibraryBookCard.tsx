@@ -33,7 +33,7 @@ export default function LibraryBookCard({
       type="button"
       onClick={() => onBook(book)}
       className={cn(
-        "group block rounded-lg text-left transition duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "group block rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isShelf
           ? "w-full space-y-2"
           : "w-[110px] overflow-hidden border bg-background shadow-sm hover:shadow-md sm:w-[140px] dark:bg-card",
@@ -41,7 +41,7 @@ export default function LibraryBookCard({
     >
       <div
         className={cn(
-          "relative h-[165px] w-[110px] overflow-hidden bg-muted shadow-sm sm:h-[210px] sm:w-[140px]",
+          "relative h-[135px] w-[90px] overflow-hidden bg-muted shadow-sm sm:h-[168px] sm:w-[112px]",
           isShelf && "rounded-md",
         )}
       >
