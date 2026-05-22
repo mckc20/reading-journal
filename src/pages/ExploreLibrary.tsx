@@ -1548,7 +1548,7 @@ function MyBooksOverview({
         )}
       </LibrarySection>
 
-      <LibrarySection title="Your Shelves">
+      <LibrarySection title="Bookshelves">
         {loading ? (
           <LoadingGrid />
         ) : (
