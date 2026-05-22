@@ -1,8 +1,11 @@
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
 import { Navigate, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
-import { BookOpen, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
+import { useSeries } from "@/hooks/useSeries";
+import { buildSeriesGroups, type BookGroup } from "@/lib/libraryShelves";
+import { cn } from "@/lib/utils";
 import BookShelf from "@/pages/library/BookShelf";
 import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import type { Book } from "@/types";
@@ -154,16 +157,235 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
   ];
 }
 
+function SeriesCoverLayer({
+  book,
+  index,
+}: {
+  book: Book;
+  index: number;
+}) {
+  const layerStyles = [
+    "z-30 translate-x-0 translate-y-0 rotate-0 opacity-100 group-hover:translate-x-0.5 group-hover:rotate-[-0.5deg]",
+    "z-20 translate-x-2 -translate-y-1 rotate-[3deg] opacity-75 group-hover:translate-x-3 group-hover:rotate-[4deg]",
+    "z-10 translate-x-4 -translate-y-2 rotate-[5deg] opacity-55 group-hover:translate-x-5 group-hover:rotate-[6deg]",
+  ];
+
+  return (
+    <div
+      aria-hidden={index > 0}
+      className={cn(
+        "absolute left-0 top-2 h-[135px] w-[90px] overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none sm:h-[168px] sm:w-[112px]",
+        layerStyles[index],
+      )}
+    >
+      {book.cover_url ? (
+        <img
+          src={book.cover_url}
+          alt={index === 0 ? book.title : ""}
+          loading="lazy"
+          className="block h-full w-full scale-[1.035] object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeriesStackCard({
+  group,
+  onSeries,
+}: {
+  group: BookGroup;
+  onSeries: (seriesName: string) => void;
+}) {
+  const visibleBooks = group.books.slice(0, 3);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSeries(group.name)}
+      className="group block w-[122px] shrink-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-[148px]"
+      data-shelf-item
+    >
+      <div className="relative h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
+        {[...visibleBooks].reverse().map((book, reversedIndex) => {
+          const index = visibleBooks.length - 1 - reversedIndex;
+
+          return <SeriesCoverLayer key={book.id} book={book} index={index} />;
+        })}
+      </div>
+      <div className="mt-2 min-w-0">
+        <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">
+          {group.name}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {bookCountLabel(group.books.length)}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function SeriesShelf({
+  groups,
+  onViewAll,
+  onSeries,
+}: {
+  groups: BookGroup[];
+  onViewAll: () => void;
+  onSeries: (seriesName: string) => void;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  function updateScrollButtons() {
+    const row = rowRef.current;
+    if (!row) return;
+
+    setCanScrollLeft(row.scrollLeft > 1);
+    setCanScrollRight(row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+  }
+
+  function scrollOneSeries(direction: "left" | "right") {
+    const row = rowRef.current;
+    const firstItem = row?.querySelector<HTMLElement>("[data-shelf-item]");
+    if (!row || !firstItem) return;
+
+    const gap = parseFloat(getComputedStyle(row).columnGap || "0");
+    const step = firstItem.offsetWidth + gap;
+
+    row.scrollBy({
+      left: direction === "right" ? step : -step,
+      behavior: "smooth",
+    });
+  }
+
+  function handleRowWheel(event: WheelEvent<HTMLDivElement>) {
+    const row = rowRef.current;
+    if (!row) return;
+
+    const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+    if (rawDelta === 0) return;
+
+    const scrollLeft = row.scrollLeft;
+    const maxScrollLeft = row.scrollWidth - row.clientWidth;
+    const canMoveLeft = rawDelta < 0 && scrollLeft > 1;
+    const canMoveRight = rawDelta > 0 && scrollLeft < maxScrollLeft - 1;
+
+    if (!canMoveLeft && !canMoveRight) return;
+
+    event.preventDefault();
+    row.scrollBy({
+      left: rawDelta,
+      behavior: "auto",
+    });
+  }
+
+  useEffect(() => {
+    updateScrollButtons();
+
+    const row = rowRef.current;
+    if (!row) return;
+
+    const resizeObserver = new ResizeObserver(updateScrollButtons);
+    resizeObserver.observe(row);
+
+    return () => resizeObserver.disconnect();
+  }, [groups.length]);
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <section className="min-w-0 px-4 py-3 sm:px-5">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-sm font-semibold leading-snug">Book Series</h3>
+              <p className="text-xs text-muted-foreground">{groups.length}</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={onViewAll}
+          >
+            View all
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {groups.length > 0 ? (
+          <div className="relative">
+            {canScrollLeft && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="absolute left-0 top-1/2 z-40 -translate-y-1/2 rounded-full bg-background shadow-sm"
+                onClick={() => scrollOneSeries("left")}
+                aria-label="Scroll Book Series left"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+
+            <div
+              ref={rowRef}
+              aria-label="Book series shelf"
+              className="flex gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onScroll={updateScrollButtons}
+              onWheel={handleRowWheel}
+            >
+              {groups.map((group) => (
+                <SeriesStackCard key={group.name} group={group} onSeries={onSeries} />
+              ))}
+            </div>
+
+            {canScrollRight && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="absolute right-0 top-1/2 z-40 -translate-y-1/2 rounded-full bg-background shadow-sm"
+                onClick={() => scrollOneSeries("right")}
+                aria-label="Scroll Book Series right"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed bg-background/55 p-4 text-sm text-muted-foreground">
+            Series you add to books will appear here.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Library() {
   const { books, loading, error, reload } = useBooksContext();
+  const { series, loading: seriesLoading } = useSeries();
   const { onAddBookClick } = useOutletContext<AppLayoutOutletContext>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get("view");
   const sortedBooks = useMemo(() => sortByDateAdded(books), [books]);
   const smartShelves = useMemo(() => buildSmartShelves(sortedBooks), [sortedBooks]);
-  const previewBooks = sortedBooks.slice(0, 12);
+  const seriesGroups = useMemo(
+    () => buildSeriesGroups(sortedBooks, series),
+    [sortedBooks, series],
+  );
   const hasExploreParams = exploreParamKeys.some((key) => searchParams.has(key));
+  const loadingSeries = loading || seriesLoading;
 
   if ((viewParam && viewParam !== "all") || hasExploreParams) {
     const nextParams = new URLSearchParams(searchParams);
@@ -176,6 +398,15 @@ export default function Library() {
 
   function openExplore(path = "/library/explore") {
     navigate(path);
+  }
+
+  function openSeries(seriesName: string) {
+    const params = new URLSearchParams({
+      view: "series",
+      value: seriesName,
+    });
+
+    navigate(`/library/explore?${params.toString()}`);
   }
 
   return (
@@ -201,7 +432,7 @@ export default function Library() {
         </div>
       )}
 
-      <LibrarySection title="Your Shelves">
+      <LibrarySection title="Bookshelves">
         {loading ? (
           <LoadingGrid />
         ) : (
@@ -221,6 +452,18 @@ export default function Library() {
         )}
       </LibrarySection>
 
+      <section className="min-w-0 space-y-3">
+        {loadingSeries ? (
+          <LoadingGrid />
+        ) : (
+          <SeriesShelf
+            groups={seriesGroups}
+            onViewAll={() => openExplore("/library/explore?view=series")}
+            onSeries={openSeries}
+          />
+        )}
+      </section>
+
       <LibrarySection
         title="All Books"
         countLabel={loading ? "..." : bookCountLabel(books.length)}
@@ -233,14 +476,14 @@ export default function Library() {
       >
         {loading ? (
           <LoadingGrid />
-        ) : previewBooks.length === 0 ? (
+        ) : sortedBooks.length === 0 ? (
           <EmptyLibraryView message="No books yet. Tap + to add one." />
         ) : (
           <div
             aria-label="All books preview"
-            className="grid grid-cols-[repeat(auto-fill,90px)] justify-start gap-3 sm:grid-cols-[repeat(auto-fill,112px)]"
+            className="grid max-h-[282px] grid-cols-[repeat(auto-fill,90px)] justify-start gap-3 overflow-hidden sm:max-h-[348px] sm:grid-cols-[repeat(auto-fill,112px)]"
           >
-            {previewBooks.map((book) => (
+            {sortedBooks.map((book) => (
               <LibraryBookCard key={book.id} book={book} onBook={openBook} variant="shelf" />
             ))}
           </div>

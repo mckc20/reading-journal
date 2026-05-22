@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type WheelEvent } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Book } from "@/types";
@@ -44,6 +44,29 @@ export default function BookShelf({
     row.scrollBy({
       left: direction === "right" ? step : -step,
       behavior: "smooth",
+    });
+  }
+
+  function handleRowWheel(event: WheelEvent<HTMLDivElement>) {
+    const row = rowRef.current;
+    if (!row) return;
+
+    const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+    if (rawDelta === 0) return;
+
+    const scrollLeft = row.scrollLeft;
+    const maxScrollLeft = row.scrollWidth - row.clientWidth;
+    const canMoveLeft = rawDelta < 0 && scrollLeft > 1;
+    const canMoveRight = rawDelta > 0 && scrollLeft < maxScrollLeft - 1;
+
+    if (!canMoveLeft && !canMoveRight) return;
+
+    event.preventDefault();
+    row.scrollBy({
+      left: rawDelta,
+      behavior: "auto",
     });
   }
 
@@ -93,8 +116,9 @@ export default function BookShelf({
           <div
             ref={rowRef}
             aria-label={`${title} shelf`}
-            className="flex gap-3 overflow-hidden scroll-smooth"
+            className="flex gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             onScroll={updateScrollButtons}
+            onWheel={handleRowWheel}
           >
             {books.map((book) => (
               <div key={book.id} data-shelf-item className="shrink-0 basis-[90px] sm:basis-[112px]">
