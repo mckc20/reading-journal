@@ -4,9 +4,7 @@ import { BookOpen, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import BookShelf from "@/pages/library/BookShelf";
-import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
 import LibraryBookCard from "@/pages/library/LibraryBookCard";
-import ShelfCarousel from "@/pages/library/ShelfCarousel";
 import type { Book } from "@/types";
 
 type AppLayoutOutletContext = {
@@ -45,14 +43,6 @@ function LoadingGrid() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
       ))}
-    </div>
-  );
-}
-
-function LibraryPlaceholder({ message }: { message: string }) {
-  return (
-    <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-      {message}
     </div>
   );
 }
@@ -171,10 +161,6 @@ export default function Library() {
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get("view");
   const sortedBooks = useMemo(() => sortByDateAdded(books), [books]);
-  const continueReadingBooks = useMemo(
-    () => sortedBooks.filter((book) => book.status === "Reading"),
-    [sortedBooks],
-  );
   const smartShelves = useMemo(() => buildSmartShelves(sortedBooks), [sortedBooks]);
   const previewBooks = sortedBooks.slice(0, 12);
   const hasExploreParams = exploreParamKeys.some((key) => searchParams.has(key));
@@ -215,29 +201,11 @@ export default function Library() {
         </div>
       )}
 
-      <LibrarySection title="Continue Reading">
-        {loading ? (
-          <LoadingGrid />
-        ) : continueReadingBooks.length > 0 ? (
-          <ShelfCarousel
-            ariaLabel="Continue reading books"
-            itemClassName="w-[72vw] max-w-[18rem] shrink-0 sm:w-[15rem] lg:w-[13.5rem]"
-            className="gap-4"
-          >
-            {continueReadingBooks.slice(0, 8).map((book) => (
-              <ContinueReadingCard key={book.id} book={book} onBook={openBook} />
-            ))}
-          </ShelfCarousel>
-        ) : (
-          <LibraryPlaceholder message="Books you are currently reading will appear here first." />
-        )}
-      </LibrarySection>
-
       <LibrarySection title="Your Shelves">
         {loading ? (
           <LoadingGrid />
         ) : (
-          <div className="space-y-7">
+          <div className="overflow-hidden rounded-lg border bg-card">
             {smartShelves.map((shelf) => (
               <BookShelf
                 key={shelf.key}
@@ -245,6 +213,7 @@ export default function Library() {
                 books={shelf.books}
                 onBook={openBook}
                 onViewAll={() => openExplore(`/library/explore?view=${shelf.view}`)}
+                onAddBook={onAddBookClick}
                 emptyMessage={shelf.emptyMessage}
               />
             ))}
@@ -257,7 +226,7 @@ export default function Library() {
         countLabel={loading ? "..." : bookCountLabel(books.length)}
         action={
           <Button type="button" variant="ghost" size="sm" onClick={() => openExplore()}>
-            Explore more
+            View all
             <ChevronRight className="h-4 w-4" />
           </Button>
         }
@@ -269,7 +238,7 @@ export default function Library() {
         ) : (
           <div
             aria-label="All books preview"
-            className="grid grid-cols-[repeat(auto-fill,110px)] justify-start gap-3 sm:grid-cols-[repeat(auto-fill,140px)]"
+            className="grid grid-cols-[repeat(auto-fill,90px)] justify-start gap-3 sm:grid-cols-[repeat(auto-fill,112px)]"
           >
             {previewBooks.map((book) => (
               <LibraryBookCard key={book.id} book={book} onBook={openBook} variant="shelf" />

@@ -26,7 +26,7 @@ export default function CompactBookCard({ book, onBook }: CompactBookCardProps) 
     <button
       type="button"
       onClick={() => onBook(book)}
-      className="group flex min-w-0 gap-3 rounded-lg border bg-background p-2 text-left shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card"
+      className="group flex min-w-0 gap-3 rounded-lg border bg-background p-2 text-left shadow-sm transition-shadow duration-150 ease-out hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-card"
     >
       <div className="relative aspect-[2/3] w-14 shrink-0 overflow-hidden rounded-md bg-muted">
         {book.cover_url ? (
