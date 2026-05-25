@@ -7,6 +7,8 @@ const Login = lazy(() => import("@/pages/Login"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
 const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
+const Authors = lazy(() => import("@/pages/Authors"));
+const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
 const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
@@ -44,6 +46,8 @@ export const router = createBrowserRouter([
           { path: "/", element: lazyRoute(<Dashboard />) },
           { path: "/library", element: lazyRoute(<Library />) },
           { path: "/library/explore", element: lazyRoute(<ExploreLibrary />) },
+          { path: "/authors", element: lazyRoute(<Authors />) },
+          { path: "/authors/:authorName", element: lazyRoute(<AuthorDetails />) },
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
