@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -71,6 +71,12 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
+type BookDetailTab = "properties" | "notes" | "analytics";
+
+function getBookDetailTab(value: string | null): BookDetailTab {
+  return value === "notes" || value === "analytics" ? value : "properties";
+}
+
 function metadataSourceLabel(source: Book["metadata_source"]): string {
   switch (source) {
     case "open_library":
@@ -110,6 +116,7 @@ function formatDateForDisplay(value: string): string {
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
   const { series } = useSeries();
 
@@ -128,7 +135,23 @@ export default function BookDetails() {
   const [deleting, setDeleting] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<BookDetailTab>(() =>
+    getBookDetailTab(searchParams.get("tab")),
+  );
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setActiveTab(getBookDetailTab(searchParams.get("tab")));
+  }, [bookId, searchParams]);
+
+  function handleTabChange(value: string) {
+    const nextTab = getBookDetailTab(value);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextTab === "properties") nextParams.delete("tab");
+    else nextParams.set("tab", nextTab);
+    setActiveTab(nextTab);
+    setSearchParams(nextParams, { replace: true });
+  }
 
   const {
     register,
@@ -561,7 +584,7 @@ export default function BookDetails() {
         </div>
       </div>
 
-      <Tabs defaultValue="properties" className="flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col min-h-0">
         <TabsList className="w-full">
           <TabsTrigger value="properties" className="flex-1">
             Properties

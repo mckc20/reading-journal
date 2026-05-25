@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildNoteGroups,
   buildRatingGroups,
+  buildSeriesGroups,
   buildShelfValueSummaries,
   filterBooksByShelfValue,
 } from "../src/lib/libraryShelves";
@@ -176,6 +177,18 @@ test("filters books by selected series name", () => {
   });
 
   assert.deepEqual(filteredBooks.map((book) => book.id), ["assassin"]);
+});
+
+test("retains the stable series id when grouping series books", () => {
+  const groups = buildSeriesGroups(
+    [makeBook({ id: "assassin", title: "Assassin's Apprentice", series_id: "series-1" })],
+    [makeSeries({ id: "series-1", name: "Realm of the Elderlings" })],
+  );
+
+  assert.deepEqual(
+    groups.map((group) => ({ seriesId: group.seriesId, name: group.name })),
+    [{ seriesId: "series-1", name: "Realm of the Elderlings" }],
+  );
 });
 
 function makeBook(overrides: Partial<Book>): Book {
