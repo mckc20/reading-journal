@@ -1,6 +1,8 @@
 export { default as Login } from "./Login";
 export { default as Dashboard } from "./Dashboard";
 export { default as Library } from "./Library";
+export { default as Series } from "./Series";
+export { default as SeriesDetails } from "./SeriesDetails";
 export { default as Authors } from "./Authors";
 export { default as AuthorDetails } from "./AuthorDetails";
 export { default as Search } from "./Search";

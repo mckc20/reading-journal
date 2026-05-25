@@ -6,6 +6,8 @@ import AppLayout from "@/components/AppLayout";
 const Login = lazy(() => import("@/pages/Login"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
+const Series = lazy(() => import("@/pages/Series"));
+const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
 const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
@@ -45,6 +47,8 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: lazyRoute(<Dashboard />) },
           { path: "/library", element: lazyRoute(<Library />) },
+          { path: "/series", element: lazyRoute(<Series />) },
+          { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
           { path: "/library/explore", element: lazyRoute(<ExploreLibrary />) },
           { path: "/authors", element: lazyRoute(<Authors />) },
           { path: "/authors/:authorName", element: lazyRoute(<AuthorDetails />) },

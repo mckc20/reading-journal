@@ -6,6 +6,10 @@ export type BookGroup = {
   books: Book[];
 };
 
+export type SeriesBookGroup = BookGroup & {
+  seriesId: string;
+};
+
 export type LibraryNote = BookNote & {
   book: Book;
 };
@@ -55,7 +59,7 @@ function sortBooksByVolume(books: Book[]) {
   });
 }
 
-function sortGroups(groups: BookGroup[]) {
+function sortGroups<T extends BookGroup>(groups: T[]): T[] {
   return [...groups].sort((a, b) => {
     if (a.name === UNCATEGORIZED) return 1;
     if (b.name === UNCATEGORIZED) return -1;
@@ -126,22 +130,23 @@ export function buildSingleValueGroups(books: Book[], getValue: (book: Book) => 
   );
 }
 
-export function buildSeriesGroups(books: Book[], series: Series[]) {
-  const seriesById = new Map(series.map((item) => [item.id, item.name]));
+export function buildSeriesGroups(books: Book[], series: Series[]): SeriesBookGroup[] {
+  const seriesById = new Map(series.map((item) => [item.id, item]));
   const groups = new Map<string, Book[]>();
 
   books.forEach((book) => {
     if (!book.series_id) return;
 
-    const seriesName = seriesById.get(book.series_id);
-    if (!seriesName) return;
+    const seriesItem = seriesById.get(book.series_id);
+    if (!seriesItem) return;
 
-    addBookToGroup(groups, seriesName, book);
+    addBookToGroup(groups, seriesItem.id, book);
   });
 
   return sortGroups(
-    Array.from(groups, ([name, groupBooks]) => ({
-      name,
+    Array.from(groups, ([seriesId, groupBooks]) => ({
+      seriesId,
+      name: seriesById.get(seriesId)!.name,
       books: sortBooksByVolume(groupBooks),
     })),
   );

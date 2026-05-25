@@ -42,7 +42,7 @@ type NavLink = {
 const sidebarNavLinks: NavLink[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/library", label: "My Books", icon: Library },
-  { to: "/library/explore?view=series", label: "Series", icon: BookMarked },
+  { to: "/series", label: "Series", icon: BookMarked },
   { to: "/authors", label: "Authors", icon: UserRound },
   { to: "/analytics", label: "Stats", icon: BarChart3 },
   { to: "/shelves", label: "Shelves", icon: Bookmark },
@@ -58,7 +58,7 @@ const mobilePrimaryLinks: NavLink[] = [
 const mobileMenuLinks: NavLink[] = [
   { to: "/search", label: "Search", icon: Search },
   { to: "/library", label: "My Books", icon: Library },
-  { to: "/library/explore?view=series", label: "Series", icon: BookMarked },
+  { to: "/series", label: "Series", icon: BookMarked },
   { to: "/authors", label: "Authors", icon: UserRound },
   { to: "/shelves", label: "Shelves", icon: Bookmark },
   { to: "/groups", label: "Groups", icon: Users },
