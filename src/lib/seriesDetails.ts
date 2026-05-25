@@ -60,6 +60,16 @@ export type SeriesPaceChartRow = {
   pagesPerDay: number;
 };
 
+export type SeriesRankedBook = {
+  book: Book;
+  value: number;
+};
+
+export type SeriesFavoriteQuote = {
+  book: Book;
+  note: BookNote;
+};
+
 export type SeriesStats = {
   overview: {
     finishedBooks: number;
@@ -74,10 +84,14 @@ export type SeriesStats = {
   slowestRead: SeriesBookWinners | null;
   longestBook: SeriesBookWinners | null;
   shortestBook: SeriesBookWinners | null;
-  mostAnnotated: SeriesBookWinners | null;
-  mostHighlighted: SeriesBookWinners | null;
   durationChart: SeriesDurationChartRow[];
   paceChart: SeriesPaceChartRow[];
+  rankings: {
+    rating: SeriesRankedBook[];
+    pace: SeriesRankedBook[];
+    annotations: SeriesRankedBook[];
+  };
+  favoriteQuotes: SeriesFavoriteQuote[];
 };
 
 function compareBookTitles(a: Book, b: Book): number {
@@ -366,6 +380,7 @@ export function getSeriesStats(
 ): SeriesStats {
   const sortedBooks = sortSeriesBooks(books);
   const bookIds = new Set(sortedBooks.map((book) => book.id));
+  const bookOrder = new Map(sortedBooks.map((book, index) => [book.id, index]));
   const seriesLogs = filterSeriesLogs(sortedBooks, logs);
   const seriesNotes = notes.filter((note) => bookIds.has(note.book_id));
   const finishedBooks = sortedBooks.filter((book) => book.status === "Finished");
@@ -373,6 +388,11 @@ export function getSeriesStats(
     const days = getJourneyDurationDays(book, seriesLogs, now);
     return days === null ? [] : [{ book, value: days }];
   });
+  const paces = durations.flatMap(({ book, value }) =>
+    value > 0 && typeof book.total_pages === "number" && book.total_pages > 0
+      ? [{ book, value: book.total_pages / value }]
+      : [],
+  );
   const lengths = sortedBooks.flatMap((book) =>
     typeof book.total_pages === "number" && book.total_pages > 0
       ? [{ book, value: book.total_pages }]
@@ -383,10 +403,7 @@ export function getSeriesStats(
       book.id,
       {
         annotated: seriesNotes.filter(
-          (note) => note.book_id === book.id && (note.label === "note" || note.label === "review"),
-        ).length,
-        highlighted: seriesNotes.filter(
-          (note) => note.book_id === book.id && note.label === "quote",
+          (note) => note.book_id === book.id && (note.label === "note" || note.label === "quote"),
         ).length,
       },
     ]),
@@ -395,10 +412,33 @@ export function getSeriesStats(
     book,
     value: notesByBook.get(book.id)?.annotated ?? 0,
   }));
-  const highlights = sortedBooks.map((book) => ({
-    book,
-    value: notesByBook.get(book.id)?.highlighted ?? 0,
-  }));
+  const ratingRanking = sortedBooks
+    .flatMap((book) =>
+      typeof book.rating === "number" ? [{ book, value: book.rating }] : [],
+    )
+    .sort((a, b) => b.value - a.value || Number(b.book.is_favorite) - Number(a.book.is_favorite));
+  const paceRanking = [...paces].sort((a, b) => b.value - a.value);
+  const annotationRanking = annotations
+    .filter((candidate) => candidate.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const favoriteQuotes = seriesNotes
+    .filter(
+      (note) =>
+        note.label === "quote" &&
+        note.is_favorite &&
+        note.content.trim().length > 0,
+    )
+    .sort(
+      (a, b) =>
+        (bookOrder.get(a.book_id) ?? Number.MAX_SAFE_INTEGER) -
+          (bookOrder.get(b.book_id) ?? Number.MAX_SAFE_INTEGER) ||
+        b.note_date.localeCompare(a.note_date) ||
+        b.created_at.localeCompare(a.created_at),
+    )
+    .map((note) => ({
+      book: sortedBooks.find((book) => book.id === note.book_id)!,
+      note,
+    }));
   const journey = getSeriesJourneySpan(sortedBooks, seriesLogs, now);
   return {
     overview: {
@@ -412,24 +452,18 @@ export function getSeriesStats(
       durations.length > 0
         ? durations.reduce((sum, duration) => sum + duration.value, 0) / durations.length
         : null,
-    fastestRead: getWinnerBooks(durations, (values) => Math.min(...values)),
-    slowestRead: getWinnerBooks(durations, (values) => Math.max(...values)),
+    fastestRead: getWinnerBooks(paces, (values) => Math.max(...values)),
+    slowestRead: getWinnerBooks(paces, (values) => Math.min(...values)),
     longestBook: getWinnerBooks(lengths, (values) => Math.max(...values)),
     shortestBook: getWinnerBooks(lengths, (values) => Math.min(...values)),
-    mostAnnotated:
-      annotations.some((candidate) => candidate.value > 0)
-        ? getWinnerBooks(annotations, (values) => Math.max(...values))
-        : null,
-    mostHighlighted:
-      highlights.some((candidate) => candidate.value > 0)
-        ? getWinnerBooks(highlights, (values) => Math.max(...values))
-        : null,
     durationChart: durations.map(({ book, value }) => ({ book, days: value })),
-    paceChart: durations.flatMap(({ book, value }) =>
-      value > 0 && typeof book.total_pages === "number" && book.total_pages > 0
-        ? [{ book, pagesPerDay: book.total_pages / value }]
-        : [],
-    ),
+    paceChart: paces.map(({ book, value }) => ({ book, pagesPerDay: value })),
+    rankings: {
+      rating: ratingRanking,
+      pace: paceRanking,
+      annotations: annotationRanking,
+    },
+    favoriteQuotes,
   };
 }
 
