@@ -281,7 +281,7 @@ test("calculates timing series stats from eligible books only", () => {
   assert.equal(stats.averageDaysPerBook, 15);
 });
 
-test("selects duration and length winners with ties while excluding missing inputs", () => {
+test("selects pace and length winners with ties while excluding missing inputs", () => {
   const stats = getSeriesStats(
     [
       makeBook({
@@ -296,25 +296,34 @@ test("selects duration and length winners with ties while excluding missing inpu
         id: "b",
         volume_number: 2,
         status: "Finished",
-        total_pages: 100,
+        total_pages: 200,
         date_started: "2026-02-01",
         date_finished: "2026-02-06",
       }),
-      makeBook({ id: "c", volume_number: 3, status: "Finished", total_pages: 300 }),
-      makeBook({ id: "missing-pages", volume_number: 4 }),
+      makeBook({
+        id: "d",
+        volume_number: 3,
+        status: "Finished",
+        total_pages: 200,
+        date_started: "2026-03-01",
+        date_finished: "2026-03-11",
+      }),
+      makeBook({ id: "c", volume_number: 4, status: "Finished", total_pages: 300 }),
+      makeBook({ id: "missing-pages", volume_number: 5, status: "Finished", date_started: "2026-04-01", date_finished: "2026-04-02" }),
     ],
     [],
     [],
   );
 
-  assert.deepEqual(stats.fastestRead?.books.map((book) => book.id), ["a", "b"]);
-  assert.deepEqual(stats.slowestRead?.books.map((book) => book.id), ["a", "b"]);
-  assert.equal(stats.fastestRead?.value, 5);
+  assert.deepEqual(stats.fastestRead?.books.map((book) => book.id), ["b"]);
+  assert.equal(stats.fastestRead?.value, 40);
+  assert.deepEqual(stats.slowestRead?.books.map((book) => book.id), ["a", "d"]);
+  assert.equal(stats.slowestRead?.value, 20);
   assert.deepEqual(stats.longestBook?.books.map((book) => book.id), ["c"]);
-  assert.deepEqual(stats.shortestBook?.books.map((book) => book.id), ["a", "b"]);
+  assert.deepEqual(stats.shortestBook?.books.map((book) => book.id), ["a"]);
 });
 
-test("counts annotation and highlight note types separately", () => {
+test("counts notes and quotes as annotations while excluding reviews", () => {
   const books = [
     makeBook({ id: "one", volume_number: 1, is_favorite: true, rating: 2 }),
     makeBook({ id: "two", volume_number: 2, is_favorite: true, rating: 5 }),
@@ -325,14 +334,38 @@ test("counts annotation and highlight note types separately", () => {
     makeNote({ id: "one-review", book_id: "one", label: "review" }),
     makeNote({ id: "one-quote", book_id: "one", label: "quote" }),
     makeNote({ id: "two-quote", book_id: "two", label: "quote" }),
+    makeNote({ id: "two-review", book_id: "two", label: "review" }),
     makeNote({ id: "outside", book_id: "outside", label: "note" }),
   ];
 
   const stats = getSeriesStats(books, [], notes);
-  assert.deepEqual(stats.mostAnnotated?.books.map((book) => book.id), ["one"]);
-  assert.equal(stats.mostAnnotated?.value, 2);
-  assert.deepEqual(stats.mostHighlighted?.books.map((book) => book.id), ["one", "two"]);
-  assert.equal(stats.mostHighlighted?.value, 1);
+  assert.deepEqual(stats.rankings.annotations.map((row) => row.book.id), ["one", "two"]);
+  assert.deepEqual(stats.rankings.annotations.map((row) => row.value), [2, 1]);
+});
+
+test("builds rankings with favorite books first among equal ratings and includes only favorited series quotes", () => {
+  const books = [
+    makeBook({ id: "one", volume_number: 1, status: "Finished", rating: 3, total_pages: 100, date_started: "2026-01-01", date_finished: "2026-01-11" }),
+    makeBook({ id: "two", volume_number: 2, status: "Finished", rating: 5, total_pages: 180, date_started: "2026-02-01", date_finished: "2026-02-11" }),
+    makeBook({ id: "three", volume_number: 3, rating: 4 }),
+    makeBook({ id: "favorite-five", volume_number: 4, rating: 5, is_favorite: true }),
+  ];
+  const notes = [
+    makeNote({ id: "one-annotation", book_id: "one", label: "note" }),
+    makeNote({ id: "two-review", book_id: "two", label: "review" }),
+    makeNote({ id: "two-annotation", book_id: "two", label: "note" }),
+    makeNote({ id: "favorite-one", book_id: "one", label: "quote", is_favorite: true, content: "First" }),
+    makeNote({ id: "plain-quote", book_id: "one", label: "quote", content: "Not selected" }),
+    makeNote({ id: "favorite-three", book_id: "three", label: "quote", is_favorite: true, content: "Third" }),
+    makeNote({ id: "outside", book_id: "outside", label: "quote", is_favorite: true }),
+  ];
+
+  const stats = getSeriesStats(books, [], notes);
+
+  assert.deepEqual(stats.rankings.rating.map((row) => row.book.id), ["favorite-five", "two", "three", "one"]);
+  assert.deepEqual(stats.rankings.pace.map((row) => row.book.id), ["two", "one"]);
+  assert.deepEqual(stats.rankings.annotations.map((row) => row.book.id), ["one", "two", "three"]);
+  assert.deepEqual(stats.favoriteQuotes.map((entry) => entry.note.id), ["favorite-one", "favorite-three"]);
 });
 
 test("builds duration and pace chart rows in series order and excludes unusable pace data", () => {
@@ -369,10 +402,10 @@ test("keeps series stats neutral when required data is absent", () => {
   const empty = getSeriesStats([], [], []);
   assert.equal(empty.overview.pagesRead, 0);
   assert.equal(empty.overview.journeySpan, null);
-  assert.equal(empty.mostAnnotated, null);
-  assert.equal(empty.mostHighlighted, null);
   assert.deepEqual(empty.durationChart, []);
   assert.deepEqual(empty.paceChart, []);
+  assert.deepEqual(empty.rankings, { rating: [], pace: [], annotations: [] });
+  assert.deepEqual(empty.favoriteQuotes, []);
 
   const incomplete = getSeriesStats(
     [

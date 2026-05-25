@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Check, Flag, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Flag, Heart, Star } from "lucide-react";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -150,14 +150,20 @@ function WinnerStatsCard({
   books,
   detail,
   emptyLabel,
+  coveredByPair = false,
 }: {
   title: string;
   books: Book[];
   detail: string | null;
   emptyLabel: string;
+  coveredByPair?: boolean;
 }) {
   return (
-    <SummaryCard title={title} compact>
+    <SummaryCard
+      title={title}
+      compact
+      className={cn("h-full", coveredByPair && "pr-12")}
+    >
       {books.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
@@ -235,6 +241,110 @@ function SmallBookRow({
         )}
       </div>
     </Link>
+  );
+}
+
+function SeriesRankingCard({
+  title,
+  rows,
+  formatValue,
+  emptyLabel,
+  getTieKey = (row) => row.value,
+}: {
+  title: string;
+  rows: Array<{ book: Book; value: number }>;
+  formatValue: (value: number, book: Book) => string;
+  emptyLabel: string;
+  getTieKey?: (row: { book: Book; value: number }) => string | number;
+}) {
+  const rankingGroups = rows.reduce<
+    Array<{ key: string | number; value: number; rows: Array<{ book: Book; value: number }> }>
+  >(
+    (groups, row) => {
+      const key = getTieKey(row);
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup?.key === key) {
+        lastGroup.rows.push(row);
+      } else {
+        groups.push({ key, value: row.value, rows: [row] });
+      }
+      return groups;
+    },
+    [],
+  );
+
+  return (
+    <SummaryCard title={title} compact>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <ol className="space-y-3">
+          {rankingGroups.map((group, index) => {
+            const rank = index + 1;
+            const hasSharedFirstPlace = rank === 1 && group.rows.length > 1;
+            return (
+              <li key={`${group.value}-${group.rows[0].book.id}`}>
+                <div
+                  className={cn(
+                    "space-y-3",
+                    hasSharedFirstPlace && "rounded-lg bg-muted/50 p-1 ring-1 ring-border",
+                  )}
+                >
+                  {group.rows.map((row, rowIndex) => (
+                    <Link
+                      key={row.book.id}
+                      to={`/books/${row.book.id}`}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-muted/50",
+                        rank === 1 && !hasSharedFirstPlace && "bg-muted/50 ring-1 ring-border",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "w-5 shrink-0 text-center text-sm font-semibold text-muted-foreground",
+                          rank === 1 && "text-foreground",
+                        )}
+                      >
+                        {rowIndex === 0 ? rank : null}
+                      </span>
+                      <BookThumbnail book={row.book} />
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-medium">{row.book.title}</p>
+                        <p className="text-xs text-muted-foreground">{formatValue(row.value, row.book)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </SummaryCard>
+  );
+}
+
+function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
+  return (
+    <article className="flex min-h-48 flex-col rounded-xl border bg-card p-5">
+      <Heart className="h-4 w-4 fill-foreground text-foreground" aria-hidden />
+      <p className="mt-4 line-clamp-5 whitespace-pre-line font-serif text-base italic leading-7">
+        &ldquo;{note.content.trim()}&rdquo;
+      </p>
+      {note.quote_speaker && (
+        <p className="mt-2 text-sm text-muted-foreground">- {note.quote_speaker}</p>
+      )}
+      <Link
+        to={`/books/${book.id}?tab=notes`}
+        className="mt-auto flex items-center gap-3 pt-5 transition-colors hover:text-muted-foreground"
+      >
+        <BookThumbnail book={book} />
+        <div className="min-w-0">
+          <p className="line-clamp-2 text-sm font-medium">{book.title}</p>
+          <p className="text-xs text-muted-foreground">View quote</p>
+        </div>
+      </Link>
+    </article>
   );
 }
 
@@ -905,12 +1015,27 @@ export default function SeriesDetails() {
               </div>
 
               <section className="space-y-4">
-                <h2 className="font-heading text-xl font-medium">Books in this series</h2>
+                <h2 className="font-heading text-xl font-medium">Books</h2>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                   {seriesBooks.map((book, index) => (
                     <SeriesOverviewBookTile key={book.id} book={book} index={index} />
                   ))}
                 </div>
+              </section>
+
+              <section className="space-y-4">
+                <h2 className="font-heading text-xl font-medium">Favorite Quotes</h2>
+                {stats.favoriteQuotes.length === 0 ? (
+                  <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                    Quotes marked as favorite in this series will appear here.
+                  </p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {stats.favoriteQuotes.map(({ book, note }) => (
+                      <FavoriteQuoteCard key={note.id} book={book} note={note} />
+                    ))}
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -986,11 +1111,7 @@ export default function SeriesDetails() {
 
         <TabsContent value="stats" className="space-y-7">
           <h2 className="font-heading text-xl font-medium">Series Stats</h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatsOverviewCard
-              label="Books Completed"
-              value={`${stats.overview.finishedBooks}/${stats.overview.totalBooks}`}
-            />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatsOverviewCard
               label="Pages Read"
               value={
@@ -1032,51 +1153,31 @@ export default function SeriesDetails() {
           </div>
 
           <section className="space-y-4">
-            <h3 className="font-heading text-lg font-medium">Detailed Statistics</h3>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <WinnerStatsCard
-                title="Fastest read"
-                books={stats.fastestRead?.books ?? []}
-                detail={stats.fastestRead ? formatDaysSpent(stats.fastestRead.value) : null}
-                emptyLabel="No completed books with dates"
+            <div>
+              <h3 className="font-heading text-lg font-medium">Book Rankings</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Compare volumes by rating, reading pace, and annotations.
+              </p>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <SeriesRankingCard
+                title="Top Rated"
+                rows={stats.rankings.rating}
+                formatValue={(value, book) => (book.is_favorite ? "Favorite" : `${value.toFixed(1)} / 5`)}
+                emptyLabel="No ratings yet"
+                getTieKey={(row) => `${row.value}-${row.book.is_favorite ? "favorite" : "regular"}`}
               />
-              <WinnerStatsCard
-                title="Slowest read"
-                books={stats.slowestRead?.books ?? []}
-                detail={stats.slowestRead ? formatDaysSpent(stats.slowestRead.value) : null}
-                emptyLabel="No completed books with dates"
+              <SeriesRankingCard
+                title="Fastest Pace"
+                rows={stats.rankings.pace}
+                formatValue={(value) => `${value.toFixed(1)} pages/day`}
+                emptyLabel="No completed books with dates and pages"
               />
-              <WinnerStatsCard
-                title="Longest book"
-                books={stats.longestBook?.books ?? []}
-                detail={stats.longestBook ? `${stats.longestBook.value.toLocaleString()} pages` : null}
-                emptyLabel="No page totals yet"
-              />
-              <WinnerStatsCard
-                title="Shortest book"
-                books={stats.shortestBook?.books ?? []}
-                detail={stats.shortestBook ? `${stats.shortestBook.value.toLocaleString()} pages` : null}
-                emptyLabel="No page totals yet"
-              />
-              <WinnerStatsCard
-                title="Most annotated book"
-                books={stats.mostAnnotated?.books ?? []}
-                detail={
-                  stats.mostAnnotated
-                    ? `${stats.mostAnnotated.value} note${stats.mostAnnotated.value === 1 ? "" : "s"}`
-                    : null
-                }
-                emptyLabel="No notes yet"
-              />
-              <WinnerStatsCard
-                title="Most highlighted book"
-                books={stats.mostHighlighted?.books ?? []}
-                detail={
-                  stats.mostHighlighted
-                    ? `${stats.mostHighlighted.value} highlight${stats.mostHighlighted.value === 1 ? "" : "s"}`
-                    : null
-                }
-                emptyLabel="No highlights yet"
+              <SeriesRankingCard
+                title="Most Annotated"
+                rows={stats.rankings.annotations}
+                formatValue={(value) => `${value} annotation${value === 1 ? "" : "s"}`}
+                emptyLabel="No annotations yet"
               />
             </div>
           </section>
@@ -1102,6 +1203,50 @@ export default function SeriesDetails() {
                 }))}
                 emptyLabel="Add completed-book dates and page totals to compare reading pace."
               />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="font-heading text-lg font-medium">Records</h3>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] items-start">
+                <div className="relative z-10">
+                  <WinnerStatsCard
+                    title="Longest"
+                    books={stats.longestBook?.books ?? []}
+                    detail={stats.longestBook ? `${stats.longestBook.value.toLocaleString()} pages` : null}
+                    emptyLabel="No page totals yet"
+                    coveredByPair
+                  />
+                </div>
+                <div className="relative z-20 -ml-10">
+                  <WinnerStatsCard
+                    title="Shortest"
+                    books={stats.shortestBook?.books ?? []}
+                    detail={stats.shortestBook ? `${stats.shortestBook.value.toLocaleString()} pages` : null}
+                    emptyLabel="No page totals yet"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] items-start">
+                <div className="relative z-10">
+                  <WinnerStatsCard
+                    title="Fastest"
+                    books={stats.fastestRead?.books ?? []}
+                    detail={stats.fastestRead ? `${stats.fastestRead.value.toFixed(1)} pages/day` : null}
+                    emptyLabel="No completed books with dates and pages"
+                    coveredByPair
+                  />
+                </div>
+                <div className="relative z-20 -ml-10">
+                  <WinnerStatsCard
+                    title="Slowest"
+                    books={stats.slowestRead?.books ?? []}
+                    detail={stats.slowestRead ? `${stats.slowestRead.value.toFixed(1)} pages/day` : null}
+                    emptyLabel="No completed books with dates and pages"
+                  />
+                </div>
+              </div>
             </div>
           </section>
 
