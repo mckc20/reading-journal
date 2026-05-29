@@ -26,6 +26,7 @@ export interface ProgressTimelinePoint {
   currentPage: number;
   progressPercent: number;
   isStart: boolean;
+  hasProgressIncrease: boolean;
 }
 
 export interface ProgressTimelineResult {
@@ -134,34 +135,68 @@ export function buildProgressTimeline(
   );
   let previousPage = 0;
   const progressByDay = new Map<string, number>();
+  const validLogDays = new Set<string>();
 
   for (const log of sortedLogs) {
     const loggedAt = new Date(log.logged_at);
     if (!isValidDate(loggedAt)) continue;
 
     const currentPage = Math.max(0, log.current_page);
-    if (currentPage <= previousPage) {
-      continue;
+    const dayKey = toLocalDayKey(loggedAt);
+    validLogDays.add(dayKey);
+
+    const dayProgress = progressByDay.get(dayKey) ?? previousPage;
+    const highestPageForDay = Math.max(dayProgress, currentPage);
+
+    if (highestPageForDay > dayProgress) {
+      progressByDay.set(dayKey, highestPageForDay);
     }
 
-    progressByDay.set(toLocalDayKey(loggedAt), currentPage);
-    previousPage = currentPage;
+    previousPage = Math.max(previousPage, highestPageForDay);
   }
 
-  const progressPoints = [...progressByDay.entries()]
-    .sort(([dayA], [dayB]) => dayA.localeCompare(dayB))
-    .map(([dayKey, currentPage]) => ({
-      dayKey,
-      currentPage,
-      progressPercent: Math.min(100, Math.round((currentPage / totalPages) * 100)),
-      isStart: false,
-    }));
+  const progressDays = [...progressByDay.entries()].sort(([dayA], [dayB]) =>
+    dayA.localeCompare(dayB)
+  );
 
-  if (progressPoints.length === 0) {
+  if (progressDays.length === 0) {
     return {
       isAvailable: true,
       points: [],
     };
+  }
+
+  const loggedDays = [...validLogDays].sort();
+  const firstDay = parseLocalDateOnly(loggedDays[0]);
+  const lastDay = parseLocalDateOnly(loggedDays[loggedDays.length - 1]);
+  if (!firstDay || !lastDay) {
+    return {
+      isAvailable: true,
+      points: [],
+    };
+  }
+
+  const progressPoints: ProgressTimelinePoint[] = [];
+  const cursor = new Date(firstDay);
+  let carriedPage = 0;
+
+  while (cursor <= lastDay) {
+    const dayKey = toLocalDayKey(cursor);
+    const increasedPage = progressByDay.get(dayKey);
+    const hasProgressIncrease = typeof increasedPage === "number" && increasedPage > carriedPage;
+    if (hasProgressIncrease) {
+      carriedPage = increasedPage;
+    }
+
+    progressPoints.push({
+      dayKey,
+      currentPage: carriedPage,
+      progressPercent: Math.min(100, Math.round((carriedPage / totalPages) * 100)),
+      isStart: false,
+      hasProgressIncrease,
+    });
+
+    cursor.setDate(cursor.getDate() + 1);
   }
 
   return {
@@ -172,6 +207,7 @@ export function buildProgressTimeline(
         currentPage: 0,
         progressPercent: 0,
         isStart: true,
+        hasProgressIncrease: false,
       },
       ...progressPoints,
     ],

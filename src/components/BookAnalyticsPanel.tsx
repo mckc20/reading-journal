@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchReadingLogsForBook } from "@/lib/books";
@@ -89,6 +89,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
   const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
+  const [showAllEntries, setShowAllEntries] = useState(false);
 
   async function loadLogs() {
     try {
@@ -176,6 +177,11 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   }, [logsWithDelta]);
 
   const entries = useMemo(() => [...logsWithDelta].reverse(), [logsWithDelta]);
+  const hasMoreEntries = entries.length > 3;
+  const visibleEntries = useMemo(
+    () => (showAllEntries || !hasMoreEntries ? entries : entries.slice(0, 3)),
+    [entries, hasMoreEntries, showAllEntries]
+  );
 
   const progressTimeline = useMemo(
     () => buildProgressTimeline(logs, book.total_pages),
@@ -255,13 +261,26 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   }, [activePointIndex, chartPoints.length]);
 
   const progressChartHeight = 176;
-  const getProgressXPercent = (index: number): number =>
-    progressTimeline.points.length > 1
-      ? (index / (progressTimeline.points.length - 1)) * 100
-      : 50;
+  const progressDatePoints = useMemo(
+    () => progressTimeline.points.filter((point) => !point.isStart),
+    [progressTimeline.points]
+  );
+  const progressStartOffsetPercent = 1.5;
+  const getProgressXPercent = (dayKey: string, isStart = false): number => {
+    const index = progressDatePoints.findIndex((point) => point.dayKey === dayKey);
+    if (index < 0) return 0;
+    if (progressDatePoints.length === 1) {
+      return isStart ? 50 - progressStartOffsetPercent : 50;
+    }
+
+    const dateX =
+      progressStartOffsetPercent +
+      (index / (progressDatePoints.length - 1)) * (100 - progressStartOffsetPercent);
+    return isStart ? Math.max(0, dateX - progressStartOffsetPercent) : dateX;
+  };
   const progressLinePoints = progressTimeline.points
-    .map((point, index) => {
-      const x = getProgressXPercent(index);
+    .map((point) => {
+      const x = getProgressXPercent(point.dayKey, point.isStart);
       const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
       return `${x},${y}`;
     })
@@ -269,7 +288,9 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   const activeProgressPoint =
     activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
   const activeProgressXPercent =
-    activeProgressIndex === null ? 0 : getProgressXPercent(activeProgressIndex);
+    activeProgressPoint === null
+      ? 0
+      : getProgressXPercent(activeProgressPoint.dayKey, activeProgressPoint.isStart);
   const activeProgressTooltipTransform =
     activeProgressXPercent < 8
       ? "translateX(0)"
@@ -277,10 +298,12 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
         ? "translateX(-100%)"
         : "translateX(-50%)";
   const progressLabelStep = useMemo(() => {
-    if (progressTimeline.points.length <= 6) return 1;
-    if (progressTimeline.points.length <= 12) return 2;
-    return 3;
-  }, [progressTimeline.points.length]);
+    if (progressDatePoints.length <= 14) return 1;
+    if (progressDatePoints.length <= 28) return 2;
+    if (progressDatePoints.length <= 42) return 3;
+    if (progressDatePoints.length <= 56) return 4;
+    return 7;
+  }, [progressDatePoints.length]);
 
   const maxPages = Math.max(...chartPoints.map((p) => p.pagesRead), 0);
   const yAxisMax = maxPages > 0 ? maxPages : 1;
@@ -388,7 +411,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
 
       <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
         <div>
-          <p className="text-sm font-medium">Progress through time</p>
+          <p className="text-sm font-medium">Progress over time</p>
         </div>
 
         {!progressTimeline.isAvailable ? (
@@ -460,7 +483,12 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                   </svg>
 
                   {progressTimeline.points.map((point, index) => {
-                    const x = getProgressXPercent(index);
+                    const nextPoint = progressTimeline.points[index + 1];
+                    const isDayBeforeProgressIncrease =
+                      !point.isStart && !point.hasProgressIncrease && !!nextPoint?.hasProgressIncrease;
+                    const showMarker =
+                      point.isStart || point.hasProgressIncrease || isDayBeforeProgressIncrease;
+                    const x = getProgressXPercent(point.dayKey, point.isStart);
                     const y =
                       progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
                     const label = point.isStart
@@ -471,12 +499,18 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                       <button
                         key={`${point.dayKey}-${point.currentPage}-${index}`}
                         type="button"
-                        className="absolute h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                        className={
+                          showMarker
+                            ? "absolute h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                            : "absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                        }
                         style={{
                           left: `${x}%`,
                           top: `${y}px`,
                           borderColor:
-                            "color-mix(in oklch, var(--muted) 20%, var(--background))",
+                            showMarker
+                              ? "color-mix(in oklch, var(--muted) 20%, var(--background))"
+                              : "transparent",
                         }}
                         onMouseEnter={() => setActiveProgressIndex(index)}
                         onMouseLeave={() => setActiveProgressIndex(null)}
@@ -489,13 +523,14 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                 </div>
 
                 <div className="relative h-4 w-full">
-                  {progressTimeline.points.map((point, index) => {
-                    const x = getProgressXPercent(index);
+                  {progressDatePoints.map((point, index) => {
+                    const x = getProgressXPercent(point.dayKey);
                     const shouldShow =
-                      progressTimeline.points.length <= 6 ||
+                      progressDatePoints.length <= 10 ||
                       index === 0 ||
-                      index === progressTimeline.points.length - 1 ||
+                      index === progressDatePoints.length - 1 ||
                       index % progressLabelStep === 0;
+                    const label = formatDayLabel(dayFromKey(point.dayKey));
 
                     return (
                       <span
@@ -503,7 +538,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                         className="absolute w-16 -translate-x-1/2 text-center text-[10px] text-muted-foreground"
                         style={{ left: `${x}%` }}
                       >
-                        {shouldShow ? (point.isStart ? "Start" : point.dayKey.slice(5)) : ""}
+                        {shouldShow ? label : ""}
                       </span>
                     );
                   })}
@@ -604,27 +639,60 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
       </section>
 
       <section className="rounded-lg border bg-muted/20 p-3">
-        <p className="text-sm font-medium">Reading progress entries</p>
-        <div className="mt-3 space-y-2 pb-1">
-          {entries.map((entry) => {
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">Reading progress entries</p>
+          <p className="text-xs text-muted-foreground">
+            {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          </p>
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-md border bg-background/80">
+          {visibleEntries.map((entry) => {
             const timeLabel = formatReadingTime(entry.reading_time_minutes);
             return (
               <div
                 key={entry.id || `${entry.logged_at}-${entry.current_page}`}
-                className="w-full min-w-0 rounded-md border bg-background/80 p-2.5"
+                className="flex min-w-0 flex-col gap-1.5 border-b px-2.5 py-2 last:border-b-0 sm:min-h-12 sm:flex-row sm:items-center sm:gap-8"
               >
-                <p className="text-xs text-muted-foreground">{formatDateTime(entry.logged_at)}</p>
-                <div className="mt-1 flex flex-wrap items-start justify-between gap-1.5">
-                  <p className="text-sm">Reached page {entry.current_page}</p>
-                  <p className="text-sm font-medium sm:text-right">+{entry.pagesReadDelta} pages</p>
+                <div className="min-w-0 sm:flex-1">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {formatDateTime(entry.logged_at)}
+                  </p>
+                  <p className="mt-0.5 text-sm">Page {entry.current_page}</p>
                 </div>
-                {timeLabel && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">Reading time: {timeLabel}</p>
-                )}
+                <p className="text-sm text-muted-foreground sm:w-40 sm:shrink-0">
+                  {timeLabel ? `Reading time: ${timeLabel}` : "No reading time"}
+                </p>
+                <p className="text-sm font-medium sm:w-24 sm:shrink-0 sm:text-right">
+                  +{entry.pagesReadDelta} page{entry.pagesReadDelta === 1 ? "" : "s"}
+                </p>
               </div>
             );
           })}
         </div>
+
+        {hasMoreEntries && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="mt-2"
+            onClick={() => setShowAllEntries((current) => !current)}
+            aria-expanded={showAllEntries}
+          >
+            {showAllEntries ? (
+              <>
+                <ChevronUp className="h-3.5 w-3.5" />
+                Show fewer
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3.5 w-3.5" />
+                Show all {entries.length}
+              </>
+            )}
+          </Button>
+        )}
       </section>
       </div>
     </ScrollArea>
