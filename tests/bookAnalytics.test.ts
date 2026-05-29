@@ -70,17 +70,42 @@ test("builds progress timeline from increasing daily progress logs", () => {
       currentPage: point.currentPage,
       progressPercent: point.progressPercent,
       isStart: point.isStart,
+      hasProgressIncrease: point.hasProgressIncrease,
     })),
     [
-      { dayKey: "2026-04-01", currentPage: 0, progressPercent: 0, isStart: true },
-      { dayKey: "2026-04-01", currentPage: 20, progressPercent: 10, isStart: false },
-      { dayKey: "2026-04-02", currentPage: 50, progressPercent: 25, isStart: false },
-      { dayKey: "2026-04-03", currentPage: 80, progressPercent: 40, isStart: false },
+      {
+        dayKey: "2026-04-01",
+        currentPage: 0,
+        progressPercent: 0,
+        isStart: true,
+        hasProgressIncrease: false,
+      },
+      {
+        dayKey: "2026-04-01",
+        currentPage: 20,
+        progressPercent: 10,
+        isStart: false,
+        hasProgressIncrease: true,
+      },
+      {
+        dayKey: "2026-04-02",
+        currentPage: 50,
+        progressPercent: 25,
+        isStart: false,
+        hasProgressIncrease: true,
+      },
+      {
+        dayKey: "2026-04-03",
+        currentPage: 80,
+        progressPercent: 40,
+        isStart: false,
+        hasProgressIncrease: true,
+      },
     ]
   );
 });
 
-test("uses one progress timeline point per day and ignores non-increasing logs", () => {
+test("builds daily progress timeline with flat days between increases", () => {
   const timeline = buildProgressTimeline(
     [
       makeProgressLog("a", 20, "2026-04-01T09:00:00"),
@@ -93,11 +118,43 @@ test("uses one progress timeline point per day and ignores non-increasing logs",
   );
 
   assert.deepEqual(
-    timeline.points.map((point) => [point.dayKey, point.currentPage, point.progressPercent]),
+    timeline.points.map((point) => [
+      point.dayKey,
+      point.currentPage,
+      point.progressPercent,
+      point.hasProgressIncrease,
+    ]),
     [
-      ["2026-04-01", 0, 0],
-      ["2026-04-01", 40, 20],
-      ["2026-04-04", 60, 30],
+      ["2026-04-01", 0, 0, false],
+      ["2026-04-01", 40, 20, true],
+      ["2026-04-02", 40, 20, false],
+      ["2026-04-03", 40, 20, false],
+      ["2026-04-04", 60, 30, true],
+    ]
+  );
+});
+
+test("keeps explicit same-page log days at the end of the progress timeline", () => {
+  const timeline = buildProgressTimeline(
+    [
+      makeProgressLog("a", 20, "2026-04-01T09:00:00"),
+      makeProgressLog("b", 20, "2026-04-03T09:00:00"),
+    ],
+    100
+  );
+
+  assert.deepEqual(
+    timeline.points.map((point) => [
+      point.dayKey,
+      point.currentPage,
+      point.progressPercent,
+      point.hasProgressIncrease,
+    ]),
+    [
+      ["2026-04-01", 0, 0, false],
+      ["2026-04-01", 20, 20, true],
+      ["2026-04-02", 20, 20, false],
+      ["2026-04-03", 20, 20, false],
     ]
   );
 });
