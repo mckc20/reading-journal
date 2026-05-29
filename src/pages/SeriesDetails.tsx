@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Check, Flag, Heart, Star } from "lucide-react";
+import QuoteBlock from "@/components/QuoteBlock";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -327,13 +328,13 @@ function SeriesRankingCard({
 function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
   return (
     <article className="flex min-h-48 flex-col rounded-xl border bg-card p-5">
-      <Heart className="h-4 w-4 fill-foreground text-foreground" aria-hidden />
-      <p className="mt-4 line-clamp-5 whitespace-pre-line font-serif text-base italic leading-7">
-        &ldquo;{note.content.trim()}&rdquo;
-      </p>
-      {note.quote_speaker && (
-        <p className="mt-2 text-sm text-muted-foreground">- {note.quote_speaker}</p>
-      )}
+      <QuoteBlock
+        contentClassName="line-clamp-5 whitespace-pre-line text-base leading-7"
+        attribution={note.quote_speaker ? `- ${note.quote_speaker}` : null}
+        actions={<Heart className="h-4 w-4 fill-foreground text-foreground" aria-hidden />}
+      >
+        {note.content.trim()}
+      </QuoteBlock>
       <Link
         to={`/books/${book.id}?tab=notes`}
         className="mt-auto flex items-center gap-3 pt-5 transition-colors hover:text-muted-foreground"
@@ -505,14 +506,20 @@ function JourneyFeaturedNote({ bookId, notes }: { bookId: string; notes: BookNot
             }}
             className="absolute inset-x-0 whitespace-pre-line font-serif text-sm italic leading-6"
           >
-            &ldquo;{note.content.trim()}&rdquo;
+            {note.content.trim()}
           </p>
         ))}
       </div>
       {selectedNote && (
-        <p className="line-clamp-4 whitespace-pre-line font-serif text-sm italic leading-6 text-foreground">
-          &ldquo;{selectedNote.content.trim()}&rdquo;
-        </p>
+        selectedNote.label === "quote" ? (
+          <QuoteBlock contentClassName="line-clamp-4 whitespace-pre-line">
+            {selectedNote.content.trim()}
+          </QuoteBlock>
+        ) : (
+          <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-foreground">
+            {selectedNote.content.trim()}
+          </p>
+        )
       )}
       {notes.length > 0 && (
         <Link

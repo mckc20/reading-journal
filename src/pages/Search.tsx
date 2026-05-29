@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Check, SlidersHorizontal } from "lucide-react";
+import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -351,36 +352,21 @@ function NoteSearchResult({
       </div>
 
       {note.label === "quote" ? (
-        <div className="grid grid-cols-[3rem_1fr] gap-x-4">
-          <div className="flex flex-col items-center">
-            <div
-              aria-hidden="true"
-              className="font-serif text-5xl leading-none text-sky-600 dark:text-sky-400"
-            >
-              “
-            </div>
-            <div className="-mt-3 w-px flex-1 bg-sky-500 dark:bg-sky-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="line-clamp-3 whitespace-pre-line font-serif text-sm italic leading-6 text-foreground">
-              <HighlightedText value={match.values[0]} query={query} />
-            </p>
-            {(note.quote_speaker || pageLabel) && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+        <QuoteBlock
+          attribution={
+            note.quote_speaker || pageLabel ? (
+              <div className="flex flex-wrap items-center gap-2">
                 {note.quote_speaker && (
-                  <span className="font-serif text-sm italic text-muted-foreground">
-                    - {note.quote_speaker}
-                  </span>
+                  <span className="font-serif italic">- {note.quote_speaker}</span>
                 )}
-                {pageLabel && (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {pageLabel}
-                  </span>
-                )}
+                {pageLabel && <span className="text-xs font-medium">{pageLabel}</span>}
               </div>
-            )}
-          </div>
-        </div>
+            ) : null
+          }
+          contentClassName="line-clamp-3 whitespace-pre-line"
+        >
+          <HighlightedText value={match.values[0]} query={query} />
+        </QuoteBlock>
       ) : (
         <>
           {note.title && (

@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import FormattedNoteContent from "@/components/FormattedNoteContent";
+import QuoteBlock from "@/components/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,9 +28,6 @@ import {
 } from "@/lib/bookNotes";
 import {
   noteMarkdownToEditorHtml,
-  parseNoteMarkdown,
-  type NoteBlockNode,
-  type NoteInlineNode,
 } from "@/lib/noteFormatting";
 import { cn } from "@/lib/utils";
 import type { Book, BookNote, BookNoteLabel } from "@/types";
@@ -122,63 +121,6 @@ function editorHtmlToMarkdown(html: string): string {
     .filter((block) => block.trim())
     .join("\n")
     .trim();
-}
-
-function renderInlineNodes(nodes: NoteInlineNode[]): ReactNode {
-  return nodes.map((node, index) => {
-    if (node.type === "text") {
-      return node.text.split("\n").map((line, lineIndex) => (
-        <span key={`${index}-${lineIndex}`}>
-          {lineIndex > 0 && <br />}
-          {line}
-        </span>
-      ));
-    }
-
-    if (node.type === "bold") {
-      return <strong key={index}>{renderInlineNodes(node.children)}</strong>;
-    }
-
-    return <em key={index}>{renderInlineNodes(node.children)}</em>;
-  });
-}
-
-function renderNoteBlock(block: NoteBlockNode, index: number): ReactNode {
-  if (block.type === "quote") {
-    return (
-      <blockquote key={index} className="border-l-2 border-border pl-3 italic">
-        {renderInlineNodes(block.children)}
-      </blockquote>
-    );
-  }
-
-  if (block.type === "list") {
-    return (
-      <ul key={index} className="list-disc space-y-1 pl-5">
-        {block.items.map((item, itemIndex) => (
-          <li key={itemIndex}>{renderInlineNodes(item)}</li>
-        ))}
-      </ul>
-    );
-  }
-
-  return <p key={index}>{renderInlineNodes(block.children)}</p>;
-}
-
-function FormattedNoteContent({
-  markdown,
-  className,
-}: {
-  markdown: string;
-  className?: string;
-}) {
-  const blocks = parseNoteMarkdown(markdown);
-
-  return (
-    <div className={cn("space-y-2 whitespace-normal", className)}>
-      {blocks.map(renderNoteBlock)}
-    </div>
-  );
 }
 
 function CollapsibleNoteContent({
@@ -742,36 +684,25 @@ export default function BookNotesPanel({ book }: BookNotesPanelProps) {
                       {formatNoteDate(visibleDate)}
                     </time>
                   </div>
-                  <div className="grid grid-cols-[3rem_1fr] gap-x-4">
-                    <div className="flex flex-col items-center">
-                      <div
-                        aria-hidden="true"
-                        className="font-serif text-5xl leading-none text-sky-600 dark:text-sky-400"
-                      >
-                        “
-                      </div>
-                      <div className="-mt-3 w-px flex-1 bg-sky-500 dark:bg-sky-400" />
-                    </div>
-                    <div className="min-w-0 pr-36 sm:pr-44">
+                  <div className="pr-36 sm:pr-44">
+                    <QuoteBlock
+                      attribution={
+                        <div className="flex flex-wrap items-center gap-2">
+                          {note.quote_speaker && (
+                            <span className="font-serif italic">
+                              - {note.quote_speaker}
+                            </span>
+                          )}
+                          {pageRangeLabel && (
+                            <span className="text-xs font-medium">{pageRangeLabel}</span>
+                          )}
+                        </div>
+                      }
+                    >
                       <CollapsibleNoteContent
                         markdown={note.content}
-                        className="font-serif text-sm italic leading-6 text-foreground"
-                        footerLeft={
-                          <div className="flex flex-wrap items-center gap-2">
-                            {note.quote_speaker && (
-                              <span className="font-serif text-sm italic text-muted-foreground">
-                                - {note.quote_speaker}
-                              </span>
-                            )}
-                            {pageRangeLabel && (
-                              <span className="text-xs font-medium text-muted-foreground">
-                                {pageRangeLabel}
-                              </span>
-                            )}
-                          </div>
-                        }
                       />
-                    </div>
+                    </QuoteBlock>
                   </div>
                 </article>
               );

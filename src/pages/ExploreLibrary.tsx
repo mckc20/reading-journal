@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import FormattedNoteContent from "@/components/FormattedNoteContent";
+import QuoteBlock from "@/components/QuoteBlock";
 import {
   Select,
   SelectContent,
@@ -34,11 +36,6 @@ import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchAllBookNotes, formatBookNotePageRange } from "@/lib/bookNotes";
-import {
-  parseNoteMarkdown,
-  type NoteBlockNode,
-  type NoteInlineNode,
-} from "@/lib/noteFormatting";
 import {
   buildMultiValueGroups,
   buildNoteGroups,
@@ -936,63 +933,6 @@ function noteGroupCountLabel(count: number) {
   return `${count} entr${count === 1 ? "y" : "ies"}`;
 }
 
-function renderInlineNodes(nodes: NoteInlineNode[]): ReactNode {
-  return nodes.map((node, index) => {
-    if (node.type === "text") {
-      return node.text.split("\n").map((line, lineIndex) => (
-        <span key={`${index}-${lineIndex}`}>
-          {lineIndex > 0 && <br />}
-          {line}
-        </span>
-      ));
-    }
-
-    if (node.type === "bold") {
-      return <strong key={index}>{renderInlineNodes(node.children)}</strong>;
-    }
-
-    return <em key={index}>{renderInlineNodes(node.children)}</em>;
-  });
-}
-
-function renderNoteBlock(block: NoteBlockNode, index: number): ReactNode {
-  if (block.type === "quote") {
-    return (
-      <blockquote key={index} className="border-l-2 border-border pl-3 italic">
-        {renderInlineNodes(block.children)}
-      </blockquote>
-    );
-  }
-
-  if (block.type === "list") {
-    return (
-      <ul key={index} className="list-disc space-y-1 pl-5">
-        {block.items.map((item, itemIndex) => (
-          <li key={itemIndex}>{renderInlineNodes(item)}</li>
-        ))}
-      </ul>
-    );
-  }
-
-  return <p key={index}>{renderInlineNodes(block.children)}</p>;
-}
-
-function FormattedNoteContent({
-  markdown,
-  className,
-}: {
-  markdown: string;
-  className?: string;
-}) {
-  const blocks = parseNoteMarkdown(markdown);
-
-  return (
-    <div className={cn("space-y-2 whitespace-normal", className)}>
-      {blocks.map(renderNoteBlock)}
-    </div>
-  );
-}
-
 function FilterSelect({
   label,
   value,
@@ -1343,35 +1283,20 @@ function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: B
       </div>
 
       {note.label === "quote" ? (
-        <div className="grid grid-cols-[3rem_1fr] gap-x-4">
-          <div className="flex flex-col items-center">
-            <div
-              aria-hidden="true"
-              className="font-serif text-5xl leading-none text-sky-600 dark:text-sky-400"
-            >
-              “
-            </div>
-            <div className="-mt-3 w-px flex-1 bg-sky-500 dark:bg-sky-400" />
-          </div>
-          <div className="min-w-0">
-            <FormattedNoteContent
-              markdown={note.content}
-              className="line-clamp-4 font-serif text-sm italic leading-6 text-foreground"
-            />
-            {(note.quote_speaker || pageLabel) && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+        <QuoteBlock
+          attribution={
+            note.quote_speaker || pageLabel ? (
+              <div className="flex flex-wrap items-center gap-2">
                 {note.quote_speaker && (
-                  <span className="font-serif text-sm italic text-muted-foreground">
-                    - {note.quote_speaker}
-                  </span>
+                  <span className="font-serif italic">- {note.quote_speaker}</span>
                 )}
-                {pageLabel && (
-                  <span className="text-xs font-medium text-muted-foreground">{pageLabel}</span>
-                )}
+                {pageLabel && <span className="text-xs font-medium">{pageLabel}</span>}
               </div>
-            )}
-          </div>
-        </div>
+            ) : null
+          }
+        >
+          <FormattedNoteContent markdown={note.content} className="line-clamp-4" />
+        </QuoteBlock>
       ) : (
         <>
           {note.title && (
