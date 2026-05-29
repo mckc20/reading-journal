@@ -253,12 +253,19 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     return chartPoints.findIndex((point) => point.dayKey === activePoint.dayKey);
   }, [activePoint, chartPoints]);
 
-  const tooltipLeft = useMemo(() => {
-    if (activePointIndex < 0) return 0;
-    const rawLeft = 20 + activePointIndex * 40;
-    const maxLeft = Math.max(44, chartPoints.length * 40 - 44);
-    return Math.min(Math.max(rawLeft, 44), maxLeft);
-  }, [activePointIndex, chartPoints.length]);
+  const activePointXPercent =
+    activePointIndex < 0 || chartPoints.length === 0
+      ? 0
+      : ((activePointIndex + 0.5) / chartPoints.length) * 100;
+  const activePointTooltipTransform =
+    activePointXPercent < 12
+      ? "translateX(0)"
+      : activePointXPercent > 88
+        ? "translateX(-100%)"
+        : "translateX(-50%)";
+  const dailyChartGridStyle = {
+    gridTemplateColumns: `repeat(${chartPoints.length}, minmax(0, 1fr))`,
+  };
 
   const progressChartHeight = 176;
   const progressDatePoints = useMemo(
@@ -577,61 +584,69 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
           </div>
 
           <div className="min-w-0">
-            <div className="overflow-x-auto overflow-y-hidden">
-              <div className="min-w-max space-y-2 px-1">
-                <div className="relative h-44">
-                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                    <div className="border-t border-border/70" />
-                    <div className="border-t border-border/50" />
-                    <div className="border-t border-border/70" />
-                  </div>
+            <div className="w-full space-y-2 px-1">
+              <div className="relative h-44 w-full">
+                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                  <div className="border-t border-border/70" />
+                  <div className="border-t border-border/50" />
+                  <div className="border-t border-border/70" />
+                </div>
 
-                  <div className="relative flex h-full items-end gap-2">
-                    {activePoint && activePointIndex >= 0 && (
-                      <div
-                        className="pointer-events-none absolute top-2 z-10 -translate-x-1/2 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                        style={{ left: `${tooltipLeft}px` }}
+                {activePoint && activePointIndex >= 0 && (
+                  <div
+                    className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
+                    style={{
+                      left: `${activePointXPercent}%`,
+                      transform: activePointTooltipTransform,
+                    }}
+                  >
+                    {formatFullDayLabel(activePoint.dayKey)}: {activePoint.pagesRead} page{activePoint.pagesRead === 1 ? "" : "s"}
+                  </div>
+                )}
+
+                <div
+                  className="relative grid h-full w-full items-end"
+                  style={dailyChartGridStyle}
+                >
+                  {chartPoints.map((point) => {
+                    const chartHeightPx = 176; // h-44 = 11rem = 176px
+                    const normalizedHeight = Math.round((point.pagesRead / yAxisMax) * chartHeightPx);
+                    const barHeight = point.pagesRead > 0 ? Math.max(normalizedHeight, 4) : 0;
+                    return (
+                      <button
+                        key={point.dayKey}
+                        type="button"
+                        className="flex h-full min-w-0 items-end justify-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                        onMouseEnter={() => setActiveDayKey(point.dayKey)}
+                        onMouseLeave={() => setActiveDayKey(null)}
+                        onFocus={() => setActiveDayKey(point.dayKey)}
+                        onBlur={() => setActiveDayKey(null)}
+                        aria-label={`${formatFullDayLabel(point.dayKey)}: ${point.pagesRead} page${point.pagesRead === 1 ? "" : "s"} read`}
                       >
-                        {formatFullDayLabel(activePoint.dayKey)}: {activePoint.pagesRead} page{activePoint.pagesRead === 1 ? "" : "s"}
-                      </div>
-                    )}
-                    {chartPoints.map((point) => {
-                      const chartHeightPx = 176; // h-44 = 11rem = 176px
-                      const normalizedHeight = Math.round((point.pagesRead / yAxisMax) * chartHeightPx);
-                      const barHeight = point.pagesRead > 0 ? Math.max(normalizedHeight, 4) : 0;
-                      return (
-                        <button
-                          key={point.dayKey}
-                          type="button"
-                          className="flex w-8 shrink-0 items-end rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                          onMouseEnter={() => setActiveDayKey(point.dayKey)}
-                          onMouseLeave={() => setActiveDayKey(null)}
-                          onFocus={() => setActiveDayKey(point.dayKey)}
-                          onBlur={() => setActiveDayKey(null)}
-                          aria-label={`${formatFullDayLabel(point.dayKey)}: ${point.pagesRead} page${point.pagesRead === 1 ? "" : "s"} read`}
-                        >
-                          <div
-                            className="w-full rounded-t-sm bg-primary/85 transition-colors hover:bg-primary"
-                            style={{ height: `${barHeight}px` }}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
+                        <div
+                          className="w-[70%] max-w-8 rounded-t-sm bg-primary/85 transition-colors hover:bg-primary"
+                          style={{ height: `${barHeight}px` }}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                <div className="flex gap-2">
-                  {chartPoints.map((point, index) => (
-                    <span
-                      key={point.dayKey}
-                      className="w-8 shrink-0 text-center text-[10px] text-muted-foreground"
-                    >
-                      {chartPoints.length <= 10 || index === 0 || index === chartPoints.length - 1 || index % labelStep === 0
-                        ? point.dayLabel
-                        : ""}
-                    </span>
-                  ))}
-                </div>
+              <div
+                className="grid w-full"
+                style={dailyChartGridStyle}
+              >
+                {chartPoints.map((point, index) => (
+                  <span
+                    key={point.dayKey}
+                    className="min-w-0 text-center text-[10px] text-muted-foreground"
+                  >
+                    {chartPoints.length <= 10 || index === 0 || index === chartPoints.length - 1 || index % labelStep === 0
+                      ? point.dayLabel
+                      : ""}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
