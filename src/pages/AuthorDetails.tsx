@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, Heart, Quote, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Heart, Star } from "lucide-react";
+import QuoteBlock from "@/components/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBooksContext } from "@/context/BooksContext";
@@ -118,6 +119,9 @@ export default function AuthorDetails() {
   const authors = useMemo(() => buildAuthorSummaries(books, notes), [books, notes]);
   const author = useMemo(() => findAuthorSummary(authors, authorName), [authors, authorName]);
   const featuredQuote = author?.quotes.find((quote) => quote.is_favorite) ?? author?.quotes[0];
+  const featuredQuoteBook = featuredQuote
+    ? author?.books.find((book) => book.id === featuredQuote.book_id)
+    : undefined;
 
   if (booksLoading) {
     return (
@@ -191,15 +195,17 @@ export default function AuthorDetails() {
             </p>
 
             {featuredQuote && (
-              <figure className="border-l-4 border-emerald-700/70 pl-4">
-                <blockquote className="font-heading text-base italic leading-relaxed">
-                  {featuredQuote.content}
-                </blockquote>
-                <figcaption className="mt-2 text-sm text-muted-foreground">
-                  {featuredQuote.quote_speaker ? `${featuredQuote.quote_speaker}, ` : ""}
-                  {author.books.find((book) => book.id === featuredQuote.book_id)?.title}
-                </figcaption>
-              </figure>
+              <QuoteBlock
+                contentClassName="text-base leading-7"
+                attribution={
+                  <>
+                    {featuredQuote.quote_speaker ? `${featuredQuote.quote_speaker}, ` : ""}
+                    {featuredQuoteBook?.title ?? formatAuthorDate(featuredQuote.note_date)}
+                  </>
+                }
+              >
+                {featuredQuote.content}
+              </QuoteBlock>
             )}
           </div>
         </div>
@@ -247,13 +253,14 @@ export default function AuthorDetails() {
               {notesError ? (
                 <p className="text-sm text-muted-foreground">Quotes could not be loaded right now.</p>
               ) : featuredQuote ? (
-                <article>
-                  <Quote className="mb-3 h-5 w-5 text-emerald-700" />
-                  <p className="font-heading text-base leading-relaxed">{featuredQuote.content}</p>
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    - {author.books.find((book) => book.id === featuredQuote.book_id)?.title}
-                  </p>
-                </article>
+                <QuoteBlock
+                  contentClassName="text-base leading-7"
+                  attribution={`- ${
+                    featuredQuoteBook?.title ?? formatAuthorDate(featuredQuote.note_date)
+                  }`}
+                >
+                  {featuredQuote.content}
+                </QuoteBlock>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Quotes from this author's books will appear here.
@@ -336,16 +343,19 @@ export default function AuthorDetails() {
 
                 return (
                   <article key={quote.id} className="min-h-44 rounded-lg border bg-card p-4">
-                    <Quote className="mb-3 h-4 w-4 text-emerald-700" />
-                    <p className="line-clamp-5 text-sm leading-relaxed">{quote.content}</p>
-                    <div className="mt-4 flex items-end justify-between gap-3">
-                      <p className="text-xs text-muted-foreground">
-                        {quoteBook ? `- ${quoteBook.title}` : formatAuthorDate(quote.note_date)}
-                      </p>
-                      {quote.is_favorite && (
-                        <Heart className="h-4 w-4 shrink-0 fill-rose-500 text-rose-500" />
-                      )}
-                    </div>
+                    <QuoteBlock
+                      contentClassName="line-clamp-5"
+                      attribution={
+                        quoteBook ? `- ${quoteBook.title}` : formatAuthorDate(quote.note_date)
+                      }
+                      actions={
+                        quote.is_favorite ? (
+                          <Heart className="h-4 w-4 shrink-0 fill-rose-500 text-rose-500" />
+                        ) : null
+                      }
+                    >
+                      {quote.content}
+                    </QuoteBlock>
                   </article>
                 );
               })}
