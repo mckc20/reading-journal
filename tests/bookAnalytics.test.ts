@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildProgressTimeline,
   formatCalendarSpan,
   formatTotalReadingTime,
   getEstimatedFinish,
@@ -50,6 +51,81 @@ test("handles missing or zero reading minutes as no sessions logged", () => {
 
   assert.equal(total, 0);
   assert.equal(formatTotalReadingTime(total), "No sessions logged");
+});
+
+test("builds progress timeline from increasing daily progress logs", () => {
+  const timeline = buildProgressTimeline(
+    [
+      makeProgressLog("a", 20, "2026-04-01T12:00:00"),
+      makeProgressLog("b", 50, "2026-04-02T12:00:00"),
+      makeProgressLog("c", 80, "2026-04-03T12:00:00"),
+    ],
+    200
+  );
+
+  assert.equal(timeline.isAvailable, true);
+  assert.deepEqual(
+    timeline.points.map((point) => ({
+      dayKey: point.dayKey,
+      currentPage: point.currentPage,
+      progressPercent: point.progressPercent,
+      isStart: point.isStart,
+    })),
+    [
+      { dayKey: "2026-04-01", currentPage: 0, progressPercent: 0, isStart: true },
+      { dayKey: "2026-04-01", currentPage: 20, progressPercent: 10, isStart: false },
+      { dayKey: "2026-04-02", currentPage: 50, progressPercent: 25, isStart: false },
+      { dayKey: "2026-04-03", currentPage: 80, progressPercent: 40, isStart: false },
+    ]
+  );
+});
+
+test("uses one progress timeline point per day and ignores non-increasing logs", () => {
+  const timeline = buildProgressTimeline(
+    [
+      makeProgressLog("a", 20, "2026-04-01T09:00:00"),
+      makeProgressLog("b", 40, "2026-04-01T18:00:00"),
+      makeProgressLog("c", 35, "2026-04-02T09:00:00"),
+      makeProgressLog("d", 40, "2026-04-03T09:00:00"),
+      makeProgressLog("e", 60, "2026-04-04T09:00:00"),
+    ],
+    200
+  );
+
+  assert.deepEqual(
+    timeline.points.map((point) => [point.dayKey, point.currentPage, point.progressPercent]),
+    [
+      ["2026-04-01", 0, 0],
+      ["2026-04-01", 40, 20],
+      ["2026-04-04", 60, 30],
+    ]
+  );
+});
+
+test("caps progress timeline percentages at 100 percent", () => {
+  const timeline = buildProgressTimeline(
+    [
+      makeProgressLog("a", 150, "2026-04-01T12:00:00"),
+      makeProgressLog("b", 220, "2026-04-02T12:00:00"),
+    ],
+    200
+  );
+
+  assert.deepEqual(
+    timeline.points.map((point) => point.progressPercent),
+    [0, 75, 100]
+  );
+});
+
+test("marks progress timeline unavailable without valid total pages", () => {
+  assert.deepEqual(buildProgressTimeline([makeProgressLog("a", 20, "2026-04-01T12:00:00")]), {
+    isAvailable: false,
+    points: [],
+  });
+  assert.deepEqual(buildProgressTimeline([makeProgressLog("a", 20, "2026-04-01T12:00:00")], 0), {
+    isAvailable: false,
+    points: [],
+  });
 });
 
 test("computes reading duration for a finished book", () => {
