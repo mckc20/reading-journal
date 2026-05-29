@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
 import { Navigate, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
-import { BookOpen, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -339,10 +339,6 @@ export default function Library() {
           <h1 className="font-heading text-4xl font-bold leading-tight">My Books</h1>
           <p className="mt-1 text-sm text-muted-foreground">Your library, your stories.</p>
         </div>
-        <Button type="button" onClick={onAddBookClick} className="sm:w-auto">
-          <Plus className="h-4 w-4" />
-          Add Book
-        </Button>
       </div>
 
       {error && (

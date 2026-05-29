@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Pencil } from "lucide-react";
+import { LogOut, Pencil } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ function getDisplayName(
 }
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { signOut, user } = useAuth();
   const { profile, loading, error } = useProfile();
   const displayName = getDisplayName(profile, user?.email);
   const details = [
@@ -68,6 +68,13 @@ export default function Profile() {
           </CardContent>
         )}
       </Card>
+
+      <div className="flex justify-end">
+        <Button type="button" variant="destructive" onClick={() => void signOut()}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Log out
+        </Button>
+      </div>
     </div>
   );
 }
