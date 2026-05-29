@@ -21,6 +21,18 @@ export interface EstimatedFinishResult {
   readingSessionCount: number;
 }
 
+export interface ProgressTimelinePoint {
+  dayKey: string;
+  currentPage: number;
+  progressPercent: number;
+  isStart: boolean;
+}
+
+export interface ProgressTimelineResult {
+  isAvailable: boolean;
+  points: ProgressTimelinePoint[];
+}
+
 export const MIN_READING_LOGS_FOR_ESTIMATED_FINISH = 3;
 
 function getEstimateConfidence(readingSessionCount: number): EstimatedFinishResult["confidence"] {
@@ -36,6 +48,13 @@ function isValidDate(date: Date): boolean {
 
 function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function toLocalDayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function wholeDaysBetween(startDate: Date, endDate: Date): number {
@@ -97,6 +116,66 @@ export function formatTotalReadingTime(totalMinutes: number): string {
   if (minutes > 0) parts.push(`${minutes}m`);
 
   return parts.join(" ");
+}
+
+export function buildProgressTimeline(
+  logs: ReadingLog[],
+  totalPages?: number
+): ProgressTimelineResult {
+  if (!totalPages || totalPages <= 0) {
+    return {
+      isAvailable: false,
+      points: [],
+    };
+  }
+
+  const sortedLogs = [...logs].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+  );
+  let previousPage = 0;
+  const progressByDay = new Map<string, number>();
+
+  for (const log of sortedLogs) {
+    const loggedAt = new Date(log.logged_at);
+    if (!isValidDate(loggedAt)) continue;
+
+    const currentPage = Math.max(0, log.current_page);
+    if (currentPage <= previousPage) {
+      continue;
+    }
+
+    progressByDay.set(toLocalDayKey(loggedAt), currentPage);
+    previousPage = currentPage;
+  }
+
+  const progressPoints = [...progressByDay.entries()]
+    .sort(([dayA], [dayB]) => dayA.localeCompare(dayB))
+    .map(([dayKey, currentPage]) => ({
+      dayKey,
+      currentPage,
+      progressPercent: Math.min(100, Math.round((currentPage / totalPages) * 100)),
+      isStart: false,
+    }));
+
+  if (progressPoints.length === 0) {
+    return {
+      isAvailable: true,
+      points: [],
+    };
+  }
+
+  return {
+    isAvailable: true,
+    points: [
+      {
+        dayKey: progressPoints[0].dayKey,
+        currentPage: 0,
+        progressPercent: 0,
+        isStart: true,
+      },
+      ...progressPoints,
+    ],
+  };
 }
 
 export function calculateCalendarSpan(startDate: Date, endDate: Date): CalendarSpan {

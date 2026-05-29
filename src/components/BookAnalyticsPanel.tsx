@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import {
+  buildProgressTimeline,
   formatCalendarSpan,
   formatTotalReadingTime,
   getEstimatedFinish,
@@ -87,6 +88,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
+  const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
 
   async function loadLogs() {
     try {
@@ -175,6 +177,11 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
 
   const entries = useMemo(() => [...logsWithDelta].reverse(), [logsWithDelta]);
 
+  const progressTimeline = useMemo(
+    () => buildProgressTimeline(logs, book.total_pages),
+    [book.total_pages, logs]
+  );
+
   const totalPagesRead = useMemo(
     () => chartPoints.reduce((sum, point) => sum + point.pagesRead, 0),
     [chartPoints]
@@ -246,6 +253,34 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     const maxLeft = Math.max(44, chartPoints.length * 40 - 44);
     return Math.min(Math.max(rawLeft, 44), maxLeft);
   }, [activePointIndex, chartPoints.length]);
+
+  const progressChartHeight = 176;
+  const getProgressXPercent = (index: number): number =>
+    progressTimeline.points.length > 1
+      ? (index / (progressTimeline.points.length - 1)) * 100
+      : 50;
+  const progressLinePoints = progressTimeline.points
+    .map((point, index) => {
+      const x = getProgressXPercent(index);
+      const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const activeProgressPoint =
+    activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
+  const activeProgressXPercent =
+    activeProgressIndex === null ? 0 : getProgressXPercent(activeProgressIndex);
+  const activeProgressTooltipTransform =
+    activeProgressXPercent < 8
+      ? "translateX(0)"
+      : activeProgressXPercent > 92
+        ? "translateX(-100%)"
+        : "translateX(-50%)";
+  const progressLabelStep = useMemo(() => {
+    if (progressTimeline.points.length <= 6) return 1;
+    if (progressTimeline.points.length <= 12) return 2;
+    return 3;
+  }, [progressTimeline.points.length]);
 
   const maxPages = Math.max(...chartPoints.map((p) => p.pagesRead), 0);
   const yAxisMax = maxPages > 0 ? maxPages : 1;
@@ -349,6 +384,134 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Progress through time</p>
+        </div>
+
+        {!progressTimeline.isAvailable ? (
+          <div className="rounded-md border bg-background/80 p-3">
+            <p className="text-sm font-medium">Total pages needed</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Add the book's total pages in the Properties tab to calculate progress percentages.
+            </p>
+          </div>
+        ) : progressTimeline.points.length === 0 ? (
+          <div className="rounded-md border bg-background/80 p-3">
+            <p className="text-sm font-medium">No increased progress yet</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              The line appears after at least one progress entry moves to a higher page.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-[2.5rem_1fr] gap-2">
+            <div className="h-44 flex flex-col justify-between text-[10px] text-muted-foreground">
+              <span>100%</span>
+              <span>50%</span>
+              <span>0%</span>
+            </div>
+
+            <div className="min-w-0">
+              <div className="space-y-2 px-1">
+                <div className="relative h-44 w-full">
+                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                    <div className="border-t border-border/70" />
+                    <div className="border-t border-border/50" />
+                    <div className="border-t border-border/70" />
+                  </div>
+
+                  {activeProgressPoint && (
+                    <div
+                      className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
+                      style={{
+                        left: `${activeProgressXPercent}%`,
+                        transform: activeProgressTooltipTransform,
+                      }}
+                    >
+                      {activeProgressPoint.isStart
+                        ? "Start"
+                        : formatFullDayLabel(activeProgressPoint.dayKey)}
+                      : {activeProgressPoint.progressPercent}% · page{" "}
+                      {activeProgressPoint.currentPage}
+                    </div>
+                  )}
+
+                  <svg
+                    className="absolute inset-0 overflow-visible"
+                    width="100%"
+                    height={progressChartHeight}
+                    viewBox={`0 0 100 ${progressChartHeight}`}
+                    preserveAspectRatio="none"
+                    role="img"
+                    aria-label="Line chart showing book progress through time"
+                  >
+                    <polyline
+                      points={progressLinePoints}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                      className="text-primary"
+                    />
+                  </svg>
+
+                  {progressTimeline.points.map((point, index) => {
+                    const x = getProgressXPercent(index);
+                    const y =
+                      progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
+                    const label = point.isStart
+                      ? `Start: ${point.progressPercent}% progress`
+                      : `${formatFullDayLabel(point.dayKey)}: ${point.progressPercent}% progress, page ${point.currentPage}`;
+
+                    return (
+                      <button
+                        key={`${point.dayKey}-${point.currentPage}-${index}`}
+                        type="button"
+                        className="absolute h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}px`,
+                          borderColor:
+                            "color-mix(in oklch, var(--muted) 20%, var(--background))",
+                        }}
+                        onMouseEnter={() => setActiveProgressIndex(index)}
+                        onMouseLeave={() => setActiveProgressIndex(null)}
+                        onFocus={() => setActiveProgressIndex(index)}
+                        onBlur={() => setActiveProgressIndex(null)}
+                        aria-label={label}
+                      />
+                    );
+                  })}
+                </div>
+
+                <div className="relative h-4 w-full">
+                  {progressTimeline.points.map((point, index) => {
+                    const x = getProgressXPercent(index);
+                    const shouldShow =
+                      progressTimeline.points.length <= 6 ||
+                      index === 0 ||
+                      index === progressTimeline.points.length - 1 ||
+                      index % progressLabelStep === 0;
+
+                    return (
+                      <span
+                        key={`${point.dayKey}-label-${index}`}
+                        className="absolute w-16 -translate-x-1/2 text-center text-[10px] text-muted-foreground"
+                        style={{ left: `${x}%` }}
+                      >
+                        {shouldShow ? (point.isStart ? "Start" : point.dayKey.slice(5)) : ""}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
