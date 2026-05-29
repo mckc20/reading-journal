@@ -1,8 +1,10 @@
 export const BOOK_GENRES = [
+  "Fiction",
   "Fantasy",
   "Science Fiction",
   "Romance",
   "Mystery",
+  "Crime",
   "Thriller",
   "Horror",
   "Historical Fiction",

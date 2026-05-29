@@ -11,7 +11,7 @@ test("keeps approved genres and normalizes their display casing", () => {
 });
 
 test("ignores unknown genres from external metadata", () => {
-  assert.deepEqual(getAllowedGenres(["Juvenile Fiction", "Fiction", "Romance"]), ["Romance"]);
+  assert.deepEqual(getAllowedGenres(["Juvenile Fiction", "Fiction", "Romance"]), ["Fiction", "Romance"]);
 });
 
 test("removes duplicate approved genres", () => {
