@@ -77,6 +77,8 @@ export interface ReadingLog {
 
 export interface Profile {
   id: string;
+  display_name?: string;
+  username?: string;
   first_name?: string;
   last_name?: string;
   avatar_url?: string;
@@ -85,6 +87,115 @@ export interface Profile {
   language?: string;
   created_at: string;
 }
+
+export type SettingsTheme = "light" | "dark" | "system";
+
+export type AccentColor = "default" | "rose" | "orange" | "green" | "blue" | "violet";
+
+export type BookCoverStyle = "rounded" | "square" | "soft";
+
+export type CornerRadiusStyle = "none" | "small" | "medium" | "large";
+
+export type FontSizePreference = "small" | "medium" | "large";
+
+export type DensityPreference = "comfortable" | "compact" | "spacious";
+
+export interface AppearanceSettings {
+  theme: SettingsTheme;
+  accent_color: AccentColor;
+  compact_mode: boolean;
+  reduced_animations: boolean;
+  book_cover_style: BookCoverStyle;
+  corner_radius: CornerRadiusStyle;
+  font_size: FontSizePreference;
+  density: DensityPreference;
+}
+
+export type ReadingPaceCalculation = "recent_logs" | "all_logs" | "manual";
+
+export type ProgressDisplay = "percentage" | "pages" | "both";
+
+export interface ReadingSettings {
+  default_reading_status: BookStatus;
+  reading_pace_calculation: ReadingPaceCalculation;
+  progress_display: ProgressDisplay;
+  reading_streak_enabled: boolean;
+  reading_streak_goal_days: number;
+  auto_finish_books: boolean;
+  estimated_completion_dates: boolean;
+}
+
+export type LibrarySorting = "recently_added" | "title" | "author" | "rating" | "status";
+
+export type LibraryView = "grid" | "list" | "compact";
+
+export interface LibrarySettings {
+  default_sorting: LibrarySorting;
+  default_view: LibraryView;
+  default_filters: Record<string, string>;
+  show_unfinished_series_first: boolean;
+  hide_completed_books: boolean;
+  show_reading_statistics: boolean;
+}
+
+export type CollectionVisibility = "private" | "followers" | "public";
+
+export type CollectionBehavior = "manual" | "smart" | "manual_and_smart";
+
+export interface CollectionSettings {
+  collection_visibility: CollectionVisibility;
+  automatic_collections: boolean;
+  smart_collections: boolean;
+  collection_behavior: CollectionBehavior;
+}
+
+export interface NotificationSettings {
+  reading_reminders: boolean;
+  weekly_summary: boolean;
+  daily_goal_reminders: boolean;
+  goal_completion_notifications: boolean;
+  friend_activity_notifications: boolean;
+  new_follower_notifications: boolean;
+}
+
+export interface PrivacySettings {
+  private_account: boolean;
+  show_reading_activity: boolean;
+  show_reading_statistics_publicly: boolean;
+  show_reading_goals_publicly: boolean;
+  allow_followers: boolean;
+  blocked_users: string[];
+}
+
+export type BackupFrequency = "manual" | "daily" | "weekly" | "monthly";
+
+export interface BackupSettings {
+  automatic_backups: boolean;
+  backup_frequency: BackupFrequency;
+  last_backup_at: string | null;
+}
+
+export interface UserSettings {
+  user_id: string;
+  appearance: AppearanceSettings;
+  reading: ReadingSettings;
+  library: LibrarySettings;
+  collections: CollectionSettings;
+  notifications: NotificationSettings;
+  privacy: PrivacySettings;
+  backup: BackupSettings;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserSettingsSections = Pick<
+  UserSettings,
+  "appearance" | "reading" | "library" | "collections" | "notifications" | "privacy" | "backup"
+>;
+
+export type UserSettingsUpdate = {
+  [Key in keyof UserSettingsSections]?: Partial<UserSettingsSections[Key]>;
+};
 
 export interface Group {
   id: string;

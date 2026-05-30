@@ -84,6 +84,8 @@ function getDisplayName(
   profile: ReturnType<typeof useProfile>["profile"],
   email?: string | null,
 ): string {
+  if (profile?.display_name?.trim()) return profile.display_name.trim();
+
   const name = [profile?.first_name, profile?.last_name]
     .map((part) => part?.trim())
     .filter(Boolean)
