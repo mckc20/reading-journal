@@ -1,7 +1,9 @@
 import type { Profile } from "@/types";
 import type { ProfilePayload } from "@/lib/profiles";
 
-export type ProfileForm = Required<ProfilePayload>;
+export type ProfileForm = Required<
+  Pick<ProfilePayload, "first_name" | "last_name" | "avatar_url" | "bio" | "timezone" | "language">
+>;
 
 export const emptyProfileForm: ProfileForm = {
   first_name: "",

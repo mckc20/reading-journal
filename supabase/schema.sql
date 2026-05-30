@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS book_notes (
 -- ── PROFILES ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name text,
+  username text,
   first_name text,
   last_name text,
   avatar_url text,
@@ -78,6 +80,27 @@ CREATE TABLE IF NOT EXISTS profiles (
   language text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'profiles_username_format_check'
+      AND conrelid = 'profiles'::regclass
+  ) THEN
+    ALTER TABLE profiles
+      ADD CONSTRAINT profiles_username_format_check
+      CHECK (
+        username IS NULL
+        OR (
+          username = lower(username)
+          AND username ~ '^[a-z0-9_]{3,30}$'
+        )
+      );
+  END IF;
+END;
+$$;
 
 INSERT INTO profiles (id)
 SELECT users.id
@@ -105,6 +128,97 @@ CREATE TRIGGER on_auth_user_created_create_profile
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION handle_new_auth_user_profile();
+
+-- ── USER SETTINGS ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  appearance jsonb NOT NULL DEFAULT '{
+    "theme": "system",
+    "accent_color": "default",
+    "compact_mode": false,
+    "reduced_animations": false,
+    "book_cover_style": "rounded",
+    "corner_radius": "medium",
+    "font_size": "medium",
+    "density": "comfortable"
+  }'::jsonb,
+  reading jsonb NOT NULL DEFAULT '{
+    "default_reading_status": "Wishlist",
+    "reading_pace_calculation": "recent_logs",
+    "progress_display": "percentage",
+    "reading_streak_enabled": true,
+    "reading_streak_goal_days": 7,
+    "auto_finish_books": true,
+    "estimated_completion_dates": true
+  }'::jsonb,
+  library jsonb NOT NULL DEFAULT '{
+    "default_sorting": "recently_added",
+    "default_view": "grid",
+    "default_filters": {},
+    "show_unfinished_series_first": true,
+    "hide_completed_books": false,
+    "show_reading_statistics": true
+  }'::jsonb,
+  collections jsonb NOT NULL DEFAULT '{
+    "collection_visibility": "private",
+    "automatic_collections": true,
+    "smart_collections": true,
+    "collection_behavior": "manual_and_smart"
+  }'::jsonb,
+  notifications jsonb NOT NULL DEFAULT '{
+    "reading_reminders": false,
+    "weekly_summary": false,
+    "daily_goal_reminders": false,
+    "goal_completion_notifications": true,
+    "friend_activity_notifications": false,
+    "new_follower_notifications": false
+  }'::jsonb,
+  privacy jsonb NOT NULL DEFAULT '{
+    "private_account": true,
+    "show_reading_activity": false,
+    "show_reading_statistics_publicly": false,
+    "show_reading_goals_publicly": false,
+    "allow_followers": false,
+    "blocked_users": []
+  }'::jsonb,
+  backup jsonb NOT NULL DEFAULT '{
+    "automatic_backups": false,
+    "backup_frequency": "manual",
+    "last_backup_at": null
+  }'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (jsonb_typeof(appearance) = 'object'),
+  CHECK (jsonb_typeof(reading) = 'object'),
+  CHECK (jsonb_typeof(library) = 'object'),
+  CHECK (jsonb_typeof(collections) = 'object'),
+  CHECK (jsonb_typeof(notifications) = 'object'),
+  CHECK (jsonb_typeof(privacy) = 'object'),
+  CHECK (jsonb_typeof(backup) = 'object')
+);
+
+INSERT INTO user_settings (user_id)
+SELECT users.id
+FROM auth.users AS users
+ON CONFLICT (user_id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS user_settings_set_updated_at ON user_settings;
+
+CREATE TRIGGER user_settings_set_updated_at
+  BEFORE UPDATE ON user_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION set_updated_at();
 
 -- ── GROUPS ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS groups (
@@ -140,6 +254,7 @@ CREATE INDEX IF NOT EXISTS book_notes_book_id_idx ON book_notes(book_id);
 CREATE INDEX IF NOT EXISTS book_notes_book_created_at_idx ON book_notes(book_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS book_notes_book_note_date_idx ON book_notes(book_id, note_date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS profiles_created_at_idx ON profiles(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_unique_idx ON profiles (lower(username)) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS groups_created_by_idx ON groups(created_by);
 CREATE INDEX IF NOT EXISTS group_memberships_user_id_idx ON group_memberships(user_id);
 CREATE INDEX IF NOT EXISTS group_memberships_group_id_idx ON group_memberships(group_id);
@@ -150,6 +265,7 @@ ALTER TABLE books        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_memberships ENABLE ROW LEVEL SECURITY;
 
@@ -321,6 +437,12 @@ CREATE POLICY "book_notes: owner delete"
 CREATE POLICY "profiles: owner select" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "profiles: owner insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "profiles: owner update" ON profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+-- user_settings
+CREATE POLICY "user_settings: owner select" ON user_settings FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "user_settings: owner insert" ON user_settings FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_settings: owner update" ON user_settings FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_settings: owner delete" ON user_settings FOR DELETE USING (auth.uid() = user_id);
 
 -- groups
 CREATE POLICY "groups: member select" ON groups FOR SELECT USING (is_active_group_member(id, auth.uid()));

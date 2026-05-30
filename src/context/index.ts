@@ -3,3 +3,4 @@ export { BooksProvider, useBooksContext } from "./BooksContext";
 export { ProfileProvider, useProfile } from "./ProfileContext";
 export { ThemeProvider, useTheme } from "./ThemeContext";
 export type { Theme } from "./ThemeContext";
+export { UserSettingsProvider, useUserSettings } from "./UserSettingsContext";

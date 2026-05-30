@@ -9,6 +9,8 @@ function getDisplayName(
   profile: ReturnType<typeof useProfile>["profile"],
   email?: string | null,
 ): string {
+  if (profile?.display_name?.trim()) return profile.display_name.trim();
+
   const name = [profile?.first_name, profile?.last_name]
     .map((part) => part?.trim())
     .filter(Boolean)
@@ -22,6 +24,7 @@ export default function Profile() {
   const { profile, loading, error } = useProfile();
   const displayName = getDisplayName(profile, user?.email);
   const details = [
+    profile?.username ? { label: "Username", value: `@${profile.username}` } : null,
     profile?.bio ? { label: "Bio", value: profile.bio } : null,
     profile?.timezone ? { label: "Timezone", value: profile.timezone } : null,
     profile?.language ? { label: "Language", value: profile.language } : null,

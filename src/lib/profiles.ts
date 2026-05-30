@@ -6,7 +6,19 @@ import type {
   Profile,
 } from "@/types";
 
-type NullableProfileRow = Omit<Profile, "first_name" | "last_name" | "avatar_url" | "bio" | "timezone" | "language"> & {
+type NullableProfileRow = Omit<
+  Profile,
+  | "display_name"
+  | "username"
+  | "first_name"
+  | "last_name"
+  | "avatar_url"
+  | "bio"
+  | "timezone"
+  | "language"
+> & {
+  display_name: string | null;
+  username: string | null;
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
@@ -21,7 +33,17 @@ type NullableGroupRow = Omit<Group, "description" | "avatar_url"> & {
 };
 
 export type ProfilePayload = Partial<
-  Pick<Profile, "first_name" | "last_name" | "avatar_url" | "bio" | "timezone" | "language">
+  Pick<
+    Profile,
+    | "display_name"
+    | "username"
+    | "first_name"
+    | "last_name"
+    | "avatar_url"
+    | "bio"
+    | "timezone"
+    | "language"
+  >
 >;
 
 export type GroupPayload = Pick<Group, "name"> &
@@ -38,6 +60,8 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 function normalizeProfile(row: NullableProfileRow): Profile {
   return {
     id: row.id,
+    display_name: row.display_name ?? undefined,
+    username: row.username ?? undefined,
     first_name: row.first_name ?? undefined,
     last_name: row.last_name ?? undefined,
     avatar_url: row.avatar_url ?? undefined,
