@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type WheelEvent } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Book } from "@/types";
 import LibraryBookCard from "./LibraryBookCard";
@@ -9,7 +9,6 @@ interface BookShelfProps {
   books: Book[];
   onBook: (book: Book) => void;
   onViewAll?: () => void;
-  onAddBook?: () => void;
   emptyMessage?: string;
 }
 
@@ -18,7 +17,6 @@ export default function BookShelf({
   books,
   onBook,
   onViewAll,
-  onAddBook,
   emptyMessage = "No books here yet.",
 }: BookShelfProps) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -80,7 +78,7 @@ export default function BookShelf({
     resizeObserver.observe(row);
 
     return () => resizeObserver.disconnect();
-  }, [books.length, onAddBook]);
+  }, [books.length]);
 
   return (
     <section className="min-w-0 border-b px-4 py-3 last:border-b-0 sm:px-5">
@@ -125,18 +123,6 @@ export default function BookShelf({
                 <LibraryBookCard book={book} onBook={onBook} variant="shelf" />
               </div>
             ))}
-            {onAddBook && (
-              <button
-                type="button"
-                data-shelf-item
-                onClick={onAddBook}
-                className="flex h-[135px] w-[90px] shrink-0 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-muted/20 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-[168px] sm:w-[112px]"
-                aria-label={`Add a book to ${title}`}
-              >
-                <Plus className="h-6 w-6" />
-                <span className="text-center text-[11px] font-medium">Add a book</span>
-              </button>
-            )}
           </div>
 
           {canScrollRight && (
@@ -153,14 +139,8 @@ export default function BookShelf({
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-3 rounded-lg border border-dashed bg-background/55 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-lg border border-dashed bg-background/55 p-4 text-sm text-muted-foreground">
           <span>{emptyMessage}</span>
-          {onAddBook && (
-            <Button type="button" variant="outline" size="sm" onClick={onAddBook}>
-              <Plus className="h-4 w-4" />
-              Add a book
-            </Button>
-          )}
         </div>
       )}
     </section>

@@ -115,6 +115,20 @@ function mergeSection<TSection extends object>(
   } as TSection;
 }
 
+function normalizeLibrarySettings(settings: LibrarySettings): LibrarySettings {
+  const storedDefaultView = String(settings.default_view);
+
+  if (storedDefaultView === "compact") {
+    return { ...settings, default_view: "gallery" };
+  }
+
+  if (!["grid", "list", "gallery"].includes(storedDefaultView)) {
+    return { ...settings, default_view: DEFAULT_LIBRARY_SETTINGS.default_view };
+  }
+
+  return settings;
+}
+
 async function getCurrentUserId(): Promise<string> {
   const {
     data: { user },
@@ -131,7 +145,7 @@ function normalizeSettings(row: UserSettingsRow): UserSettings {
     user_id: row.user_id,
     appearance: mergeSection(DEFAULT_APPEARANCE_SETTINGS, row.appearance),
     reading: mergeSection(DEFAULT_READING_SETTINGS, row.reading),
-    library: mergeSection(DEFAULT_LIBRARY_SETTINGS, row.library),
+    library: normalizeLibrarySettings(mergeSection(DEFAULT_LIBRARY_SETTINGS, row.library)),
     collections: mergeSection(DEFAULT_COLLECTION_SETTINGS, row.collections),
     notifications: mergeSection(DEFAULT_NOTIFICATION_SETTINGS, row.notifications),
     privacy: mergeSection(DEFAULT_PRIVACY_SETTINGS, row.privacy),
@@ -162,7 +176,9 @@ export function mergeUserSettings(
     ...settings,
     appearance: mergeSection(DEFAULT_APPEARANCE_SETTINGS, settings.appearance, update.appearance),
     reading: mergeSection(DEFAULT_READING_SETTINGS, settings.reading, update.reading),
-    library: mergeSection(DEFAULT_LIBRARY_SETTINGS, settings.library, update.library),
+    library: normalizeLibrarySettings(
+      mergeSection(DEFAULT_LIBRARY_SETTINGS, settings.library, update.library),
+    ),
     collections: mergeSection(DEFAULT_COLLECTION_SETTINGS, settings.collections, update.collections),
     notifications: mergeSection(
       DEFAULT_NOTIFICATION_SETTINGS,

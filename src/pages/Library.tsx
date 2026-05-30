@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
-import { Navigate, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
@@ -10,17 +10,10 @@ import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { Book } from "@/types";
 
-type AppLayoutOutletContext = {
-  onAddBookClick: () => void;
-};
-
-type ShelfView = "reading" | "tbr" | "finished" | "favorites";
-
 type SmartShelf = {
   key: "currently-reading" | "want-to-read" | "recently-finished" | "favorites";
   title: string;
   books: Book[];
-  view: ShelfView;
   emptyMessage: string;
 };
 
@@ -38,6 +31,11 @@ const exploreParamKeys = [
   "format",
   "language",
   "belongsTo",
+  "status",
+  "progress",
+  "series",
+  "author",
+  "favorite",
 ];
 
 function LoadingGrid() {
@@ -130,31 +128,43 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
       key: "currently-reading",
       title: "Currently Reading",
       books: currentlyReading,
-      view: "reading",
       emptyMessage: "Books you are currently reading will appear here.",
     },
     {
       key: "want-to-read",
       title: "Want to Read",
       books: wantToRead,
-      view: "tbr",
       emptyMessage: "Wishlist, Not Started, and Up Next books will appear here.",
     },
     {
       key: "recently-finished",
       title: "Recently Finished",
       books: recentlyFinished,
-      view: "finished",
       emptyMessage: "Finished books will appear here.",
     },
     {
       key: "favorites",
       title: "Favorites",
       books: favorites,
-      view: "favorites",
       emptyMessage: "Tap the heart on a book to collect favorites here.",
     },
   ];
+}
+
+function buildShelfExplorePath(shelf: SmartShelf): string {
+  const params = new URLSearchParams();
+
+  if (shelf.key === "currently-reading") {
+    params.set("status", "Currently Reading");
+  } else if (shelf.key === "want-to-read") {
+    params.set("status", "Want to Read");
+  } else if (shelf.key === "recently-finished") {
+    params.set("sort", "date-finished");
+  } else if (shelf.key === "favorites") {
+    params.set("favorite", "Yes");
+  }
+
+  return `/library/explore?${params.toString()}`;
 }
 
 function SeriesShelf({
@@ -302,7 +312,6 @@ function SeriesShelf({
 export default function Library() {
   const { books, loading, error, reload } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
-  const { onAddBookClick } = useOutletContext<AppLayoutOutletContext>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get("view");
@@ -362,8 +371,7 @@ export default function Library() {
                 title={shelf.title}
                 books={shelf.books}
                 onBook={openBook}
-                onViewAll={() => openExplore(`/library/explore?view=${shelf.view}`)}
-                onAddBook={onAddBookClick}
+                onViewAll={() => openExplore(buildShelfExplorePath(shelf))}
                 emptyMessage={shelf.emptyMessage}
               />
             ))}
