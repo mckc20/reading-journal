@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   Check,
   Download,
   Grid2X2,
   Heart,
+  Images,
   MoreHorizontal,
-  Plus,
   RefreshCw,
-  Rows3,
   Star,
   Table2,
   X,
@@ -55,7 +54,6 @@ import {
 import { cn, statusVariant } from "@/lib/utils";
 import BookCard from "@/components/BookCard";
 import BookShelf from "@/pages/library/BookShelf";
-import CompactBookCard from "@/pages/library/CompactBookCard";
 import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
 import ShelfCarousel from "@/pages/library/ShelfCarousel";
 import type { Book, BookNote, BookStatus, BookUpdate, ReadingLog, Series } from "@/types";
@@ -104,7 +102,7 @@ type LibrarySort =
   | "continue-reading"
   | "near-completion";
 
-type LibraryDisplay = "grid" | "compact" | "table";
+type LibraryDisplay = "grid" | "gallery" | "table";
 
 type LibraryFilterKey =
   | "status"
@@ -115,7 +113,8 @@ type LibraryFilterKey =
   | "format"
   | "language"
   | "series"
-  | "author";
+  | "author"
+  | "favorite";
 
 type LibraryFilters = Record<LibraryFilterKey, string>;
 
@@ -130,7 +129,6 @@ type SmartShelf = {
   key: "currently-reading" | "want-to-read" | "recently-finished" | "favorites";
   title: string;
   books: Book[];
-  view: LibraryView;
   emptyMessage: string;
 };
 
@@ -155,6 +153,7 @@ const filterKeys: LibraryFilterKey[] = [
   "language",
   "series",
   "author",
+  "favorite",
 ];
 
 const filterLabels: Record<LibraryFilterKey, string> = {
@@ -167,6 +166,7 @@ const filterLabels: Record<LibraryFilterKey, string> = {
   language: "Language",
   series: "Series",
   author: "Author",
+  favorite: "Favorite",
 };
 
 const allFilterValue = "__all__";
@@ -186,7 +186,7 @@ const validSorts = new Set<LibrarySort>([
   "continue-reading",
   "near-completion",
 ]);
-const validDisplays = new Set<LibraryDisplay>(["grid", "compact", "table"]);
+const validDisplays = new Set<LibraryDisplay>(["grid", "gallery", "table"]);
 const primaryShelves: PrimaryShelf[] = [
   {
     value: "all",
@@ -252,6 +252,11 @@ const statusFilterLabels: Record<BookStatus, string> = {
   DNF: "DNF",
 };
 
+const statusFilterOptions = [
+  "Want to Read",
+  ...bookStatuses.map((status) => statusFilterLabels[status]),
+];
+
 const progressFilterOptions = [
   "Not started",
   "In progress",
@@ -276,6 +281,11 @@ function isLibraryDisplay(value: string | null): value is LibraryDisplay {
   return value !== null && validDisplays.has(value as LibraryDisplay);
 }
 
+function normalizeLibraryDisplay(value: string | null): LibraryDisplay {
+  if (value === "compact") return "gallery";
+  return isLibraryDisplay(value) ? value : "grid";
+}
+
 function EmptyLibraryView({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -288,7 +298,7 @@ function EmptyLibraryView({ message }: { message: string }) {
 function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
   if (books.length === 0) return null;
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,110px)] justify-start gap-3 sm:grid-cols-[repeat(auto-fill,140px)]">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
       {books.map((book) => (
         <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" />
       ))}
@@ -296,12 +306,38 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void
   );
 }
 
-function CompactBooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
+function GalleryBooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
   if (books.length === 0) return null;
   return (
-    <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
       {books.map((book) => (
-        <CompactBookCard key={book.id} book={book} onBook={onBook} />
+        <button
+          key={book.id}
+          type="button"
+          onClick={() => onBook(book)}
+          className="group block min-w-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-muted shadow-sm">
+            {book.cover_url ? (
+              <img
+                src={book.cover_url}
+                alt={book.title}
+                loading="lazy"
+                className="absolute inset-0 block h-full w-full scale-[1.035] object-cover transition duration-200 ease-out group-hover:scale-[1.055]"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+              </div>
+            )}
+            {book.is_favorite && (
+              <Heart
+                className="absolute right-2 top-2 h-4 w-4 fill-rose-500 text-rose-500 drop-shadow"
+                aria-label="Favorite"
+              />
+            )}
+          </div>
+        </button>
       ))}
     </div>
   );
@@ -317,24 +353,35 @@ function LoadingGrid() {
   );
 }
 
-function BooksTable({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
+function BooksTable({
+  books,
+  onBook,
+}: {
+  books: Book[];
+  onBook: (b: Book) => void;
+}) {
   if (books.length === 0) return null;
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-background dark:bg-card">
-      <table className="w-full min-w-[48rem] text-left text-sm">
+      <table className="w-full min-w-[60rem] text-left text-sm">
         <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
           <tr>
-            <th className="px-3 py-2">Book</th>
+            <th className="w-16 px-3 py-2">Cover</th>
+            <th className="px-3 py-2">Title</th>
+            <th className="px-3 py-2">Author</th>
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Rating</th>
-            <th className="px-3 py-2">Progress</th>
-            <th className="px-3 py-2">Format</th>
+            <th className="px-3 py-2">Date Added</th>
           </tr>
         </thead>
         <tbody className="divide-y">
           {books.map((book) => (
-            <BookTableRow key={book.id} book={book} onBook={onBook} />
+            <BookTableRow
+              key={book.id}
+              book={book}
+              onBook={onBook}
+            />
           ))}
         </tbody>
       </table>
@@ -342,9 +389,13 @@ function BooksTable({ books, onBook }: { books: Book[]; onBook: (b: Book) => voi
   );
 }
 
-function BookTableRow({ book, onBook }: { book: Book; onBook: (b: Book) => void }) {
-  const progress = getBookProgress(book);
-
+function BookTableRow({
+  book,
+  onBook,
+}: {
+  book: Book;
+  onBook: (b: Book) => void;
+}) {
   return (
     <tr
       tabIndex={0}
@@ -359,28 +410,26 @@ function BookTableRow({ book, onBook }: { book: Book; onBook: (b: Book) => void 
       className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
     >
       <td className="px-3 py-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-            {book.cover_url ? (
-              <img
-                src={book.cover_url}
-                alt={book.title}
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-              </div>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="max-w-72 truncate font-medium leading-snug">{book.title}</p>
-            <p className="max-w-72 truncate text-xs text-muted-foreground">
-              {book.authors.join(", ")}
-            </p>
-          </div>
+        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+          {book.cover_url ? (
+            <img
+              src={book.cover_url}
+              alt={book.title}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <BookOpen className="h-4 w-4 text-muted-foreground/40" />
+            </div>
+          )}
         </div>
+      </td>
+      <td className="px-3 py-2">
+        <p className="max-w-72 truncate font-medium leading-snug">{book.title}</p>
+      </td>
+      <td className="px-3 py-2 text-muted-foreground">
+        <p className="max-w-64 truncate">{book.authors.join(", ") || "-"}</p>
       </td>
       <td className="px-3 py-2">
         <Badge variant={statusVariant(book.status)} className="text-[10px]">
@@ -400,11 +449,8 @@ function BookTableRow({ book, onBook }: { book: Book; onBook: (b: Book) => void 
           <Heart className="ml-2 inline h-3.5 w-3.5 fill-rose-500 text-rose-500" aria-label="Favorite" />
         )}
       </td>
-      <td className="px-3 py-2">
-        <span className="text-muted-foreground">{progress}%</span>
-      </td>
       <td className="px-3 py-2 text-muted-foreground">
-        {book.format ?? book.language ?? "-"}
+        {formatNumericDate(book.created_at)}
       </td>
     </tr>
   );
@@ -422,7 +468,7 @@ function BooksView({
   if (display === "table") {
     return <BooksTable books={books} onBook={onBook} />;
   }
-  if (display === "compact") return <CompactBooksGrid books={books} onBook={onBook} />;
+  if (display === "gallery") return <GalleryBooksGrid books={books} onBook={onBook} />;
   return <BooksGrid books={books} onBook={onBook} />;
 }
 
@@ -697,12 +743,12 @@ function LibraryViewModeSwitcher({
       <Button
         type="button"
         size="icon-sm"
-        variant={display === "compact" ? "secondary" : "ghost"}
-        aria-label="Compact view"
-        aria-pressed={display === "compact"}
-        onClick={() => onDisplayChange("compact")}
+        variant={display === "gallery" ? "secondary" : "ghost"}
+        aria-label="Gallery view"
+        aria-pressed={display === "gallery"}
+        onClick={() => onDisplayChange("gallery")}
       >
-        <Rows3 className="h-4 w-4" />
+        <Images className="h-4 w-4" />
       </Button>
       <Button
         type="button"
@@ -823,6 +869,7 @@ function getLibraryFilters(searchParams: URLSearchParams): LibraryFilters {
     language: searchParams.get("language")?.trim() ?? "",
     series: searchParams.get("series")?.trim() ?? "",
     author: searchParams.get("author")?.trim() ?? "",
+    favorite: searchParams.get("favorite")?.trim() ?? "",
   };
 }
 
@@ -840,7 +887,7 @@ function buildLibraryFilterOptions(books: Book[], series: Series[]): LibraryFilt
   });
 
   return {
-    status: bookStatuses.map((status) => statusFilterLabels[status]),
+    status: statusFilterOptions,
     genre: uniqueSortedValues(books.flatMap((book) => book.genres ?? [])),
     rating: uniqueSortedValues(books.map((book) => book.rating?.toString())),
     year: Array.from(years).sort((a, b) => Number(b) - Number(a)),
@@ -849,6 +896,7 @@ function buildLibraryFilterOptions(books: Book[], series: Series[]): LibraryFilt
     language: uniqueSortedValues(books.map((book) => book.language)),
     series: uniqueSortedValues(books.map((book) => (book.series_id ? seriesById.get(book.series_id) : null))),
     author: uniqueSortedValues(books.flatMap((book) => book.authors)),
+    favorite: ["Yes"],
   };
 }
 
@@ -865,8 +913,12 @@ function bookMatchesProgressFilter(book: Book, filter: string): boolean {
 
 function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: Series[]): boolean {
   if (filters.status) {
-    const matchingStatus = bookStatuses.find((status) => statusFilterLabels[status] === filters.status);
-    if (!matchingStatus || book.status !== matchingStatus) return false;
+    if (filters.status === "Want to Read") {
+      if (!["Wishlist", "Not Started", "Up Next"].includes(book.status)) return false;
+    } else {
+      const matchingStatus = bookStatuses.find((status) => statusFilterLabels[status] === filters.status);
+      if (!matchingStatus || book.status !== matchingStatus) return false;
+    }
   }
 
   if (filters.genre && !(book.genres ?? []).includes(filters.genre)) return false;
@@ -881,6 +933,7 @@ function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: 
   if (filters.language && book.language !== filters.language) return false;
   if (filters.series && getSeriesName(book, series) !== filters.series) return false;
   if (filters.author && !book.authors.includes(filters.author)) return false;
+  if (filters.favorite && (filters.favorite !== "Yes" || !book.is_favorite)) return false;
 
   if (filters.year) {
     const { year } = getBookFilterDateParts(book);
@@ -1072,14 +1125,40 @@ function filterAndSortBooks({
   );
 }
 
-function formatNoteDate(value: string): string {
-  const dateValue = value.includes("T") ? value : `${value}T00:00:00`;
+function formatLibraryDate(value: string | number | null | undefined): string {
+  if (value === undefined || value === null || value === "") return "-";
 
-  return new Date(dateValue).toLocaleDateString(undefined, {
+  const date = typeof value === "number"
+    ? new Date(value)
+    : new Date(value.includes("T") ? value : `${value}T00:00:00`);
+
+  if (!Number.isFinite(date.getTime())) return "-";
+
+  return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatNumericDate(value: string | number | null | undefined): string {
+  if (value === undefined || value === null || value === "") return "-";
+
+  const date = typeof value === "number"
+    ? new Date(value)
+    : new Date(value.includes("T") ? value : `${value}T00:00:00`);
+
+  if (!Number.isFinite(date.getTime())) return "-";
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatNoteDate(value: string): string {
+  return formatLibraryDate(value);
 }
 
 function noteGroupCountLabel(count: number) {
@@ -1490,6 +1569,7 @@ function LibraryControlsBar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="date-added">Recently Added</SelectItem>
+              <SelectItem value="date-finished">Date Finished</SelectItem>
               <SelectItem value="title">Title A-Z</SelectItem>
               <SelectItem value="author">Author A-Z</SelectItem>
               <SelectItem value="all-sorting" className="text-muted-foreground">
@@ -1558,13 +1638,11 @@ function LibraryToolbar({
   title,
   countLabel,
   loading,
-  onAddBook,
   onManageLibrary,
 }: {
   title: string;
   countLabel: string;
   loading: boolean;
-  onAddBook: () => void;
   onManageLibrary?: () => void;
 }) {
   return (
@@ -1577,10 +1655,6 @@ function LibraryToolbar({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
-        <Button type="button" onClick={onAddBook} className="sm:w-auto">
-          <Plus className="h-4 w-4" />
-          Add Book
-        </Button>
         {onManageLibrary && (
           <Button
             type="button"
@@ -1771,31 +1845,39 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
       key: "currently-reading",
       title: "Currently Reading",
       books: currentlyReading,
-      view: "reading",
       emptyMessage: "Books you are currently reading will appear here.",
     },
     {
       key: "want-to-read",
       title: "Want to Read",
       books: wantToRead,
-      view: "tbr",
       emptyMessage: "Wishlist, Not Started, and Up Next books will appear here.",
     },
     {
       key: "recently-finished",
       title: "Recently Finished",
       books: recentlyFinished,
-      view: "finished",
       emptyMessage: "Finished books will appear here.",
     },
     {
       key: "favorites",
       title: "Favorites",
       books: favorites,
-      view: "favorites",
       emptyMessage: "Tap the heart on a book to collect favorites here.",
     },
   ];
+}
+
+function getShelfFilters(shelf: SmartShelf): Partial<LibraryFilters> {
+  if (shelf.key === "currently-reading") return { status: "Currently Reading" };
+  if (shelf.key === "want-to-read") return { status: "Want to Read" };
+  if (shelf.key === "favorites") return { favorite: "Yes" };
+  return {};
+}
+
+function getShelfSort(shelf: SmartShelf): LibrarySort | undefined {
+  if (shelf.key === "recently-finished") return "date-finished";
+  return undefined;
 }
 
 function MyBooksOverview({
@@ -1822,7 +1904,7 @@ function MyBooksOverview({
   countLabel: string;
   controls: ReactNode;
   onDisplayChange: (display: LibraryDisplay) => void;
-  onViewAll: (view: LibraryView) => void;
+  onViewAll: (shelf: SmartShelf) => void;
   onBook: (book: Book) => void;
 }) {
   const hasSearch = Boolean(normalizeSearchText(query));
@@ -1860,7 +1942,7 @@ function MyBooksOverview({
                 title={shelf.title}
                 books={shelf.books}
                 onBook={onBook}
-                onViewAll={() => onViewAll(shelf.view)}
+                onViewAll={() => onViewAll(shelf)}
                 emptyMessage={shelf.emptyMessage}
               />
             ))}
@@ -1890,21 +1972,20 @@ function MyBooksOverview({
             })}
           />
         ) : (
-          <BooksView books={books} display={display} onBook={onBook} />
+          <BooksView
+            books={books}
+            display={display}
+            onBook={onBook}
+          />
         )}
       </LibrarySection>
     </div>
   );
 }
 
-type AppLayoutOutletContext = {
-  onAddBookClick: () => void;
-};
-
 export default function Library() {
   const { books, loading: booksLoading, error, reload, updateBook } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
-  const { onAddBookClick } = useOutletContext<AppLayoutOutletContext>();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
@@ -1927,7 +2008,7 @@ export default function Library() {
   const contentView = activeView;
   const libraryQuery = queryParam;
   const librarySort: LibrarySort = isLibrarySort(sortParam) ? sortParam : "title";
-  const libraryDisplay: LibraryDisplay = isLibraryDisplay(displayParam) ? displayParam : "grid";
+  const libraryDisplay = normalizeLibraryDisplay(displayParam);
   const isManageMode = modeParam === "manage";
   const isNotesView = contentView === "notes";
   const activeCategoryShelf = categoryShelves.find((shelf) => shelf.value === contentView);
@@ -1951,6 +2032,14 @@ export default function Library() {
       navigate("/library/explore", { replace: true });
     }
   }, [navigate, viewParam]);
+
+  useEffect(() => {
+    if (displayParam !== "compact") return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("display", "gallery");
+    setSearchParams(nextParams, { replace: true });
+  }, [displayParam, searchParams, setSearchParams]);
 
   useEffect(() => {
     setSelectedBookIds((current) => {
@@ -2036,10 +2125,20 @@ export default function Library() {
     setSearchParams(nextParams, { replace: true });
   }
 
-  function updateLibraryView(view: LibraryView) {
+  function updateLibraryShelfFilters(shelf: SmartShelf) {
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("view", view);
+    nextParams.delete("view");
     nextParams.delete("value");
+    nextParams.delete("sort");
+    filterKeys.forEach((key) => nextParams.delete(key));
+
+    Object.entries(getShelfFilters(shelf)).forEach(([key, value]) => {
+      if (value) nextParams.set(key, value);
+    });
+
+    const shelfSort = getShelfSort(shelf);
+    if (shelfSort) nextParams.set("sort", shelfSort);
+
     setSearchParams(nextParams, { replace: true });
   }
 
@@ -2296,7 +2395,6 @@ export default function Library() {
           title={pageTitle}
           countLabel={displayedCountLabel}
           loading={loading}
-          onAddBook={onAddBookClick}
           onManageLibrary={isManageMode ? undefined : openManageMode}
         />
       )}
@@ -2344,7 +2442,7 @@ export default function Library() {
           countLabel={displayedCountLabel}
           controls={controlsBar}
           onDisplayChange={(display) => updateLibraryParam("display", display)}
-          onViewAll={updateLibraryView}
+          onViewAll={updateLibraryShelfFilters}
           onBook={openBook}
         />
       ) : (
@@ -2381,7 +2479,11 @@ export default function Library() {
                     })}
                   />
                 ) : (
-                  <BooksView books={visibleBooks} display={libraryDisplay} onBook={openBook} />
+                  <BooksView
+                    books={visibleBooks}
+                    display={libraryDisplay}
+                    onBook={openBook}
+                  />
                 )
               ) : selectedValue && activeValueShelf && activeValueShelf !== "notes" ? (
                 filteredBooks.length === 0 ? (
@@ -2395,7 +2497,11 @@ export default function Library() {
                     }
                   />
                 ) : (
-                  <BooksView books={filteredBooks} display={libraryDisplay} onBook={openBook} />
+                  <BooksView
+                    books={filteredBooks}
+                    display={libraryDisplay}
+                    onBook={openBook}
+                  />
                 )
               ) : isNotesView ? (
                 notesError ? null : <GroupedNotesView groups={groupedNotes} onBook={openBook} />

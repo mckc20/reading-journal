@@ -127,7 +127,7 @@ export interface ReadingSettings {
 
 export type LibrarySorting = "recently_added" | "title" | "author" | "rating" | "status";
 
-export type LibraryView = "grid" | "list" | "compact";
+export type LibraryView = "grid" | "list" | "gallery";
 
 export interface LibrarySettings {
   default_sorting: LibrarySorting;
