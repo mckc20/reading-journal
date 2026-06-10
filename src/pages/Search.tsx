@@ -399,7 +399,7 @@ function HighlightedText({
     part.highlighted ? (
       <mark
         key={index}
-        className="rounded-sm bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-500/40"
+        className="rounded-sm bg-search-highlight px-0.5 text-inherit"
       >
         {part.text}
       </mark>

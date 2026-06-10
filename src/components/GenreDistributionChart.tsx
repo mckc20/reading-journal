@@ -20,22 +20,16 @@ const STROKE_WIDTH = 44;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const DONUT_PALETTE = [
-  "#4B88B2",
-  "#56A2B8",
-  "#66B6AE",
-  "#7DC2A4",
-  "#97CC98",
-  "#B3D48F",
-  "#C9DA8A",
-  "#DCE094",
-  "#E8DE98",
-  "#ECD08A",
-  "#EEBC72",
-  "#F0A55D",
-  "#F1894F",
-  "#EE6D47",
-  "#E85546",
-  "#D43A4B",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--favorite)",
+  "var(--rating)",
+  "var(--quote)",
+  "var(--note)",
+  "var(--insight)",
 ];
 
 function hashLabel(value: string): number {

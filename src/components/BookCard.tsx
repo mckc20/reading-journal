@@ -41,7 +41,7 @@ export default function BookCard({
     <Card
       role="button"
       tabIndex={0}
-      className="cursor-pointer overflow-hidden pt-0 gap-0 pb-2 transition-shadow hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="cursor-pointer overflow-hidden pt-0 gap-0 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={() => onClick(book)}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -67,14 +67,14 @@ export default function BookCard({
         )}
         {book.is_favorite && (
           <Heart
-            className="absolute right-1.5 top-1.5 h-4 w-4 fill-rose-500 text-rose-500 drop-shadow"
+            className="absolute right-1.5 top-1.5 h-4 w-4 fill-favorite text-favorite drop-shadow"
             aria-label="Favorite"
           />
         )}
       </div>
 
       <CardContent className="p-2 space-y-1">
-        <p className={textSize === "compact" ? "text-xs font-medium leading-tight line-clamp-2" : "text-sm font-medium leading-tight line-clamp-2"}>
+        <p className={textSize === "compact" ? "font-heading text-sm font-medium leading-tight line-clamp-2" : "font-heading text-base font-medium leading-tight line-clamp-2"}>
           {book.title}
         </p>
         <p className={textSize === "compact" ? "text-[11px] text-muted-foreground line-clamp-1" : "text-xs text-muted-foreground line-clamp-1"}>

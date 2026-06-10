@@ -416,7 +416,7 @@ export default function Login() {
   };
 
   return (
-    <main className="relative min-h-svh overflow-hidden bg-zinc-900">
+    <main className="relative min-h-svh overflow-hidden bg-foreground">
       <div className="absolute inset-0" aria-hidden="true">
         {previousCover && (
           <img
@@ -441,11 +441,11 @@ export default function Login() {
             decoding="async"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-600 via-zinc-700 to-zinc-900" />
+          <div className="login-fallback absolute inset-0" />
         )}
 
         <div className="absolute inset-0 bg-black/35" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_20%,_rgba(0,0,0,0.55)_100%)]" />
+        <div className="login-vignette absolute inset-0" />
       </div>
 
       {currentCover?.locationText && (
@@ -472,7 +472,7 @@ export default function Login() {
       )}
 
       <div className="pointer-events-none relative z-20 flex min-h-svh items-center justify-center px-4 py-8 sm:px-8">
-        <div className="pointer-events-auto w-full max-w-sm space-y-6 rounded-xl border border-white/30 bg-background/95 p-6 shadow-xl backdrop-blur-md sm:p-7">
+        <div className="pointer-events-auto w-full max-w-sm space-y-6 rounded-lg border border-border/70 bg-background/95 p-6 shadow-[var(--shadow-popover)] backdrop-blur-md sm:p-7">
           <div className="space-y-1">
             <h1 className="text-2xl font-heading leading-snug font-medium tracking-tight">Reading Journal</h1>
             <p className="text-sm text-muted-foreground">Sign in to your account</p>

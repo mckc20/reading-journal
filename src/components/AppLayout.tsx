@@ -198,16 +198,16 @@ function DesktopSidebar({
 }) {
   return (
     <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex md:flex-col">
-      <div className="flex h-16 items-center gap-2 px-5">
+      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border/70 px-5">
         <img
           src={readingJournalLogo}
           alt="Reading Journal logo"
           className="h-7 w-7 rounded-sm object-cover dark:brightness-0 dark:invert"
         />
-        <span className="font-heading text-sm font-medium">Reading Journal</span>
+        <span className="font-heading text-base font-medium">Reading Journal</span>
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {sidebarNavLinks.map((link) => (
           <NavItem
             key={link.to}
@@ -224,7 +224,7 @@ function DesktopSidebar({
 
 function DesktopUtilityBar({ onAddBookClick }: { onAddBookClick: () => void }) {
   return (
-    <header className="sticky top-0 z-40 hidden h-14 items-center justify-end border-b bg-background/95 px-8 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:flex lg:px-10">
+    <header className="sticky top-0 z-40 hidden h-14 items-center justify-end border-b border-border/80 bg-background/90 px-8 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:flex lg:px-10">
       <div className="flex items-center gap-1">
         <Button size="icon" variant="ghost" asChild>
           <Link to="/search" aria-label="Search">
@@ -233,9 +233,8 @@ function DesktopUtilityBar({ onAddBookClick }: { onAddBookClick: () => void }) {
         </Button>
         <Button
           size="default"
-          variant="ghost"
+          variant="default"
           onClick={onAddBookClick}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
         >
           <Plus className="h-4 w-4" />
           Add Book
@@ -252,13 +251,13 @@ function MobileHeader({
   profileProps,
 }: AppHeaderProps & { profileProps: SidebarProfileProps }) {
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:hidden">
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:hidden">
       <div className="flex h-14 items-center gap-2 px-4">
         <MobileMenu pathname={pathname} search={search} profileProps={profileProps} />
 
         <Link
           to="/"
-          className="flex min-w-0 items-center gap-2 font-semibold text-foreground"
+          className="flex min-w-0 items-center gap-2 font-heading font-medium text-foreground"
         >
           <img
             src={readingJournalLogo}
@@ -313,7 +312,7 @@ function MobileMenu({
       </Button>
       <DialogContent
         showCloseButton={false}
-        className="left-0 top-0 h-svh max-w-80 translate-x-0 translate-y-0 content-start grid-rows-[auto_minmax(0,1fr)] gap-0 rounded-none border-r bg-background p-0"
+        className="left-0 top-0 h-svh max-w-80 translate-x-0 translate-y-0 content-start grid-rows-[auto_minmax(0,1fr)] gap-0 rounded-none border-r bg-sidebar p-0"
       >
         <DialogHeader className="flex-row items-center justify-between border-b px-4 py-3">
           <DialogTitle>Menu</DialogTitle>
@@ -348,7 +347,7 @@ function MobileMenu({
 
 function MobileBottomNav({ pathname, search }: { pathname: string; search: string }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t bg-background md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-border/80 bg-background/95 backdrop-blur md:hidden">
       {mobilePrimaryLinks.map(({ to, label, icon: Icon }) => {
         const active = isActiveRoute(pathname, search, to);
         return (
@@ -356,8 +355,8 @@ function MobileBottomNav({ pathname, search }: { pathname: string; search: strin
             key={to}
             to={to}
             className={cn(
-              "flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors",
-              active ? "font-medium text-foreground" : "text-muted-foreground"
+              "flex flex-1 flex-col items-center gap-1 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] transition-colors",
+              active ? "text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Icon className="h-5 w-5" />
@@ -384,7 +383,7 @@ function NavItem({
     <Link
       to={link.to}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-200",
         active
           ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
           : "text-sidebar-foreground/75 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
@@ -405,7 +404,7 @@ function SidebarProfileFooter({
 }: SidebarProfileProps) {
   return (
     <div className="border-t border-sidebar-border p-3">
-      <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+      <div className="flex items-center gap-3 rounded-md px-2 py-2">
         <ProfileAvatar profile={profile} email={email} className="h-10 w-10 text-sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-sidebar-foreground">

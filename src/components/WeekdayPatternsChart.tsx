@@ -7,7 +7,7 @@ interface WeekdayPatternsChartProps {
   weekdays: ReadingHabitsMetrics["weekdays"];
 }
 
-const DOT_COLOR = "#EEBC72";
+const DOT_COLOR = "var(--rating)";
 
 function getColumnPercent(value: number, maxValue: number): number {
   if (value <= 0 || maxValue <= 0) return 0;

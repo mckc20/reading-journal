@@ -25,7 +25,7 @@ export default function QuoteBlock({
       <div aria-hidden="true" className="flex justify-center">
         <span
           className={cn(
-            "font-serif text-4xl font-semibold leading-none text-emerald-700 dark:text-emerald-400",
+            "font-serif text-4xl font-semibold leading-none text-primary",
             markClassName,
           )}
         >
@@ -35,7 +35,7 @@ export default function QuoteBlock({
       <div className="min-w-0">
         <blockquote
           className={cn(
-            "font-serif text-sm italic leading-6 text-foreground",
+            "font-heading text-base italic leading-7 text-foreground",
             contentClassName,
           )}
         >

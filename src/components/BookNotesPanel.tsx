@@ -39,10 +39,10 @@ interface BookNotesPanelProps {
 const NOTE_LABELS: BookNoteLabel[] = ["quote", "review", "note"];
 
 const LABEL_STYLES: Record<BookNoteLabel, string> = {
-  quote: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200",
+  quote: "border-quote/25 bg-quote/10 text-quote",
   review:
-    "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200",
-  note: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200",
+    "border-insight/25 bg-insight/10 text-insight",
+  note: "border-note/25 bg-note/10 text-note",
 };
 
 function formatNoteDate(value: string): string {
@@ -675,7 +675,7 @@ export default function BookNotesPanel({ book }: BookNotesPanelProps) {
                       <Heart
                         className={`h-5 w-5 ${
                           note.is_favorite
-                            ? "fill-rose-500 text-rose-500"
+                            ? "fill-favorite text-favorite"
                             : "text-muted-foreground"
                         }`}
                       />

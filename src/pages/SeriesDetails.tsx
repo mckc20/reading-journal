@@ -202,7 +202,7 @@ function StatsBarChart({
               </Link>
               <div className="h-3 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-zinc-800"
+                  className="h-full rounded-full bg-primary"
                   style={{ width: `${maximumValue > 0 ? (row.value / maximumValue) * 100 : 0}%` }}
                 />
               </div>
@@ -366,7 +366,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
     <Link
       to={`/books/${book.id}`}
       className={cn(
-        "group relative flex min-w-0 flex-col items-center rounded-xl border bg-background px-3 pb-4 pt-3 text-foreground shadow-[0_1px_3px_rgb(0_0_0/0.035)] transition-shadow hover:shadow-[0_2px_6px_rgb(0_0_0/0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "group relative flex min-w-0 flex-col items-center rounded-lg border bg-card px-3 pb-4 pt-3 text-foreground shadow-[var(--shadow-card)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-surface-hover/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isReading && "border-foreground ring-1 ring-foreground",
       )}
       aria-label={`Open ${book.title}`}
@@ -374,7 +374,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
       <span
         className={cn(
           "absolute left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold shadow-sm",
-          isFinished && "border-zinc-400 bg-zinc-400 text-white",
+          isFinished && "border-primary bg-primary text-primary-foreground",
           isReading && "border-foreground bg-foreground text-background",
           !isFinished && !isReading && "border-border bg-background text-muted-foreground",
         )}
@@ -413,7 +413,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
             className={cn(
               "h-4 w-4",
               book.rating && rating <= book.rating
-                ? "fill-foreground text-foreground"
+                ? "fill-rating text-rating"
                 : "fill-muted text-muted-foreground/45",
             )}
           />
@@ -423,7 +423,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
       <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
         {isFinished ? (
           <span
-            className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-500 bg-zinc-500 text-white"
+            className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground"
             aria-hidden
           >
             <Check className="h-2.5 w-2.5 stroke-[3]" />
@@ -621,7 +621,7 @@ function SeriesJourneyItem({
           <span
             className={cn(
               "relative z-10 mt-7 flex h-7 w-7 items-center justify-center rounded-full border bg-background",
-              isFinished && "border-zinc-400 bg-zinc-400 text-background",
+              isFinished && "border-primary bg-primary text-primary-foreground",
               isReading && "border-foreground bg-foreground text-background",
               !isFinished && !isReading && "border-muted-foreground/70 text-muted-foreground",
             )}
@@ -653,7 +653,7 @@ function SeriesJourneyItem({
 
         <article
           className={cn(
-            "grid min-w-0 gap-5 rounded-xl border bg-card p-4 shadow-[0_1px_3px_rgb(0_0_0/0.04)] sm:grid-cols-[7rem_minmax(13rem,1fr)] lg:grid-cols-[7rem_minmax(17rem,1fr)_minmax(13rem,17rem)]",
+            "grid min-w-0 gap-5 rounded-lg border bg-card p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7rem_minmax(13rem,1fr)] lg:grid-cols-[7rem_minmax(17rem,1fr)_minmax(13rem,17rem)]",
             isReading && "border-foreground ring-1 ring-foreground",
           )}
         >
@@ -890,10 +890,10 @@ export default function SeriesDetails() {
 
       <header className="relative flex min-h-64 items-end overflow-hidden rounded-2xl border bg-muted">
         <div
-          className="absolute inset-0 bg-gradient-to-br from-emerald-950 via-slate-800 to-stone-700"
+          className="absolute inset-0 bg-primary"
           aria-label="Series banner placeholder"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
+        <div className="absolute inset-0 bg-foreground/45" />
         <div className="relative space-y-3 p-6 text-white sm:p-8">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/70">
             Series

@@ -33,10 +33,10 @@ export default function LibraryBookCard({
       type="button"
       onClick={() => onBook(book)}
       className={cn(
-        "group block rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "group block rounded-lg text-left transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isShelf
           ? "w-full space-y-2"
-          : "w-[110px] overflow-hidden border bg-background shadow-sm hover:shadow-md sm:w-[140px] dark:bg-card",
+          : "w-[110px] overflow-hidden border bg-background shadow-sm sm:w-[140px] dark:bg-card",
       )}
     >
       <div
@@ -59,7 +59,7 @@ export default function LibraryBookCard({
         )}
         {book.is_favorite && (
           <Heart
-            className="absolute right-2 top-2 h-4 w-4 fill-rose-500 text-rose-500 drop-shadow"
+            className="absolute right-2 top-2 h-4 w-4 fill-favorite text-favorite drop-shadow"
             aria-label="Favorite"
           />
         )}

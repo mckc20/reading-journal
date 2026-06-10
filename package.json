@@ -16,6 +16,7 @@
   "dependencies": {
     "@ericblade/quagga2": "^1.12.1",
     "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/lora": "^5.2.8",
     "@supabase/supabase-js": "^2.103.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
