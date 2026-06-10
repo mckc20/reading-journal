@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatBookNotePageRange,
+  getProgressNoteDate,
   normalizeBookNoteFields,
   normalizeBookNoteInput,
   sortBookNotes,
@@ -159,6 +160,15 @@ test("stores quote speaker only for quote entries", () => {
 test("formats source page labels", () => {
   assert.equal(formatBookNotePageRange({ page_start: null }), null);
   assert.equal(formatBookNotePageRange({ page_start: 42 }), "p. 42");
+});
+
+test("uses the selected progress date for notes created from progress updates", () => {
+  assert.equal(getProgressNoteDate(true, "2026-05-05T23:45"), "2026-05-05");
+});
+
+test("lets progress notes default to today when no progress date is edited", () => {
+  assert.equal(getProgressNoteDate(false, "2026-05-05T23:45"), null);
+  assert.equal(getProgressNoteDate(true, ""), null);
 });
 
 test("sorts notes by visible note date newest first", () => {

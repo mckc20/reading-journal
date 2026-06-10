@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
+import { Textarea } from "@/components/ui/textarea";
+import { createBookNote, getProgressNoteDate } from "@/lib/bookNotes";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
 import type { Book, ReadingLog } from "@/types";
@@ -66,6 +68,8 @@ export default function ReadingProgressPanel({
   const [selectedLoggedAt, setSelectedLoggedAt] = useState(() =>
     toDateTimeLocalValue(new Date())
   );
+  const [showNoteEditor, setShowNoteEditor] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
 
   // Fetch last reading log on mount
   useEffect(() => {
@@ -93,6 +97,8 @@ export default function ReadingProgressPanel({
       setSelectedMinutes(0);
       setShowLoggedAtEditor(false);
       setSelectedLoggedAt(toDateTimeLocalValue(new Date()));
+      setShowNoteEditor(false);
+      setNoteContent("");
       setErrorMsg(null);
     }
   }, [expanded, lastLog, book.current_page, totalPages]);
@@ -125,6 +131,19 @@ export default function ReadingProgressPanel({
         timeMinutes > 0 ? timeMinutes : undefined,
         loggedAtIso
       );
+
+      const trimmedNoteContent = noteContent.trim();
+      if (trimmedNoteContent) {
+        await createBookNote({
+          bookId: book.id,
+          userId: user.id,
+          label: "note",
+          content: trimmedNoteContent,
+          pageStart: selectedPage,
+          noteDate: getProgressNoteDate(showLoggedAtEditor, selectedLoggedAt),
+        });
+      }
+
       await onProgressSaved(selectedPage);
       // Update lastLog locally so the min page updates
       setLastLog({
@@ -134,6 +153,8 @@ export default function ReadingProgressPanel({
         current_page: selectedPage,
         logged_at: loggedAtIso ?? new Date().toISOString(),
       });
+      setShowNoteEditor(false);
+      setNoteContent("");
       setExpanded(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save progress");
@@ -220,6 +241,34 @@ export default function ReadingProgressPanel({
                   type="datetime-local"
                   value={selectedLoggedAt}
                   onChange={(event) => setSelectedLoggedAt(event.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {!showNoteEditor && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNoteEditor(true)}
+              >
+                Add Note
+              </Button>
+            )}
+
+            {showNoteEditor && (
+              <div className="space-y-1.5">
+                <Label htmlFor="progress-note" className="text-xs text-muted-foreground">
+                  Note for this progress update (optional)
+                </Label>
+                <Textarea
+                  id="progress-note"
+                  value={noteContent}
+                  onChange={(event) => setNoteContent(event.target.value)}
+                  placeholder="Write a note about what you read..."
+                  className="min-h-28"
                 />
               </div>
             )}
