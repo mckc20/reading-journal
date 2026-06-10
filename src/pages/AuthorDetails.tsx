@@ -52,7 +52,7 @@ function BookCover({ book, size = "md" }: { book: Book; size?: "sm" | "md" }) {
       <p className="mt-2 line-clamp-2 text-xs font-medium leading-tight">{book.title}</p>
       {book.rating ? (
         <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Star className="h-3 w-3 fill-current text-amber-500" />
+          <Star className="h-3 w-3 fill-current text-rating" />
           {book.rating}
         </p>
       ) : null}
@@ -85,7 +85,7 @@ function EmptySection({ message }: { message: string }) {
 
 function AuthorPlaceholder({ name }: { name: string }) {
   return (
-    <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-full bg-sky-950 text-5xl font-medium text-white shadow-sm sm:h-40 sm:w-40 sm:text-6xl">
+    <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-full bg-primary text-5xl font-medium text-primary-foreground shadow-sm sm:h-40 sm:w-40 sm:text-6xl">
       {getAuthorInitials(name)}
     </div>
   );
@@ -168,7 +168,7 @@ export default function AuthorDetails() {
           </Button>
           {author.isFavorite && (
             <div className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm">
-              <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
+              <Heart className="h-4 w-4 fill-favorite text-favorite" />
               Favorite
             </div>
           )}
@@ -184,7 +184,7 @@ export default function AuthorDetails() {
               <span>{countLabel(author.bookCount, "book")}</span>
               <span>{countLabel(author.quoteCount, "quote")}</span>
               <span className="inline-flex items-center gap-1">
-                <Star className="h-4 w-4 fill-current text-amber-500" />
+                <Star className="h-4 w-4 fill-current text-rating" />
                 {author.averageRating ?? "No rating"} average rating
               </span>
             </div>
@@ -350,7 +350,7 @@ export default function AuthorDetails() {
                       }
                       actions={
                         quote.is_favorite ? (
-                          <Heart className="h-4 w-4 shrink-0 fill-rose-500 text-rose-500" />
+                          <Heart className="h-4 w-4 shrink-0 fill-favorite text-favorite" />
                         ) : null
                       }
                     >

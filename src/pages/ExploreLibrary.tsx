@@ -332,7 +332,7 @@ function GalleryBooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) 
             )}
             {book.is_favorite && (
               <Heart
-                className="absolute right-2 top-2 h-4 w-4 fill-rose-500 text-rose-500 drop-shadow"
+                className="absolute right-2 top-2 h-4 w-4 fill-favorite text-favorite drop-shadow"
                 aria-label="Favorite"
               />
             )}
@@ -446,7 +446,7 @@ function BookTableRow({
           <span className="text-muted-foreground">-</span>
         )}
         {book.is_favorite && (
-          <Heart className="ml-2 inline h-3.5 w-3.5 fill-rose-500 text-rose-500" aria-label="Favorite" />
+          <Heart className="ml-2 inline h-3.5 w-3.5 fill-favorite text-favorite" aria-label="Favorite" />
         )}
       </td>
       <td className="px-3 py-2 text-muted-foreground">
@@ -1703,7 +1703,7 @@ function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: B
   const noteMetadata = (
     <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
       {note.label === "quote" && note.is_favorite && (
-        <Heart className="h-4 w-4 fill-rose-500 text-rose-500" aria-label="Favorite quote" />
+        <Heart className="h-4 w-4 fill-favorite text-favorite" aria-label="Favorite quote" />
       )}
       <time dateTime={visibleDate}>{formatNoteDate(visibleDate)}</time>
     </div>

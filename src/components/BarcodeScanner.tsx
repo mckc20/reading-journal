@@ -201,12 +201,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
 
   return (
     <div className="space-y-3">
-      <div className="relative w-full aspect-[4/3] bg-black rounded-lg overflow-hidden">
+      <div className="relative w-full aspect-[4/3] bg-foreground rounded-lg overflow-hidden">
         <div
           ref={containerRef}
           className="absolute inset-0 [&_canvas]:hidden [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
         />
-        <div className="pointer-events-none absolute inset-x-[8%] top-1/2 h-32 -translate-y-1/2 rounded-md border-2 border-primary/80 shadow-[0_0_0_999px_rgba(0,0,0,0.28)]" />
+        <div className="scanner-mask pointer-events-none absolute inset-x-[8%] top-1/2 h-32 -translate-y-1/2 rounded-md border-2 border-primary/80" />
       </div>
 
       {error ? (
@@ -215,7 +215,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         <p
           className={
             status === "hint"
-              ? "text-sm text-amber-600 dark:text-amber-400 text-center"
+              ? "text-sm text-insight text-center"
               : "text-sm text-muted-foreground text-center"
           }
         >

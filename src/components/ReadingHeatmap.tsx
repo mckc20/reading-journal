@@ -172,10 +172,10 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
 
   const intensityClassByLevel: Record<HeatmapCell["level"], string> = {
     0: "bg-muted border-border/70",
-    1: "bg-emerald-100 border-emerald-200",
-    2: "bg-emerald-200 border-emerald-300",
-    3: "bg-emerald-400 border-emerald-500",
-    4: "bg-emerald-600 border-emerald-700",
+    1: "bg-heatmap-1 border-heatmap-1/70",
+    2: "bg-heatmap-2 border-heatmap-2/70",
+    3: "bg-heatmap-3 border-heatmap-3/80",
+    4: "bg-heatmap-4 border-heatmap-4/90",
   };
 
   const windowRangeLabel = `${activeWindowStart.toLocaleDateString(undefined, {

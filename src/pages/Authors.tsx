@@ -85,7 +85,7 @@ function bookMatchesFilters(book: Book, genre: string, language: string): boolea
 
 function AuthorPlaceholder({ name }: { name: string }) {
   return (
-    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-sky-950 text-xl font-medium text-white shadow-sm">
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-medium text-primary-foreground shadow-sm">
       {getAuthorInitials(name)}
     </div>
   );
@@ -156,7 +156,7 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
       <CardContent className="flex flex-col gap-4">
         {author.isFavorite && (
           <Heart
-            className="absolute right-5 top-5 h-5 w-5 fill-rose-500 text-rose-500"
+            className="absolute right-5 top-5 h-5 w-5 fill-favorite text-favorite"
             aria-label="Favorite author"
           />
         )}
@@ -175,7 +175,7 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
               <span>{countLabel(author.bookCount, "book")}</span>
               <span>{countLabel(author.quoteCount, "quote")}</span>
               <span className="inline-flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-current text-amber-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-rating" />
                 {author.averageRating ?? "No rating"}
               </span>
             </div>

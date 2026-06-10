@@ -424,7 +424,7 @@ export default function BookDetails() {
               >
                 <Heart
                   className={`h-5 w-5 ${
-                    isFavorite ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
+                    isFavorite ? "fill-favorite text-favorite" : "text-muted-foreground"
                   }`}
                 />
               </button>
@@ -455,7 +455,7 @@ export default function BookDetails() {
                   <Star
                     className={`h-5 w-5 ${
                       localRating && n <= localRating
-                        ? "fill-amber-400 text-amber-400"
+                        ? "fill-rating text-rating"
                         : "text-muted-foreground"
                     }`}
                   />
