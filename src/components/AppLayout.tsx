@@ -122,7 +122,7 @@ function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-      <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-5 sm:px-8 md:px-10 lg:px-12">
+      <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 sm:px-8 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-10 lg:px-12">
         <Link
           to="/"
           className="flex min-w-0 items-center gap-3 font-heading font-medium text-foreground"
