@@ -30,7 +30,7 @@ const exploreParamKeys = [
   "year",
   "format",
   "language",
-  "belongsTo",
+  "source",
   "status",
   "progress",
   "series",

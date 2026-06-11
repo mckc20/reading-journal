@@ -10,8 +10,11 @@ export type BookSearchPropertyKey =
   | "pagesProgress"
   | "dates"
   | "language"
-  | "belongsTo"
+  | "source"
   | "format"
+  | "publisher"
+  | "publicationDate"
+  | "description"
   | "isbn"
   | "series"
   | "volume";
@@ -73,7 +76,10 @@ export const BOOK_SEARCH_PROPERTIES: Array<{
   { key: "volume", label: "Volume" },
   { key: "language", label: "Language" },
   { key: "format", label: "Format" },
-  { key: "belongsTo", label: "Belongs To" },
+  { key: "source", label: "Source" },
+  { key: "publisher", label: "Publisher" },
+  { key: "publicationDate", label: "Publication Date" },
+  { key: "description", label: "Description" },
   { key: "rating", label: "Rating" },
   { key: "favorite", label: "Favorite" },
   { key: "dates", label: "Dates" },
@@ -130,9 +136,24 @@ const BASE_SOURCES: BookSearchSource[] = [
     getValues: (book) => (book.format ? [book.format] : []),
   },
   {
-    key: "belongsTo",
-    label: "Belongs To",
-    getValues: (book) => (book.belongs_to ? [book.belongs_to] : []),
+    key: "source",
+    label: "Source",
+    getValues: (book) => (book.source ? [book.source] : []),
+  },
+  {
+    key: "publisher",
+    label: "Publisher",
+    getValues: (book) => (book.publisher ? [book.publisher] : []),
+  },
+  {
+    key: "publicationDate",
+    label: "Publication Date",
+    getValues: (book) => (book.publication_date ? [book.publication_date] : []),
+  },
+  {
+    key: "description",
+    label: "Description",
+    getValues: (book) => (book.description ? [book.description] : []),
   },
   {
     key: "rating",

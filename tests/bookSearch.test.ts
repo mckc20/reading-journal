@@ -30,7 +30,7 @@ function makeBook(overrides: Partial<Book>): Book {
     total_pages: 512,
     date_started: "2026-04-10",
     language: "English",
-    belongs_to: "Me",
+    source: "Owned",
     format: "Paperback",
     isbn: "9780316229296",
     series_id: "series-1",

@@ -8,11 +8,13 @@ export type BookStatus =
 
 export type BookLanguage = "German" | "Spanish" | "English";
 
-export type BookBelongsTo = "Me" | "Family" | "Friends" | "Library";
+export type BookSource = "Owned" | "Family" | "Friends" | "Library";
 
 export type BookFormat = "eBook" | "Audiobook" | "Paperback" | "Hardcover";
 
 export type BookMetadataSource = "open_library" | "google_books";
+
+export type PublicationDatePrecision = "year" | "month" | "day";
 
 export interface Series {
   id: string;
@@ -36,9 +38,13 @@ export interface Book {
   date_started?: string;
   date_finished?: string;
   language?: BookLanguage;
-  belongs_to?: BookBelongsTo;
+  source?: BookSource;
   format?: BookFormat;
   isbn?: string;
+  publisher?: string | null;
+  publication_date?: string | null;
+  publication_date_precision?: PublicationDatePrecision | null;
+  description?: string | null;
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
   series_id?: string;
