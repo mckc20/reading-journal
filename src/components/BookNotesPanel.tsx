@@ -34,6 +34,7 @@ import type { Book, BookNote, BookNoteLabel } from "@/types";
 
 interface BookNotesPanelProps {
   book: Book;
+  initialComposerOpen?: boolean;
 }
 
 const NOTE_LABELS: BookNoteLabel[] = ["quote", "review", "note"];
@@ -187,11 +188,11 @@ function CollapsibleNoteContent({
   );
 }
 
-export default function BookNotesPanel({ book }: BookNotesPanelProps) {
+export default function BookNotesPanel({ book, initialComposerOpen = false }: BookNotesPanelProps) {
   const { user } = useAuth();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isComposerOpen, setIsComposerOpen] = useState(initialComposerOpen);
   const [label, setLabel] = useState<BookNoteLabel>("note");
   const [title, setTitle] = useState("");
   const [quoteSpeaker, setQuoteSpeaker] = useState("");

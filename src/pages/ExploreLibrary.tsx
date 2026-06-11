@@ -73,7 +73,7 @@ type LibraryView =
   | "notes"
   | "languages"
   | "format"
-  | "belongs-to";
+  | "source";
 
 type PrimaryShelf = {
   value: LibraryView;
@@ -240,7 +240,7 @@ const categoryShelves: CategoryShelf[] = [
   { value: "notes", label: "Notes" },
   { value: "languages", label: "Languages" },
   { value: "format", label: "Format" },
-  { value: "belongs-to", label: "Belongs to" },
+  { value: "source", label: "Source" },
 ];
 
 const statusFilterLabels: Record<BookStatus, string> = {
@@ -491,8 +491,11 @@ function downloadBooksCsv(books: Book[]) {
     "Date Started",
     "Date Finished",
     "Language",
-    "Belongs To",
     "Format",
+    "Source",
+    "Publisher",
+    "Publication Date",
+    "Description",
     "ISBN",
   ];
   const rows = books.map((book) => [
@@ -507,8 +510,11 @@ function downloadBooksCsv(books: Book[]) {
     book.date_started ?? "",
     book.date_finished ?? "",
     book.language ?? "",
-    book.belongs_to ?? "",
     book.format ?? "",
+    book.source ?? "",
+    book.publisher ?? "",
+    book.publication_date ?? "",
+    book.description ?? "",
     book.isbn ?? "",
   ]);
   const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
@@ -2325,8 +2331,8 @@ export default function Library() {
     if (contentView === "rating") return buildRatingGroups(filterableBooks);
     if (contentView === "languages") return buildSingleValueGroups(filterableBooks, (book) => book.language);
     if (contentView === "format") return buildSingleValueGroups(filterableBooks, (book) => book.format);
-    if (contentView === "belongs-to") {
-      return buildSingleValueGroups(filterableBooks, (book) => book.belongs_to);
+    if (contentView === "source") {
+      return buildSingleValueGroups(filterableBooks, (book) => book.source);
     }
     return [];
   }, [contentView, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, series]);

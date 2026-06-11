@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchBookByISBN } from "../src/lib/bookLookup";
+import { fetchBookByISBN, parsePublicationDate } from "../src/lib/bookLookup";
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
@@ -26,6 +26,9 @@ test("uses Open Library metadata before Google Books", async () => {
           number_of_pages: 208,
           subjects: [{ name: "Science fiction" }, { name: "Fiction" }, { name: "Science fiction" }],
           languages: [{ key: "/languages/eng" }],
+          publishers: [{ name: "Farrar, Straus and Giroux" }],
+          publish_date: "February 2014",
+          description: { value: "Area X has been cut off from the rest of the continent." },
         },
       });
     }
@@ -46,6 +49,10 @@ test("uses Open Library metadata before Google Books", async () => {
       totalPages: 208,
       genres: ["Science fiction", "Fiction"],
       language: "English",
+      publisher: "Farrar, Straus and Giroux",
+      publicationDate: "2014-02-01",
+      publicationDatePrecision: "month",
+      description: "Area X has been cut off from the rest of the continent.",
       coverUrl: "https://covers.example/annihilation.jpg",
       metadataSource: "open_library",
       metadataSourceUrl: "https://openlibrary.org/api/books?bibkeys=ISBN%3A9780374104092&format=json&jscmd=data",
@@ -80,6 +87,9 @@ test("falls back to Google Books when Open Library has no result", async () => {
               pageCount: 333,
               categories: ["Fiction"],
               language: "en",
+              publisher: "Vintage",
+              publishedDate: "2015-06-02",
+              description: "A novel about art, fame, and survival.",
             },
           },
         ],
@@ -99,10 +109,37 @@ test("falls back to Google Books when Open Library has no result", async () => {
     assert.equal(result?.metadataSource, "google_books");
     assert.equal(result?.metadataSourceUrl, "https://www.googleapis.com/books/v1/volumes/google-id");
     assert.equal(result?.title, "Station Eleven");
+    assert.equal(result?.publisher, "Vintage");
+    assert.equal(result?.publicationDate, "2015-06-02");
+    assert.equal(result?.publicationDatePrecision, "day");
+    assert.equal(result?.description, "A novel about art, fame, and survival.");
     assert.equal(result?.coverUrl, undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("parses publication date precision from common provider formats", () => {
+  assert.deepEqual(parsePublicationDate("2002"), {
+    date: "2002-01-01",
+    precision: "year",
+  });
+  assert.deepEqual(parsePublicationDate("2002-10"), {
+    date: "2002-10-01",
+    precision: "month",
+  });
+  assert.deepEqual(parsePublicationDate("2002-10-10"), {
+    date: "2002-10-10",
+    precision: "day",
+  });
+  assert.deepEqual(parsePublicationDate("October 2002"), {
+    date: "2002-10-01",
+    precision: "month",
+  });
+  assert.deepEqual(parsePublicationDate("10 October 2002"), {
+    date: "2002-10-10",
+    precision: "day",
+  });
 });
 
 test("returns null when both metadata providers miss", async () => {

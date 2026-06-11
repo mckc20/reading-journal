@@ -14,6 +14,8 @@ const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
 const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
+const BookAnalytics = lazy(() => import("@/pages/BookAnalytics"));
+const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
 const Groups = lazy(() => import("@/pages/Groups"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -54,6 +56,8 @@ export const router = createBrowserRouter([
           { path: "/authors/:authorName", element: lazyRoute(<AuthorDetails />) },
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
+          { path: "/books/:bookId/analytics", element: lazyRoute(<BookAnalytics />) },
+          { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
           { path: "/notes", element: lazyRoute(<Notes />) },
           { path: "/account", element: <Navigate to="/settings/profile" replace /> },

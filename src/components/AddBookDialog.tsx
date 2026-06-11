@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -29,7 +30,7 @@ import {
   parseAuthorsInput,
 } from "@/lib/utils";
 import { getAllowedGenres } from "@/lib/bookGenres";
-import type { BookStatus, BookLanguage, BookBelongsTo, BookFormat, BookMetadataSource } from "@/types";
+import type { BookStatus, BookLanguage, BookSource, BookFormat, BookMetadataSource } from "@/types";
 
 interface FormValues {
   title: string;
@@ -38,9 +39,12 @@ interface FormValues {
   genres: string[];
   language: BookLanguage | "";
   format: BookFormat | "";
-  belongs_to: BookBelongsTo | "";
+  source: BookSource | "";
   total_pages: string;
   current_page: string;
+  publisher: string;
+  publication_date: string;
+  description: string;
   date_started: string;
   date_finished: string;
   series_id: string;
@@ -61,6 +65,8 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
+const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
+
 export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps) {
   const { addBook } = useBooksContext();
   const { series, addSeries } = useSeries();
@@ -80,6 +86,10 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [scannedIsbn, setScannedIsbn] = useState<string | null>(null);
   const [metadataSource, setMetadataSource] = useState<BookMetadataSource | null>(null);
   const [metadataSourceUrl, setMetadataSourceUrl] = useState<string | null>(null);
+  const [metadataPublicationDate, setMetadataPublicationDate] = useState<string | null>(null);
+  const [metadataPublicationDatePrecision, setMetadataPublicationDatePrecision] = useState<
+    "year" | "month" | "day" | null
+  >(null);
 
   const {
     register,
@@ -132,6 +142,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     setIsbnError(null);
     setMetadataSource(null);
     setMetadataSourceUrl(null);
+    setMetadataPublicationDate(null);
+    setMetadataPublicationDatePrecision(null);
 
     try {
       const bookData = await fetchBookByISBN(isbn.trim());
@@ -144,9 +156,14 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(isbn.trim());
       setMetadataSource(bookData.metadataSource);
       setMetadataSourceUrl(bookData.metadataSourceUrl);
+      setMetadataPublicationDate(bookData.publicationDate ?? null);
+      setMetadataPublicationDatePrecision(bookData.publicationDatePrecision ?? null);
       setValue("title", bookData.title);
       setValue("authorsInput", formatAuthorsInput(bookData.authors), { shouldValidate: true });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
+      if (bookData.publisher) setValue("publisher", bookData.publisher);
+      if (bookData.publicationDate) setValue("publication_date", bookData.publicationDate);
+      if (bookData.description) setValue("description", bookData.description);
       if (bookData.genres) {
         setValue("genres", getAllowedGenres(bookData.genres), {
           shouldDirty: true,
@@ -218,9 +235,17 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           genres: genres.length > 0 ? genres : undefined,
           language: (values.language as BookLanguage) || undefined,
           format: (values.format as BookFormat) || undefined,
-          belongs_to: (values.belongs_to as BookBelongsTo) || undefined,
+          source: (values.source as BookSource) || undefined,
           total_pages: values.total_pages ? Number(values.total_pages) : undefined,
           current_page: values.current_page ? Number(values.current_page) : undefined,
+          publisher: values.publisher.trim() || undefined,
+          publication_date: values.publication_date || undefined,
+          publication_date_precision: values.publication_date
+            ? values.publication_date === metadataPublicationDate
+              ? metadataPublicationDatePrecision ?? "day"
+              : "day"
+            : undefined,
+          description: values.description.trim() || undefined,
           date_started: values.date_started || undefined,
           date_finished: values.date_finished || undefined,
           series_id: values.series_id || undefined,
@@ -244,6 +269,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         setScannedIsbn(null);
         setMetadataSource(null);
         setMetadataSourceUrl(null);
+        setMetadataPublicationDate(null);
+        setMetadataPublicationDatePrecision(null);
         setAddingNewSeries(false);
         setNewSeriesName("");
         setIsCreatingSeries(false);
@@ -262,6 +289,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
+      setMetadataPublicationDate(null);
+      setMetadataPublicationDatePrecision(null);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -289,6 +318,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
+      setMetadataPublicationDate(null);
+      setMetadataPublicationDatePrecision(null);
       setAddingNewSeries(false);
       setNewSeriesName("");
       setIsCreatingSeries(false);
@@ -506,28 +537,44 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                 />
               </div>
 
-              {/* Belongs to */}
+              {/* Source */}
               <div className="space-y-1.5">
-                <Label>Belongs to</Label>
+                <Label>Source</Label>
                 <Controller
-                  name="belongs_to"
+                  name="source"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select owner" />
+                        <SelectValue placeholder="Select source" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Not set</SelectItem>
-                        {(["Me", "Family", "Friends", "Library"] as BookBelongsTo[]).map((b) => (
-                          <SelectItem key={b} value={b}>
-                            {b}
+                        {SOURCE_OPTIONS.map((source) => (
+                          <SelectItem key={source} value={source}>
+                            {source}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
                 />
+              </div>
+
+              {/* Publication metadata */}
+              <div className="space-y-1.5">
+                <Label htmlFor="publisher">Publisher</Label>
+                <Input id="publisher" {...register("publisher")} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="publication_date">Publication date</Label>
+                <Input id="publication_date" type="date" {...register("publication_date")} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" rows={5} {...register("description")} />
               </div>
 
               {/* Pages */}

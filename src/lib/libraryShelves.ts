@@ -27,7 +27,7 @@ export type LibraryValueShelf =
   | "notes"
   | "languages"
   | "format"
-  | "belongs-to";
+  | "source";
 
 export type ShelfValueSummary = {
   name: string;
@@ -254,7 +254,7 @@ export function buildShelfValueSummaries({
   if (shelf === "notes") return summarizeNoteGroups(buildNoteGroups(notes, books));
   if (shelf === "languages") return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.language));
   if (shelf === "format") return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.format));
-  return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.belongs_to));
+  return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.source));
 }
 
 export function filterBooksByShelfValue({
@@ -310,8 +310,8 @@ export function filterBooksByShelfValue({
     return sortBooksByTitle(books.filter((book) => (book.format ?? UNCATEGORIZED) === selectedValue));
   }
 
-  if (shelf === "belongs-to") {
-    return sortBooksByTitle(books.filter((book) => (book.belongs_to ?? UNCATEGORIZED) === selectedValue));
+  if (shelf === "source") {
+    return sortBooksByTitle(books.filter((book) => (book.source ?? UNCATEGORIZED) === selectedValue));
   }
 
   return [];
