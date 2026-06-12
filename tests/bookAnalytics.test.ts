@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   buildProgressTimeline,
   formatCalendarSpan,
+  formatPagesPerDay,
   formatTotalReadingTime,
+  getCalendarPagesPerDay,
   getEstimatedFinish,
   getReadingDuration,
   sumReadingMinutes,
@@ -51,6 +53,47 @@ test("handles missing or zero reading minutes as no sessions logged", () => {
 
   assert.equal(total, 0);
   assert.equal(formatTotalReadingTime(total), "No sessions logged");
+});
+
+test("calculates calendar pages per day from start to end dates", () => {
+  assert.equal(
+    getCalendarPagesPerDay({
+      pages: 300,
+      dateStarted: "2026-04-01",
+      dateEnded: "2026-04-06",
+    }),
+    60,
+  );
+});
+
+test("uses at least one day for same-day calendar pace", () => {
+  assert.equal(
+    getCalendarPagesPerDay({
+      pages: 120,
+      dateStarted: "2026-04-01",
+      dateEnded: "2026-04-01",
+    }),
+    120,
+  );
+});
+
+test("returns null calendar pace when dates or pages are missing", () => {
+  assert.equal(getCalendarPagesPerDay({ pages: 0, dateStarted: "2026-04-01" }), null);
+  assert.equal(getCalendarPagesPerDay({ pages: 100 }), null);
+  assert.equal(
+    getCalendarPagesPerDay({
+      pages: 100,
+      dateStarted: "2026-04-06",
+      dateEnded: "2026-04-01",
+    }),
+    null,
+  );
+});
+
+test("formats pages per day labels", () => {
+  assert.equal(formatPagesPerDay(12), "12.0 pages/day");
+  assert.equal(formatPagesPerDay(12.345), "12.3 pages/day");
+  assert.equal(formatPagesPerDay(null), "Not available");
 });
 
 test("builds progress timeline from increasing daily progress logs", () => {

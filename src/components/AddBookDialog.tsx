@@ -30,7 +30,19 @@ import {
   parseAuthorsInput,
 } from "@/lib/utils";
 import { getAllowedGenres } from "@/lib/bookGenres";
-import type { BookStatus, BookLanguage, BookSource, BookFormat, BookMetadataSource } from "@/types";
+import {
+  formatPublicationDateInput,
+  parsePublicationDateInput,
+  trimPublicationDateInputForPrecision,
+} from "@/lib/publicationDate";
+import type {
+  BookStatus,
+  BookLanguage,
+  BookSource,
+  BookFormat,
+  BookMetadataSource,
+  PublicationDatePrecision,
+} from "@/types";
 
 interface FormValues {
   title: string;
@@ -44,6 +56,7 @@ interface FormValues {
   current_page: string;
   publisher: string;
   publication_date: string;
+  publication_date_precision: PublicationDatePrecision | "";
   description: string;
   date_started: string;
   date_finished: string;
@@ -86,11 +99,6 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [scannedIsbn, setScannedIsbn] = useState<string | null>(null);
   const [metadataSource, setMetadataSource] = useState<BookMetadataSource | null>(null);
   const [metadataSourceUrl, setMetadataSourceUrl] = useState<string | null>(null);
-  const [metadataPublicationDate, setMetadataPublicationDate] = useState<string | null>(null);
-  const [metadataPublicationDatePrecision, setMetadataPublicationDatePrecision] = useState<
-    "year" | "month" | "day" | null
-  >(null);
-
   const {
     register,
     control,
@@ -102,11 +110,18 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { status: "Not Started", authorsInput: "", genres: [] },
+    defaultValues: {
+      status: "Not Started",
+      authorsInput: "",
+      genres: [],
+      publication_date_precision: "",
+    },
   });
 
   const status = watch("status");
   const seriesId = watch("series_id");
+  const publicationDate = watch("publication_date") ?? "";
+  const publicationDatePrecision = watch("publication_date_precision") ?? "";
 
   // Revoke object URL on unmount / change
   useEffect(() => {
@@ -142,8 +157,6 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     setIsbnError(null);
     setMetadataSource(null);
     setMetadataSourceUrl(null);
-    setMetadataPublicationDate(null);
-    setMetadataPublicationDatePrecision(null);
 
     try {
       const bookData = await fetchBookByISBN(isbn.trim());
@@ -156,13 +169,15 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(isbn.trim());
       setMetadataSource(bookData.metadataSource);
       setMetadataSourceUrl(bookData.metadataSourceUrl);
-      setMetadataPublicationDate(bookData.publicationDate ?? null);
-      setMetadataPublicationDatePrecision(bookData.publicationDatePrecision ?? null);
       setValue("title", bookData.title);
       setValue("authorsInput", formatAuthorsInput(bookData.authors), { shouldValidate: true });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
       if (bookData.publisher) setValue("publisher", bookData.publisher);
-      if (bookData.publicationDate) setValue("publication_date", bookData.publicationDate);
+      if (bookData.publicationDate) {
+        const precision = bookData.publicationDatePrecision ?? "day";
+        setValue("publication_date", formatPublicationDateInput(bookData.publicationDate, precision));
+        setValue("publication_date_precision", precision);
+      }
       if (bookData.description) setValue("description", bookData.description);
       if (bookData.genres) {
         setValue("genres", getAllowedGenres(bookData.genres), {
@@ -226,6 +241,20 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         setError("authorsInput", { message: "At least one author is required" });
         return;
       }
+      const parsedPublicationDate = parsePublicationDateInput(
+        values.publication_date,
+        values.publication_date_precision,
+      );
+      if (values.publication_date.trim() && !values.publication_date_precision) {
+        setError("publication_date", { message: "Select which parts of the date count." });
+        return;
+      }
+      if (values.publication_date.trim() && !parsedPublicationDate) {
+        setError("publication_date", {
+          message: "Use YYYY, YYYY-MM, or YYYY-MM-DD to match the selected boxes.",
+        });
+        return;
+      }
       const genres = getAllowedGenres(values.genres);
       const result = await addBook(
         {
@@ -239,12 +268,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           total_pages: values.total_pages ? Number(values.total_pages) : undefined,
           current_page: values.current_page ? Number(values.current_page) : undefined,
           publisher: values.publisher.trim() || undefined,
-          publication_date: values.publication_date || undefined,
-          publication_date_precision: values.publication_date
-            ? values.publication_date === metadataPublicationDate
-              ? metadataPublicationDatePrecision ?? "day"
-              : "day"
-            : undefined,
+          publication_date: parsedPublicationDate?.date,
+          publication_date_precision: parsedPublicationDate?.precision,
           description: values.description.trim() || undefined,
           date_started: values.date_started || undefined,
           date_finished: values.date_finished || undefined,
@@ -259,7 +284,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       );
 
       if (result.warning) {
-        reset({ status: "Not Started", authorsInput: "", genres: [] });
+        reset({
+          status: "Not Started",
+          authorsInput: "",
+          genres: [],
+          publication_date_precision: "",
+        });
         setCoverFile(null);
         setCoverPreview(null);
         setShowScanner(false);
@@ -269,8 +299,6 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         setScannedIsbn(null);
         setMetadataSource(null);
         setMetadataSourceUrl(null);
-        setMetadataPublicationDate(null);
-        setMetadataPublicationDatePrecision(null);
         setAddingNewSeries(false);
         setNewSeriesName("");
         setIsCreatingSeries(false);
@@ -279,7 +307,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         return;
       }
 
-      reset({ status: "Not Started", authorsInput: "", genres: [] });
+      reset({
+        status: "Not Started",
+        authorsInput: "",
+        genres: [],
+        publication_date_precision: "",
+      });
       setCoverFile(null);
       setCoverPreview(null);
       setShowScanner(false);
@@ -289,8 +322,6 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
-      setMetadataPublicationDate(null);
-      setMetadataPublicationDatePrecision(null);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -306,9 +337,27 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
   const showDateFinished = ["Finished", "DNF"].includes(status);
 
+  function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
+    setValue(
+      "publication_date",
+      trimPublicationDateInputForPrecision(publicationDate, nextPrecision),
+      { shouldDirty: true, shouldTouch: true },
+    );
+    setValue("publication_date_precision", nextPrecision, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    clearErrors("publication_date");
+  }
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
-      reset({ status: "Not Started", authorsInput: "", genres: [] });
+      reset({
+        status: "Not Started",
+        authorsInput: "",
+        genres: [],
+        publication_date_precision: "",
+      });
       setCoverFile(null);
       setCoverPreview(null);
       setShowScanner(false);
@@ -318,8 +367,6 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
-      setMetadataPublicationDate(null);
-      setMetadataPublicationDatePrecision(null);
       setAddingNewSeries(false);
       setNewSeriesName("");
       setIsCreatingSeries(false);
@@ -569,7 +616,56 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
               <div className="space-y-1.5">
                 <Label htmlFor="publication_date">Publication date</Label>
-                <Input id="publication_date" type="date" {...register("publication_date")} />
+                <Input
+                  id="publication_date"
+                  placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
+                  aria-invalid={!!errors.publication_date}
+                  {...register("publication_date", {
+                    onChange: () => clearErrors("publication_date"),
+                  })}
+                />
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={!!publicationDatePrecision}
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "year" : "")
+                      }
+                    />
+                    Year
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={
+                        publicationDatePrecision === "month" || publicationDatePrecision === "day"
+                      }
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "month" : "year")
+                      }
+                    />
+                    Month
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={publicationDatePrecision === "day"}
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "day" : "month")
+                      }
+                    />
+                    Day
+                  </label>
+                </div>
+                {errors.publication_date && (
+                  <p className="text-xs text-destructive">
+                    {errors.publication_date.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">

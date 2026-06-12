@@ -1,9 +1,7 @@
+import { parsePublicationDate } from "@/lib/publicationDate";
 import type { BookMetadataSource, PublicationDatePrecision } from "@/types";
 
-export interface ParsedPublicationDate {
-  date: string;
-  precision: PublicationDatePrecision;
-}
+export { parsePublicationDate } from "@/lib/publicationDate";
 
 export interface BookLookupResult {
   title: string;
@@ -90,80 +88,6 @@ function languageKeyToCode(key: string | undefined): string | undefined {
 function cleanText(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
-}
-
-function normalizeMonthName(value: string): number | undefined {
-  const normalized = value.trim().toLowerCase();
-  const monthNames = [
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-  ];
-  const index = monthNames.findIndex((month) => month.startsWith(normalized.slice(0, 3)));
-  return index >= 0 ? index + 1 : undefined;
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-export function parsePublicationDate(value: string | undefined): ParsedPublicationDate | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-
-  const isoMatch = trimmed.match(/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/);
-  if (isoMatch) {
-    const year = isoMatch[1];
-    const month = isoMatch[2] ? Number(isoMatch[2]) : undefined;
-    const day = isoMatch[3] ? Number(isoMatch[3]) : undefined;
-    if (month !== undefined && (month < 1 || month > 12)) return undefined;
-    if (day !== undefined && (day < 1 || day > 31)) return undefined;
-
-    return {
-      date: `${year}-${pad2(month ?? 1)}-${pad2(day ?? 1)}`,
-      precision: day ? "day" : month ? "month" : "year",
-    };
-  }
-
-  const monthYearMatch = trimmed.match(/^([A-Za-z]+)\s+(\d{4})$/);
-  if (monthYearMatch) {
-    const month = normalizeMonthName(monthYearMatch[1]);
-    if (!month) return undefined;
-    return {
-      date: `${monthYearMatch[2]}-${pad2(month)}-01`,
-      precision: "month",
-    };
-  }
-
-  const dayMonthYearMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
-  if (dayMonthYearMatch) {
-    const day = Number(dayMonthYearMatch[1]);
-    const month = normalizeMonthName(dayMonthYearMatch[2]);
-    if (!month || day < 1 || day > 31) return undefined;
-    return {
-      date: `${dayMonthYearMatch[3]}-${pad2(month)}-${pad2(day)}`,
-      precision: "day",
-    };
-  }
-
-  const yearMatch = trimmed.match(/\b(\d{4})\b/);
-  if (yearMatch) {
-    return {
-      date: `${yearMatch[1]}-01-01`,
-      precision: "year",
-    };
-  }
-
-  return undefined;
 }
 
 function getOpenLibraryDescription(

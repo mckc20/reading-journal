@@ -119,6 +119,29 @@ export function formatTotalReadingTime(totalMinutes: number): string {
   return parts.join(" ");
 }
 
+export function getCalendarPagesPerDay(params: {
+  pages?: number;
+  dateStarted?: string;
+  dateEnded?: string;
+  now?: Date;
+}): number | null {
+  const pages = params.pages ?? 0;
+  const started = parseLocalDateOnly(params.dateStarted);
+  const ended = params.dateEnded
+    ? parseLocalDateOnly(params.dateEnded)
+    : startOfLocalDay(params.now ?? new Date());
+
+  if (pages <= 0 || !started || !ended || ended < started) return null;
+
+  const elapsedDays = Math.max(1, wholeDaysBetween(started, ended));
+  return pages / elapsedDays;
+}
+
+export function formatPagesPerDay(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Not available";
+  return `${value.toFixed(1)} pages/day`;
+}
+
 export function buildProgressTimeline(
   logs: ReadingLog[],
   totalPages?: number

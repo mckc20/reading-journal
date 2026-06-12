@@ -6,6 +6,8 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  CalendarCheck,
+  CalendarClock,
   Clock,
   Heart,
   ImagePlus,
@@ -16,6 +18,7 @@ import {
   RefreshCw,
   Star,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
@@ -39,13 +42,22 @@ import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatCalendarSpan,
+  formatPagesPerDay,
   formatTotalReadingTime,
+  getCalendarPagesPerDay,
+  getEstimatedFinish,
   getReadingDuration,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import { getAllowedGenres } from "@/lib/bookGenres";
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogsForBook } from "@/lib/books";
+import {
+  formatPublicationDateForDisplay,
+  formatPublicationDateInput,
+  parsePublicationDateInput,
+  trimPublicationDateInputForPrecision,
+} from "@/lib/publicationDate";
 import {
   formatAuthorsInput,
   getTodayLocalDate,
@@ -59,6 +71,7 @@ import type {
   BookNoteLabel,
   BookSource,
   BookStatus,
+  PublicationDatePrecision,
   ReadingLog,
 } from "@/types";
 
@@ -74,6 +87,7 @@ interface FormValues {
   total_pages: string;
   publisher: string;
   publication_date: string;
+  publication_date_precision: PublicationDatePrecision | "";
   description: string;
   date_started: string;
   date_finished: string;
@@ -92,6 +106,12 @@ const STATUS_OPTIONS: BookStatus[] = [
 
 const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
 
+type ProgressStat = {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+};
+
 function bookToFormValues(book: Book): FormValues {
   return {
     title: book.title,
@@ -104,7 +124,11 @@ function bookToFormValues(book: Book): FormValues {
     source: book.source ?? "",
     total_pages: book.total_pages?.toString() ?? "",
     publisher: book.publisher ?? "",
-    publication_date: book.publication_date ?? "",
+    publication_date: formatPublicationDateInput(
+      book.publication_date,
+      book.publication_date_precision,
+    ),
+    publication_date_precision: book.publication_date_precision ?? "",
     description: book.description ?? "",
     date_started: book.date_started ?? "",
     date_finished: book.date_finished ?? "",
@@ -124,21 +148,13 @@ function formatDateForDisplay(value?: string | null): string {
   });
 }
 
-function formatPublicationDateForDisplay(
-  value: string | null | undefined,
-  precision: Book["publication_date_precision"],
-): string {
-  if (!value) return "Not set";
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year) return value;
-  if (precision === "year") return String(year);
-
-  const date = new Date(year, (month || 1) - 1, day || 1);
-  const monthName = date.toLocaleDateString(undefined, { month: "long" });
-  if (precision === "month") return `${monthName} ${year}`;
-  if (precision === "day") return `${monthName} ${day}, ${year}`;
-
-  return value;
+function formatDateObjectForDisplay(value: Date | null): string {
+  if (!value) return "Not available";
+  return value.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function getProgressPercent(book: Book): number {
@@ -189,6 +205,9 @@ export default function BookDetails() {
     control,
     handleSubmit,
     watch,
+    setValue,
+    setError,
+    clearErrors,
     reset,
     formState: { isDirty, dirtyFields, errors },
   } = useForm<FormValues>();
@@ -258,6 +277,8 @@ export default function BookDetails() {
   }, [bookId]);
 
   const watchedSeriesId = watch("series_id");
+  const publicationDate = watch("publication_date") ?? "";
+  const publicationDatePrecision = watch("publication_date_precision") ?? "";
   const progressPercent = book ? getProgressPercent(book) : 0;
   const totalReadingMinutes = useMemo(() => sumReadingMinutes(readingLogs), [readingLogs]);
   const readingDuration = useMemo(
@@ -272,6 +293,16 @@ export default function BookDetails() {
     readingDuration.isAvailable && readingDuration.span
       ? formatCalendarSpan(readingDuration.span)
       : "Not set";
+  const estimatedFinish = useMemo(
+    () =>
+      getEstimatedFinish({
+        status: book?.status ?? "Not Started",
+        currentPage: book?.current_page,
+        totalPages: book?.total_pages,
+        logs: readingLogs,
+      }),
+    [book?.current_page, book?.status, book?.total_pages, readingLogs],
+  );
 
   const relatedByAuthor = useMemo(() => {
     if (!book) return [];
@@ -389,9 +420,23 @@ export default function BookDetails() {
       payload.total_pages = values.total_pages ? Number(values.total_pages) : undefined;
     }
     if (dirtyFields.publisher) payload.publisher = values.publisher.trim() || undefined;
-    if (dirtyFields.publication_date) {
-      payload.publication_date = values.publication_date || undefined;
-      payload.publication_date_precision = values.publication_date ? "day" : undefined;
+    if (dirtyFields.publication_date || dirtyFields.publication_date_precision) {
+      const parsedPublicationDate = parsePublicationDateInput(
+        values.publication_date,
+        values.publication_date_precision,
+      );
+      if (values.publication_date.trim() && !values.publication_date_precision) {
+        setError("publication_date", { message: "Select which parts of the date count." });
+        return;
+      }
+      if (values.publication_date.trim() && !parsedPublicationDate) {
+        setError("publication_date", {
+          message: "Use YYYY, YYYY-MM, or YYYY-MM-DD to match the selected boxes.",
+        });
+        return;
+      }
+      payload.publication_date = parsedPublicationDate?.date ?? null;
+      payload.publication_date_precision = parsedPublicationDate?.precision ?? null;
     }
     if (dirtyFields.description) payload.description = values.description.trim() || undefined;
     if (dirtyFields.date_started) payload.date_started = values.date_started || undefined;
@@ -433,6 +478,19 @@ export default function BookDetails() {
     } finally {
       setDeleting(false);
     }
+  }
+
+  function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
+    setValue(
+      "publication_date",
+      trimPublicationDateInputForPrecision(publicationDate, nextPrecision),
+      { shouldDirty: true, shouldTouch: true },
+    );
+    setValue("publication_date_precision", nextPrecision, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    clearErrors("publication_date");
   }
 
   if (loading) {
@@ -480,6 +538,89 @@ export default function BookDetails() {
 
   const currentPage = book.current_page ?? 0;
   const totalPages = book.total_pages ?? 0;
+  const readingProgressStats: ProgressStat[] =
+    book.status === "Reading"
+      ? [
+          {
+            icon: Calendar,
+            label: "Started On",
+            value: formatDateForDisplay(book.date_started),
+          },
+          {
+            icon: TrendingUp,
+            label: "Current Pace",
+            value: formatPagesPerDay(
+              getCalendarPagesPerDay({
+                pages: currentPage,
+                dateStarted: book.date_started,
+              }),
+            ),
+          },
+          {
+            icon: Clock,
+            label: "Time Reading",
+            value: formatTotalReadingTime(totalReadingMinutes),
+          },
+          {
+            icon: CalendarClock,
+            label: "Estimated Finish",
+            value:
+              estimatedFinish.isAvailable && estimatedFinish.finishDate
+                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
+                : "Not available",
+          },
+        ]
+      : book.status === "Finished"
+        ? [
+            {
+              icon: Calendar,
+              label: "Started On",
+              value: formatDateForDisplay(book.date_started),
+            },
+            {
+              icon: CalendarCheck,
+              label: "Finished On",
+              value: formatDateForDisplay(book.date_finished),
+            },
+            {
+              icon: Clock,
+              label: "Total Reading Time",
+              value: formatTotalReadingTime(totalReadingMinutes),
+            },
+            {
+              icon: TrendingUp,
+              label: "Average Pace",
+              value: formatPagesPerDay(
+                getCalendarPagesPerDay({
+                  pages: totalPages,
+                  dateStarted: book.date_started,
+                  dateEnded: book.date_finished,
+                }),
+              ),
+            },
+          ]
+        : [
+            {
+              icon: Calendar,
+              label: "Started On",
+              value: formatDateForDisplay(book.date_started),
+            },
+            {
+              icon: TrendingUp,
+              label: "Current Page",
+              value: `${currentPage} / ${totalPages || "-"}`,
+            },
+            {
+              icon: Clock,
+              label: "Time Reading",
+              value: formatTotalReadingTime(totalReadingMinutes),
+            },
+            {
+              icon: Calendar,
+              label: "Days Reading",
+              value: daysReading,
+            },
+          ];
   const description = book.description?.trim() || "";
   const shouldCollapseDescription = description.length > 420;
   const previewNotes = {
@@ -741,6 +882,9 @@ export default function BookDetails() {
           errors={errors}
           series={series}
           watchedSeriesId={watchedSeriesId}
+          publicationDatePrecision={publicationDatePrecision}
+          updatePublicationDatePrecision={updatePublicationDatePrecision}
+          clearPublicationDateError={() => clearErrors("publication_date")}
         />
       )}
 
@@ -819,13 +963,7 @@ export default function BookDetails() {
                 </Link>
               </Button>
             </div>
-            <ProgressStatsStrip
-              currentPage={currentPage}
-              totalPages={totalPages}
-              startedOn={formatDateForDisplay(book.date_started)}
-              timeReading={formatTotalReadingTime(totalReadingMinutes)}
-              daysReading={daysReading}
-            />
+            <ProgressStatsStrip stats={readingProgressStats} />
 
             <div className="rounded-xl border bg-card p-5">
               <h3 className="text-sm font-medium">Progress over time</h3>
@@ -964,29 +1102,17 @@ function MetadataItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProgressStatsStrip({
-  startedOn,
-  currentPage,
-  totalPages,
-  timeReading,
-  daysReading,
-}: {
-  startedOn: string;
-  currentPage: number;
-  totalPages: number;
-  timeReading: string;
-  daysReading: string;
-}) {
+function ProgressStatsStrip({ stats }: { stats: ProgressStat[] }) {
   return (
     <div className="grid overflow-hidden rounded-xl border bg-card sm:grid-cols-2 lg:grid-cols-4">
-      <ProgressStatItem icon={Calendar} label="Started On" value={startedOn} />
-      <ProgressStatItem
-        icon={TrendingUp}
-        label="Current Page"
-        value={`${currentPage} / ${totalPages || "-"}`}
-      />
-      <ProgressStatItem icon={Clock} label="Time Reading" value={timeReading} />
-      <ProgressStatItem icon={Calendar} label="Days Reading" value={daysReading} />
+      {stats.map((stat) => (
+        <ProgressStatItem
+          key={stat.label}
+          icon={stat.icon}
+          label={stat.label}
+          value={stat.value}
+        />
+      ))}
     </div>
   );
 }
@@ -996,7 +1122,7 @@ function ProgressStatItem({
   label,
   value,
 }: {
-  icon: typeof Calendar;
+  icon: LucideIcon;
   label: string;
   value: string;
 }) {
@@ -1064,6 +1190,9 @@ function EditDetailsForm({
   errors,
   series,
   watchedSeriesId,
+  publicationDatePrecision,
+  updatePublicationDatePrecision,
+  clearPublicationDateError,
 }: {
   control: ReturnType<typeof useForm<FormValues>>["control"];
   register: ReturnType<typeof useForm<FormValues>>["register"];
@@ -1078,6 +1207,9 @@ function EditDetailsForm({
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
   series: { id: string; name: string }[];
   watchedSeriesId: string;
+  publicationDatePrecision: PublicationDatePrecision | "";
+  updatePublicationDatePrecision: (precision: PublicationDatePrecision | "") => void;
+  clearPublicationDateError: () => void;
 }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
@@ -1128,7 +1260,52 @@ function EditDetailsForm({
 
         <div className="space-y-1.5">
           <Label htmlFor="detail-publication-date">Publication date</Label>
-          <Input id="detail-publication-date" type="date" {...register("publication_date")} />
+          <Input
+            id="detail-publication-date"
+            placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
+            aria-invalid={!!errors.publication_date}
+            {...register("publication_date", {
+              onChange: clearPublicationDateError,
+            })}
+          />
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-primary"
+                checked={!!publicationDatePrecision}
+                onChange={(event) =>
+                  updatePublicationDatePrecision(event.target.checked ? "year" : "")
+                }
+              />
+              Year
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-primary"
+                checked={publicationDatePrecision === "month" || publicationDatePrecision === "day"}
+                onChange={(event) =>
+                  updatePublicationDatePrecision(event.target.checked ? "month" : "year")
+                }
+              />
+              Month
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-primary"
+                checked={publicationDatePrecision === "day"}
+                onChange={(event) =>
+                  updatePublicationDatePrecision(event.target.checked ? "day" : "month")
+                }
+              />
+              Day
+            </label>
+          </div>
+          {errors.publication_date && (
+            <p className="text-xs text-destructive">{errors.publication_date.message}</p>
+          )}
         </div>
 
         <div className="space-y-1.5">
