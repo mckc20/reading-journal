@@ -5,6 +5,7 @@ import {
   formatGenrePathForDisplay,
   getGenrePathLabel,
   getMostSpecificGenres,
+  getSelectedGenreTags,
   mapGenreLabelsToIds,
   searchGenres,
 } from "../src/lib/genreTree";
@@ -61,6 +62,15 @@ test("keeps only most-specific selected genres for compact display", () => {
   assert.deepEqual(
     getMostSpecificGenres(selected, genres).map((genre) => genre.name),
     ["Epic Fantasy", "History"],
+  );
+});
+
+test("keeps selected parents as separate tags instead of path prefixes", () => {
+  const selected = genres.filter((genre) => ["fantasy", "epic", "history"].includes(genre.id));
+
+  assert.deepEqual(
+    getSelectedGenreTags(selected).map((genre) => genre.name),
+    ["Epic Fantasy", "Fantasy", "History"],
   );
 });
 

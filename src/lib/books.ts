@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { fetchGenres, getGenrePathLabel, getMostSpecificGenres } from "@/lib/genres";
+import { getSelectedGenreTags } from "@/lib/genres";
 import type { Book, BookUpdate, Genre, Series, ReadingLog } from "@/types";
 
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
@@ -30,17 +30,14 @@ function parseLegacyAuthorList(author?: string | null): string[] {
   );
 }
 
-function normalizeBook(row: LegacyAuthorBookRow, allGenres: Genre[] = []): Book {
+function normalizeBook(row: LegacyAuthorBookRow): Book {
   const selectedGenres = (row.book_genres ?? [])
     .map((item) => item.genre)
     .filter((genre): genre is Genre => Boolean(genre));
-  const mostSpecificGenres =
-    selectedGenres.length > 0 && allGenres.length > 0
-      ? getMostSpecificGenres(selectedGenres, allGenres)
-      : selectedGenres;
+  const displayGenres = selectedGenres.length > 0 ? getSelectedGenreTags(selectedGenres) : [];
   const genres =
-    mostSpecificGenres.length > 0
-      ? mostSpecificGenres.map((genre) => genre.name)
+    displayGenres.length > 0
+      ? displayGenres.map((genre) => genre.name)
       : row.genres ?? parseLegacyGenre(row.genre);
   const normalizedAuthors = row.authors?.map((value) => value.trim()).filter(Boolean) ?? [];
   const legacyAuthors = parseLegacyAuthorList(row.author);
@@ -56,10 +53,7 @@ function normalizeBook(row: LegacyAuthorBookRow, allGenres: Genre[] = []): Book 
     authors,
     genre_ids: selectedGenres.map((genre) => genre.id),
     selected_genres: selectedGenres,
-    genre_paths:
-      mostSpecificGenres.length > 0 && allGenres.length > 0
-        ? mostSpecificGenres.map((genre) => getGenrePathLabel(genre.id, allGenres))
-        : genres,
+    genre_paths: displayGenres.length > 0 ? displayGenres.map((genre) => genre.name) : genres,
     genres,
   };
 }
@@ -146,7 +140,6 @@ function isMissingAuthorsColumnError(error: unknown): boolean {
 // ── Books ──────────────────────────────────────────────────────────────────
 
 export async function fetchBooks(): Promise<Book[]> {
-  const allGenres = await fetchGenres().catch(() => []);
   const { data, error } = await supabase
     .from("books")
     .select("*, book_genres(genre:genres(*))")
@@ -161,7 +154,7 @@ export async function fetchBooks(): Promise<Book[]> {
     if (legacyError) throw legacyError;
     return ((legacyData ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row));
   }
-  return ((data ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row, allGenres));
+  return ((data ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row));
 }
 
 export type BookInsert = Omit<Book, "created_at">;
@@ -266,7 +259,6 @@ async function updateBookPayload(
 }
 
 async function fetchBookById(id: string): Promise<Book> {
-  const allGenres = await fetchGenres().catch(() => []);
   const { data, error } = await supabase
     .from("books")
     .select("*, book_genres(genre:genres(*))")
@@ -284,7 +276,7 @@ async function fetchBookById(id: string): Promise<Book> {
     if (legacyError) throw legacyError;
     return normalizeBook(legacyData as LegacyAuthorBookRow);
   }
-  return normalizeBook(data as LegacyAuthorBookRow, allGenres);
+  return normalizeBook(data as LegacyAuthorBookRow);
 }
 
 async function replaceBookGenres(bookId: string, genreIds: string[]): Promise<void> {
