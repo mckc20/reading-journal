@@ -24,10 +24,30 @@ export interface Series {
   created_at: string;
 }
 
+export interface Genre {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  user_id?: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GenreTreeNode extends Genre {
+  children: GenreTreeNode[];
+  depth: number;
+  path: Genre[];
+  pathLabel: string;
+}
+
 export interface Book {
   id: string;
   title: string;
   authors: string[];
+  genre_ids?: string[];
+  selected_genres?: Genre[];
+  genre_paths?: string[];
   genres?: string[];
   status: BookStatus;
   cover_url?: string;

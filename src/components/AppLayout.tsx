@@ -17,6 +17,7 @@ import {
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
 import { BooksProvider } from "@/context/BooksContext";
+import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useProfile } from "@/context";
 import { cn } from "@/lib/utils";
@@ -320,10 +321,12 @@ function MobileBottomNav({ pathname, search }: { pathname: string; search: strin
 
 export default function AppLayout() {
   return (
-    <BooksProvider>
-      <ProfileProvider>
-        <AppLayoutContent />
-      </ProfileProvider>
-    </BooksProvider>
+    <GenresProvider>
+      <BooksProvider>
+        <ProfileProvider>
+          <AppLayoutContent />
+        </ProfileProvider>
+      </BooksProvider>
+    </GenresProvider>
   );
 }

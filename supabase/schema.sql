@@ -45,6 +45,99 @@ CREATE TABLE IF NOT EXISTS books (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
+-- ── GENRES ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS genres (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text NOT NULL CHECK (btrim(name) <> ''),
+  parent_id  uuid REFERENCES genres(id) ON DELETE CASCADE,
+  user_id    uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  is_system  boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (
+    (is_system = true AND user_id IS NULL)
+    OR (is_system = false AND user_id IS NOT NULL)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS book_genres (
+  book_id  uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  genre_id uuid NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
+  PRIMARY KEY (book_id, genre_id)
+);
+
+DO $$
+DECLARE
+  genre_record record;
+  parent_genre_id uuid;
+BEGIN
+  FOR genre_record IN
+    SELECT *
+    FROM (
+      VALUES
+        ('Fiction', NULL, 0),
+        ('Non-Fiction', NULL, 0),
+        ('Age Target', NULL, 0),
+
+        ('Literary Fiction', 'Fiction', 1),
+        ('Contemporary Fiction', 'Fiction', 1),
+        ('Historical Fiction', 'Fiction', 1),
+        ('Romance', 'Fiction', 1),
+        ('Mystery & Crime', 'Fiction', 1),
+        ('Thriller & Suspense', 'Fiction', 1),
+        ('Science Fiction', 'Fiction', 1),
+        ('Fantasy', 'Fiction', 1),
+        ('Horror', 'Fiction', 1),
+        ('Action & Adventure', 'Fiction', 1),
+        ('Humor & Satire', 'Fiction', 1),
+
+        ('Biography & Memoir', 'Non-Fiction', 1),
+        ('History', 'Non-Fiction', 1),
+        ('True Crime', 'Non-Fiction', 1),
+        ('Politics & Current Events', 'Non-Fiction', 1),
+        ('Self-Help & Personal Development', 'Non-Fiction', 1),
+        ('Business & Economics', 'Non-Fiction', 1),
+        ('Science & Technology', 'Non-Fiction', 1),
+        ('Philosophy & Spirituality', 'Non-Fiction', 1),
+        ('Health & Wellness', 'Non-Fiction', 1),
+        ('Travel', 'Non-Fiction', 1),
+        ('Cookbooks & Food', 'Non-Fiction', 1),
+        ('Art, Photography & Design', 'Non-Fiction', 1),
+        ('Essays & Anthologies', 'Non-Fiction', 1),
+
+        ('Children''s', 'Age Target', 1),
+        ('Middle Grade', 'Age Target', 1),
+        ('Young Adult', 'Age Target', 1),
+        ('New Adult', 'Age Target', 1),
+        ('Adult', 'Age Target', 1),
+
+        ('Space Opera', 'Science Fiction', 2),
+        ('Dystopian', 'Science Fiction', 2),
+        ('Hard Sci-Fi', 'Science Fiction', 2),
+        ('High Fantasy', 'Fantasy', 2),
+        ('Epic Fantasy', 'Fantasy', 2),
+        ('Urban Fantasy', 'Fantasy', 2),
+        ('Popular Science', 'Science & Technology', 2),
+        ('Nature & Environment', 'Science & Technology', 2)
+    ) AS genres_to_seed(name, parent_name, sort_order)
+    ORDER BY sort_order, name
+  LOOP
+    IF genre_record.parent_name IS NULL THEN
+      parent_genre_id := NULL;
+    ELSE
+      SELECT id INTO parent_genre_id
+      FROM genres
+      WHERE is_system = true
+        AND name = genre_record.parent_name
+      LIMIT 1;
+    END IF;
+
+    INSERT INTO genres (name, parent_id, user_id, is_system)
+    VALUES (genre_record.name, parent_genre_id, NULL, true)
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+END $$;
+
 -- ── READING LOGS ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS reading_logs (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -250,6 +343,10 @@ CREATE TABLE IF NOT EXISTS group_memberships (
 -- supports the "currently reading" dashboard card query.
 CREATE INDEX IF NOT EXISTS books_user_id_idx        ON books(user_id);
 CREATE INDEX IF NOT EXISTS books_status_idx         ON books(user_id, status);
+CREATE INDEX IF NOT EXISTS genres_parent_id_idx     ON genres(parent_id);
+CREATE INDEX IF NOT EXISTS genres_user_id_idx       ON genres(user_id);
+CREATE INDEX IF NOT EXISTS genres_is_system_idx     ON genres(is_system);
+CREATE INDEX IF NOT EXISTS book_genres_genre_id_idx ON book_genres(genre_id);
 CREATE INDEX IF NOT EXISTS series_user_id_idx       ON series(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_user_id_idx ON reading_logs(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_book_id_idx ON reading_logs(book_id);
@@ -263,9 +360,19 @@ CREATE INDEX IF NOT EXISTS groups_created_by_idx ON groups(created_by);
 CREATE INDEX IF NOT EXISTS group_memberships_user_id_idx ON group_memberships(user_id);
 CREATE INDEX IF NOT EXISTS group_memberships_group_id_idx ON group_memberships(group_id);
 
+CREATE UNIQUE INDEX IF NOT EXISTS genres_unique_system_sibling_name_idx
+  ON genres (COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
+  WHERE is_system = true;
+
+CREATE UNIQUE INDEX IF NOT EXISTS genres_unique_user_sibling_name_idx
+  ON genres (user_id, COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
+  WHERE is_system = false;
+
 -- ── ROW LEVEL SECURITY ────────────────────────────────────
 ALTER TABLE series       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE books        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE genres       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_genres  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -385,6 +492,77 @@ $$;
 
 GRANT EXECUTE ON FUNCTION create_group_with_owner(text, text, text) TO authenticated;
 
+CREATE OR REPLACE FUNCTION prevent_genre_cycles()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  current_parent uuid;
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.parent_id = NEW.id THEN
+    RAISE EXCEPTION 'A genre cannot be its own parent.';
+  END IF;
+
+  current_parent := NEW.parent_id;
+
+  WHILE current_parent IS NOT NULL LOOP
+    IF current_parent = NEW.id THEN
+      RAISE EXCEPTION 'A genre cannot be moved below one of its own descendants.';
+    END IF;
+
+    SELECT parent_id INTO current_parent
+    FROM genres
+    WHERE id = current_parent;
+  END LOOP;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS genres_prevent_cycles ON genres;
+
+CREATE TRIGGER genres_prevent_cycles
+  BEFORE INSERT OR UPDATE OF parent_id ON genres
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_genre_cycles();
+
+DROP TRIGGER IF EXISTS genres_set_updated_at ON genres;
+
+CREATE TRIGGER genres_set_updated_at
+  BEFORE UPDATE ON genres
+  FOR EACH ROW
+  EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION can_use_genre(genre_uuid uuid, user_uuid uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM genres
+    WHERE id = genre_uuid
+      AND (is_system = true OR user_id = user_uuid)
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION can_use_genre_parent(parent_uuid uuid, user_uuid uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT parent_uuid IS NULL OR can_use_genre(parent_uuid, user_uuid);
+$$;
+
 -- series
 CREATE POLICY "series: owner select" ON series FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "series: owner insert" ON series FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -396,6 +574,67 @@ CREATE POLICY "books: owner select" ON books FOR SELECT USING (auth.uid() = user
 CREATE POLICY "books: owner insert" ON books FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "books: owner update" ON books FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "books: owner delete" ON books FOR DELETE USING (auth.uid() = user_id);
+
+-- genres
+CREATE POLICY "genres: visible select"
+  ON genres FOR SELECT
+  USING (is_system = true OR auth.uid() = user_id);
+
+CREATE POLICY "genres: owner insert custom"
+  ON genres FOR INSERT
+  WITH CHECK (
+    is_system = false
+    AND auth.uid() = user_id
+    AND can_use_genre_parent(parent_id, auth.uid())
+  );
+
+CREATE POLICY "genres: owner update custom"
+  ON genres FOR UPDATE
+  USING (is_system = false AND auth.uid() = user_id)
+  WITH CHECK (
+    is_system = false
+    AND auth.uid() = user_id
+    AND can_use_genre_parent(parent_id, auth.uid())
+  );
+
+CREATE POLICY "genres: owner delete custom"
+  ON genres FOR DELETE
+  USING (is_system = false AND auth.uid() = user_id);
+
+-- book_genres
+CREATE POLICY "book_genres: owner select"
+  ON book_genres FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_genres.book_id
+        AND books.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "book_genres: owner insert"
+  ON book_genres FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_genres.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND can_use_genre(genre_id, auth.uid())
+  );
+
+CREATE POLICY "book_genres: owner delete"
+  ON book_genres FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_genres.book_id
+        AND books.user_id = auth.uid()
+    )
+  );
 
 -- reading_logs
 CREATE POLICY "reading_logs: owner select" ON reading_logs FOR SELECT USING (auth.uid() = user_id);
