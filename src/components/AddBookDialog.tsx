@@ -24,12 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
+import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatAuthorsInput,
   parseAuthorsInput,
 } from "@/lib/utils";
-import { getAllowedGenres } from "@/lib/bookGenres";
+import { mapGenreLabelsToIds } from "@/lib/genres";
 import {
   formatPublicationDateInput,
   parsePublicationDateInput,
@@ -82,6 +83,7 @@ const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
 
 export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps) {
   const { addBook } = useBooksContext();
+  const { genres } = useGenresContext();
   const { series, addSeries } = useSeries();
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -180,7 +182,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       }
       if (bookData.description) setValue("description", bookData.description);
       if (bookData.genres) {
-        setValue("genres", getAllowedGenres(bookData.genres), {
+        setValue("genres", mapGenreLabelsToIds(bookData.genres, genres), {
           shouldDirty: true,
           shouldTouch: true,
           shouldValidate: true,
@@ -255,13 +257,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         });
         return;
       }
-      const genres = getAllowedGenres(values.genres);
       const result = await addBook(
         {
           title: values.title,
           authors,
           status: values.status,
-          genres: genres.length > 0 ? genres : undefined,
+          genre_ids: values.genres,
           language: (values.language as BookLanguage) || undefined,
           format: (values.format as BookFormat) || undefined,
           source: (values.source as BookSource) || undefined,

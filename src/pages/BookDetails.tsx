@@ -49,9 +49,9 @@ import {
   getReadingDuration,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
-import { getAllowedGenres } from "@/lib/bookGenres";
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogsForBook } from "@/lib/books";
+import { formatGenrePathForDisplay } from "@/lib/genreTree";
 import {
   formatPublicationDateForDisplay,
   formatPublicationDateInput,
@@ -117,7 +117,7 @@ function bookToFormValues(book: Book): FormValues {
     title: book.title,
     authorsInput: formatAuthorsInput(book.authors),
     status: book.status,
-    genres: book.genres ?? [],
+    genres: book.genre_ids ?? [],
     isbn: book.isbn ?? "",
     language: book.language ?? "",
     format: book.format ?? "",
@@ -317,13 +317,13 @@ export default function BookDetails() {
   }, [book, books]);
 
   const relatedByGenre = useMemo(() => {
-    if (!book || !book.genres?.length) return [];
-    const genres = new Set(book.genres.map((genre) => genre.toLowerCase()));
+    if (!book || !book.genre_ids?.length) return [];
+    const genreIds = new Set(book.genre_ids);
     return books
       .filter(
         (item) =>
           item.id !== book.id &&
-          item.genres?.some((genre) => genres.has(genre.toLowerCase())) &&
+          item.genre_ids?.some((genreId) => genreIds.has(genreId)) &&
           !relatedByAuthor.some((authorBook) => authorBook.id === item.id),
       )
       .slice(0, 3);
@@ -405,8 +405,7 @@ export default function BookDetails() {
       payload.authors = authors;
     }
     if (dirtyFields.genres) {
-      const allowedGenres = getAllowedGenres(values.genres);
-      payload.genres = allowedGenres.length > 0 ? allowedGenres : undefined;
+      payload.genre_ids = values.genres;
     }
     if (dirtyFields.isbn) {
       payload.isbn = values.isbn.trim() || undefined;
@@ -920,11 +919,11 @@ export default function BookDetails() {
             <div className="rounded-xl border bg-card p-5">
               <div className="space-y-5">
                 <MetadataGroup title="Genres">
-                  {book.genres?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {book.genres.map((genre) => (
-                        <Badge key={genre} variant="secondary" className="font-sans font-normal">
-                          {genre}
+                  {book.genre_paths?.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {book.genre_paths.map((path) => (
+                        <Badge key={path} variant="outline" className="max-w-full font-normal">
+                          {formatGenrePathForDisplay(path)}
                         </Badge>
                       ))}
                     </div>

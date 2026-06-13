@@ -22,9 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
+import GenreMultiSelect from "@/components/GenreMultiSelect";
 import QuoteBlock from "@/components/QuoteBlock";
 import {
   Select,
@@ -527,17 +527,6 @@ function downloadBooksCsv(books: Book[]) {
   URL.revokeObjectURL(url);
 }
 
-function parseGenreInput(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((genre) => genre.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
 function ManagementTable({
   books,
   selectedIds,
@@ -636,9 +625,9 @@ function ManagementMode({
   selectedIds: Set<string>;
   saving: boolean;
   bulkError: string | null;
-  genreInput: string;
+  genreInput: string[];
   bulkStatus: BookStatus;
-  onGenreInputChange: (value: string) => void;
+  onGenreInputChange: (value: string[]) => void;
   onBulkStatusChange: (value: BookStatus) => void;
   onToggleBook: (bookId: string) => void;
   onToggleAll: () => void;
@@ -649,7 +638,7 @@ function ManagementMode({
 }) {
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
-  const hasGenreInput = parseGenreInput(genreInput).length > 0;
+  const hasGenreInput = genreInput.length > 0;
 
   return (
     <div className="space-y-4">
@@ -681,10 +670,9 @@ function ManagementMode({
           </Button>
           <div className="w-56">
             <Label className="text-xs text-muted-foreground">Add genres</Label>
-            <Input
+            <GenreMultiSelect
               value={genreInput}
-              onChange={(event) => onGenreInputChange(event.target.value)}
-              placeholder="Fantasy, Memoir"
+              onChange={onGenreInputChange}
               disabled={saving}
             />
           </div>
@@ -2029,7 +2017,7 @@ export default function Library() {
   const filterOptions = useMemo(() => buildLibraryFilterOptions(books, series), [books, series]);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(() => new Set());
   const [bulkStatus, setBulkStatus] = useState<BookStatus>("Reading");
-  const [genreInput, setGenreInput] = useState("");
+  const [genreInput, setGenreInput] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
@@ -2246,14 +2234,14 @@ export default function Library() {
   }
 
   function addBulkGenres() {
-    const genresToAdd = parseGenreInput(genreInput);
+    const genresToAdd = genreInput;
     if (genresToAdd.length === 0) return;
 
     void applyBulkUpdate((book) => {
-      const existingGenres = book.genres ?? [];
+      const existingGenres = book.genre_ids ?? [];
       const nextGenres = Array.from(new Set([...existingGenres, ...genresToAdd]));
       if (nextGenres.length === existingGenres.length) return null;
-      return { genres: nextGenres };
+      return { genre_ids: nextGenres };
     });
   }
 
