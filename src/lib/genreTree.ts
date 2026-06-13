@@ -151,6 +151,12 @@ export function getMostSpecificGenres(selectedGenres: Genre[], allGenres: Genre[
     .sort(compareGenres);
 }
 
+export function getSelectedGenreTags(selectedGenres: Genre[]): Genre[] {
+  return selectedGenres
+    .filter((genre) => !isGenreRoot(genre))
+    .sort(compareGenres);
+}
+
 export function getMostSpecificGenreLabels(book: { selected_genres?: Genre[]; genres?: string[] }, allGenres?: Genre[]): string[] {
   if (book.selected_genres?.length && allGenres?.length) {
     return getMostSpecificGenres(book.selected_genres, allGenres).map((genre) => genre.name);
