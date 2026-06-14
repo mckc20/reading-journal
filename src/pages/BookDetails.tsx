@@ -39,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBooksContext } from "@/context/BooksContext";
+import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatCalendarSpan,
@@ -51,7 +52,7 @@ import {
 } from "@/lib/bookAnalytics";
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogsForBook } from "@/lib/books";
-import { formatGenrePathForDisplay } from "@/lib/genreTree";
+import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
   formatPublicationDateForDisplay,
   formatPublicationDateInput,
@@ -174,9 +175,18 @@ export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
   const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
+  const { genres } = useGenresContext();
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+  const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
+  const linkedGenres = useMemo(() => {
+    if (!book?.selected_genres?.length) return [];
+    return getSelectedGenreTags(book.selected_genres).map((genre) => ({
+      genre,
+      slug: slugById.get(genre.id) ?? genre.id,
+    }));
+  }, [book?.selected_genres, slugById]);
   const seriesName = book?.series_id
     ? series.find((item) => item.id === book.series_id)?.name
     : undefined;
@@ -919,7 +929,15 @@ export default function BookDetails() {
             <div className="rounded-xl border bg-card p-5">
               <div className="space-y-5">
                 <MetadataGroup title="Genres">
-                  {book.genre_paths?.length ? (
+                  {linkedGenres.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {linkedGenres.map(({ genre, slug }) => (
+                        <Badge key={genre.id} variant="outline" className="max-w-full font-normal" asChild>
+                          <Link to={`/genres/${slug}`}>{genre.name}</Link>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : book.genre_paths?.length ? (
                     <div className="flex flex-wrap gap-1.5">
                       {book.genre_paths.map((path) => (
                         <Badge key={path} variant="outline" className="max-w-full font-normal">
