@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -171,6 +171,19 @@ function pickPreviewNotes(notes: BookNote[], label: BookNoteLabel): BookNote[] {
     .slice(0, 3);
 }
 
+function buildLibraryFilterPath(
+  key: "language" | "format" | "publicationYear" | "publisher" | "source",
+  value: string,
+): string {
+  const params = new URLSearchParams({ [key]: value });
+  return `/library/explore?${params.toString()}`;
+}
+
+function getPublicationYear(value?: string | null): string | null {
+  const [year] = (value ?? "").split("-");
+  return year && /^\d{4}$/.test(year) ? year : null;
+}
+
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
@@ -190,6 +203,7 @@ export default function BookDetails() {
   const seriesName = book?.series_id
     ? series.find((item) => item.id === book.series_id)?.name
     : undefined;
+  const publicationYear = getPublicationYear(book?.publication_date);
 
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
@@ -708,11 +722,29 @@ export default function BookDetails() {
 
             {seriesName && (
               <p className="text-sm text-muted-foreground">
-                {seriesName}
+                <Link
+                  to={`/series/${book.series_id}`}
+                  className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {seriesName}
+                </Link>
                 {book.volume_number != null ? ` · Book ${book.volume_number}` : ""}
               </p>
             )}
-            <p className="text-base text-muted-foreground">by {book.authors.join(", ")}</p>
+            <p className="text-base text-muted-foreground">
+              by{" "}
+              {book.authors.map((author, index) => (
+                <Fragment key={author}>
+                  {index > 0 ? ", " : ""}
+                  <Link
+                    to={`/authors/${encodeURIComponent(author)}`}
+                    className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {author}
+                  </Link>
+                </Fragment>
+              ))}
+            </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-1">
               <div className="flex items-center gap-1">
@@ -951,17 +983,72 @@ export default function BookDetails() {
                 </MetadataGroup>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <MetadataItem label="Language" value={book.language || "Not set"} />
-                  <MetadataItem label="Format" value={book.format || "Not set"} />
+                  <MetadataItem
+                    label="Language"
+                    value={
+                      book.language ? (
+                        <MetadataLink to={buildLibraryFilterPath("language", book.language)}>
+                          {book.language}
+                        </MetadataLink>
+                      ) : (
+                        "Not set"
+                      )
+                    }
+                  />
+                  <MetadataItem
+                    label="Format"
+                    value={
+                      book.format ? (
+                        <MetadataLink to={buildLibraryFilterPath("format", book.format)}>
+                          {book.format}
+                        </MetadataLink>
+                      ) : (
+                        "Not set"
+                      )
+                    }
+                  />
                   <MetadataItem
                     label="Publication Date"
-                    value={formatPublicationDateForDisplay(
-                      book.publication_date,
-                      book.publication_date_precision,
-                    )}
+                    value={
+                      publicationYear ? (
+                        <MetadataLink to={buildLibraryFilterPath("publicationYear", publicationYear)}>
+                          {formatPublicationDateForDisplay(
+                            book.publication_date,
+                            book.publication_date_precision,
+                          )}
+                        </MetadataLink>
+                      ) : (
+                        formatPublicationDateForDisplay(
+                          book.publication_date,
+                          book.publication_date_precision,
+                        )
+                      )
+                    }
                   />
-                  <MetadataItem label="Publisher" value={book.publisher || "Not set"} />
-                  <MetadataItem label="Source" value={book.source || "Not set"} />
+                  <MetadataItem
+                    label="Publisher"
+                    value={
+                      book.publisher ? (
+                        <MetadataLink to={buildLibraryFilterPath("publisher", book.publisher)}>
+                          {book.publisher}
+                        </MetadataLink>
+                      ) : (
+                        "Not set"
+                      )
+                    }
+                  />
+                  <MetadataItem
+                    label="Source"
+                    value={
+                      book.source ? (
+                        <MetadataLink to={buildLibraryFilterPath("source", book.source)}>
+                          {book.source}
+                        </MetadataLink>
+                      ) : (
+                        "Not set"
+                      )
+                    }
+                  />
                   <MetadataItem label="ISBN" value={book.isbn || "Not set"} />
                 </div>
               </div>
@@ -1110,7 +1197,18 @@ function MetadataGroup({ title, children }: { title: string; children: React.Rea
   );
 }
 
-function MetadataItem({ label, value }: { label: string; value: string }) {
+function MetadataLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function MetadataItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p className="font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">{label}</p>
