@@ -77,6 +77,19 @@ function uniqueCleanValues(values: string[] | undefined) {
   return Array.from(new Set(values?.map((value) => value.trim()).filter(Boolean)));
 }
 
+function normalizeShelfValue(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function shelfValueMatches(value: string | undefined, selectedValue: string) {
+  return normalizeShelfValue(value ?? UNCATEGORIZED) === normalizeShelfValue(selectedValue);
+}
+
+function shelfValuesInclude(values: string[] | undefined, selectedValue: string) {
+  const normalizedSelectedValue = normalizeShelfValue(selectedValue);
+  return uniqueCleanValues(values).some((value) => normalizeShelfValue(value) === normalizedSelectedValue);
+}
+
 export function countUniqueBookValues(
   books: Book[],
   getValues: (book: Book) => string[] | undefined,
@@ -273,20 +286,20 @@ export function filterBooksByShelfValue({
 
   if (shelf === "series") {
     const matchingSeriesIds = new Set(
-      series.filter((item) => item.name === selectedValue).map((item) => item.id),
+      series.filter((item) => shelfValueMatches(item.name, selectedValue)).map((item) => item.id),
     );
     return sortBooksByTitle(books.filter((book) => book.series_id && matchingSeriesIds.has(book.series_id)));
   }
 
   if (shelf === "authors") {
     return sortBooksByTitle(
-      books.filter((book) => uniqueCleanValues(book.authors).includes(selectedValue)),
+      books.filter((book) => shelfValuesInclude(book.authors, selectedValue)),
     );
   }
 
   if (shelf === "genres") {
     return sortBooksByTitle(
-      books.filter((book) => uniqueCleanValues(book.genres).includes(selectedValue)),
+      books.filter((book) => shelfValuesInclude(book.genres, selectedValue)),
     );
   }
 
@@ -303,15 +316,15 @@ export function filterBooksByShelfValue({
   }
 
   if (shelf === "languages") {
-    return sortBooksByTitle(books.filter((book) => (book.language ?? UNCATEGORIZED) === selectedValue));
+    return sortBooksByTitle(books.filter((book) => shelfValueMatches(book.language, selectedValue)));
   }
 
   if (shelf === "format") {
-    return sortBooksByTitle(books.filter((book) => (book.format ?? UNCATEGORIZED) === selectedValue));
+    return sortBooksByTitle(books.filter((book) => shelfValueMatches(book.format, selectedValue)));
   }
 
   if (shelf === "source") {
-    return sortBooksByTitle(books.filter((book) => (book.source ?? UNCATEGORIZED) === selectedValue));
+    return sortBooksByTitle(books.filter((book) => shelfValueMatches(book.source, selectedValue)));
   }
 
   return [];

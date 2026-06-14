@@ -143,6 +143,29 @@ test("filters books by selected multi-value shelf value", () => {
   assert.deepEqual(filteredBooks.map((book) => book.id), ["fantasy"]);
 });
 
+test("filters multi-value shelf values case-insensitively", () => {
+  const books = [
+    makeBook({ id: "fantasy", title: "Fantasy", authors: ["N. K. Jemisin"], genres: ["Fantasy"] }),
+    makeBook({ id: "mystery", title: "Mystery", authors: ["Agatha Christie"], genres: ["Mystery"] }),
+  ];
+
+  const authorBooks = filterBooksByShelfValue({
+    shelf: "authors",
+    value: " n. k. jemisin ",
+    books,
+    series: [],
+  });
+  const genreBooks = filterBooksByShelfValue({
+    shelf: "genres",
+    value: " fantasy ",
+    books,
+    series: [],
+  });
+
+  assert.deepEqual(authorBooks.map((book) => book.id), ["fantasy"]);
+  assert.deepEqual(genreBooks.map((book) => book.id), ["fantasy"]);
+});
+
 test("filters books by selected single-value shelf value", () => {
   const books = [
     makeBook({ id: "paperback", title: "Paperback", format: "Paperback" }),
@@ -157,6 +180,36 @@ test("filters books by selected single-value shelf value", () => {
   });
 
   assert.deepEqual(filteredBooks.map((book) => book.id), ["paperback"]);
+});
+
+test("filters single-value shelf values case-insensitively", () => {
+  const books = [
+    makeBook({ id: "english-paperback", title: "English Paperback", language: "English", format: "Paperback", source: "Owned" }),
+    makeBook({ id: "german-ebook", title: "German Ebook", language: "German", format: "eBook", source: "Library" }),
+  ];
+
+  const languageBooks = filterBooksByShelfValue({
+    shelf: "languages",
+    value: " english ",
+    books,
+    series: [],
+  });
+  const formatBooks = filterBooksByShelfValue({
+    shelf: "format",
+    value: " paperback ",
+    books,
+    series: [],
+  });
+  const sourceBooks = filterBooksByShelfValue({
+    shelf: "source",
+    value: " owned ",
+    books,
+    series: [],
+  });
+
+  assert.deepEqual(languageBooks.map((book) => book.id), ["english-paperback"]);
+  assert.deepEqual(formatBooks.map((book) => book.id), ["english-paperback"]);
+  assert.deepEqual(sourceBooks.map((book) => book.id), ["english-paperback"]);
 });
 
 test("filters books by selected series name", () => {
