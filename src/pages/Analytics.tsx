@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,8 +218,15 @@ export default function Analytics() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Genre distribution</CardTitle>
-          <CardDescription>See how your library is split across genres.</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Genre distribution</CardTitle>
+              <CardDescription>See how your library is split across genres.</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/genres">Browse genres</Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <GenreDistributionChart books={books} loading={booksLoading} error={booksError} />
