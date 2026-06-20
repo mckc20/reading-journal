@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   BookOpen,
@@ -34,7 +34,7 @@ const primaryNavLinks: NavLink[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/library", label: "Books", icon: Library },
   { to: "/authors", label: "Authors", icon: UserRound },
-  { to: "/analytics", label: "Discover", icon: Compass },
+  { to: "/discover", label: "Discover", icon: Compass },
   { to: "/notes", label: "Notes", icon: StickyNote },
 ];
 
@@ -76,6 +76,23 @@ function AppLayoutContent() {
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
   const displayName = getDisplayName(profile, user?.email);
+
+  useEffect(() => {
+    if (!("scrollRestoration" in window.history)) return;
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [location.pathname]);
 
   return (
     <>

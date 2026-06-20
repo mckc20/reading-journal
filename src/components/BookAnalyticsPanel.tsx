@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,6 +84,7 @@ function formatEstimateConfidence(confidence: "low" | "medium" | "high" | null):
 }
 
 export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
+  const progressGradientId = `book-progress-fill-${useId().replace(/:/g, "")}`;
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -292,6 +293,16 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
       return `${x},${y}`;
     })
     .join(" ");
+  const progressAreaPoints =
+    progressTimeline.points.length > 0
+      ? `0,${progressChartHeight} ${progressTimeline.points
+          .map((point) => {
+            const x = getProgressXPercent(point.dayKey, point.isStart);
+            const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
+            return `${x},${y}`;
+          })
+          .join(" ")} 100,${progressChartHeight}`
+      : "";
   const activeProgressPoint =
     activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
   const activeProgressXPercent =
@@ -354,7 +365,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     <ScrollArea className="flex-1 min-h-0 pr-2">
       <div className="space-y-3 py-2">
         {estimatedFinish.shouldShow && (
-          <section className="rounded-lg border bg-muted/20 p-3">
+          <section className="space-y-3">
             <p className="text-sm font-medium">Estimated finish</p>
             {estimatedFinish.isAvailable && estimatedFinish.finishDate ? (
               <>
@@ -397,7 +408,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
           </section>
         )}
 
-      <section className="rounded-lg border bg-muted/20 p-3">
+      <section className="space-y-3">
         <p className="text-sm font-medium">Time-based stats</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div className="rounded-md border bg-background/80 px-2 py-2">
@@ -416,7 +427,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
         </div>
       </section>
 
-      <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
+      <section className="space-y-3">
         <div>
           <p className="text-sm font-medium">Progress over time</p>
         </div>
@@ -477,15 +488,22 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                     role="img"
                     aria-label="Line chart showing book progress through time"
                   >
+                    <defs>
+                      <linearGradient id={progressGradientId} x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.34" />
+                        <stop offset="70%" stopColor="var(--primary)" stopOpacity="0.1" />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <polygon points={progressAreaPoints} fill={`url(#${progressGradientId})`} />
                     <polyline
                       points={progressLinePoints}
                       fill="none"
-                      stroke="currentColor"
+                      stroke="var(--primary)"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       vectorEffect="non-scaling-stroke"
-                      className="text-primary"
                     />
                   </svg>
 
@@ -556,7 +574,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
         )}
       </section>
 
-      <section className="rounded-lg border bg-muted/20 p-3 space-y-3">
+      <section className="space-y-3">
         <div>
           <p className="text-sm font-medium">Pages read per day</p>
         </div>
@@ -653,7 +671,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
         </div>
       </section>
 
-      <section className="rounded-lg border bg-muted/20 p-3">
+      <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium">Reading progress entries</p>
           <p className="text-xs text-muted-foreground">

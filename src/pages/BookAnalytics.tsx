@@ -55,9 +55,7 @@ export default function BookAnalytics() {
         <h1 className="text-2xl font-heading leading-snug font-medium">Analytics</h1>
       </div>
 
-      <div className="rounded-xl border p-2 sm:p-3">
-        <BookAnalyticsPanel book={book} />
-      </div>
+      <BookAnalyticsPanel book={book} />
     </div>
   );
 }
