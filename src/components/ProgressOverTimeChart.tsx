@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { buildProgressTimeline } from "@/lib/bookAnalytics";
 import type { ReadingLog } from "@/types";
 
@@ -29,6 +29,7 @@ export default function ProgressOverTimeChart({
   totalPages,
 }: ProgressOverTimeChartProps) {
   const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
+  const gradientId = `progress-fill-${useId().replace(/:/g, "")}`;
   const progressTimeline = useMemo(
     () => buildProgressTimeline(logs, totalPages),
     [logs, totalPages],
@@ -54,13 +55,18 @@ export default function ProgressOverTimeChart({
     return isStart ? Math.max(0, dateX - progressStartOffsetPercent) : dateX;
   };
 
-  const progressLinePoints = progressTimeline.points
-    .map((point) => {
-      const x = getProgressXPercent(point.dayKey, point.isStart);
-      const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-      return `${x},${y}`;
-    })
+  const progressPoints = progressTimeline.points.map((point) => {
+    const x = getProgressXPercent(point.dayKey, point.isStart);
+    const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
+    return { ...point, x, y };
+  });
+  const progressLinePoints = progressPoints
+    .map((point) => `${point.x},${point.y}`)
     .join(" ");
+  const progressAreaPoints =
+    progressPoints.length > 0
+      ? `0,${progressChartHeight} ${progressPoints.map((point) => `${point.x},${point.y}`).join(" ")} 100,${progressChartHeight}`
+      : "";
 
   const activeProgressPoint =
     activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
@@ -147,15 +153,22 @@ export default function ProgressOverTimeChart({
               role="img"
               aria-label="Line chart showing book progress through time"
             >
+              <defs>
+                <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.34" />
+                  <stop offset="70%" stopColor="var(--primary)" stopOpacity="0.1" />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <polygon points={progressAreaPoints} fill={`url(#${gradientId})`} />
               <polyline
                 points={progressLinePoints}
                 fill="none"
-                stroke="currentColor"
+                stroke="var(--primary)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
-                className="text-primary"
               />
             </svg>
 
