@@ -336,6 +336,7 @@ export interface ChatSharedBookSnapshot {
   description?: string | null;
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
+  volume_number?: number | null;
   included_notes?: ChatSharedNoteSnapshot[];
 }
 

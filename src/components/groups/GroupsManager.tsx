@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -188,6 +189,22 @@ function attachmentTypeLabel(attachment: ChatAttachmentPayload): string {
   return "Series";
 }
 
+function attachmentHref(attachment: ChatAttachmentPayload): string | null {
+  if (attachment.type === "book") return attachment.book.id ? `/books/${attachment.book.id}` : null;
+  if (attachment.type === "note") {
+    if (!attachment.note.book_id) return null;
+    return `/books/${attachment.note.book_id}/annotations`;
+  }
+  if (attachment.type === "author") return `/authors/${encodeURIComponent(attachment.author.name)}`;
+  if (attachment.series.id) return `/series/${attachment.series.id}`;
+  return null;
+}
+
+function quoteHref(note: ChatSharedNoteSnapshot): string | null {
+  if (!note.book_id) return null;
+  return `/books/${note.book_id}/annotations`;
+}
+
 function sortSeriesByName(series: Series[]): Series[] {
   return [...series].sort((first, second) =>
     first.name.localeCompare(second.name, undefined, { sensitivity: "base", numeric: true }),
@@ -255,6 +272,7 @@ function AttachmentCard({
   noteImportOpen,
   noteImportTargetBookId,
   onImportBook,
+  onImportSeries,
   onOpenNoteImport,
   onCancelNoteImport,
   onNoteTargetChange,
@@ -266,6 +284,7 @@ function AttachmentCard({
   noteImportOpen: boolean;
   noteImportTargetBookId: string;
   onImportBook: (book: ChatSharedBookSnapshot) => void;
+  onImportSeries: (series: Extract<ChatAttachmentPayload, { type: "series" }>["series"]) => void;
   onOpenNoteImport: () => void;
   onCancelNoteImport: () => void;
   onNoteTargetChange: (bookId: string) => void;
@@ -273,8 +292,10 @@ function AttachmentCard({
 }) {
   const attachment = message.attachment_payload;
   if (!attachment) return null;
+  const href = attachmentHref(attachment);
+  const isClickable = mine && href;
 
-  return (
+  const body = (
     <div className="mt-2 space-y-3 rounded-lg border bg-background p-3 text-foreground shadow-sm">
       <div className="flex items-center gap-2">
         <Badge variant="outline">{attachmentTypeLabel(attachment)}</Badge>
@@ -296,7 +317,7 @@ function AttachmentCard({
           )}
           <div className="min-w-0 flex-1 space-y-2">
             <div>
-              <p className="font-medium leading-snug">{attachment.book.title}</p>
+              <p className="line-clamp-2 font-medium leading-snug">{attachment.book.title}</p>
               <p className="text-xs text-muted-foreground">{attachment.book.authors.join(", ")}</p>
             </div>
             {attachment.book.description && (
@@ -304,11 +325,26 @@ function AttachmentCard({
             )}
             {attachment.book.included_notes && attachment.book.included_notes.length > 0 && (
               <div className="space-y-1">
-                {attachment.book.included_notes.map((note, index) => (
-                  <p key={`${note.id ?? index}-${note.label}`} className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                    <span className="font-medium">{noteLabel(note.label)}:</span> {note.content}
-                  </p>
-                ))}
+                {attachment.book.included_notes.map((note, index) => {
+                  const noteItem = (
+                    <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
+                      <span className="font-medium">{noteLabel(note.label)}:</span> {note.content}
+                    </span>
+                  );
+                  return mine ? (
+                    <p key={`${note.id ?? index}-${note.label}`} className="text-xs">
+                      {noteItem}
+                    </p>
+                  ) : (
+                    <Link
+                      key={`${note.id ?? index}-${note.label}`}
+                      to={quoteHref(note) ?? "#"}
+                      className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {noteItem}
+                    </Link>
+                  );
+                })}
               </div>
             )}
             {!mine && (
@@ -322,19 +358,39 @@ function AttachmentCard({
 
       {attachment.type === "note" && (
         <div className="space-y-3">
-          <div className="rounded-md bg-muted/50 px-3 py-2">
-            <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
-            {attachment.note.title && <p className="mt-1 text-sm font-medium">{attachment.note.title}</p>}
-            <p className="mt-1 text-sm">{attachment.note.content}</p>
-            {attachment.note.quote_speaker && (
-              <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.quote_speaker}</p>
-            )}
-            {attachment.note.book_title && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                From {attachment.note.book_title}
-              </p>
-            )}
-          </div>
+          {mine ? (
+            <div className="rounded-md bg-muted/50 px-3 py-2">
+              <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
+              {attachment.note.title && <p className="mt-1 text-sm font-medium">{attachment.note.title}</p>}
+              <p className="mt-1 text-sm">{attachment.note.content}</p>
+              {attachment.note.quote_speaker && (
+                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.quote_speaker}</p>
+              )}
+              {attachment.note.book_title && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  From {attachment.note.book_title}
+                </p>
+              )}
+            </div>
+          ) : (
+            <Link
+              to={href ?? "#"}
+              className="block rounded-md bg-muted/50 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Open ${attachment.note.book_title ?? attachment.note.title ?? "quote"}`}
+            >
+              <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
+              {attachment.note.title && <p className="mt-1 text-sm font-medium">{attachment.note.title}</p>}
+              <p className="mt-1 text-sm">{attachment.note.content}</p>
+              {attachment.note.quote_speaker && (
+                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.quote_speaker}</p>
+              )}
+              {attachment.note.book_title && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  From {attachment.note.book_title}
+                </p>
+              )}
+            </Link>
+          )}
 
           {!mine && !noteImportOpen && (
             <Button type="button" size="sm" variant="outline" onClick={onOpenNoteImport}>
@@ -373,7 +429,16 @@ function AttachmentCard({
       {attachment.type === "author" && (
         <div className="space-y-3">
           <div>
-            <p className="font-medium">{attachment.author.name}</p>
+            {mine ? (
+              <p className="font-medium">{attachment.author.name}</p>
+            ) : (
+              <Link
+                to={href ?? "#"}
+                className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {attachment.author.name}
+              </Link>
+            )}
             <p className="text-xs text-muted-foreground">
               {attachment.author.books.length} book{attachment.author.books.length === 1 ? "" : "s"} shared
             </p>
@@ -407,12 +472,27 @@ function AttachmentCard({
           )}
           {attachment.author.included_quotes && attachment.author.included_quotes.length > 0 && (
             <div className="space-y-1">
-              {attachment.author.included_quotes.map((quote, index) => (
-                <p key={`${quote.id ?? index}-${quote.content}`} className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                  {quote.content}
-                  {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
-                </p>
-              ))}
+              {attachment.author.included_quotes.map((quote, index) => {
+                const quoteItem = (
+                  <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
+                    {quote.content}
+                    {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
+                  </span>
+                );
+                return mine ? (
+                  <p key={`${quote.id ?? index}-${quote.content}`} className="text-xs">
+                    {quoteItem}
+                  </p>
+                ) : (
+                  <Link
+                    key={`${quote.id ?? index}-${quote.content}`}
+                    to={quoteHref(quote) ?? "#"}
+                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {quoteItem}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -421,7 +501,16 @@ function AttachmentCard({
       {attachment.type === "series" && (
         <div className="space-y-3">
           <div>
-            <p className="font-medium">{attachment.series.name}</p>
+            {mine ? (
+              <p className="font-medium">{attachment.series.name}</p>
+            ) : (
+              <Link
+                to={href ?? "#"}
+                className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {attachment.series.name}
+              </Link>
+            )}
             <p className="text-xs text-muted-foreground">
               {attachment.series.books.length} book{attachment.series.books.length === 1 ? "" : "s"} shared
             </p>
@@ -448,26 +537,61 @@ function AttachmentCard({
               ))}
             </div>
           )}
+          {!mine && (
+            <Button type="button" size="sm" variant="outline" onClick={() => onImportSeries(attachment.series)}>
+              Save to own library
+            </Button>
+          )}
           {attachment.series.included_quotes && attachment.series.included_quotes.length > 0 && (
             <div className="space-y-1">
-              {attachment.series.included_quotes.map((quote, index) => (
-                <p key={`${quote.id ?? index}-${quote.content}`} className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                  {quote.content}
-                  {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
-                </p>
-              ))}
+              {attachment.series.included_quotes.map((quote, index) => {
+                const quoteLink = mine ? quoteHref(quote) : null;
+                const quoteItem = (
+                  <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
+                    {quote.content}
+                    {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
+                  </span>
+                );
+                return quoteLink ? (
+                  <Link
+                    key={`${quote.id ?? index}-${quote.content}`}
+                    to={quoteLink}
+                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {quoteItem}
+                  </Link>
+                ) : (
+                  <p key={`${quote.id ?? index}-${quote.content}`} className="text-xs">
+                    {quoteItem}
+                  </p>
+                );
+              })}
             </div>
           )}
         </div>
       )}
     </div>
   );
+
+  if (isClickable) {
+    return (
+      <Link
+        to={href}
+        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Open ${attachmentTitle(attachment)}`}
+      >
+        {body}
+      </Link>
+    );
+  }
+
+  return body;
 }
 
 export function GroupsManager() {
   const { user } = useAuth();
   const { books, addBook } = useBooksContext();
-  const { series } = useSeries();
+  const { series: librarySeries, addSeries } = useSeries();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -540,7 +664,7 @@ export function GroupsManager() {
   }, [notes]);
 
   const authorSummaries = useMemo(() => buildAuthorSummaries(books, notes), [books, notes]);
-  const seriesById = useMemo(() => new Map(series.map((item) => [item.id, item])), [series]);
+  const seriesById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item])), [librarySeries]);
   const seriesBooksById = useMemo(() => {
     const map = new Map<string, Book[]>();
     books.forEach((book) => {
@@ -590,10 +714,10 @@ export function GroupsManager() {
 
   const filteredSeries = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
-    const sorted = sortSeriesByName(series);
+    const sorted = sortSeriesByName(librarySeries);
     if (!query) return sorted;
     return sorted.filter((item) => item.name.toLowerCase().includes(query));
-  }, [attachmentSearch, series]);
+  }, [attachmentSearch, librarySeries]);
 
   const selectedBook = selectedBookId ? booksById.get(selectedBookId) ?? null : null;
   const selectedNote = selectedNoteId ? notes.find((note) => note.id === selectedNoteId) ?? null : null;
@@ -935,6 +1059,7 @@ export function GroupsManager() {
         .filter((note): note is BookNote => Boolean(note));
       setSelectedAttachment(
         buildSeriesAttachment({
+          seriesId: selectedSeries.id,
           seriesName: selectedSeries.name,
           books: selectedSeriesBooks,
           includedQuotes,
@@ -984,6 +1109,29 @@ export function GroupsManager() {
       setStatusMessage("Book saved to your library.");
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save book."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function importSeriesAttachment(seriesSnapshot: Extract<ChatAttachmentPayload, { type: "series" }>["series"]) {
+    setSaving(true);
+    setError(null);
+    setStatusMessage(null);
+
+    try {
+      const existingSeries = librarySeries.find(
+        (item) => item.name.trim().toLowerCase() === seriesSnapshot.name.trim().toLowerCase(),
+      );
+      const seriesId = existingSeries?.id ?? (await addSeries(seriesSnapshot.name)).id;
+
+      for (const book of seriesSnapshot.books) {
+        await addBook(bookSnapshotToAddBookPayload(book, { series_id: seriesId }));
+      }
+
+      setStatusMessage("Series saved to your library.");
+    } catch (importError) {
+      setError(toChatErrorMessage(importError, "Could not save series."));
     } finally {
       setSaving(false);
     }
@@ -1501,6 +1649,7 @@ export function GroupsManager() {
                                     noteImportOpen={noteImportMessageId === message.id}
                                     noteImportTargetBookId={noteImportTargetBookId}
                                     onImportBook={importBookSnapshot}
+                                    onImportSeries={importSeriesAttachment}
                                     onOpenNoteImport={() => {
                                       setNoteImportMessageId(message.id);
                                       setNoteImportTargetBookId("");
