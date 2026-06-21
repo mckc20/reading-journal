@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context";
-import { fetchSeries, createSeries } from "@/lib/books";
+import { createSeries, deleteSeries, fetchSeries } from "@/lib/books";
 import type { Series } from "@/types";
 
 export function useSeries() {
@@ -27,5 +27,10 @@ export function useSeries() {
     return created;
   }, [user]);
 
-  return { series, loading, error, addSeries };
+  const removeSeries = useCallback(async (seriesId: string): Promise<void> => {
+    await deleteSeries(seriesId);
+    setSeries((prev) => prev.filter((item) => item.id !== seriesId));
+  }, []);
+
+  return { series, loading, error, addSeries, removeSeries };
 }

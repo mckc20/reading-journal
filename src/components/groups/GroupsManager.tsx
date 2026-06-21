@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -93,6 +93,11 @@ import type {
 
 type ComposeMode = "direct" | "group";
 type AttachmentPickerMode = "book" | "note" | "author" | "series";
+
+type OpenAttachmentState =
+  | { type: "book"; bookId: string }
+  | { type: "author"; authorName: string }
+  | { type: "series"; seriesId: string };
 
 type ConfirmAction =
   | { type: "message"; messageId: string }
@@ -592,6 +597,8 @@ export function GroupsManager() {
   const { user } = useAuth();
   const { books, addBook } = useBooksContext();
   const { series: librarySeries, addSeries } = useSeries();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -746,6 +753,25 @@ export function GroupsManager() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const state = location.state as { openAttachmentPicker?: OpenAttachmentState } | null;
+    const launch = state?.openAttachmentPicker;
+    if (!launch) return;
+
+    if (launch.type === "book") {
+      setAttachmentPicker("book");
+      setSelectedBookId(launch.bookId);
+    } else if (launch.type === "author") {
+      setAttachmentPicker("author");
+      setSelectedAuthorName(launch.authorName);
+    } else if (launch.type === "series") {
+      setAttachmentPicker("series");
+      setSelectedSeriesId(launch.seriesId);
+    }
+
+    navigate(location.pathname + location.search, { replace: true });
+  }, [location.key, location.pathname, location.search, location.state, navigate]);
 
   async function loadThreads(preferredGroupId?: string) {
     if (!user) return;

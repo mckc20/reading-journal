@@ -363,6 +363,17 @@ export async function createSeries(userId: string, name: string): Promise<Series
   return data as Series;
 }
 
+export async function deleteSeries(seriesId: string): Promise<void> {
+  const { error: detachError } = await supabase
+    .from("books")
+    .update({ series_id: null })
+    .eq("series_id", seriesId);
+  if (detachError) throw detachError;
+
+  const { error } = await supabase.from("series").delete().eq("id", seriesId);
+  if (error) throw error;
+}
+
 // ── Reading Logs ──────────────────────────────────────────────────────────
 
 export async function createReadingLog(
