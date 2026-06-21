@@ -42,6 +42,7 @@ import { useAuth, useProfile, useTheme, useUserSettings } from "@/context";
 import { useGenresContext } from "@/context/GenresContext";
 import { getErrorMessage } from "@/lib/profiles";
 import { flattenGenreTree, getGenrePathLabel, isGenreRoot } from "@/lib/genres";
+import { RELEASE_NOTES_EVENT } from "@/components/ReleaseNotesDialog";
 import { supabase } from "@/lib/supabase";
 import {
   DEFAULT_APPEARANCE_SETTINGS,
@@ -74,6 +75,7 @@ import type {
   ReadingPaceCalculation,
   ReadingSettings as ReadingSettingsValues,
 } from "@/types";
+import { getLatestReleaseNote, hasUnreadReleaseNote } from "@/lib/releaseNotes";
 
 type SettingsTab =
   | "profile"
@@ -1034,6 +1036,10 @@ function AccountSettings() {
 }
 
 function AboutSettings() {
+  const { settings, loading } = useUserSettings();
+  const latestReleaseNote = getLatestReleaseNote();
+  const showReleaseNotes = !loading && hasUnreadReleaseNote(settings?.last_seen_release_note_version);
+
   return (
     <SettingsSection
       title="About"
@@ -1042,13 +1048,23 @@ function AboutSettings() {
     >
       <SettingsRows>
         <SettingRow title="App version">
-          <span className="text-sm text-muted-foreground">{APP_VERSION}</span>
+          <span className="text-sm text-muted-foreground">
+            {APP_VERSION}
+            {showReleaseNotes ? ` · update ${latestReleaseNote.version} available` : ""}
+          </span>
         </SettingRow>
-        <SettingRow title="Changelog">
-          <Button type="button" variant="outline" size="sm" disabled>
-            View changelog
-          </Button>
-        </SettingRow>
+        {showReleaseNotes && (
+          <SettingRow title="What's new">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.dispatchEvent(new Event(RELEASE_NOTES_EVENT))}
+            >
+              Open release notes
+            </Button>
+          </SettingRow>
+        )}
         <SettingRow title="Documentation">
           <Button type="button" variant="outline" size="sm" disabled>
             Open docs

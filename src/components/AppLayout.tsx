@@ -21,6 +21,7 @@ import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useProfile } from "@/context";
 import { cn } from "@/lib/utils";
+import ReleaseNotesDialog from "./ReleaseNotesDialog";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 
@@ -119,6 +120,8 @@ function AppLayoutContent() {
           <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
         )}
       </Suspense>
+
+      <ReleaseNotesDialog />
     </>
   );
 }
