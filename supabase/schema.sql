@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS books (
   authors         text[] NOT NULL CHECK (cardinality(authors) > 0),
   genres          text[],
   status          text NOT NULL DEFAULT 'Wishlist'
-                    CHECK (status IN ('Wishlist','Not Started','Up Next','Reading','Finished','DNF')),
+                    CHECK (status IN ('Wishlist','Not Started','Up Next','Reading','Paused','Finished','DNF')),
   cover_url       text,
   rating          smallint CHECK (rating BETWEEN 1 AND 5),
   is_favorite     boolean NOT NULL DEFAULT false,
@@ -146,6 +146,17 @@ CREATE TABLE IF NOT EXISTS reading_logs (
   current_page         integer NOT NULL CHECK (current_page >= 0),
   reading_time_minutes integer CHECK (reading_time_minutes > 0),
   logged_at            timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── BOOK PAUSE PERIODS ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS book_pause_periods (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  book_id    uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  paused_at  timestamptz NOT NULL DEFAULT now(),
+  resumed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (resumed_at IS NULL OR resumed_at >= paused_at)
 );
 
 -- ── BOOK NOTES ────────────────────────────────────────────
@@ -387,6 +398,11 @@ CREATE INDEX IF NOT EXISTS book_genres_genre_id_idx ON book_genres(genre_id);
 CREATE INDEX IF NOT EXISTS series_user_id_idx       ON series(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_user_id_idx ON reading_logs(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_book_id_idx ON reading_logs(book_id);
+CREATE INDEX IF NOT EXISTS book_pause_periods_user_id_idx ON book_pause_periods(user_id);
+CREATE INDEX IF NOT EXISTS book_pause_periods_book_id_idx ON book_pause_periods(book_id);
+CREATE UNIQUE INDEX IF NOT EXISTS book_pause_periods_open_book_idx
+  ON book_pause_periods(book_id)
+  WHERE resumed_at IS NULL;
 CREATE INDEX IF NOT EXISTS book_notes_user_id_idx ON book_notes(user_id);
 CREATE INDEX IF NOT EXISTS book_notes_book_id_idx ON book_notes(book_id);
 CREATE INDEX IF NOT EXISTS book_notes_book_created_at_idx ON book_notes(book_id, created_at DESC);
@@ -426,6 +442,7 @@ ALTER TABLE books        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE genres       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_genres  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_pause_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
@@ -841,6 +858,76 @@ AS $$
   SELECT parent_uuid IS NULL OR can_use_genre(parent_uuid, user_uuid);
 $$;
 
+CREATE OR REPLACE FUNCTION pause_book(book_uuid uuid)
+RETURNS SETOF books
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+BEGIN
+  IF current_user_id IS NULL THEN
+    RAISE EXCEPTION 'You must be signed in.';
+  END IF;
+
+  UPDATE books
+  SET status = 'Paused'
+  WHERE id = book_uuid
+    AND user_id = current_user_id
+    AND status = 'Reading';
+
+  IF FOUND THEN
+    INSERT INTO book_pause_periods (user_id, book_id, paused_at)
+    VALUES (current_user_id, book_uuid, now())
+    ON CONFLICT DO NOTHING;
+  END IF;
+
+  RETURN QUERY
+  SELECT books.*
+  FROM books
+  WHERE id = book_uuid
+    AND user_id = current_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION pause_book(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION resume_book(book_uuid uuid)
+RETURNS SETOF books
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+BEGIN
+  IF current_user_id IS NULL THEN
+    RAISE EXCEPTION 'You must be signed in.';
+  END IF;
+
+  UPDATE book_pause_periods
+  SET resumed_at = now()
+  WHERE book_id = book_uuid
+    AND user_id = current_user_id
+    AND resumed_at IS NULL;
+
+  UPDATE books
+  SET status = 'Reading'
+  WHERE id = book_uuid
+    AND user_id = current_user_id
+    AND status = 'Paused';
+
+  RETURN QUERY
+  SELECT books.*
+  FROM books
+  WHERE id = book_uuid
+    AND user_id = current_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION resume_book(uuid) TO authenticated;
+
 -- series
 CREATE POLICY "series: owner select" ON series FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "series: owner insert" ON series FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -919,6 +1006,24 @@ CREATE POLICY "reading_logs: owner select" ON reading_logs FOR SELECT USING (aut
 CREATE POLICY "reading_logs: owner insert" ON reading_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "reading_logs: owner update" ON reading_logs FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "reading_logs: owner delete" ON reading_logs FOR DELETE USING (auth.uid() = user_id);
+
+-- book_pause_periods
+CREATE POLICY "book_pause_periods: owner select"
+  ON book_pause_periods FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "book_pause_periods: owner insert"
+  ON book_pause_periods FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "book_pause_periods: owner update"
+  ON book_pause_periods FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "book_pause_periods: owner delete"
+  ON book_pause_periods FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- book_notes
 CREATE POLICY "book_notes: owner select"

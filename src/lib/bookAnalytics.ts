@@ -1,4 +1,4 @@
-import type { BookStatus, ReadingLog } from "@/types";
+import type { BookPausePeriod, BookStatus, ReadingLog } from "@/types";
 
 export interface CalendarSpan {
   months: number;
@@ -29,9 +29,17 @@ export interface ProgressTimelinePoint {
   hasProgressIncrease: boolean;
 }
 
+export interface PauseTimelineSegment {
+  startDayKey: string;
+  endDayKey: string;
+  durationDays: number;
+  isOpenEnded: boolean;
+}
+
 export interface ProgressTimelineResult {
   isAvailable: boolean;
   points: ProgressTimelinePoint[];
+  pauseSegments: PauseTimelineSegment[];
 }
 
 export const MIN_READING_LOGS_FOR_ESTIMATED_FINISH = 3;
@@ -58,10 +66,79 @@ function toLocalDayKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function parseTimestamp(value?: string | null): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return isValidDate(parsed) ? parsed : null;
+}
+
 function wholeDaysBetween(startDate: Date, endDate: Date): number {
   const start = startOfLocalDay(startDate);
   const end = startOfLocalDay(endDate);
   return Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function getPauseSegments(
+  pausePeriods: BookPausePeriod[] | undefined,
+  now: Date,
+): PauseTimelineSegment[] {
+  return (pausePeriods ?? [])
+    .flatMap((period) => {
+      const pausedAt = parseTimestamp(period.paused_at);
+      if (!pausedAt) return [];
+
+      const resumedAt = parseTimestamp(period.resumed_at ?? undefined) ?? startOfLocalDay(now);
+      const start = startOfLocalDay(pausedAt);
+      const end = startOfLocalDay(resumedAt);
+      if (end < start) return [];
+
+      return [
+        {
+          startDayKey: toLocalDayKey(start),
+          endDayKey: toLocalDayKey(end),
+          durationDays: wholeDaysBetween(start, end),
+          isOpenEnded: !period.resumed_at,
+        },
+      ];
+    })
+    .sort((a, b) => a.startDayKey.localeCompare(b.startDayKey));
+}
+
+function getPauseDaysBetween(
+  startDate: Date,
+  endDate: Date,
+  pausePeriods: BookPausePeriod[] | undefined,
+  now: Date,
+): number {
+  const start = startOfLocalDay(startDate);
+  const end = startOfLocalDay(endDate);
+  if (end < start) return 0;
+
+  let pausedDays = 0;
+
+  for (const segment of getPauseSegments(pausePeriods, now)) {
+    const pauseStart = parseLocalDateOnly(segment.startDayKey);
+    const pauseEnd = parseLocalDateOnly(segment.endDayKey);
+    if (!pauseStart || !pauseEnd) continue;
+
+    const overlapStart = pauseStart > start ? pauseStart : start;
+    const overlapEnd = pauseEnd < end ? pauseEnd : end;
+    if (overlapEnd < overlapStart) continue;
+
+    pausedDays += wholeDaysBetween(overlapStart, overlapEnd);
+  }
+
+  return Math.max(0, pausedDays);
+}
+
+export function getActiveDaysBetween(
+  startDate: Date,
+  endDate: Date,
+  pausePeriods: BookPausePeriod[] | undefined,
+  now: Date,
+): number {
+  const totalDays = wholeDaysBetween(startOfLocalDay(startDate), startOfLocalDay(endDate));
+  return Math.max(0, totalDays - getPauseDaysBetween(startDate, endDate, pausePeriods, now));
 }
 
 function addMonthsClamped(date: Date, months: number): Date {
@@ -123,6 +200,7 @@ export function getCalendarPagesPerDay(params: {
   pages?: number;
   dateStarted?: string;
   dateEnded?: string;
+  pausePeriods?: BookPausePeriod[];
   now?: Date;
 }): number | null {
   const pages = params.pages ?? 0;
@@ -133,7 +211,10 @@ export function getCalendarPagesPerDay(params: {
 
   if (pages <= 0 || !started || !ended || ended < started) return null;
 
-  const elapsedDays = Math.max(1, wholeDaysBetween(started, ended));
+  const elapsedDays = Math.max(
+    1,
+    getActiveDaysBetween(started, ended, params.pausePeriods, params.now ?? new Date()),
+  );
   return pages / elapsedDays;
 }
 
@@ -144,12 +225,14 @@ export function formatPagesPerDay(value: number | null): string {
 
 export function buildProgressTimeline(
   logs: ReadingLog[],
-  totalPages?: number
+  totalPages?: number,
+  pausePeriods: BookPausePeriod[] = [],
 ): ProgressTimelineResult {
   if (!totalPages || totalPages <= 0) {
     return {
       isAvailable: false,
       points: [],
+      pauseSegments: [],
     };
   }
 
@@ -186,6 +269,7 @@ export function buildProgressTimeline(
     return {
       isAvailable: true,
       points: [],
+      pauseSegments: getPauseSegments(pausePeriods, new Date()),
     };
   }
 
@@ -196,14 +280,23 @@ export function buildProgressTimeline(
     return {
       isAvailable: true,
       points: [],
+      pauseSegments: getPauseSegments(pausePeriods, new Date()),
     };
   }
+
+  const pauseSegments = getPauseSegments(pausePeriods, new Date());
+  const latestPauseDay = pauseSegments.reduce((latest, segment) => {
+    const end = parseLocalDateOnly(segment.endDayKey);
+    if (!end) return latest;
+    return !latest || end > latest ? end : latest;
+  }, null as Date | null);
+  const lastVisibleDay = latestPauseDay && latestPauseDay > lastDay ? latestPauseDay : lastDay;
 
   const progressPoints: ProgressTimelinePoint[] = [];
   const cursor = new Date(firstDay);
   let carriedPage = 0;
 
-  while (cursor <= lastDay) {
+  while (cursor <= lastVisibleDay) {
     const dayKey = toLocalDayKey(cursor);
     const increasedPage = progressByDay.get(dayKey);
     const hasProgressIncrease = typeof increasedPage === "number" && increasedPage > carriedPage;
@@ -234,6 +327,7 @@ export function buildProgressTimeline(
       },
       ...progressPoints,
     ],
+    pauseSegments,
   };
 }
 
@@ -279,6 +373,7 @@ export function formatCalendarSpan(span: CalendarSpan): string {
 export function getReadingDuration(params: {
   dateStarted?: string;
   dateFinished?: string;
+  pausePeriods?: BookPausePeriod[];
   now?: Date;
 }): ReadingDurationResult {
   const started = parseLocalDateOnly(params.dateStarted);
@@ -303,10 +398,14 @@ export function getReadingDuration(params: {
     };
   }
 
+  const pausedDays = getPauseDaysBetween(started, endDate, params.pausePeriods, fallbackNow);
+  const effectiveEndDate = new Date(endDate);
+  effectiveEndDate.setDate(effectiveEndDate.getDate() - pausedDays);
+
   return {
     isAvailable: true,
     isInProgress,
-    span: calculateCalendarSpan(started, endDate),
+    span: calculateCalendarSpan(started, effectiveEndDate),
   };
 }
 
@@ -315,6 +414,7 @@ export function getEstimatedFinish(params: {
   currentPage?: number;
   totalPages?: number;
   logs: ReadingLog[];
+  pausePeriods?: BookPausePeriod[];
   now?: Date;
 }): EstimatedFinishResult {
   if (params.status !== "Reading") {
@@ -355,7 +455,12 @@ export function getEstimatedFinish(params: {
   const lastLog = sortedLogs[sortedLogs.length - 1];
   const firstLogDate = new Date(firstLog.logged_at);
   const lastLogDate = new Date(lastLog.logged_at);
-  const loggedDays = wholeDaysBetween(firstLogDate, lastLogDate);
+  const loggedDays = getActiveDaysBetween(
+    firstLogDate,
+    lastLogDate,
+    params.pausePeriods,
+    params.now ?? new Date(),
+  );
   const loggedProgress = lastLog.current_page - firstLog.current_page;
 
   if (!isValidDate(firstLogDate) || !isValidDate(lastLogDate) || loggedDays <= 0 || loggedProgress <= 0) {

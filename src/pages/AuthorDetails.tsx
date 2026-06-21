@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, Heart, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Heart, PauseCircle, Star } from "lucide-react";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
@@ -25,6 +25,7 @@ function countLabel(count: number, singular: string): string {
 }
 
 function BookCover({ book, size = "md" }: { book: Book; size?: "sm" | "md" }) {
+  const isPaused = book.status === "Paused";
   return (
     <Link
       to={`/books/${book.id}`}
@@ -37,6 +38,7 @@ function BookCover({ book, size = "md" }: { book: Book; size?: "sm" | "md" }) {
         className={cn(
           "overflow-hidden rounded-md border bg-muted shadow-sm",
           size === "sm" ? "h-20 w-14" : "h-[120px] w-20",
+          isPaused && "opacity-70",
         )}
       >
         {book.cover_url ? (
@@ -44,11 +46,19 @@ function BookCover({ book, size = "md" }: { book: Book; size?: "sm" | "md" }) {
             src={book.cover_url}
             alt={book.title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            className={cn(
+              "h-full w-full object-cover transition-transform group-hover:scale-105",
+              isPaused && "grayscale",
+            )}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <BookOpen className="h-5 w-5 text-muted-foreground/50" />
+          </div>
+        )}
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+            <PauseCircle className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
       </div>

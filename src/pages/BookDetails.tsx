@@ -13,6 +13,7 @@ import {
   ImagePlus,
   Info,
   MessageSquarePlus,
+  PauseCircle,
   RefreshCw,
   Star,
   TrendingUp,
@@ -64,6 +65,7 @@ import {
   formatAuthorsInput,
   getTodayLocalDate,
   parseAuthorsInput,
+  cn,
 } from "@/lib/utils";
 import type {
   Book,
@@ -188,7 +190,17 @@ function getPublicationYear(value?: string | null): string | null {
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
-  const { books, loading, error, updateBook, updateCover, deleteBook, reload } = useBooksContext();
+  const {
+    books,
+    loading,
+    error,
+    updateBook,
+    pauseBook,
+    resumeBook,
+    updateCover,
+    deleteBook,
+    reload,
+  } = useBooksContext();
   const { genres } = useGenresContext();
   const { series } = useSeries();
 
@@ -308,8 +320,9 @@ export default function BookDetails() {
       getReadingDuration({
         dateStarted: book?.date_started,
         dateFinished: book?.date_finished,
+        pausePeriods: book?.pause_periods,
       }),
-    [book?.date_finished, book?.date_started],
+    [book?.date_finished, book?.date_started, book?.pause_periods],
   );
   const daysReading =
     readingDuration.isAvailable && readingDuration.span
@@ -322,8 +335,9 @@ export default function BookDetails() {
         currentPage: book?.current_page,
         totalPages: book?.total_pages,
         logs: readingLogs,
+        pausePeriods: book?.pause_periods,
       }),
-    [book?.current_page, book?.status, book?.total_pages, readingLogs],
+    [book?.current_page, book?.pause_periods, book?.status, book?.total_pages, readingLogs],
   );
 
   const relatedByAuthor = useMemo(() => {
@@ -393,6 +407,26 @@ export default function BookDetails() {
       reset(bookToFormValues({ ...book, ...payload }));
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to update status");
+    }
+  }
+
+  async function handlePause() {
+    if (!book || book.status !== "Reading") return;
+    try {
+      setErrorMsg(null);
+      await pauseBook(book.id);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to pause book");
+    }
+  }
+
+  async function handleResume() {
+    if (!book || book.status !== "Paused") return;
+    try {
+      setErrorMsg(null);
+      await resumeBook(book.id);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to resume book");
     }
   }
 
@@ -591,8 +625,10 @@ export default function BookDetails() {
 
   const currentPage = book.current_page ?? 0;
   const totalPages = book.total_pages ?? 0;
+  const isPaused = book.status === "Paused";
+  const isReading = book.status === "Reading";
   const readingProgressStats: ProgressStat[] =
-    book.status === "Reading"
+    isReading || isPaused
       ? [
           {
             icon: Calendar,
@@ -602,27 +638,28 @@ export default function BookDetails() {
           {
             icon: TrendingUp,
             label: "Current Pace",
-            value: formatPagesPerDay(
-              getCalendarPagesPerDay({
-                pages: currentPage,
-                dateStarted: book.date_started,
-              }),
-            ),
-          },
-          {
-            icon: Clock,
-            label: "Time Reading",
-            value: formatTotalReadingTime(totalReadingMinutes),
-          },
-          {
-            icon: CalendarClock,
-            label: "Estimated Finish",
-            value:
-              estimatedFinish.isAvailable && estimatedFinish.finishDate
-                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
-                : "Not available",
-          },
-        ]
+              value: formatPagesPerDay(
+                getCalendarPagesPerDay({
+                  pages: currentPage,
+                  dateStarted: book.date_started,
+                  pausePeriods: book.pause_periods,
+                }),
+              ),
+            },
+            {
+              icon: Clock,
+              label: "Time Reading",
+              value: formatTotalReadingTime(totalReadingMinutes),
+            },
+            {
+              icon: CalendarClock,
+              label: "Estimated Finish",
+              value:
+                estimatedFinish.isAvailable && estimatedFinish.finishDate
+                  ? formatDateObjectForDisplay(estimatedFinish.finishDate)
+                  : "Not available",
+            },
+          ]
       : book.status === "Finished"
         ? [
             {
@@ -648,6 +685,7 @@ export default function BookDetails() {
                   pages: totalPages,
                   dateStarted: book.date_started,
                   dateEnded: book.date_finished,
+                  pausePeriods: book.pause_periods,
                 }),
               ),
             },
@@ -699,6 +737,8 @@ export default function BookDetails() {
           kind="book"
           label={book.title}
           shareAttachmentLabel="Send the book as attachment in a chat"
+          onPause={isReading ? () => void handlePause() : undefined}
+          onResume={isPaused ? () => void handleResume() : undefined}
           onEdit={() => {
             setErrorMsg(null);
             setIsEditMode(true);
@@ -712,12 +752,26 @@ export default function BookDetails() {
 
       <section className="grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
         <div className="mx-auto w-full max-w-[240px]">
-          <div className="relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm">
+          <div
+            className={cn(
+              "relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm",
+              isPaused && "opacity-70",
+            )}
+          >
             {book.cover_url ? (
-              <img src={book.cover_url} alt={book.title} className="h-full w-full object-cover" />
+              <img
+                src={book.cover_url}
+                alt={book.title}
+                className={cn("h-full w-full object-cover", isPaused && "grayscale")}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+              </div>
+            )}
+            {isPaused && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+                <PauseCircle className="h-8 w-8 text-muted-foreground" />
               </div>
             )}
           </div>
@@ -836,18 +890,25 @@ export default function BookDetails() {
             </div>
 
             <div className="mt-3">
-              <Select value={book.status} onValueChange={(value) => handleStatusChange(value as BookStatus)}>
-                <SelectTrigger className="h-10 w-40 bg-muted/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isPaused ? (
+                <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                  <PauseCircle className="h-3.5 w-3.5" />
+                  Paused
+                </Badge>
+              ) : (
+                <Select value={book.status} onValueChange={(value) => handleStatusChange(value as BookStatus)}>
+                  <SelectTrigger className="h-10 w-40 bg-muted/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -862,7 +923,11 @@ export default function BookDetails() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {book.status === "Reading" ? (
+            {isPaused ? (
+              <Button type="button" onClick={() => void handleResume()}>
+                Resume
+              </Button>
+            ) : isReading ? (
               <ReadingProgressDialog
                 book={book}
                 open={isProgressDialogOpen}
@@ -1077,7 +1142,11 @@ export default function BookDetails() {
                 ) : logsError ? (
                   <p className="text-sm text-destructive">{logsError}</p>
                 ) : (
-                  <ProgressOverTimeChart logs={readingLogs} totalPages={book.total_pages} />
+                  <ProgressOverTimeChart
+                    logs={readingLogs}
+                    totalPages={book.total_pages}
+                    pausePeriods={book.pause_periods}
+                  />
                 )}
               </div>
             </div>

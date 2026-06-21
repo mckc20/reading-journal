@@ -93,7 +93,7 @@ function getReadingDateBounds(books: Book[]): {
 
 function shelfKeyForStatus(status: BookStatus): AuthorShelfGroupKey {
   if (status === "Finished") return "read";
-  if (status === "Reading") return "reading";
+  if (status === "Reading" || status === "Paused") return "reading";
   if (["Wishlist", "Not Started", "Up Next"].includes(status)) return "want-to-read";
   return "uncategorized";
 }
@@ -172,7 +172,7 @@ export function buildAuthorSummaries(books: Book[], notes: BookNote[] = []): Aut
         coverBooks: getCoverBooks(sortedBooks),
         statusCounts: {
           read: sortedBooks.filter((book) => book.status === "Finished").length,
-          reading: sortedBooks.filter((book) => book.status === "Reading").length,
+          reading: sortedBooks.filter((book) => book.status === "Reading" || book.status === "Paused").length,
           wantToRead: sortedBooks.filter((book) =>
             ["Wishlist", "Not Started", "Up Next"].includes(book.status),
           ).length,

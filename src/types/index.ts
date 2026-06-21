@@ -3,6 +3,7 @@ export type BookStatus =
   | "Not Started"
   | "Up Next"
   | "Reading"
+  | "Paused"
   | "Finished"
   | "DNF";
 
@@ -69,7 +70,17 @@ export interface Book {
   metadata_source_url?: string | null;
   series_id?: string;
   volume_number?: number;
+  pause_periods?: BookPausePeriod[];
   user_id: string;
+  created_at: string;
+}
+
+export interface BookPausePeriod {
+  id: string;
+  book_id: string;
+  user_id: string;
+  paused_at: string;
+  resumed_at?: string | null;
   created_at: string;
 }
 

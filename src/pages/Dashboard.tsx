@@ -67,6 +67,7 @@ export default function Dashboard() {
   }
 
   const currentlyReading = books.filter((b) => b.status === "Reading");
+  const pausedBooks = books.filter((b) => b.status === "Paused");
   const upNext = books.filter((b) => b.status === "Up Next");
   const recentlyFinished = books
     .filter((book) => isRecentlyFinished(book))
@@ -100,7 +101,7 @@ export default function Dashboard() {
     );
   }
 
-  const hasActiveBooks = currentlyReading.length > 0 || upNext.length > 0;
+  const hasActiveBooks = currentlyReading.length > 0 || pausedBooks.length > 0 || upNext.length > 0;
 
   return (
     <div className="space-y-8">
@@ -126,6 +127,22 @@ export default function Dashboard() {
                 book={book}
                 onClick={openBook}
                 showQuickProgress
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {pausedBooks.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-heading leading-snug font-medium">Paused</h2>
+          <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
+            {pausedBooks.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                onClick={openBook}
+                textSize="compact"
               />
             ))}
           </div>

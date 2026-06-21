@@ -1,7 +1,8 @@
-import { BookOpen, Heart, Star } from "lucide-react";
+import { BookOpen, Heart, PauseCircle, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { statusVariant } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 
 interface CompactBookCardProps {
@@ -21,6 +22,7 @@ function getProgress(book: Book) {
 
 export default function CompactBookCard({ book, onBook }: CompactBookCardProps) {
   const progress = getProgress(book);
+  const isPaused = book.status === "Paused";
 
   return (
     <button
@@ -34,11 +36,19 @@ export default function CompactBookCard({ book, onBook }: CompactBookCardProps) 
             src={book.cover_url}
             alt={book.title}
             loading="lazy"
-            className="h-full w-full object-cover transition duration-200 ease-out group-hover:scale-[1.015]"
+            className={cn(
+              "h-full w-full object-cover transition duration-200 ease-out group-hover:scale-[1.015]",
+              isPaused && "grayscale opacity-70",
+            )}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <BookOpen className="h-5 w-5 text-muted-foreground/40" />
+          </div>
+        )}
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+            <PauseCircle className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
         {book.is_favorite && (

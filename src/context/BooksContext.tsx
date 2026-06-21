@@ -9,6 +9,8 @@ interface BooksContextValue {
   addBook: (payload: AddBookPayload, coverFile?: File) => Promise<AddBookResult>;
   updateBook: (id: string, payload: BookUpdate) => Promise<void>;
   updateCover: (id: string, file: File) => Promise<void>;
+  pauseBook: (id: string) => Promise<void>;
+  resumeBook: (id: string) => Promise<void>;
   deleteBook: (id: string) => Promise<void>;
   reload: () => Promise<void>;
 }

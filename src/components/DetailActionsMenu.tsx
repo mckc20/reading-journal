@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MoreVertical, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { MoreVertical, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,8 @@ interface DetailActionsMenuProps {
   label: string;
   shareLinkLabel?: string;
   shareAttachmentLabel: string;
+  onPause?: () => void;
+  onResume?: () => void;
   onEdit?: () => void;
   onDelete: () => void | Promise<void>;
   onSendAttachment: () => void;
@@ -42,6 +44,8 @@ export default function DetailActionsMenu({
   label,
   shareLinkLabel = "Copy link to this page",
   shareAttachmentLabel,
+  onPause,
+  onResume,
   onEdit,
   onDelete,
   onSendAttachment,
@@ -105,7 +109,7 @@ export default function DetailActionsMenu({
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
     const panelWidth = 200;
-    const panelHeight = onEdit ? 128 : 92;
+    const panelHeight = (onEdit ? 42 : 0) + ((onPause || onResume) ? 42 : 0) + 92;
     const left = Math.max(8, Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8));
     const top = Math.min(rect.bottom + 8, window.innerHeight - panelHeight - 8);
     setMenuPosition({ top, left });
@@ -150,6 +154,32 @@ export default function DetailActionsMenu({
             <Share2 className="h-4 w-4" />
             Share
           </button>
+          {onPause && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => {
+                setMenuOpen(false);
+                onPause();
+              }}
+            >
+              <PauseCircle className="h-4 w-4" />
+              Pause
+            </button>
+          )}
+          {onResume && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => {
+                setMenuOpen(false);
+                onResume();
+              }}
+            >
+              <Play className="h-4 w-4" />
+              Resume
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"

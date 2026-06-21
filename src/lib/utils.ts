@@ -10,6 +10,7 @@ export function statusVariant(
   status: BookStatus
 ): "default" | "secondary" | "outline" | "destructive" {
   if (status === "Reading") return "default";
+  if (status === "Paused") return "secondary";
   if (status === "DNF") return "destructive";
   if (status === "Up Next") return "secondary";
   return "outline";

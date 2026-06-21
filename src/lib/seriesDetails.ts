@@ -1,5 +1,6 @@
 import {
   calculateCalendarSpan,
+  getActiveDaysBetween,
   parseLocalDateOnly,
   sumReadingMinutes,
   type CalendarSpan,
@@ -190,7 +191,7 @@ export function getSeriesProgress(books: Book[]): SeriesProgress {
   const readPages = books.reduce((sum, book) => {
     const total = book.total_pages ?? 0;
     if (book.status === "Finished") return sum + total;
-    if (book.status === "Reading" || book.status === "DNF") {
+    if (book.status === "Reading" || book.status === "Paused" || book.status === "DNF") {
       return sum + Math.min(total, Math.max(0, book.current_page ?? 0));
     }
     return sum;
@@ -208,7 +209,7 @@ export function getSeriesProgress(books: Book[]): SeriesProgress {
 export function getNextUpBook(books: Book[]): Book | null {
   return (
     sortSeriesBooks(books).find(
-      (book) => !["Finished", "DNF", "Reading"].includes(book.status),
+      (book) => !["Finished", "DNF", "Reading", "Paused"].includes(book.status),
     ) ?? null
   );
 }
@@ -262,10 +263,14 @@ export function getJourneyDurationDays(
 
   const finished =
     dates.finished ??
-    (book.status === "Reading" ? dateToDateOnly(now) : null);
+    (book.status === "Reading" || book.status === "Paused" ? dateToDateOnly(now) : null);
   if (!finished) return null;
 
-  return daysBetween(dates.started, finished);
+  const startedDate = parseLocalDateOnly(dates.started);
+  const finishedDate = parseLocalDateOnly(finished);
+  if (!startedDate || !finishedDate) return null;
+
+  return getActiveDaysBetween(startedDate, finishedDate, book.pause_periods, now);
 }
 
 export function getSeriesJourneyRecap(
@@ -327,7 +332,7 @@ function getSeriesPagesRead(books: Book[]): number | null {
     if (book.status === "Finished") {
       if (typeof book.total_pages !== "number" || book.total_pages <= 0) return null;
       pagesRead += book.total_pages;
-    } else if (book.status === "Reading") {
+    } else if (book.status === "Reading" || book.status === "Paused") {
       if (
         typeof book.current_page !== "number" ||
         !Number.isFinite(book.current_page) ||
@@ -353,7 +358,8 @@ function getSeriesJourneySpan(
   const startDate = parseLocalDateOnly(started ?? undefined);
   if (!startDate) return { journeySpan: null, journeyDays: null };
 
-  const hasActiveBook = books.some((book) => book.status === "Reading");
+  const hasActiveBook = books.some((book) => book.status === "Reading" || book.status === "Paused");
+  const pausePeriods = books.flatMap((book) => book.pause_periods ?? []);
   const finishedDates = dates
     .flatMap((date) => (date.finished ? [date.finished] : []))
     .sort();
@@ -368,7 +374,7 @@ function getSeriesJourneySpan(
 
   return {
     journeySpan: calculateCalendarSpan(startDate, endDate),
-    journeyDays: daysBetween(dateToDateOnly(startDate), dateToDateOnly(endDate)),
+    journeyDays: getActiveDaysBetween(startDate, endDate, pausePeriods, now),
   };
 }
 

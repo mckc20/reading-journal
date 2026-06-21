@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, PauseCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SeriesBookGroup } from "@/lib/libraryShelves";
 import type { Book } from "@/types";
@@ -26,6 +26,7 @@ function SeriesCoverLayer({
       className={cn(
         "absolute left-0 top-2 h-[135px] w-[90px] overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-transform duration-300 ease-out motion-reduce:transition-none sm:h-[168px] sm:w-[112px]",
         layerStyles[index],
+        book.status === "Paused" && "opacity-70",
       )}
     >
       {book.cover_url ? (
@@ -33,11 +34,16 @@ function SeriesCoverLayer({
           src={book.cover_url}
           alt={index === 0 ? book.title : ""}
           loading="lazy"
-          className="block h-full w-full scale-[1.035] object-cover"
+          className={cn("block h-full w-full scale-[1.035] object-cover", book.status === "Paused" && "grayscale")}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+        </div>
+      )}
+      {book.status === "Paused" && index === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+          <PauseCircle className="h-7 w-7 text-muted-foreground" />
         </div>
       )}
     </div>

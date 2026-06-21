@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import { BarChart3, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, PauseCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchReadingLogsForBook } from "@/lib/books";
@@ -185,8 +185,8 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   );
 
   const progressTimeline = useMemo(
-    () => buildProgressTimeline(logs, book.total_pages),
-    [book.total_pages, logs]
+    () => buildProgressTimeline(logs, book.total_pages, book.pause_periods),
+    [book.pause_periods, book.total_pages, logs]
   );
 
   const totalPagesRead = useMemo(
@@ -208,8 +208,9 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
         currentPage: book.current_page,
         totalPages: book.total_pages,
         logs,
+        pausePeriods: book.pause_periods,
       }),
-    [book.current_page, book.status, book.total_pages, logs]
+    [book.current_page, book.pause_periods, book.status, book.total_pages, logs]
   );
 
   const readingDuration = useMemo(
@@ -217,8 +218,9 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
       getReadingDuration({
         dateStarted: book.date_started,
         dateFinished: book.date_finished,
+        pausePeriods: book.pause_periods,
       }),
-    [book.date_finished, book.date_started]
+    [book.date_finished, book.date_started, book.pause_periods]
   );
 
   const readingDurationLabel = useMemo(() => {
@@ -322,6 +324,16 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     if (progressDatePoints.length <= 56) return 4;
     return 7;
   }, [progressDatePoints.length]);
+  const pauseBands = progressTimeline.pauseSegments.map((segment, index) => {
+    const startX = getProgressXPercent(segment.startDayKey);
+    const endX = Math.max(startX + 3, getProgressXPercent(segment.endDayKey));
+    return {
+      key: `${segment.startDayKey}-${segment.endDayKey}-${index}`,
+      startX,
+      endX,
+      segment,
+    };
+  });
 
   const maxPages = Math.max(...chartPoints.map((p) => p.pagesRead), 0);
   const yAxisMax = maxPages > 0 ? maxPages : 1;
@@ -462,6 +474,24 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                     <div className="border-t border-border/50" />
                     <div className="border-t border-border/70" />
                   </div>
+
+                  {pauseBands.map(({ key, startX, endX, segment }) => (
+                    <div
+                      key={key}
+                      className="pointer-events-none absolute inset-y-0 z-[1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 bg-muted/20"
+                      style={{ left: `${startX}%`, width: `${Math.max(4, endX - startX)}%` }}
+                    >
+                      <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">
+                        <span className="inline-flex flex-col items-center gap-1">
+                          <PauseCircle className="h-5 w-5 text-muted-foreground/70" />
+                          <span>
+                            Paused for {segment.durationDays}
+                            {segment.durationDays === 1 ? " day" : " days"}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
 
                   {activeProgressPoint && (
                     <div
