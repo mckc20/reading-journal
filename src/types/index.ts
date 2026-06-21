@@ -229,8 +229,12 @@ export interface Group {
   description?: string;
   avatar_url?: string;
   created_by: string;
+  kind: GroupKind;
+  direct_pair_key?: string | null;
   created_at: string;
 }
+
+export type GroupKind = "direct" | "group";
 
 export type GroupMembershipRole = "owner" | "admin" | "member";
 
@@ -241,5 +245,119 @@ export interface GroupMembership {
   user_id: string;
   role: GroupMembershipRole;
   status: GroupMembershipStatus;
+  last_read_at?: string | null;
   joined_at: string;
 }
+
+export type PublicProfile = Pick<
+  Profile,
+  "id" | "username" | "display_name" | "avatar_url" | "created_at"
+>;
+
+export interface GroupMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string;
+  attachment_type?: ChatAttachmentType | null;
+  attachment_payload?: ChatAttachmentPayload | null;
+  reply_to_message_id?: string | null;
+  reply_snapshot?: ChatReplySnapshot | null;
+  reactions?: ChatReactionSummary[];
+  created_at: string;
+  updated_at: string;
+  edited_at?: string | null;
+  deleted_at?: string | null;
+}
+
+export type ChatReactionType = "heart";
+
+export interface ChatReaction {
+  message_id: string;
+  user_id: string;
+  reaction: ChatReactionType;
+  created_at: string;
+}
+
+export interface ChatReactionParticipant {
+  user_id: string;
+  display_name: string;
+}
+
+export interface ChatReactionSummary {
+  reaction: ChatReactionType;
+  count: number;
+  reacted_by_current_user: boolean;
+  participants: ChatReactionParticipant[];
+}
+
+export interface ChatReplySnapshot {
+  message_id: string;
+  sender_id: string;
+  sender_name: string;
+  text: string;
+  attachment_type?: ChatAttachmentType | null;
+  attachment_title?: string | null;
+  created_at: string;
+}
+
+export type ChatAttachmentType = "book" | "note" | "author";
+
+export type ChatSharedNoteLabel = BookNoteLabel;
+
+export interface ChatSharedNoteSnapshot {
+  id?: string;
+  label: ChatSharedNoteLabel;
+  title?: string | null;
+  content: string;
+  quote_speaker?: string | null;
+  page_start?: number | null;
+  note_date?: string | null;
+  book_id?: string | null;
+  book_title?: string | null;
+  book_authors?: string[];
+}
+
+export interface ChatSharedBookSnapshot {
+  id?: string;
+  title: string;
+  authors: string[];
+  cover_url?: string | null;
+  genres?: string[];
+  total_pages?: number | null;
+  language?: BookLanguage | null;
+  format?: BookFormat | null;
+  isbn?: string | null;
+  publisher?: string | null;
+  publication_date?: string | null;
+  publication_date_precision?: PublicationDatePrecision | null;
+  description?: string | null;
+  metadata_source?: BookMetadataSource | null;
+  metadata_source_url?: string | null;
+  included_notes?: ChatSharedNoteSnapshot[];
+}
+
+export interface ChatBookAttachment {
+  type: "book";
+  book: ChatSharedBookSnapshot;
+}
+
+export interface ChatNoteAttachment {
+  type: "note";
+  note: ChatSharedNoteSnapshot;
+  book?: ChatSharedBookSnapshot | null;
+}
+
+export interface ChatAuthorAttachment {
+  type: "author";
+  author: {
+    name: string;
+    books: ChatSharedBookSnapshot[];
+    included_quotes?: ChatSharedNoteSnapshot[];
+  };
+}
+
+export type ChatAttachmentPayload =
+  | ChatBookAttachment
+  | ChatNoteAttachment
+  | ChatAuthorAttachment;

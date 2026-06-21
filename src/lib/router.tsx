@@ -67,6 +67,7 @@ export const router = createBrowserRouter([
           { path: "/analytics/:category", element: lazyRoute(<Analytics />) },
           { path: "/notes", element: lazyRoute(<Notes />) },
           { path: "/account", element: <Navigate to="/settings/profile" replace /> },
+          { path: "/group", element: <Navigate to="/groups" replace /> },
           { path: "/groups", element: lazyRoute(<Groups />) },
           { path: "/profile", element: lazyRoute(<Profile />) },
           { path: "/settings", element: lazyRoute(<Settings />) },
