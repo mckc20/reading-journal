@@ -47,6 +47,7 @@ import {
   buildAuthorAttachment,
   buildBookAttachment,
   buildNoteAttachment,
+  buildSeriesAttachment,
   noteSnapshotToCreateInput,
   MAX_INCLUDED_ATTACHMENT_NOTES,
 } from "@/lib/chatAttachments";
@@ -74,6 +75,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { buildAuthorSummaries } from "@/lib/authorShelf";
 import { createBookNote, fetchAllBookNotes } from "@/lib/bookNotes";
+import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
 import type {
   Book,
@@ -85,10 +87,11 @@ import type {
   GroupMessage,
   PublicProfile,
   GroupMembershipRole,
+  Series,
 } from "@/types";
 
 type ComposeMode = "direct" | "group";
-type AttachmentPickerMode = "book" | "note" | "author";
+type AttachmentPickerMode = "book" | "note" | "author" | "series";
 
 type ConfirmAction =
   | { type: "message"; messageId: string }
@@ -181,7 +184,14 @@ function noteLabel(label: ChatSharedNoteSnapshot["label"]): string {
 function attachmentTypeLabel(attachment: ChatAttachmentPayload): string {
   if (attachment.type === "book") return "Book";
   if (attachment.type === "note") return noteLabel(attachment.note.label);
-  return "Author";
+  if (attachment.type === "author") return "Author";
+  return "Series";
+}
+
+function sortSeriesByName(series: Series[]): Series[] {
+  return [...series].sort((first, second) =>
+    first.name.localeCompare(second.name, undefined, { sensitivity: "base", numeric: true }),
+  );
 }
 
 function sortBooksByTitle(books: Book[]): Book[] {
@@ -407,6 +417,49 @@ function AttachmentCard({
           )}
         </div>
       )}
+
+      {attachment.type === "series" && (
+        <div className="space-y-3">
+          <div>
+            <p className="font-medium">{attachment.series.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {attachment.series.books.length} book{attachment.series.books.length === 1 ? "" : "s"} shared
+            </p>
+          </div>
+          {attachment.series.books.length > 0 && (
+            <div className="space-y-2">
+              {attachment.series.books.map((book, index) => (
+                <div
+                  key={`${book.id ?? book.title}-${index}`}
+                  className="flex items-center gap-3 rounded-md border bg-muted/20 p-2"
+                >
+                  {book.cover_url ? (
+                    <img src={book.cover_url} alt="" className="h-14 w-10 shrink-0 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-muted">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{book.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {attachment.series.included_quotes && attachment.series.included_quotes.length > 0 && (
+            <div className="space-y-1">
+              {attachment.series.included_quotes.map((quote, index) => (
+                <p key={`${quote.id ?? index}-${quote.content}`} className="rounded-md bg-muted/50 px-2 py-1 text-xs">
+                  {quote.content}
+                  {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -414,6 +467,7 @@ function AttachmentCard({
 export function GroupsManager() {
   const { user } = useAuth();
   const { books, addBook } = useBooksContext();
+  const { series } = useSeries();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -437,6 +491,7 @@ export function GroupsManager() {
   const [selectedBookId, setSelectedBookId] = useState("");
   const [selectedNoteId, setSelectedNoteId] = useState("");
   const [selectedAuthorName, setSelectedAuthorName] = useState("");
+  const [selectedSeriesId, setSelectedSeriesId] = useState("");
   const [selectedIncludedNoteIds, setSelectedIncludedNoteIds] = useState<string[]>([]);
   const [selectedAttachment, setSelectedAttachment] = useState<ChatAttachmentPayload | null>(null);
   const [selectedReply, setSelectedReply] = useState<ChatReplySnapshot | null>(null);
@@ -485,6 +540,26 @@ export function GroupsManager() {
   }, [notes]);
 
   const authorSummaries = useMemo(() => buildAuthorSummaries(books, notes), [books, notes]);
+  const seriesById = useMemo(() => new Map(series.map((item) => [item.id, item])), [series]);
+  const seriesBooksById = useMemo(() => {
+    const map = new Map<string, Book[]>();
+    books.forEach((book) => {
+      if (!book.series_id) return;
+      map.set(book.series_id, [...(map.get(book.series_id) ?? []), book]);
+    });
+    return map;
+  }, [books]);
+  const seriesQuoteNotesById = useMemo(() => {
+    const map = new Map<string, BookNote[]>();
+    books.forEach((book) => {
+      if (!book.series_id) return;
+      const bookNotes = notesByBookId.get(book.id) ?? [];
+      const quoteNotes = bookNotes.filter((note) => note.label === "quote");
+      if (quoteNotes.length === 0) return;
+      map.set(book.series_id, [...(map.get(book.series_id) ?? []), ...quoteNotes]);
+    });
+    return map;
+  }, [books, notesByBookId]);
 
   const filteredBooks = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
@@ -513,14 +588,24 @@ export function GroupsManager() {
     return authorSummaries.filter((author) => author.name.toLowerCase().includes(query));
   }, [attachmentSearch, authorSummaries]);
 
+  const filteredSeries = useMemo(() => {
+    const query = attachmentSearch.trim().toLowerCase();
+    const sorted = sortSeriesByName(series);
+    if (!query) return sorted;
+    return sorted.filter((item) => item.name.toLowerCase().includes(query));
+  }, [attachmentSearch, series]);
+
   const selectedBook = selectedBookId ? booksById.get(selectedBookId) ?? null : null;
   const selectedNote = selectedNoteId ? notes.find((note) => note.id === selectedNoteId) ?? null : null;
   const selectedAuthor = selectedAuthorName
     ? authorSummaries.find((author) => author.name === selectedAuthorName) ?? null
     : null;
+  const selectedSeries = selectedSeriesId ? seriesById.get(selectedSeriesId) ?? null : null;
 
   const selectedBookNotes = selectedBook ? sortNotesForPicker(notesByBookId.get(selectedBook.id) ?? []) : [];
   const selectedAuthorQuotes = selectedAuthor ? sortNotesForPicker(selectedAuthor.quotes) : [];
+  const selectedSeriesBooks = selectedSeries ? sortBooksByTitle(seriesBooksById.get(selectedSeries.id) ?? []) : [];
+  const selectedSeriesQuotes = selectedSeries ? sortNotesForPicker(seriesQuoteNotesById.get(selectedSeries.id) ?? []) : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -807,6 +892,7 @@ export function GroupsManager() {
     setSelectedBookId("");
     setSelectedNoteId("");
     setSelectedAuthorName("");
+    setSelectedSeriesId("");
     setSelectedIncludedNoteIds([]);
   }
 
@@ -838,6 +924,19 @@ export function GroupsManager() {
         buildAuthorAttachment({
           authorName: selectedAuthor.name,
           books: selectedAuthor.books,
+          includedQuotes,
+        }),
+      );
+    }
+
+    if (attachmentPicker === "series" && selectedSeries) {
+      const includedQuotes = selectedIncludedNoteIds
+        .map((noteId) => notes.find((note) => note.id === noteId))
+        .filter((note): note is BookNote => Boolean(note));
+      setSelectedAttachment(
+        buildSeriesAttachment({
+          seriesName: selectedSeries.name,
+          books: selectedSeriesBooks,
           includedQuotes,
         }),
       );
@@ -1527,6 +1626,14 @@ export function GroupsManager() {
                               <UserRound className="h-4 w-4" />
                               Attach Author
                             </button>
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                              onClick={() => openAttachmentPicker("series")}
+                            >
+                              <Users className="h-4 w-4" />
+                              Attach Series
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1674,7 +1781,9 @@ export function GroupsManager() {
                 ? "Attach Book"
                 : attachmentPicker === "note"
                   ? "Attach Notes"
-                  : "Attach Author"}
+                  : attachmentPicker === "author"
+                    ? "Attach Author"
+                    : "Attach Series"}
             </DialogTitle>
             <DialogDescription>
               Select what you want to send in this chat.
@@ -1827,6 +1936,61 @@ export function GroupsManager() {
                 </div>
               </div>
             )}
+
+            {attachmentPicker === "series" && (
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {filteredSeries.map((item) => {
+                    const booksInSeries = seriesBooksById.get(item.id) ?? [];
+                    const quotesInSeries = seriesQuoteNotesById.get(item.id) ?? [];
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={cn(
+                          "w-full rounded-md p-3 text-left hover:bg-muted",
+                          selectedSeriesId === item.id && "bg-muted",
+                        )}
+                        onClick={() => {
+                          setSelectedSeriesId(item.id);
+                          setSelectedIncludedNoteIds([]);
+                        }}
+                      >
+                        <span className="block truncate text-sm font-medium">{item.name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {booksInSeries.length} book{booksInSeries.length === 1 ? "" : "s"} · {quotesInSeries.length} quote
+                          {quotesInSeries.length === 1 ? "" : "s"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
+                  <p className="text-sm font-medium">Include quotes</p>
+                  {!selectedSeries ? (
+                    <p className="text-sm text-muted-foreground">Select a series first.</p>
+                  ) : selectedSeriesQuotes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No quotes for this series yet.</p>
+                  ) : (
+                    selectedSeriesQuotes.map((quote) => (
+                      <label key={quote.id} className="flex gap-2 rounded-md p-2 text-sm hover:bg-muted">
+                        <input
+                          type="checkbox"
+                          checked={selectedIncludedNoteIds.includes(quote.id)}
+                          disabled={
+                            !selectedIncludedNoteIds.includes(quote.id) &&
+                            selectedIncludedNoteIds.length >= MAX_INCLUDED_ATTACHMENT_NOTES
+                          }
+                          onChange={() => toggleIncludedNote(quote.id)}
+                        />
+                        <span className="line-clamp-2">{quote.content}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -1839,7 +2003,8 @@ export function GroupsManager() {
               disabled={
                 (attachmentPicker === "book" && !selectedBook) ||
                 (attachmentPicker === "note" && !selectedNote) ||
-                (attachmentPicker === "author" && !selectedAuthor)
+                (attachmentPicker === "author" && !selectedAuthor) ||
+                (attachmentPicker === "series" && !selectedSeries)
               }
             >
               Attach

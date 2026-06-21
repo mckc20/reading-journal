@@ -5,6 +5,7 @@ import type {
   ChatAuthorAttachment,
   ChatBookAttachment,
   ChatNoteAttachment,
+  ChatSeriesAttachment,
   ChatSharedBookSnapshot,
   ChatSharedNoteSnapshot,
 } from "@/types";
@@ -96,6 +97,27 @@ export function buildAuthorAttachment({
   };
 }
 
+export function buildSeriesAttachment({
+  seriesName,
+  books,
+  includedQuotes,
+}: {
+  seriesName: string;
+  books: Book[];
+  includedQuotes: BookNote[];
+}): ChatSeriesAttachment {
+  return {
+    type: "series",
+    series: {
+      name: seriesName,
+      books: books.map((book) => buildSharedBookSnapshot(book)),
+      included_quotes: includedQuotes
+        .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
+        .map((note) => buildSharedNoteSnapshot(note, books.find((book) => book.id === note.book_id))),
+    },
+  };
+}
+
 export function bookSnapshotToAddBookPayload(book: ChatSharedBookSnapshot): AddBookPayload {
   return {
     title: book.title,
@@ -141,5 +163,6 @@ export function noteSnapshotToCreateInput({
 export function attachmentTitle(attachment: ChatAttachmentPayload): string {
   if (attachment.type === "book") return attachment.book.title;
   if (attachment.type === "note") return attachment.note.title || attachment.note.book_title || "Shared note";
-  return attachment.author.name;
+  if (attachment.type === "author") return attachment.author.name;
+  return attachment.series.name;
 }
