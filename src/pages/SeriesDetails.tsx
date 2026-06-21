@@ -7,8 +7,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Check, Flag, Heart, Star } from "lucide-react";
+import DetailActionsMenu from "@/components/DetailActionsMenu";
+import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ import { useSeries } from "@/hooks/useSeries";
 import { parseLocalDateOnly, type CalendarSpan } from "@/lib/bookAnalytics";
 import { fetchAllBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogs } from "@/lib/books";
+import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import {
   filterSeriesLogs,
   getAverageSeriesRating,
@@ -757,12 +760,16 @@ function PageLoading() {
 
 export default function SeriesDetails() {
   const { seriesId } = useParams<{ seriesId: string }>();
+  const navigate = useNavigate();
   const { books, loading: booksLoading, error: booksError, updateBook } = useBooksContext();
-  const { series, loading: seriesLoading, error: seriesError } = useSeries();
+  const { series, loading: seriesLoading, error: seriesError, removeSeries } = useSeries();
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [notes, setNotes] = useState<BookNote[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const seriesBooks = useMemo(
@@ -839,6 +846,21 @@ export default function SeriesDetails() {
     [notes, seriesBooks, seriesLogs],
   );
 
+  function openAttachmentPicker() {
+    setSendAttachmentOpen(true);
+  }
+
+  async function handleDeleteSeries() {
+    if (!seriesRecord) return;
+    try {
+      setActionError(null);
+      await removeSeries(seriesRecord.id);
+      navigate("/series", { replace: true });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to delete series");
+    }
+  }
+
   async function saveProgress(book: Book, newPage: number) {
     const shouldFinish = Boolean(book.total_pages && newPage >= book.total_pages);
 
@@ -881,12 +903,29 @@ export default function SeriesDetails() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" className="px-2" asChild>
-        <Link to="/series">
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back to Series
-        </Link>
-      </Button>
+      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+      {shareStatus && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
+          {shareStatus}
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-3">
+        <Button variant="ghost" size="sm" className="px-2" asChild>
+          <Link to="/series">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back to Series
+          </Link>
+        </Button>
+        <DetailActionsMenu
+          kind="series"
+          label={seriesRecord.name}
+          shareAttachmentLabel="Send the series as attachment in a chat"
+          onDelete={handleDeleteSeries}
+          onSendAttachment={openAttachmentPicker}
+          deleteTitle="Delete this series?"
+          deleteDescription="Are you sure you want to delete this series? The books will stay in your library and be detached from this series."
+        />
+      </div>
 
       <header className="relative flex min-h-64 items-end overflow-hidden rounded-2xl border bg-muted">
         <div
@@ -1264,6 +1303,21 @@ export default function SeriesDetails() {
           )}
         </TabsContent>
       </Tabs>
+      <SendAttachmentDialog
+        open={sendAttachmentOpen}
+        onOpenChange={setSendAttachmentOpen}
+        attachment={buildSeriesAttachment({
+          seriesId: seriesRecord.id,
+          seriesName: seriesRecord.name,
+          books: seriesBooks,
+          includedQuotes: notes
+            .filter((note) => note.label === "quote" && seriesBookIds.has(note.book_id))
+            .slice(0, 3),
+        })}
+        title={`Send "${seriesRecord.name}" to chat`}
+        description="Add a message, then pick the chat you want to send this series to."
+        onSent={() => setShareStatus("Series sent to chat.")}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -13,16 +13,16 @@ import {
   ImagePlus,
   Info,
   MessageSquarePlus,
-  MoreHorizontal,
-  Pencil,
   RefreshCw,
   Star,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
+import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
 import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
+import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ import {
 } from "@/lib/bookAnalytics";
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogsForBook } from "@/lib/books";
+import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
   formatPublicationDateForDisplay,
@@ -210,9 +211,7 @@ export default function BookDetails() {
   const [showRatingGuide, setShowRatingGuide] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -222,8 +221,8 @@ export default function BookDetails() {
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-
+  const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const {
     register,
     control,
@@ -246,7 +245,6 @@ export default function BookDetails() {
     setIsFavorite(book.is_favorite);
     setLocalRating(book.rating ?? null);
     setIsEditMode(false);
-    setConfirmDelete(false);
     setErrorMsg(null);
     setDescriptionExpanded(false);
     reset(bookToFormValues(book));
@@ -356,7 +354,6 @@ export default function BookDetails() {
   function exitEditMode() {
     if (!book) return;
     reset(bookToFormValues(book));
-    setConfirmDelete(false);
     setErrorMsg(null);
     setIsEditMode(false);
   }
@@ -411,7 +408,7 @@ export default function BookDetails() {
       setErrorMsg(err instanceof Error ? err.message : "Failed to update cover");
     } finally {
       setUploadingCover(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
+      event.currentTarget.value = "";
     }
   }
 
@@ -477,7 +474,6 @@ export default function BookDetails() {
       await updateBook(book.id, payload);
       reset(values);
       setIsEditMode(false);
-      setConfirmDelete(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
@@ -487,20 +483,17 @@ export default function BookDetails() {
 
   async function handleDelete() {
     if (!book) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     try {
-      setDeleting(true);
       setErrorMsg(null);
       await deleteBook(book.id);
       navigate("/library", { replace: true });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to delete book");
-    } finally {
-      setDeleting(false);
     }
+  }
+
+  function openAttachmentPicker() {
+    setSendAttachmentOpen(true);
   }
 
   function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
@@ -555,6 +548,43 @@ export default function BookDetails() {
         <Button asChild size="sm" variant="outline">
           <Link to="/library">Back to Library</Link>
         </Button>
+      </div>
+    );
+  }
+
+  if (isEditMode) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back
+        </Button>
+
+        {errorMsg && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {errorMsg}
+          </div>
+        )}
+
+        <EditDetailsForm
+          bookTitle={book.title}
+          coverUrl={book.cover_url}
+          control={control}
+          register={register}
+          handleSubmit={handleSubmit}
+          onSubmit={onSubmit}
+          onCancel={exitEditMode}
+          saving={saving}
+          isDirty={isDirty}
+          errors={errors}
+          series={series}
+          watchedSeriesId={watchedSeriesId}
+          publicationDatePrecision={publicationDatePrecision}
+          updatePublicationDatePrecision={updatePublicationDatePrecision}
+          clearPublicationDateError={() => clearErrors("publication_date")}
+          uploadingCover={uploadingCover}
+          handleCoverChange={handleCoverChange}
+        />
       </div>
     );
   }
@@ -659,19 +689,30 @@ export default function BookDetails() {
 
   return (
     <div className="space-y-8">
-      <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-        <ArrowLeft className="mr-1.5 h-4 w-4" />
-        Back
-      </Button>
+      <div className="flex items-start justify-between gap-3">
+        <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back
+        </Button>
+
+        <DetailActionsMenu
+          kind="book"
+          label={book.title}
+          shareAttachmentLabel="Send the book as attachment in a chat"
+          onEdit={() => {
+            setErrorMsg(null);
+            setIsEditMode(true);
+          }}
+          onDelete={handleDelete}
+          onSendAttachment={openAttachmentPicker}
+          deleteTitle="Delete this book?"
+          deleteDescription="Are you sure you want to delete this book? This cannot be undone."
+        />
+      </div>
 
       <section className="grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
         <div className="mx-auto w-full max-w-[240px]">
-          <label
-            htmlFor="cover-change"
-            className={`relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm group ${
-              isEditMode ? "cursor-pointer" : "cursor-default"
-            }`}
-          >
+          <div className="relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm">
             {book.cover_url ? (
               <img src={book.cover_url} alt={book.title} className="h-full w-full object-cover" />
             ) : (
@@ -679,27 +720,7 @@ export default function BookDetails() {
                 <BookOpen className="h-10 w-10 text-muted-foreground/40" />
               </div>
             )}
-            <div
-              className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
-                isEditMode ? "opacity-0 group-hover:opacity-100" : "opacity-0"
-              }`}
-            >
-              {uploadingCover ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <ImagePlus className="h-5 w-5 text-white" />
-              )}
-            </div>
-            <input
-              id="cover-change"
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              ref={coverInputRef}
-              onChange={handleCoverChange}
-              disabled={uploadingCover || !isEditMode}
-            />
-          </label>
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -883,21 +904,6 @@ export default function BookDetails() {
                 Add Note
               </Link>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setConfirmDelete(false);
-                setErrorMsg(null);
-                setIsEditMode((current) => !current);
-              }}
-            >
-              <Pencil className="mr-1.5 h-4 w-4" />
-              Edit
-            </Button>
-            <Button type="button" variant="outline" size="icon" aria-label="More options">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </section>
@@ -908,26 +914,20 @@ export default function BookDetails() {
         </div>
       )}
 
-      {isEditMode && (
-        <EditDetailsForm
-          control={control}
-          register={register}
-          handleSubmit={handleSubmit}
-          onSubmit={onSubmit}
-          onCancel={exitEditMode}
-          onDelete={handleDelete}
-          deleting={deleting}
-          confirmDelete={confirmDelete}
-          saving={saving}
-          isDirty={isDirty}
-          errors={errors}
-          series={series}
-          watchedSeriesId={watchedSeriesId}
-          publicationDatePrecision={publicationDatePrecision}
-          updatePublicationDatePrecision={updatePublicationDatePrecision}
-          clearPublicationDateError={() => clearErrors("publication_date")}
-        />
+      {shareStatus && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+          {shareStatus}
+        </div>
       )}
+
+      <SendAttachmentDialog
+        open={sendAttachmentOpen}
+        onOpenChange={setSendAttachmentOpen}
+        attachment={buildBookAttachment(book)}
+        title={`Send "${book.title}" to chat`}
+        description="Add a message, then pick the chat you want to send this book to."
+        onSent={() => setShareStatus("Book sent to chat.")}
+      />
 
       {!isEditMode && (
         <>
@@ -1292,14 +1292,13 @@ function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Bo
 }
 
 function EditDetailsForm({
+  bookTitle,
+  coverUrl,
   control,
   register,
   handleSubmit,
   onSubmit,
   onCancel,
-  onDelete,
-  deleting,
-  confirmDelete,
   saving,
   isDirty,
   errors,
@@ -1308,15 +1307,16 @@ function EditDetailsForm({
   publicationDatePrecision,
   updatePublicationDatePrecision,
   clearPublicationDateError,
+  uploadingCover,
+  handleCoverChange,
 }: {
+  bookTitle: string;
+  coverUrl?: string | null;
   control: ReturnType<typeof useForm<FormValues>>["control"];
   register: ReturnType<typeof useForm<FormValues>>["register"];
   handleSubmit: ReturnType<typeof useForm<FormValues>>["handleSubmit"];
   onSubmit: (values: FormValues) => Promise<void>;
   onCancel: () => void;
-  onDelete: () => void;
-  deleting: boolean;
-  confirmDelete: boolean;
   saving: boolean;
   isDirty: boolean;
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
@@ -1325,168 +1325,199 @@ function EditDetailsForm({
   publicationDatePrecision: PublicationDatePrecision | "";
   updatePublicationDatePrecision: (precision: PublicationDatePrecision | "") => void;
   clearPublicationDateError: () => void;
+  uploadingCover: boolean;
+  handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
 }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="detail-title">Title</Label>
-          <Input id="detail-title" {...register("title", { required: true })} />
-        </div>
-
-        <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="detail-authors">Authors</Label>
-          <Input
-            id="detail-authors"
-            {...register("authorsInput", {
-              validate: (value) =>
-                parseAuthorsInput(value).length > 0 || "At least one author is required",
-            })}
-          />
-          {errors.authorsInput && (
-            <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5 md:col-span-2">
-          <Label>Genres</Label>
-          <Controller
-            name="genres"
-            control={control}
-            render={({ field }) => (
-              <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
+      <div className="grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
+        <div className="mx-auto w-full max-w-[240px]">
+          <label
+            htmlFor="cover-change"
+            className="relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm group cursor-pointer"
+          >
+            {coverUrl ? (
+              <img src={coverUrl} alt={bookTitle} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <ImagePlus className="h-10 w-10 text-muted-foreground/40" />
+              </div>
             )}
-          />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              {uploadingCover ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <ImagePlus className="h-5 w-5 text-white" />
+              )}
+            </div>
+            <input
+              id="cover-change"
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleCoverChange}
+              disabled={uploadingCover}
+            />
+          </label>
         </div>
 
-        <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
-        <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
-        <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
-
-        <div className="space-y-1.5">
-          <Label htmlFor="detail-total-pages">Total pages</Label>
-          <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="detail-publisher">Publisher</Label>
-          <Input id="detail-publisher" {...register("publisher")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="detail-publication-date">Publication date</Label>
-          <Input
-            id="detail-publication-date"
-            placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
-            aria-invalid={!!errors.publication_date}
-            {...register("publication_date", {
-              onChange: clearPublicationDateError,
-            })}
-          />
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-primary"
-                checked={!!publicationDatePrecision}
-                onChange={(event) =>
-                  updatePublicationDatePrecision(event.target.checked ? "year" : "")
-                }
-              />
-              Year
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-primary"
-                checked={publicationDatePrecision === "month" || publicationDatePrecision === "day"}
-                onChange={(event) =>
-                  updatePublicationDatePrecision(event.target.checked ? "month" : "year")
-                }
-              />
-              Month
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-primary"
-                checked={publicationDatePrecision === "day"}
-                onChange={(event) =>
-                  updatePublicationDatePrecision(event.target.checked ? "day" : "month")
-                }
-              />
-              Day
-            </label>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="detail-title">Title</Label>
+            <Input id="detail-title" {...register("title", { required: true })} />
           </div>
-          {errors.publication_date && (
-            <p className="text-xs text-destructive">{errors.publication_date.message}</p>
-          )}
-        </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="detail-date-started">Date started</Label>
-          <Input id="detail-date-started" type="date" {...register("date_started")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="detail-date-finished">Date finished</Label>
-          <Input id="detail-date-finished" type="date" {...register("date_finished")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Series</Label>
-          <Controller
-            name="series_id"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value || "__none__"}
-                onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {series.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="detail-authors">Authors</Label>
+            <Input
+              id="detail-authors"
+              {...register("authorsInput", {
+                validate: (value) =>
+                  parseAuthorsInput(value).length > 0 || "At least one author is required",
+              })}
+            />
+            {errors.authorsInput && (
+              <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
             )}
-          />
-        </div>
+          </div>
 
-        {watchedSeriesId && (
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Genres</Label>
+            <Controller
+              name="genres"
+              control={control}
+              render={({ field }) => (
+                <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
+              )}
+            />
+          </div>
+
+          <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
+          <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
+          <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
+
           <div className="space-y-1.5">
-            <Label htmlFor="detail-volume-number">Volume number</Label>
-            <Input id="detail-volume-number" type="number" min={0.5} step="any" {...register("volume_number")} />
+            <Label htmlFor="detail-total-pages">Total pages</Label>
+            <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
           </div>
-        )}
 
-        <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="detail-isbn">ISBN</Label>
-          <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-publisher">Publisher</Label>
+            <Input id="detail-publisher" {...register("publisher")} />
+          </div>
 
-        <div className="space-y-1.5 md:col-span-2">
-          <Label htmlFor="detail-description">Description</Label>
-          <Textarea id="detail-description" rows={6} {...register("description")} />
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-publication-date">Publication date</Label>
+            <Input
+              id="detail-publication-date"
+              placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
+              aria-invalid={!!errors.publication_date}
+              {...register("publication_date", {
+                onChange: clearPublicationDateError,
+              })}
+            />
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary"
+                  checked={!!publicationDatePrecision}
+                  onChange={(event) =>
+                    updatePublicationDatePrecision(event.target.checked ? "year" : "")
+                  }
+                />
+                Year
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary"
+                  checked={publicationDatePrecision === "month" || publicationDatePrecision === "day"}
+                  onChange={(event) =>
+                    updatePublicationDatePrecision(event.target.checked ? "month" : "year")
+                  }
+                />
+                Month
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary"
+                  checked={publicationDatePrecision === "day"}
+                  onChange={(event) =>
+                    updatePublicationDatePrecision(event.target.checked ? "day" : "month")
+                  }
+                />
+                Day
+              </label>
+            </div>
+            {errors.publication_date && (
+              <p className="text-xs text-destructive">{errors.publication_date.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-date-started">Date started</Label>
+            <Input id="detail-date-started" type="date" {...register("date_started")} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-date-finished">Date finished</Label>
+            <Input id="detail-date-finished" type="date" {...register("date_finished")} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Series</Label>
+            <Controller
+              name="series_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || "__none__"}
+                  onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {series.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          {watchedSeriesId && (
+            <div className="space-y-1.5">
+              <Label htmlFor="detail-volume-number">Volume number</Label>
+              <Input id="detail-volume-number" type="number" min={0.5} step="any" {...register("volume_number")} />
+            </div>
+          )}
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="detail-isbn">ISBN</Label>
+            <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="detail-description">Description</Label>
+            <Textarea id="detail-description" rows={6} {...register("description")} />
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="destructive" size="sm" disabled={deleting} onClick={onDelete}>
-          {deleting ? "Deleting..." : confirmDelete ? "Are you sure?" : "Delete"}
-        </Button>
-        <div className="ml-auto flex items-center gap-2">
+      <div className="sticky bottom-0 mt-5 border-t bg-card/95 px-0 py-4 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
+            Cancel
+          </Button>
           <Button type="submit" size="sm" disabled={saving || !isDirty}>
             {saving ? "Saving..." : "Save Changes"}
-          </Button>
-          <Button type="button" variant="outline" size="sm" disabled={saving || deleting} onClick={onCancel}>
-            Cancel
           </Button>
         </div>
       </div>

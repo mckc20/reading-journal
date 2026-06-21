@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronRight, Heart, Star } from "lucide-react";
+import DetailActionsMenu from "@/components/DetailActionsMenu";
+import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +16,7 @@ import {
   getAuthorInitials,
 } from "@/lib/authorShelf";
 import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { cn } from "@/lib/utils";
 import type { Book, BookNote } from "@/types";
 
@@ -97,6 +100,8 @@ export default function AuthorDetails() {
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -122,6 +127,10 @@ export default function AuthorDetails() {
   const featuredQuoteBook = featuredQuote
     ? author?.books.find((book) => book.id === featuredQuote.book_id)
     : undefined;
+
+  function openAttachmentPicker() {
+    setSendAttachmentOpen(true);
+  }
 
   if (booksLoading) {
     return (
@@ -166,13 +175,30 @@ export default function AuthorDetails() {
             <ArrowLeft className="h-4 w-4" />
             Back to authors
           </Button>
-          {author.isFavorite && (
-            <div className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm">
-              <Heart className="h-4 w-4 fill-favorite text-favorite" />
-              Favorite
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {author.isFavorite && (
+              <div className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm">
+                <Heart className="h-4 w-4 fill-favorite text-favorite" />
+                Favorite
+              </div>
+            )}
+            <DetailActionsMenu
+              kind="author"
+              label={author.name}
+              shareAttachmentLabel="Send the author as attachment in a chat"
+              onDelete={() => navigate("/authors", { replace: true })}
+              onSendAttachment={openAttachmentPicker}
+              deleteTitle="Delete this author view?"
+              deleteDescription="This only removes the author page from view. The books stay in your library."
+            />
+          </div>
         </div>
+
+        {shareStatus && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
+            {shareStatus}
+          </div>
+        )}
 
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
           <AuthorPlaceholder name={author.name} />
@@ -363,6 +389,19 @@ export default function AuthorDetails() {
           )}
         </TabsContent>
       </Tabs>
+
+      <SendAttachmentDialog
+        open={sendAttachmentOpen}
+        onOpenChange={setSendAttachmentOpen}
+        attachment={buildAuthorAttachment({
+          authorName: author.name,
+          books: author.books,
+          includedQuotes: author.quotes.slice(0, 3),
+        })}
+        title={`Send "${author.name}" to chat`}
+        description="Add a message, then pick the chat you want to send this author to."
+        onSent={() => setShareStatus("Author sent to chat.")}
+      />
     </div>
   );
 }
