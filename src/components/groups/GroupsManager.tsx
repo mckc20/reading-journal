@@ -893,6 +893,7 @@ export function GroupsManager() {
     setSelectedReply(null);
     setMessageActionMenu(null);
     setReactionDetailsMessageId(null);
+    setSettingsOpen(false);
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -952,6 +953,181 @@ export function GroupsManager() {
     } catch (reactionError) {
       setError(toChatErrorMessage(reactionError, "Could not update reaction."));
     }
+  }
+
+  function renderSettingsPanelContent({ showHeading = true }: { showHeading?: boolean } = {}) {
+    return (
+      <div className="space-y-4">
+        {showHeading && (
+          <div>
+            <h2 className="font-heading text-base font-medium leading-snug">Chat Settings</h2>
+            <p className="text-sm text-muted-foreground">
+              {members.length} member{members.length === 1 ? "" : "s"}
+            </p>
+          </div>
+        )}
+
+        {canManageSelectedGroup && (
+          <form className="flex gap-2" onSubmit={submitMember}>
+            <Input
+              aria-label="Member username"
+              placeholder="username"
+              value={memberUsername}
+              onChange={(event) => setMemberUsername(event.target.value)}
+            />
+            <Button type="submit" size="icon" variant="outline" disabled={saving || !memberUsername.trim()}>
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
+
+        <div className="space-y-2">
+          {members.map((member) => {
+            const canEditMember =
+              canManageSelectedGroup && member.user_id !== user?.id && member.role !== "owner";
+            return (
+              <div key={member.user_id} className="space-y-2 rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <MessageAvatar profile={member.profile} fallback={member.user_id} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {member.user_id === user?.id ? "You" : profileLabel(member.profile)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {profileSubLabel(member.profile)} · {member.role}
+                    </p>
+                  </div>
+                </div>
+
+                {canEditMember && (
+                  <div className="flex gap-2">
+                    <Select
+                      value={member.role}
+                      onValueChange={(value) => changeRole(member.user_id, value as GroupMembershipRole)}
+                    >
+                      <SelectTrigger className="h-8 flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Member</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setConfirmAction({ type: "member", userId: member.user_id })}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {selectedThread?.group.kind === "group" && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => user && setConfirmAction({ type: "leave", userId: user.id })}
+            disabled={saving}
+          >
+            Leave group
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  function renderChatComposer() {
+    return (
+      <form className="space-y-2 border-t bg-background p-3" onSubmit={submitMessage}>
+        {selectedReply && <ReplyPreview reply={selectedReply} onCancel={() => setSelectedReply(null)} />}
+
+        {selectedAttachment && (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <AttachmentSummary attachment={selectedAttachment} />
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Remove attachment"
+              onClick={() => setSelectedAttachment(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          <div className="relative">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Attach"
+              onClick={() => setAttachMenuOpen((current) => !current)}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            {attachMenuOpen && (
+              <div className="absolute bottom-12 left-0 z-20 w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => openAttachmentPicker("book")}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Attach Book
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => openAttachmentPicker("note")}
+                >
+                  <StickyNote className="h-4 w-4" />
+                  Attach Notes
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => openAttachmentPicker("author")}
+                >
+                  <UserRound className="h-4 w-4" />
+                  Attach Author
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => openAttachmentPicker("series")}
+                >
+                  <Users className="h-4 w-4" />
+                  Attach Series
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Textarea
+            aria-label="Message"
+            value={messageText}
+            onChange={(event) => setMessageText(event.target.value)}
+            placeholder="Write a message"
+            rows={2}
+            className="min-h-12 resize-none rounded-full px-4 py-3"
+          />
+          <Button type="submit" size="icon" disabled={saving || (!messageText.trim() && !selectedAttachment)}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </form>
+    );
   }
 
   async function submitGroup(event: FormEvent<HTMLFormElement>) {
@@ -1293,7 +1469,7 @@ export function GroupsManager() {
           className="fixed z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
           style={{
             left: Math.min(messageActionMenu.x, window.innerWidth - 190),
-            top: Math.min(messageActionMenu.y, window.innerHeight - 180),
+            top: Math.min(messageActionMenu.y, window.innerHeight - 224),
           }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -1304,6 +1480,17 @@ export function GroupsManager() {
           >
             <Reply className="h-4 w-4" />
             Reply
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+            onClick={() => {
+              setMessageActionMenu(null);
+              void toggleMessageHeart(actionMenuMessage);
+            }}
+          >
+            <Heart className="h-4 w-4 fill-current" />
+            React
           </button>
           {actionMenuMessage.content.trim() && (
             <button
@@ -1495,7 +1682,7 @@ export function GroupsManager() {
 
         <section className={cn("min-h-0 min-w-0", !mobileThreadOpen && "hidden lg:block")}>
           {selectedThread ? (
-            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
               <div className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-3 sm:px-4">
                 <div className="flex min-w-0 items-center gap-2">
                   <Button
@@ -1530,13 +1717,8 @@ export function GroupsManager() {
                 </Button>
               </div>
 
-              <div
-                className={cn(
-                  "grid min-h-0",
-                  settingsOpen ? "lg:grid-cols-[minmax(0,1fr)_19rem]" : "lg:grid-cols-[minmax(0,1fr)]",
-                )}
-              >
-                <div className="flex min-h-[32rem] min-w-0 flex-col">
+              <div className={cn("min-h-0", settingsOpen ? "grid lg:grid-cols-[minmax(0,1fr)_19rem]" : "grid")}>
+                <div className={cn("min-h-0 min-w-0 flex-col", settingsOpen ? "hidden lg:flex" : "flex")}>
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6">
                     {messagesLoading ? (
                       <p className="text-sm text-muted-foreground">Loading messages...</p>
@@ -1741,179 +1923,16 @@ export function GroupsManager() {
                     )}
                     <div ref={messagesEndRef} />
                   </div>
-
-                  <form className="space-y-2 border-t bg-background p-3" onSubmit={submitMessage}>
-                    {selectedReply && (
-                      <ReplyPreview reply={selectedReply} onCancel={() => setSelectedReply(null)} />
-                    )}
-
-                    {selectedAttachment && (
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <AttachmentSummary attachment={selectedAttachment} />
-                        </div>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Remove attachment"
-                          onClick={() => setSelectedAttachment(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className="flex items-end gap-2">
-                      <div className="relative">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          aria-label="Attach"
-                          onClick={() => setAttachMenuOpen((current) => !current)}
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
-                        {attachMenuOpen && (
-                          <div className="absolute bottom-12 left-0 z-20 w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => openAttachmentPicker("book")}
-                            >
-                              <BookOpen className="h-4 w-4" />
-                              Attach Book
-                            </button>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => openAttachmentPicker("note")}
-                            >
-                              <StickyNote className="h-4 w-4" />
-                              Attach Notes
-                            </button>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => openAttachmentPicker("author")}
-                            >
-                              <UserRound className="h-4 w-4" />
-                              Attach Author
-                            </button>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => openAttachmentPicker("series")}
-                            >
-                              <Users className="h-4 w-4" />
-                              Attach Series
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <Textarea
-                        aria-label="Message"
-                        value={messageText}
-                        onChange={(event) => setMessageText(event.target.value)}
-                        placeholder="Write a message"
-                        rows={2}
-                        className="min-h-12 resize-none rounded-full px-4 py-3"
-                      />
-                      <Button type="submit" size="icon" disabled={saving || (!messageText.trim() && !selectedAttachment)}>
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </form>
                 </div>
 
                 {settingsOpen && (
                   <aside className="min-h-0 overflow-y-auto border-t bg-muted/20 p-4 lg:border-l lg:border-t-0">
-                  <div className="space-y-4">
-                    <div>
-                      <h2 className="font-heading text-base font-medium leading-snug">Chat Settings</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {members.length} member{members.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
-
-                    {canManageSelectedGroup && (
-                      <form className="flex gap-2" onSubmit={submitMember}>
-                        <Input
-                          aria-label="Member username"
-                          placeholder="username"
-                          value={memberUsername}
-                          onChange={(event) => setMemberUsername(event.target.value)}
-                        />
-                        <Button type="submit" size="icon" variant="outline" disabled={saving || !memberUsername.trim()}>
-                          <UserPlus className="h-4 w-4" />
-                        </Button>
-                      </form>
-                    )}
-
-                    <div className="space-y-2">
-                      {members.map((member) => {
-                        const canEditMember =
-                          canManageSelectedGroup && member.user_id !== user?.id && member.role !== "owner";
-                        return (
-                          <div key={member.user_id} className="space-y-2 rounded-md border p-3">
-                            <div className="flex items-center gap-2">
-                              <MessageAvatar profile={member.profile} fallback={member.user_id} />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
-                                  {member.user_id === user?.id ? "You" : profileLabel(member.profile)}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {profileSubLabel(member.profile)} · {member.role}
-                                </p>
-                              </div>
-                            </div>
-
-                            {canEditMember && (
-                              <div className="flex gap-2">
-                                <Select
-                                  value={member.role}
-                                  onValueChange={(value) => changeRole(member.user_id, value as GroupMembershipRole)}
-                                >
-                                  <SelectTrigger className="h-8 flex-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="member">Member</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => setConfirmAction({ type: "member", userId: member.user_id })}
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {selectedThread.group.kind === "group" && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => user && setConfirmAction({ type: "leave", userId: user.id })}
-                        disabled={saving}
-                      >
-                        Leave group
-                      </Button>
-                    )}
-                  </div>
-                </aside>
+                    {renderSettingsPanelContent()}
+                  </aside>
                 )}
               </div>
+
+              <div className="border-t bg-background">{renderChatComposer()}</div>
             </div>
           ) : (
             <div className="flex h-full min-h-[38rem] items-center justify-center">

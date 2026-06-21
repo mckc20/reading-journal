@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -190,6 +191,7 @@ function getPublicationYear(value?: string | null): string | null {
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
+  const { setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
   const {
     books,
     loading,
@@ -261,6 +263,14 @@ export default function BookDetails() {
     setDescriptionExpanded(false);
     reset(bookToFormValues(book));
   }, [book, reset]);
+
+  useEffect(() => {
+    setDetailEditingOpen(isEditMode);
+
+    return () => {
+      setDetailEditingOpen(false);
+    };
+  }, [isEditMode, setDetailEditingOpen]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -1399,17 +1409,17 @@ function EditDetailsForm({
 }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
-      <div className="grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
-        <div className="mx-auto w-full max-w-[240px]">
+      <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
+        <div className="md:row-span-3 md:self-start">
           <label
             htmlFor="cover-change"
-            className="relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm group cursor-pointer"
+            className="group relative block w-[min(7rem,38vw)] aspect-[2/3] cursor-pointer overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
           >
             {coverUrl ? (
               <img src={coverUrl} alt={bookTitle} className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
-                <ImagePlus className="h-10 w-10 text-muted-foreground/40" />
+                <ImagePlus className="h-8 w-8 text-muted-foreground/40" />
               </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
@@ -1430,60 +1440,54 @@ function EditDetailsForm({
           </label>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5 md:col-span-2">
+        <div className="min-w-0 space-y-4">
+          <div className="space-y-1.5">
             <Label htmlFor="detail-title">Title</Label>
             <Input id="detail-title" {...register("title", { required: true })} />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5">
             <Label htmlFor="detail-authors">Authors</Label>
             <Input
               id="detail-authors"
               {...register("authorsInput", {
-                validate: (value) =>
-                  parseAuthorsInput(value).length > 0 || "At least one author is required",
+                validate: (value) => parseAuthorsInput(value).length > 0 || "At least one author is required",
               })}
             />
-            {errors.authorsInput && (
-              <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
-            )}
+            {errors.authorsInput && <p className="text-xs text-destructive">{errors.authorsInput.message}</p>}
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5">
             <Label>Genres</Label>
             <Controller
               name="genres"
               control={control}
-              render={({ field }) => (
-                <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
-              )}
+              render={({ field }) => <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />}
             />
           </div>
+        </div>
 
+        <div className="md:col-span-2 grid gap-4 sm:grid-cols-2">
           <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
           <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
           <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
-
           <div className="space-y-1.5">
             <Label htmlFor="detail-total-pages">Total pages</Label>
             <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-publisher">Publisher</Label>
             <Input id="detail-publisher" {...register("publisher")} />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-publication-date">Publication date</Label>
             <Input
               id="detail-publication-date"
               placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
               aria-invalid={!!errors.publication_date}
-              {...register("publication_date", {
-                onChange: clearPublicationDateError,
-              })}
+              {...register("publication_date", { onChange: clearPublicationDateError })}
             />
             <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
               <label className="flex items-center gap-1.5">
@@ -1491,9 +1495,7 @@ function EditDetailsForm({
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-primary"
                   checked={!!publicationDatePrecision}
-                  onChange={(event) =>
-                    updatePublicationDatePrecision(event.target.checked ? "year" : "")
-                  }
+                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "year" : "")}
                 />
                 Year
               </label>
@@ -1502,9 +1504,7 @@ function EditDetailsForm({
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-primary"
                   checked={publicationDatePrecision === "month" || publicationDatePrecision === "day"}
-                  onChange={(event) =>
-                    updatePublicationDatePrecision(event.target.checked ? "month" : "year")
-                  }
+                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "month" : "year")}
                 />
                 Month
               </label>
@@ -1513,16 +1513,12 @@ function EditDetailsForm({
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-primary"
                   checked={publicationDatePrecision === "day"}
-                  onChange={(event) =>
-                    updatePublicationDatePrecision(event.target.checked ? "day" : "month")
-                  }
+                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "day" : "month")}
                 />
                 Day
               </label>
             </div>
-            {errors.publication_date && (
-              <p className="text-xs text-destructive">{errors.publication_date.message}</p>
-            )}
+            {errors.publication_date && <p className="text-xs text-destructive">{errors.publication_date.message}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -1568,19 +1564,19 @@ function EditDetailsForm({
             </div>
           )}
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-isbn">ISBN</Label>
             <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
           </div>
 
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-description">Description</Label>
             <Textarea id="detail-description" rows={6} {...register("description")} />
           </div>
         </div>
       </div>
 
-      <div className="sticky bottom-0 mt-5 border-t bg-card/95 px-0 py-4 backdrop-blur">
+      <div className="mt-5 border-t pt-4">
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
             Cancel

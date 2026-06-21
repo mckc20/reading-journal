@@ -25,6 +25,11 @@ import ReleaseNotesDialog from "./ReleaseNotesDialog";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 
+export interface AppLayoutOutletContext {
+  onAddBookClick: () => void;
+  setDetailEditingOpen: (open: boolean) => void;
+}
+
 type NavLink = {
   to: string;
   label: string;
@@ -76,7 +81,9 @@ function AppLayoutContent() {
   const { profile } = useProfile();
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
+  const [detailEditingOpen, setDetailEditingOpen] = useState(false);
   const displayName = getDisplayName(profile, user?.email);
+  const hideAddBookButton = location.pathname.startsWith("/groups") || detailEditingOpen;
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return;
@@ -108,10 +115,17 @@ function AppLayoutContent() {
         />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 sm:px-8 md:px-10 md:py-8 lg:px-12">
-          <Outlet context={{ onAddBookClick: () => setAddBookOpen(true) }} />
+          <Outlet
+            context={
+              {
+                onAddBookClick: () => setAddBookOpen(true),
+                setDetailEditingOpen,
+              } satisfies AppLayoutOutletContext
+            }
+          />
         </main>
 
-        <FloatingAddBookButton onClick={() => setAddBookOpen(true)} />
+        {!hideAddBookButton && <FloatingAddBookButton onClick={() => setAddBookOpen(true)} />}
         <MobileBottomNav pathname={location.pathname} search={location.search} />
       </div>
 

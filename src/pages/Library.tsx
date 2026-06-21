@@ -163,7 +163,7 @@ function buildShelfExplorePath(shelf: SmartShelf): string {
   } else if (shelf.key === "recently-finished") {
     params.set("sort", "date-finished");
   } else if (shelf.key === "favorites") {
-    params.set("favorite", "Yes");
+    params.set("rating", "Favorite");
   }
 
   return `/library/explore?${params.toString()}`;
