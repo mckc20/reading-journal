@@ -52,6 +52,7 @@ export function buildSharedBookSnapshot(
     description: book.description ?? null,
     metadata_source: book.metadata_source ?? null,
     metadata_source_url: book.metadata_source_url ?? null,
+    volume_number: book.volume_number ?? null,
     included_notes: includedNotes
       .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
       .map((note) => buildSharedNoteSnapshot(note, book)),
@@ -98,10 +99,12 @@ export function buildAuthorAttachment({
 }
 
 export function buildSeriesAttachment({
+  seriesId,
   seriesName,
   books,
   includedQuotes,
 }: {
+  seriesId?: string | null;
   seriesName: string;
   books: Book[];
   includedQuotes: BookNote[];
@@ -109,6 +112,7 @@ export function buildSeriesAttachment({
   return {
     type: "series",
     series: {
+      id: seriesId ?? undefined,
       name: seriesName,
       books: books.map((book) => buildSharedBookSnapshot(book)),
       included_quotes: includedQuotes
@@ -118,7 +122,10 @@ export function buildSeriesAttachment({
   };
 }
 
-export function bookSnapshotToAddBookPayload(book: ChatSharedBookSnapshot): AddBookPayload {
+export function bookSnapshotToAddBookPayload(
+  book: ChatSharedBookSnapshot,
+  overrides: { series_id?: string | null } = {},
+): AddBookPayload {
   return {
     title: book.title,
     authors: book.authors.length > 0 ? book.authors : ["Unknown"],
@@ -134,6 +141,8 @@ export function bookSnapshotToAddBookPayload(book: ChatSharedBookSnapshot): AddB
     description: book.description ?? null,
     metadata_source: book.metadata_source ?? null,
     metadata_source_url: book.metadata_source_url ?? null,
+    series_id: overrides.series_id ?? undefined,
+    volume_number: book.volume_number ?? undefined,
     is_favorite: false,
   };
 }
