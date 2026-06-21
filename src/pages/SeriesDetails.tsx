@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Check, Flag, Heart, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Flag, Heart, PauseCircle, Star } from "lucide-react";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
@@ -81,13 +81,28 @@ function formatDaysSpent(days: number | null): string {
 }
 
 function BookThumbnail({ book }: { book: Book }) {
+  const isPaused = book.status === "Paused";
   return (
-    <div className="h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm">
+    <div
+      className={cn(
+        "relative h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm",
+        isPaused && "opacity-70",
+      )}
+    >
       {book.cover_url ? (
-        <img src={book.cover_url} alt="" className="h-full w-full object-cover" />
+        <img
+          src={book.cover_url}
+          alt=""
+          className={cn("h-full w-full object-cover", isPaused && "grayscale")}
+        />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <BookOpen className="h-4 w-4 text-muted-foreground/40" />
+        </div>
+      )}
+      {isPaused && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+          <PauseCircle className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
     </div>
@@ -355,15 +370,18 @@ function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
 function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) {
   const isFinished = book.status === "Finished";
   const isReading = book.status === "Reading";
+  const isPaused = book.status === "Paused";
   const sequenceNumber = book.volume_number ?? index + 1;
   const percent = getBookProgressPercent(book);
   const statusLabel = isFinished
     ? "Completed"
-    : isReading
-      ? "Currently Reading"
-      : book.status === "DNF"
-        ? "DNF"
-        : "Unread";
+      : isReading
+        ? "Currently Reading"
+        : isPaused
+          ? "Paused"
+        : book.status === "DNF"
+          ? "DNF"
+          : "Unread";
 
   return (
     <Link
@@ -371,6 +389,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
       className={cn(
         "group relative flex min-w-0 flex-col items-center rounded-lg border bg-card px-3 pb-4 pt-3 text-foreground shadow-[var(--shadow-card)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-surface-hover/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isReading && "border-foreground ring-1 ring-foreground",
+        isPaused && "border-muted-foreground/70 bg-muted/10",
       )}
       aria-label={`Open ${book.title}`}
     >
@@ -379,6 +398,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
           "absolute left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold shadow-sm",
           isFinished && "border-primary bg-primary text-primary-foreground",
           isReading && "border-foreground bg-foreground text-background",
+          isPaused && "border-muted-foreground bg-muted text-muted-foreground",
           !isFinished && !isReading && "border-border bg-background text-muted-foreground",
         )}
       >
@@ -386,18 +406,29 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
       </span>
 
       <div
-        className="h-[190px] w-[126px] overflow-hidden rounded-md bg-muted shadow-sm sm:h-[210px] sm:w-[140px]"
+        className={cn(
+          "relative h-[190px] w-[126px] overflow-hidden rounded-md bg-muted shadow-sm sm:h-[210px] sm:w-[140px]",
+          isPaused && "opacity-70",
+        )}
       >
         {book.cover_url ? (
           <img
             src={book.cover_url}
             alt={book.title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.025]"
+            className={cn(
+              "h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.025]",
+              isPaused && "grayscale",
+            )}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+            <PauseCircle className="h-7 w-7 text-muted-foreground" />
           </div>
         )}
       </div>
@@ -598,6 +629,7 @@ function SeriesJourneyItem({
 }) {
   const isFinished = book.status === "Finished";
   const isReading = book.status === "Reading";
+  const isPaused = book.status === "Paused";
   const percent = getBookProgressPercent(book);
   const dates = getJourneyBookDates(book, logs);
   const durationDays = getJourneyDurationDays(book, logs);
@@ -616,7 +648,7 @@ function SeriesJourneyItem({
             <span
               className={cn(
                 "absolute top-0 h-7 w-px",
-                isReading ? "bg-foreground" : "bg-border",
+                isReading ? "bg-foreground" : isPaused ? "bg-muted-foreground" : "bg-border",
               )}
               aria-hidden
             />
@@ -626,19 +658,20 @@ function SeriesJourneyItem({
               "relative z-10 mt-7 flex h-7 w-7 items-center justify-center rounded-full border bg-background",
               isFinished && "border-primary bg-primary text-primary-foreground",
               isReading && "border-foreground bg-foreground text-background",
+              isPaused && "border-muted-foreground bg-muted text-muted-foreground",
               !isFinished && !isReading && "border-muted-foreground/70 text-muted-foreground",
             )}
             aria-hidden
           >
-            {isFinished ? (
-              <Check className="h-3.5 w-3.5 stroke-[3]" />
-            ) : null}
+            {isFinished ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : isPaused ? <PauseCircle className="h-3.5 w-3.5" /> : null}
           </span>
           <p className="mt-3 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {isFinished
               ? formatDate(dates.finished)
               : isReading
                 ? formatDate(dates.started)
+                : isPaused
+                  ? "Paused"
                 : book.status === "Up Next"
                   ? "Up next"
                   : "Future"}
@@ -647,7 +680,7 @@ function SeriesJourneyItem({
             <span
               className={cn(
                 "-mb-6 mt-4 min-h-4 w-px flex-1",
-                isReading || nextBookIsReading ? "bg-foreground" : "bg-border",
+                isReading || nextBookIsReading ? "bg-foreground" : isPaused ? "bg-muted-foreground" : "bg-border",
               )}
               aria-hidden
             />
@@ -658,18 +691,31 @@ function SeriesJourneyItem({
           className={cn(
             "grid min-w-0 gap-5 rounded-lg border bg-card p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7rem_minmax(13rem,1fr)] lg:grid-cols-[7rem_minmax(17rem,1fr)_minmax(13rem,17rem)]",
             isReading && "border-foreground ring-1 ring-foreground",
+            isPaused && "border-muted-foreground bg-muted/10",
           )}
         >
           <Link
             to={`/books/${book.id}`}
-            className="h-[168px] w-28 overflow-hidden rounded-lg bg-muted shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              "relative h-[168px] w-28 overflow-hidden rounded-lg bg-muted shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              book.status === "Paused" && "opacity-70",
+            )}
             aria-label={`Open ${book.title}`}
           >
             {book.cover_url ? (
-              <img src={book.cover_url} alt={book.title} className="h-full w-full object-cover" />
+              <img
+                src={book.cover_url}
+                alt={book.title}
+                className={cn("h-full w-full object-cover", book.status === "Paused" && "grayscale")}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+              </div>
+            )}
+            {book.status === "Paused" && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+                <PauseCircle className="h-7 w-7 text-muted-foreground" />
               </div>
             )}
           </Link>
@@ -696,7 +742,7 @@ function SeriesJourneyItem({
               </div>
             )}
 
-            {isReading && (
+            {(isReading || isPaused) && (
               <div className="grid gap-4 sm:grid-cols-3">
                 <TimelineMetric label="Started" value={formatDate(dates.started)} />
                 <TimelineMetric
@@ -722,12 +768,12 @@ function SeriesJourneyItem({
               </div>
             )}
 
-            {!isFinished && !isReading && (
+            {!isFinished && !isReading && !isPaused && (
               <p className="text-sm text-muted-foreground">Not started yet</p>
             )}
           </div>
 
-          {(isFinished || isReading) && (
+          {(isFinished || isReading || isPaused) && (
             <div className="flex min-h-full flex-col gap-5 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-2">
               <RatingStars rating={book.rating} />
               <JourneyFeaturedNote bookId={book.id} notes={notes} />

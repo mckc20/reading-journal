@@ -1,4 +1,5 @@
 import type { Book, ReadingLog } from "@/types";
+import { getActiveDaysBetween } from "@/lib/bookAnalytics";
 
 export type YearComparisonMetric = "books" | "pages" | "hours";
 
@@ -210,8 +211,7 @@ function getCompletionDays(book: Book): number | null {
   const finished = parseDate(book.date_finished);
   if (!started || !finished || finished < started) return null;
 
-  const dayMs = 24 * 60 * 60 * 1000;
-  return Math.max(1, Math.round((finished.getTime() - started.getTime()) / dayMs));
+  return Math.max(1, getActiveDaysBetween(started, finished, book.pause_periods, new Date()));
 }
 
 function buildPageDeltas(logs: ReadingLog[]): PageDelta[] {
@@ -546,7 +546,7 @@ function buildHallOfFame(books: Book[], logs: ReadingLog[], pageDeltas: PageDelt
   };
 }
 
-function buildReadingGaps(logs: ReadingLog[]): number | null {
+function buildReadingGaps(books: Book[], logs: ReadingLog[], now = new Date()): number | null {
   const dayKeys = Array.from(new Set(logs.map((log) => {
     const loggedAt = parseDate(log.logged_at);
     return loggedAt ? toDayKey(loggedAt) : null;
@@ -555,12 +555,12 @@ function buildReadingGaps(logs: ReadingLog[]): number | null {
   if (dayKeys.length < 2) return null;
 
   const gaps: number[] = [];
+  const pausePeriods = books.flatMap((book) => book.pause_periods ?? []);
   for (let index = 1; index < dayKeys.length; index += 1) {
     const previous = parseDate(dayKeys[index - 1]);
     const current = parseDate(dayKeys[index]);
     if (!previous || !current) continue;
-    const diffDays = Math.round((current.getTime() - previous.getTime()) / (24 * 60 * 60 * 1000));
-    gaps.push(Math.max(0, diffDays - 1));
+    gaps.push(Math.max(0, getActiveDaysBetween(previous, current, pausePeriods, now) - 1));
   }
 
   if (gaps.length === 0) return null;
@@ -634,7 +634,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
   const finishedBooks = books.filter((book) => book.status === "Finished");
   const dnfBooks = books.filter((book) => book.status === "DNF");
   const activeBookIds = new Set(
-    books.filter((book) => book.status === "Finished" || book.status === "Reading").map((book) => book.id)
+    books.filter((book) => book.status === "Finished" || book.status === "Reading" || book.status === "Paused").map((book) => book.id)
   );
   const pageDeltas = buildPageDeltas(logs);
   const totalPageDeltas = pageDeltas.reduce((sum, delta) => sum + delta.pages, 0);
@@ -860,7 +860,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     },
     hallOfFame: buildHallOfFame(books, logs, pageDeltas),
     insights: {
-      averageReadingGapDays: buildReadingGaps(logs),
+      averageReadingGapDays: buildReadingGaps(books, logs),
       favoriteGenre: topPercentages(finishedGenreCounts, 1)[0]?.label ?? null,
       favoriteAuthor: topPercentages(finishedAuthorCounts, 1)[0]?.label ?? null,
       mostProductiveMonth: mostProductiveMonth?.value > 0 ? formatRecordMonth(mostProductiveMonth.key) : null,

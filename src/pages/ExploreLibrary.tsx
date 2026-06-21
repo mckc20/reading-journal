@@ -137,7 +137,17 @@ type SmartShelf = {
   emptyMessage: string;
 };
 
-const bookStatuses: BookStatus[] = [
+const filterableBookStatuses: BookStatus[] = [
+  "Wishlist",
+  "Not Started",
+  "Up Next",
+  "Reading",
+  "Paused",
+  "Finished",
+  "DNF",
+];
+
+const bulkEditableBookStatuses: BookStatus[] = [
   "Wishlist",
   "Not Started",
   "Up Next",
@@ -258,13 +268,14 @@ const statusFilterLabels: Record<BookStatus, string> = {
   "Not Started": "Not Started",
   "Up Next": "Up Next",
   Reading: "Currently Reading",
+  Paused: "Paused",
   Finished: "Finished",
   DNF: "DNF",
 };
 
 const statusFilterOptions = [
   "Want to Read",
-  ...bookStatuses.map((status) => statusFilterLabels[status]),
+  ...filterableBookStatuses.map((status) => statusFilterLabels[status]),
 ];
 
 const progressFilterOptions = [
@@ -667,7 +678,7 @@ function ManagementMode({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {bookStatuses.map((status) => (
+                {bulkEditableBookStatuses.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
                   </SelectItem>
@@ -943,7 +954,7 @@ function matchesAnyFilterValue(values: string[], matches: (value: string) => boo
 function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: Series[]): boolean {
   if (!matchesAnyFilterValue(filters.status, (filter) => {
     if (filter === "Want to Read") return ["Wishlist", "Not Started", "Up Next"].includes(book.status);
-    const matchingStatus = bookStatuses.find((status) => statusFilterLabels[status] === filter);
+    const matchingStatus = filterableBookStatuses.find((status) => statusFilterLabels[status] === filter);
     return Boolean(matchingStatus && book.status === matchingStatus);
   })) return false;
 

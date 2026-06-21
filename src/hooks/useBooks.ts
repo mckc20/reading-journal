@@ -4,6 +4,8 @@ import {
   fetchBooks,
   createBook,
   updateBook as updateBookDb,
+  pauseBook as pauseBookDb,
+  resumeBook as resumeBookDb,
   deleteBook as deleteBookDb,
   uploadCover,
   deleteCover,
@@ -97,6 +99,16 @@ export function useBooks() {
     [user]
   );
 
+  const pauseBook = useCallback(async (id: string): Promise<void> => {
+    const updated = await pauseBookDb(id);
+    setBooks((prev) => prev.map((book) => (book.id === id ? updated : book)));
+  }, []);
+
+  const resumeBook = useCallback(async (id: string): Promise<void> => {
+    const updated = await resumeBookDb(id);
+    setBooks((prev) => prev.map((book) => (book.id === id ? updated : book)));
+  }, []);
+
   const deleteBook = useCallback(
     async (id: string): Promise<void> => {
       if (!user) throw new Error("Not authenticated");
@@ -108,5 +120,16 @@ export function useBooks() {
     [user]
   );
 
-  return { books, loading, error, addBook, updateBook, updateCover, deleteBook, reload: load };
+  return {
+    books,
+    loading,
+    error,
+    addBook,
+    updateBook,
+    updateCover,
+    pauseBook,
+    resumeBook,
+    deleteBook,
+    reload: load,
+  };
 }

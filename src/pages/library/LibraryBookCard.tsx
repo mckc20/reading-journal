@@ -1,4 +1,4 @@
-import { BookOpen, Heart, Star } from "lucide-react";
+import { BookOpen, Heart, PauseCircle, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn, statusVariant } from "@/lib/utils";
@@ -27,6 +27,7 @@ export default function LibraryBookCard({
 }: LibraryBookCardProps) {
   const progress = getProgress(book);
   const isShelf = variant === "shelf";
+  const isPaused = book.status === "Paused";
 
   return (
     <button
@@ -43,6 +44,7 @@ export default function LibraryBookCard({
         className={cn(
           "relative h-[135px] w-[90px] overflow-hidden bg-muted shadow-sm sm:h-[168px] sm:w-[112px]",
           isShelf && "rounded-md",
+          isPaused && "opacity-70",
         )}
       >
         {book.cover_url ? (
@@ -50,11 +52,19 @@ export default function LibraryBookCard({
             src={book.cover_url}
             alt={book.title}
             loading="lazy"
-            className="absolute inset-0 block h-full w-full scale-[1.035] object-cover transition duration-200 ease-out group-hover:scale-[1.055]"
+            className={cn(
+              "absolute inset-0 block h-full w-full scale-[1.035] object-cover transition duration-200 ease-out group-hover:scale-[1.055]",
+              isPaused && "grayscale",
+            )}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+            <PauseCircle className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
         {book.is_favorite && (

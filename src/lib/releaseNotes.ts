@@ -12,11 +12,11 @@ export type ReleaseNote = {
 };
 
 export const CURRENT_RELEASE_NOTE: ReleaseNote = {
-  version: "2026-06-21-chat-groups",
+  version: "2026-06-21-pause-books",
   published_at: "2026-06-21",
-  title: "Chat and groups are here",
+  title: "Chat, groups, and pause mode",
   summary:
-    "You can now chat with other readers and organize conversations into groups.",
+    "You can now chat with other readers, organize conversations into groups, and pause books when you need to step away.",
   highlights: [
     {
       title: "Direct chats and groups",
@@ -27,6 +27,11 @@ export const CURRENT_RELEASE_NOTE: ReleaseNote = {
       title: "Attachments and library saves",
       description:
         "Share books, notes, authors, and series in chat, then save shared items to your own library.",
+    },
+    {
+      title: "Pause and resume books",
+      description:
+        "Pause a book when you are away, then resume later so that paused time does not affect your reading analytics.",
     },
   ],
 };

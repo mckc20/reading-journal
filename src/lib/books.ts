@@ -1,12 +1,13 @@
 import { supabase } from "./supabase";
 import { getSelectedGenreTags } from "@/lib/genres";
-import type { Book, BookUpdate, Genre, Series, ReadingLog } from "@/types";
+import type { Book, BookPausePeriod, BookUpdate, Genre, Series, ReadingLog } from "@/types";
 
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
   authors?: string[] | null;
   author?: string | null;
   genre?: string | null;
   book_genres?: Array<{ genre?: Genre | null }>;
+  pause_periods?: BookPausePeriod[] | null;
 };
 
 function parseLegacyGenre(genre?: string | null): string[] | undefined {
@@ -35,6 +36,12 @@ function normalizeBook(row: LegacyAuthorBookRow): Book {
     .map((item) => item.genre)
     .filter((genre): genre is Genre => Boolean(genre));
   const displayGenres = selectedGenres.length > 0 ? getSelectedGenreTags(selectedGenres) : [];
+  const pausePeriods = (row.pause_periods ?? [])
+    .map((period) => ({
+      ...period,
+      resumed_at: period.resumed_at ?? null,
+    }))
+    .sort((a, b) => new Date(a.paused_at).getTime() - new Date(b.paused_at).getTime());
   const genres =
     displayGenres.length > 0
       ? displayGenres.map((genre) => genre.name)
@@ -55,6 +62,7 @@ function normalizeBook(row: LegacyAuthorBookRow): Book {
     selected_genres: selectedGenres,
     genre_paths: displayGenres.length > 0 ? displayGenres.map((genre) => genre.name) : genres,
     genres,
+    pause_periods: pausePeriods,
   };
 }
 
@@ -96,6 +104,15 @@ function isMissingGenreTablesError(error: unknown): boolean {
     combined.includes("relationship") && combined.includes("genres") ||
     combined.includes("relation") && combined.includes("genres")
   );
+}
+
+function isMissingPausePeriodsRelationError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message).toLowerCase() : "";
+  const details = "details" in error ? String((error as { details: unknown }).details).toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return combined.includes("book_pause_periods") || combined.includes("pause_periods");
 }
 
 function withoutMetadataSourcePayload<
@@ -142,9 +159,19 @@ function isMissingAuthorsColumnError(error: unknown): boolean {
 export async function fetchBooks(): Promise<Book[]> {
   const { data, error } = await supabase
     .from("books")
-    .select("*, book_genres(genre:genres(*))")
+    .select("*, book_genres(genre:genres(*)), book_pause_periods(*)")
     .order("created_at", { ascending: false });
   if (error) {
+    if (isMissingPausePeriodsRelationError(error)) {
+      const { data: pauseLegacyData, error: pauseLegacyError } = await supabase
+        .from("books")
+        .select("*, book_genres(genre:genres(*))")
+        .order("created_at", { ascending: false });
+      if (!pauseLegacyError) {
+        return ((pauseLegacyData ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row));
+      }
+      if (!isMissingGenreTablesError(pauseLegacyError)) throw pauseLegacyError;
+    }
     if (!isMissingGenreTablesError(error)) throw error;
 
     const { data: legacyData, error: legacyError } = await supabase
@@ -258,14 +285,40 @@ async function updateBookPayload(
   return normalizeBook(legacyData as LegacyAuthorBookRow);
 }
 
+async function runPauseBookMutation(
+  fnName: "pause_book" | "resume_book",
+  bookId: string,
+): Promise<Book> {
+  const { error } = await supabase.rpc(fnName, { book_uuid: bookId });
+  if (error) throw error;
+  return fetchBookById(bookId);
+}
+
+export async function pauseBook(id: string): Promise<Book> {
+  return runPauseBookMutation("pause_book", id);
+}
+
+export async function resumeBook(id: string): Promise<Book> {
+  return runPauseBookMutation("resume_book", id);
+}
+
 async function fetchBookById(id: string): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
-    .select("*, book_genres(genre:genres(*))")
+    .select("*, book_genres(genre:genres(*)), book_pause_periods(*)")
     .eq("id", id)
     .single();
 
   if (error) {
+    if (isMissingPausePeriodsRelationError(error)) {
+      const { data: pauseLegacyData, error: pauseLegacyError } = await supabase
+        .from("books")
+        .select("*, book_genres(genre:genres(*))")
+        .eq("id", id)
+        .single();
+      if (!pauseLegacyError) return normalizeBook(pauseLegacyData as LegacyAuthorBookRow);
+      if (!isMissingGenreTablesError(pauseLegacyError)) throw pauseLegacyError;
+    }
     if (!isMissingGenreTablesError(error)) throw error;
 
     const { data: legacyData, error: legacyError } = await supabase

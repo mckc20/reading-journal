@@ -1,10 +1,12 @@
 import { useId, useMemo, useState } from "react";
+import { PauseCircle } from "lucide-react";
 import { buildProgressTimeline } from "@/lib/bookAnalytics";
-import type { ReadingLog } from "@/types";
+import type { BookPausePeriod, ReadingLog } from "@/types";
 
 interface ProgressOverTimeChartProps {
   logs: ReadingLog[];
   totalPages?: number;
+  pausePeriods?: BookPausePeriod[];
 }
 
 function dayFromKey(dayKey: string): Date {
@@ -27,12 +29,13 @@ function formatFullDayLabel(dayKey: string): string {
 export default function ProgressOverTimeChart({
   logs,
   totalPages,
+  pausePeriods = [],
 }: ProgressOverTimeChartProps) {
   const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
   const gradientId = `progress-fill-${useId().replace(/:/g, "")}`;
   const progressTimeline = useMemo(
-    () => buildProgressTimeline(logs, totalPages),
-    [logs, totalPages],
+    () => buildProgressTimeline(logs, totalPages, pausePeriods),
+    [logs, pausePeriods, totalPages],
   );
 
   const progressChartHeight = 176;
@@ -44,7 +47,14 @@ export default function ProgressOverTimeChart({
 
   const getProgressXPercent = (dayKey: string, isStart = false): number => {
     const index = progressDatePoints.findIndex((point) => point.dayKey === dayKey);
-    if (index < 0) return 0;
+    if (index < 0) {
+      if (progressDatePoints.length === 0) return 0;
+      const firstDayKey = progressDatePoints[0].dayKey;
+      const lastDayKey = progressDatePoints[progressDatePoints.length - 1].dayKey;
+      if (dayKey < firstDayKey) return 0;
+      if (dayKey > lastDayKey) return 100;
+      return 0;
+    }
     if (progressDatePoints.length === 1) {
       return isStart ? 50 - progressStartOffsetPercent : 50;
     }
@@ -54,6 +64,17 @@ export default function ProgressOverTimeChart({
       (index / (progressDatePoints.length - 1)) * (100 - progressStartOffsetPercent);
     return isStart ? Math.max(0, dateX - progressStartOffsetPercent) : dateX;
   };
+
+  const pauseBands = progressTimeline.pauseSegments.map((segment, index) => {
+    const startX = getProgressXPercent(segment.startDayKey);
+    const endX = Math.max(startX + 3, getProgressXPercent(segment.endDayKey));
+    return {
+      key: `${segment.startDayKey}-${segment.endDayKey}-${index}`,
+      startX,
+      endX,
+      segment,
+    };
+  });
 
   const progressPoints = progressTimeline.points.map((point) => {
     const x = getProgressXPercent(point.dayKey, point.isStart);
@@ -128,6 +149,24 @@ export default function ProgressOverTimeChart({
               <div className="border-t border-border/70" />
             </div>
 
+            {pauseBands.map(({ key, startX, endX, segment }) => (
+              <div
+                key={key}
+                className="pointer-events-none absolute inset-y-0 z-[1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 bg-muted/20"
+                style={{ left: `${startX}%`, width: `${Math.max(4, endX - startX)}%` }}
+              >
+                <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">
+                  <span className="inline-flex flex-col items-center gap-1">
+                    <PauseCircle className="h-5 w-5 text-muted-foreground/70" />
+                    <span>
+                      Paused for {segment.durationDays}
+                      {segment.durationDays === 1 ? " day" : " days"}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ))}
+
             {activeProgressPoint && (
               <div
                 className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
@@ -145,7 +184,7 @@ export default function ProgressOverTimeChart({
             )}
 
             <svg
-              className="absolute inset-0 overflow-visible"
+              className="absolute inset-0 z-[2] overflow-visible"
               width="100%"
               height={progressChartHeight}
               viewBox={`0 0 100 ${progressChartHeight}`}
@@ -194,8 +233,8 @@ export default function ProgressOverTimeChart({
                   type="button"
                   className={
                     showMarker
-                      ? "absolute h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                      : "absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      ? "absolute z-[3] h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      : "absolute z-[3] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   }
                   style={{
                     left: `${x}%`,

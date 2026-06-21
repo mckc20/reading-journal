@@ -1,4 +1,4 @@
-import { BookOpen, Heart } from "lucide-react";
+import { BookOpen, Heart, PauseCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -6,6 +6,7 @@ import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { getTodayLocalDate, statusVariant } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 
 interface BookCardProps {
@@ -26,6 +27,7 @@ export default function BookCard({
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
   const hasTotalPages = totalPages > 0;
+  const isPaused = book.status === "Paused";
   const progressPercent = hasTotalPages
     ? Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)))
     : 0;
@@ -52,17 +54,27 @@ export default function BookCard({
       }}
     >
       {/* Cover */}
-      <div className="relative aspect-[2/3] w-full bg-muted flex-shrink-0">
+      <div
+        className={cn(
+          "relative aspect-[2/3] w-full bg-muted flex-shrink-0",
+          isPaused && "opacity-70",
+        )}
+      >
         {book.cover_url ? (
           <img
             src={book.cover_url}
             alt={book.title}
             loading="lazy"
-            className="h-full w-full object-cover"
+            className={cn("h-full w-full object-cover", isPaused && "grayscale")}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+          </div>
+        )}
+        {isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
+            <PauseCircle className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
         {book.is_favorite && (
