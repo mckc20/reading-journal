@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS group_messages (
   group_id uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   sender_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   content text NOT NULL DEFAULT '',
-  attachment_type text CHECK (attachment_type IN ('book', 'note', 'author')),
+  attachment_type text CHECK (attachment_type IN ('book', 'note', 'author', 'series')),
   attachment_payload jsonb,
   reply_to_message_id uuid REFERENCES group_messages(id) ON DELETE SET NULL,
   reply_snapshot jsonb,

@@ -301,7 +301,9 @@ export interface ChatReplySnapshot {
   created_at: string;
 }
 
-export type ChatAttachmentType = "book" | "note" | "author";
+// Chat attachments use a stable snapshot shape so sent messages don't change
+// if the underlying book, note, author, or series data changes later.
+export type ChatAttachmentType = "book" | "note" | "author" | "series";
 
 export type ChatSharedNoteLabel = BookNoteLabel;
 
@@ -357,7 +359,20 @@ export interface ChatAuthorAttachment {
   };
 }
 
+export interface ChatSharedSeriesSnapshot {
+  id?: string;
+  name: string;
+  books: ChatSharedBookSnapshot[];
+  included_quotes?: ChatSharedNoteSnapshot[];
+}
+
+export interface ChatSeriesAttachment {
+  type: "series";
+  series: ChatSharedSeriesSnapshot;
+}
+
 export type ChatAttachmentPayload =
   | ChatBookAttachment
   | ChatNoteAttachment
-  | ChatAuthorAttachment;
+  | ChatAuthorAttachment
+  | ChatSeriesAttachment;

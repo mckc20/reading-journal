@@ -12,6 +12,7 @@ import {
 import {
   bookSnapshotToAddBookPayload,
   buildBookAttachment,
+  buildSeriesAttachment,
   noteSnapshotToCreateInput,
 } from "../src/lib/chatAttachments";
 import type { Book, BookNote, Group, GroupMembership, GroupMessage } from "../src/types";
@@ -216,6 +217,21 @@ test("summarizes heart reactions with participant names", () => {
       ],
     },
   ]);
+});
+
+test("builds series attachments with included quotes", () => {
+  const attachment = buildSeriesAttachment({
+    seriesName: "The Locked Tomb",
+    books: [makeBook({ id: "book-a", title: "Gideon the Ninth" }), makeBook({ id: "book-b", title: "Harrow the Ninth" })],
+    includedQuotes: [
+      makeNote({ id: "quote-1", label: "quote", content: "The quote", book_id: "book-a" }),
+    ],
+  });
+
+  assert.equal(attachment.type, "series");
+  assert.equal(attachment.series.name, "The Locked Tomb");
+  assert.equal(attachment.series.books.length, 2);
+  assert.equal(attachment.series.included_quotes?.[0]?.content, "The quote");
 });
 
 function makeGroup(overrides: Partial<Group> = {}): Group {
