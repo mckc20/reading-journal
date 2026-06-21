@@ -283,6 +283,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "backup_frequency": "manual",
     "last_backup_at": null
   }'::jsonb,
+  last_seen_release_note_version text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK (jsonb_typeof(appearance) = 'object'),

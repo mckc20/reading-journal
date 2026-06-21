@@ -12,6 +12,7 @@ import { useTheme } from "@/context/ThemeContext";
 import {
   buildSectionUpdate,
   getMySettings,
+  markReleaseNoteAsSeen,
   upsertMySettings,
 } from "@/lib/userSettings";
 import { getErrorMessage } from "@/lib/profiles";
@@ -32,6 +33,7 @@ interface UserSettingsContextValue {
     section: Key,
     values: Partial<UserSettingsSections[Key]>,
   ) => Promise<UserSettings>;
+  markReleaseNoteSeen: (version: string) => Promise<UserSettings>;
 }
 
 const UserSettingsContext = createContext<UserSettingsContextValue | null>(null);
@@ -104,6 +106,16 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     [saveSettings],
   );
 
+  const markReleaseNoteSeen = useCallback(
+    async (version: string) => {
+      const savedSettings = await markReleaseNoteAsSeen(version);
+      setSettings(savedSettings);
+      setError(null);
+      return savedSettings;
+    },
+    [],
+  );
+
   const value = useMemo<UserSettingsContextValue>(
     () => ({
       settings,
@@ -113,6 +125,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       refreshSettings,
       saveSettings,
       saveSettingsSection,
+      markReleaseNoteSeen,
     }),
     [
       settings,
@@ -122,6 +135,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       refreshSettings,
       saveSettings,
       saveSettingsSection,
+      markReleaseNoteSeen,
     ],
   );
 

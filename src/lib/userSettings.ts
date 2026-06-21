@@ -23,6 +23,7 @@ type UserSettingsRow = {
   notifications: unknown;
   privacy: unknown;
   backup: unknown;
+  last_seen_release_note_version: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -150,6 +151,7 @@ function normalizeSettings(row: UserSettingsRow): UserSettings {
     notifications: mergeSection(DEFAULT_NOTIFICATION_SETTINGS, row.notifications),
     privacy: mergeSection(DEFAULT_PRIVACY_SETTINGS, row.privacy),
     backup: mergeSection(DEFAULT_BACKUP_SETTINGS, row.backup),
+    last_seen_release_note_version: row.last_seen_release_note_version ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -217,6 +219,21 @@ export async function upsertMySettings(update: UserSettingsUpdate): Promise<User
   const { data, error } = await supabase
     .from("user_settings")
     .upsert(toSettingsPayload(nextSettings), { onConflict: "user_id" })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return normalizeSettings(data as UserSettingsRow);
+}
+
+export async function markReleaseNoteAsSeen(
+  version: string,
+): Promise<UserSettings> {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("user_settings")
+    .update({ last_seen_release_note_version: version })
+    .eq("user_id", userId)
     .select("*")
     .single();
 

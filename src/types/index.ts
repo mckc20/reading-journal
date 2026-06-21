@@ -210,6 +210,7 @@ export interface UserSettings {
   notifications: NotificationSettings;
   privacy: PrivacySettings;
   backup: BackupSettings;
+  last_seen_release_note_version: string | null;
   created_at: string;
   updated_at: string;
 }
