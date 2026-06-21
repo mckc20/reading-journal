@@ -922,7 +922,7 @@ function buildLibraryFilterOptions(books: Book[], series: Series[]): LibraryFilt
   return {
     status: statusFilterOptions,
     genre: uniqueSortedValues(books.flatMap((book) => book.genres ?? [])),
-    rating: uniqueSortedValues(books.map((book) => book.rating?.toString())),
+    rating: ["Favorite", ...uniqueSortedValues(books.map((book) => book.rating?.toString()))],
     year: Array.from(years).sort((a, b) => Number(b) - Number(a)),
     publicationYear: Array.from(publicationYears).sort((a, b) => Number(b) - Number(a)),
     progress: progressFilterOptions,
@@ -961,6 +961,7 @@ function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: 
   if (!matchesAnyFilterValue(filters.genre, (filter) => (book.genres ?? []).includes(filter))) return false;
 
   if (!matchesAnyFilterValue(filters.rating, (filter) => {
+    if (filter === "Favorite") return book.is_favorite;
     const rating = Number.parseInt(filter, 10);
     return Number.isFinite(rating) && book.rating === rating;
   })) return false;
@@ -1962,7 +1963,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
 function getShelfFilters(shelf: SmartShelf): Partial<LibraryFilters> {
   if (shelf.key === "currently-reading") return { status: ["Currently Reading"] };
   if (shelf.key === "want-to-read") return { status: ["Want to Read"] };
-  if (shelf.key === "favorites") return { favorite: ["Yes"] };
+  if (shelf.key === "favorites") return { rating: ["Favorite"] };
   return {};
 }
 
