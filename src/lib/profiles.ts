@@ -30,6 +30,8 @@ type NullableProfileRow = Omit<
 type NullableGroupRow = Omit<Group, "description" | "avatar_url"> & {
   description: string | null;
   avatar_url: string | null;
+  kind?: Group["kind"] | null;
+  direct_pair_key?: string | null;
 };
 
 export type ProfilePayload = Partial<
@@ -79,6 +81,8 @@ function normalizeGroup(row: NullableGroupRow): Group {
     description: row.description ?? undefined,
     avatar_url: row.avatar_url ?? undefined,
     created_by: row.created_by,
+    kind: row.kind ?? "group",
+    direct_pair_key: row.direct_pair_key ?? null,
     created_at: row.created_at,
   };
 }
