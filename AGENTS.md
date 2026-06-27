@@ -40,6 +40,15 @@ npm run preview   # Preview production build
 
 Environment variables go in `.env` — Supabase URL and anon key from the Supabase dashboard.
 
+## Release Process
+
+Before creating a PR, update the user-facing release content for any user-facing and notable change that affects the app.
+
+- Update `src/content/changelog.md` with the new user-facing release note.
+- Make sure `src/components/ReleaseNotesDialog.tsx` will surface the new release note to users after deployment.
+- Treat this as a required pre-PR step, not a follow-up task.
+- If the change is visible to users, include a short note about what they should notice.
+
 ## Architecture
 
 ### Database Schema (Supabase/PostgreSQL)
