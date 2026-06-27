@@ -262,6 +262,7 @@ function makeSeries(overrides: Partial<Series>): Series {
   return {
     id: "series-1",
     name: "Series",
+    status: "ongoing",
     user_id: "user-1",
     created_at: "2026-05-01T08:00:00Z",
     ...overrides,

@@ -7,6 +7,7 @@ export * from "@/lib/genreTree";
 export type GenreInput = {
   name: string;
   parent_id?: string | null;
+  description?: string | null;
 };
 
 export async function fetchGenres(): Promise<Genre[]> {
@@ -28,6 +29,7 @@ export async function createGenre(userId: string, input: GenreInput): Promise<Ge
     .insert({
       name,
       parent_id: input.parent_id ?? null,
+      description: input.description?.trim() || null,
       user_id: userId,
       is_system: false,
     })
@@ -47,6 +49,7 @@ export async function updateGenre(id: string, input: GenreInput): Promise<Genre>
     .update({
       name,
       parent_id: input.parent_id ?? null,
+      description: input.description?.trim() || null,
     })
     .eq("id", id)
     .select()

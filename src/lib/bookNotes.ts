@@ -7,6 +7,7 @@ export interface CreateBookNoteInput {
   title?: string;
   quoteSpeaker?: string;
   content: string;
+  tags?: string[] | null;
   pageStart?: string | number | null;
   noteDate?: string | null;
   isFavorite?: boolean;
@@ -17,6 +18,7 @@ export interface BookNoteFieldsInput {
   title?: string;
   quoteSpeaker?: string;
   content: string;
+  tags?: string[] | null;
   pageStart?: string | number | null;
   noteDate?: string | null;
   isFavorite?: boolean;
@@ -29,6 +31,7 @@ export interface NormalizedBookNoteInput {
   title: string | null;
   quote_speaker: string | null;
   content: string;
+  tags: string[] | null;
   page_start: number | null;
   is_favorite: boolean;
   note_date: string;
@@ -39,6 +42,7 @@ export interface NormalizedBookNoteFields {
   title: string | null;
   quote_speaker: string | null;
   content: string;
+  tags: string[] | null;
   page_start: number | null;
   is_favorite: boolean;
   note_date: string;
@@ -94,6 +98,15 @@ function normalizeNoteDate(value: string | null | undefined): string {
   return normalizedValue;
 }
 
+function normalizeTags(value: string[] | null | undefined): string[] | null {
+  if (!value) return null;
+  const tags = value
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const uniqueTags = Array.from(new Set(tags));
+  return uniqueTags.length > 0 ? uniqueTags : null;
+}
+
 export function formatBookNotePageRange(
   note: Pick<BookNote, "page_start">,
 ): string | null {
@@ -117,6 +130,7 @@ export function normalizeBookNoteFields(
     quote_speaker:
       input.label === "quote" ? input.quoteSpeaker?.trim() || null : null,
     content,
+    tags: normalizeTags(input.tags),
     page_start: pageStart,
     is_favorite: input.label === "quote" ? Boolean(input.isFavorite) : false,
     note_date: normalizeNoteDate(input.noteDate),

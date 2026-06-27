@@ -17,9 +17,14 @@ export type BookMetadataSource = "open_library" | "google_books";
 
 export type PublicationDatePrecision = "year" | "month" | "day";
 
+export type SeriesStatus = "ongoing" | "completed";
+
 export interface Series {
   id: string;
   name: string;
+  description?: string | null;
+  status: SeriesStatus;
+  cover_url?: string | null;
   journal_content?: string;
   user_id: string;
   created_at: string;
@@ -28,6 +33,7 @@ export interface Series {
 export interface Genre {
   id: string;
   name: string;
+  description?: string | null;
   parent_id?: string | null;
   user_id?: string | null;
   is_system: boolean;
@@ -96,6 +102,7 @@ export interface BookNote {
   title?: string | null;
   quote_speaker?: string | null;
   content: string;
+  tags?: string[] | null;
   page_start?: number | null;
   is_favorite: boolean;
   note_date: string;

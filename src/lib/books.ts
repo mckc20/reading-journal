@@ -1,6 +1,14 @@
 import { supabase } from "./supabase";
 import { getSelectedGenreTags } from "@/lib/genres";
-import type { Book, BookPausePeriod, BookUpdate, Genre, Series, ReadingLog } from "@/types";
+import type {
+  Book,
+  BookPausePeriod,
+  BookUpdate,
+  Genre,
+  ReadingLog,
+  Series,
+  SeriesStatus,
+} from "@/types";
 
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
   authors?: string[] | null;
@@ -185,6 +193,14 @@ export async function fetchBooks(): Promise<Book[]> {
 }
 
 export type BookInsert = Omit<Book, "created_at">;
+
+export type SeriesInput = {
+  name: string;
+  description?: string | null;
+  status?: SeriesStatus;
+  cover_url?: string | null;
+  journal_content?: string | null;
+};
 
 async function insertBookPayload(payload: BookInsert): Promise<Book> {
   const { bookPayload, genreIds } = splitGenrePayload(payload);
@@ -406,10 +422,49 @@ export async function fetchSeries(): Promise<Series[]> {
   return data as Series[];
 }
 
-export async function createSeries(userId: string, name: string): Promise<Series> {
+export async function createSeries(userId: string, input: string | SeriesInput): Promise<Series> {
+  const payload =
+    typeof input === "string"
+      ? { name: input }
+      : input;
   const { data, error } = await supabase
     .from("series")
-    .insert({ name, user_id: userId })
+    .insert({
+      name: payload.name,
+      description: payload.description?.trim() || null,
+      status: payload.status ?? "ongoing",
+      cover_url: payload.cover_url ?? null,
+      journal_content: payload.journal_content ?? null,
+      user_id: userId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Series;
+}
+
+export async function updateSeries(seriesId: string, input: Partial<SeriesInput>): Promise<Series> {
+  const payload: Partial<SeriesInput> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.status !== undefined) payload.status = input.status;
+  if (input.cover_url !== undefined) payload.cover_url = input.cover_url;
+  if (input.journal_content !== undefined) payload.journal_content = input.journal_content;
+
+  const { data, error } = await supabase
+    .from("series")
+    .update({
+      ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+      ...(payload.description !== undefined
+        ? { description: payload.description?.trim() || null }
+        : {}),
+      ...(payload.status !== undefined ? { status: payload.status } : {}),
+      ...(payload.cover_url !== undefined ? { cover_url: payload.cover_url ?? null } : {}),
+      ...(payload.journal_content !== undefined
+        ? { journal_content: payload.journal_content ?? null }
+        : {}),
+    })
+    .eq("id", seriesId)
     .select()
     .single();
   if (error) throw error;
