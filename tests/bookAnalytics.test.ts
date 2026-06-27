@@ -221,10 +221,12 @@ test("marks progress timeline unavailable without valid total pages", () => {
   assert.deepEqual(buildProgressTimeline([makeProgressLog("a", 20, "2026-04-01T12:00:00")]), {
     isAvailable: false,
     points: [],
+    pauseSegments: [],
   });
   assert.deepEqual(buildProgressTimeline([makeProgressLog("a", 20, "2026-04-01T12:00:00")], 0), {
     isAvailable: false,
     points: [],
+    pauseSegments: [],
   });
 });
 

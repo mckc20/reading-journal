@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -92,18 +93,31 @@ export default function ReleaseNotesDialog() {
           ))}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
-            type="button"
-            variant="outline"
-            onClick={() => setOpen(false)}
-            disabled={saving}
+            variant="link"
+            size="sm"
+            asChild
+            className="w-fit justify-start px-0 text-xs font-medium"
           >
-            Not now
+            <Link to="/changelog" onClick={() => setOpen(false)}>
+              View changelog
+            </Link>
           </Button>
-          <Button type="button" onClick={() => void handleAcknowledge()} disabled={saving}>
-            Got it
-          </Button>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={saving}
+            >
+              Not now
+            </Button>
+            <Button type="button" onClick={() => void handleAcknowledge()} disabled={saving}>
+              Got it
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
