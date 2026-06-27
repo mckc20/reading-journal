@@ -12,6 +12,7 @@ const series: Series[] = [
   {
     id: "series-1",
     name: "The Broken Earth",
+    status: "ongoing",
     user_id: "user-1",
     created_at: "2026-04-01T10:00:00Z",
   },

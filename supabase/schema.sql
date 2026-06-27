@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS series (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name            text NOT NULL,
+  description     text,
+  status          text NOT NULL DEFAULT 'ongoing'
+                    CHECK (status IN ('ongoing', 'completed')),
+  cover_url       text,
   journal_content text,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -49,6 +53,7 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS genres (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name       text NOT NULL CHECK (btrim(name) <> ''),
+  description text,
   parent_id  uuid REFERENCES genres(id) ON DELETE CASCADE,
   user_id    uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   is_system  boolean NOT NULL DEFAULT false,
@@ -168,6 +173,7 @@ CREATE TABLE IF NOT EXISTS book_notes (
   title      text,
   quote_speaker text,
   content    text NOT NULL CHECK (length(btrim(content)) > 0),
+  tags       text[],
   page_start integer CHECK (page_start IS NULL OR page_start > 0),
   is_favorite boolean NOT NULL DEFAULT false,
   note_date  date NOT NULL DEFAULT CURRENT_DATE,

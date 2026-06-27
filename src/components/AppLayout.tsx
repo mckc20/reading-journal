@@ -1,15 +1,18 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   BookOpen,
   Compass,
   Home,
   Library,
+  LibraryBig,
   LogOut,
+  MessageCircle,
   Plus,
   Search,
   Settings,
   StickyNote,
+  SwatchBook,
   UserRound,
   Users,
   type LucideIcon,
@@ -24,6 +27,26 @@ import { cn } from "@/lib/utils";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
+const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
+const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
+const AddNoteDialog = lazy(() => import("./AddNoteDialog"));
+const AddChatDialog = lazy(() => import("./AddChatDialog"));
+const AddGenreDialog = lazy(() => import("./AddGenreDialog"));
+
+type AddAction = "book" | "author" | "series" | "note" | "chat" | "genre";
+
+const addActions: Array<{
+  key: AddAction;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { key: "book", label: "Book", icon: BookOpen },
+  { key: "author", label: "Author", icon: UserRound },
+  { key: "series", label: "Series", icon: LibraryBig },
+  { key: "note", label: "Note", icon: StickyNote },
+  { key: "chat", label: "Chat", icon: MessageCircle },
+  { key: "genre", label: "Genre", icon: SwatchBook },
+];
 
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
@@ -81,7 +104,11 @@ function AppLayoutContent() {
   const { profile } = useProfile();
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
   const [detailEditingOpen, setDetailEditingOpen] = useState(false);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
   const displayName = getDisplayName(profile, user?.email);
   const hideAddBookButton = location.pathname.startsWith("/groups") || detailEditingOpen;
 
@@ -101,6 +128,38 @@ function AppLayoutContent() {
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (addButtonRef.current?.contains(target) || addMenuRef.current?.contains(target)) {
+        return;
+      }
+      setAddMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setAddMenuOpen(false);
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [addMenuOpen]);
+
+  function openAddDialog(action: AddAction) {
+    setAddMenuOpen(false);
+    if (action === "book") {
+      setAddBookOpen(true);
+      return;
+    }
+    setActiveAddAction(action);
+  }
 
   return (
     <>
@@ -125,13 +184,51 @@ function AppLayoutContent() {
           />
         </main>
 
-        {!hideAddBookButton && <FloatingAddBookButton onClick={() => setAddBookOpen(true)} />}
+        {!hideAddBookButton && (
+          <FloatingAddButtonMenu
+            buttonRef={addButtonRef}
+            menuRef={addMenuRef}
+            open={addMenuOpen}
+            onToggleOpen={() => setAddMenuOpen((current) => !current)}
+            onSelect={openAddDialog}
+          />
+        )}
         <MobileBottomNav pathname={location.pathname} search={location.search} />
       </div>
 
       <Suspense fallback={null}>
         {addBookOpen && (
           <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
+        )}
+        {activeAddAction === "author" && (
+          <AddAuthorDialog
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+          />
+        )}
+        {activeAddAction === "series" && (
+          <AddSeriesDialog
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+          />
+        )}
+        {activeAddAction === "note" && (
+          <AddNoteDialog
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+          />
+        )}
+        {activeAddAction === "chat" && (
+          <AddChatDialog
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+          />
+        )}
+        {activeAddAction === "genre" && (
+          <AddGenreDialog
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+          />
         )}
       </Suspense>
 
@@ -316,17 +413,57 @@ function ProfileMenuLink({
   );
 }
 
-function FloatingAddBookButton({ onClick }: { onClick: () => void }) {
+function FloatingAddButtonMenu({
+  open,
+  onToggleOpen,
+  onSelect,
+  buttonRef,
+  menuRef,
+}: {
+  open: boolean;
+  onToggleOpen: () => void;
+  onSelect: (action: AddAction) => void;
+  buttonRef: RefObject<HTMLButtonElement>;
+  menuRef: RefObject<HTMLDivElement>;
+}) {
   return (
-    <Button
-      type="button"
-      size="icon-lg"
-      className="fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-[0_14px_30px_oklch(0.21_0_0_/_0.18)] hover:bg-primary/90 md:bottom-6 md:right-6"
-      aria-label="Add book"
-      onClick={onClick}
-    >
-      <Plus className="h-7 w-7" />
-    </Button>
+    <div className="fixed bottom-20 right-4 z-40 md:bottom-6 md:right-6">
+      {open && (
+        <div
+          ref={menuRef}
+          className="absolute bottom-full right-0 mb-3 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
+        >
+          <div className="mb-1 px-2 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Add
+          </div>
+          <div className="space-y-1">
+            {addActions.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover"
+                onClick={() => onSelect(key)}
+              >
+                <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <Button
+        ref={buttonRef}
+        type="button"
+        size="icon-lg"
+        className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-[0_14px_30px_oklch(0.21_0_0_/_0.18)] hover:bg-primary/90"
+        aria-label="Add"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={onToggleOpen}
+      >
+        <Plus className="h-7 w-7" />
+      </Button>
+    </div>
   );
 }
 
