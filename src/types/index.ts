@@ -30,6 +30,22 @@ export interface Series {
   created_at: string;
 }
 
+export interface Author {
+  id: string;
+  user_id: string;
+  name: string;
+  photo_url?: string | null;
+  birth_date?: string | null;
+  birth_date_precision?: PublicationDatePrecision | null;
+  death_date?: string | null;
+  death_date_precision?: PublicationDatePrecision | null;
+  bio?: string | null;
+  is_favorite: boolean;
+  nationality?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Genre {
   id: string;
   name: string;
@@ -373,6 +389,7 @@ export interface ChatNoteAttachment {
 export interface ChatAuthorAttachment {
   type: "author";
   author: {
+    id?: string;
     name: string;
     books: ChatSharedBookSnapshot[];
     included_quotes?: ChatSharedNoteSnapshot[];

@@ -2,6 +2,17 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-06-27 - Database-backed authors and author picker
+Version: `2026-06-27-authors-normalization`
+Summary: Authors now come from their own database table, and book forms use a searchable picker with inline author creation.
+
+- Author picker for books
+  You can now pick existing authors or open the Add Author dialog directly from the book form.
+- Author metadata and detail pages
+  Author pages now read from saved author records, so bio, photo, favorite, and nationality can show up there.
+- Stable author links
+  Author detail pages now use stable IDs, which keeps links working even if an author name changes later.
+
 ## 2026-06-21 - Chat, groups, attachments, and pause mode
 Version: `2026-06-21-pause-books`
 Summary: You can now chat with other readers, organize conversations into groups, share attachments, and pause books when you need to step away.

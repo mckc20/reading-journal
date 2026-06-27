@@ -1,19 +1,20 @@
 import { supabase } from "./supabase";
 import { getSelectedGenreTags } from "@/lib/genres";
-import type {
-  Book,
-  BookPausePeriod,
-  BookUpdate,
-  Genre,
-  ReadingLog,
-  Series,
-  SeriesStatus,
-} from "@/types";
+import { replaceBookAuthors } from "@/lib/authors";
+import { deletePublicImageVariants, uploadPublicImage } from "@/lib/storage";
+import type { Book, BookPausePeriod, BookUpdate, Genre, ReadingLog, Series, SeriesStatus } from "@/types";
 
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
   authors?: string[] | null;
   author?: string | null;
   genre?: string | null;
+  book_authors?: Array<{
+    position?: number | null;
+    author?: {
+      id: string;
+      name: string;
+    } | null;
+  }> | null;
   book_genres?: Array<{ genre?: Genre | null }>;
   pause_periods?: BookPausePeriod[] | null;
 };
@@ -39,6 +40,10 @@ function parseLegacyAuthorList(author?: string | null): string[] {
   );
 }
 
+function normalizeAuthorName(author: string): string {
+  return author.trim().replace(/\s+/g, " ");
+}
+
 function normalizeBook(row: LegacyAuthorBookRow): Book {
   const selectedGenres = (row.book_genres ?? [])
     .map((item) => item.genre)
@@ -54,14 +59,21 @@ function normalizeBook(row: LegacyAuthorBookRow): Book {
     displayGenres.length > 0
       ? displayGenres.map((genre) => genre.name)
       : row.genres ?? parseLegacyGenre(row.genre);
-  const normalizedAuthors = row.authors?.map((value) => value.trim()).filter(Boolean) ?? [];
+  const joinedAuthors = (row.book_authors ?? [])
+    .slice()
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((item) => item.author?.name?.trim())
+    .filter((value): value is string => Boolean(value));
+  const normalizedAuthors = row.authors?.map(normalizeAuthorName).filter(Boolean) ?? [];
   const legacyAuthors = parseLegacyAuthorList(row.author);
   const authors =
-    normalizedAuthors.length > 0
-      ? normalizedAuthors
-      : legacyAuthors.length > 0
-        ? legacyAuthors
-        : ["Unknown"];
+    joinedAuthors.length > 0
+      ? Array.from(new Set(joinedAuthors))
+      : normalizedAuthors.length > 0
+        ? Array.from(new Set(normalizedAuthors))
+        : legacyAuthors.length > 0
+          ? legacyAuthors
+          : ["Unknown"];
 
   return {
     ...row,
@@ -130,6 +142,11 @@ function withoutMetadataSourcePayload<
   return rest;
 }
 
+function withoutAuthorsPayload<T extends { authors?: unknown }>(payload: T): Omit<T, "authors"> {
+  const { authors: _authors, ...rest } = payload;
+  return rest;
+}
+
 function isMissingMetadataSourceColumnError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const message = "message" in error ? String((error as { message: unknown }).message) : "";
@@ -156,10 +173,35 @@ function toLegacyAuthorPayload<T extends { authors?: string[] }>(
   };
 }
 
-function isMissingAuthorsColumnError(error: unknown): boolean {
+function isMissingAuthorRelationsError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const message = "message" in error ? String((error as { message: unknown }).message) : "";
-  return message.toLowerCase().includes("authors") && message.toLowerCase().includes("column");
+  const message = "message" in error ? String((error as { message: unknown }).message).toLowerCase() : "";
+  const details = "details" in error ? String((error as { details: unknown }).details).toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return (
+    combined.includes("book_authors") ||
+    (combined.includes("authors") && combined.includes("relation")) ||
+    (combined.includes("authors") && combined.includes("column")) ||
+    (combined.includes("authors") && combined.includes("null value")) ||
+    (combined.includes("authors") && combined.includes("not-null"))
+  );
+}
+
+function isMissingNormalizedAuthorsSupportError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message).toLowerCase() : "";
+  const details = "details" in error ? String((error as { details: unknown }).details).toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return (
+    combined.includes("authors") &&
+    (combined.includes("book_authors") ||
+      combined.includes("relation") ||
+      combined.includes("column") ||
+      combined.includes("null value") ||
+      combined.includes("not-null"))
+  );
 }
 
 // ── Books ──────────────────────────────────────────────────────────────────
@@ -167,20 +209,22 @@ function isMissingAuthorsColumnError(error: unknown): boolean {
 export async function fetchBooks(): Promise<Book[]> {
   const { data, error } = await supabase
     .from("books")
-    .select("*, book_genres(genre:genres(*)), book_pause_periods(*)")
+    .select("*, book_genres(genre:genres(*)), book_authors(position, author:authors(*)), book_pause_periods(*)")
     .order("created_at", { ascending: false });
   if (error) {
     if (isMissingPausePeriodsRelationError(error)) {
       const { data: pauseLegacyData, error: pauseLegacyError } = await supabase
         .from("books")
-        .select("*, book_genres(genre:genres(*))")
+        .select("*, book_genres(genre:genres(*)), book_authors(position, author:authors(*))")
         .order("created_at", { ascending: false });
       if (!pauseLegacyError) {
         return ((pauseLegacyData ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row));
       }
-      if (!isMissingGenreTablesError(pauseLegacyError)) throw pauseLegacyError;
+      if (!isMissingGenreTablesError(pauseLegacyError) && !isMissingAuthorRelationsError(pauseLegacyError)) {
+        throw pauseLegacyError;
+      }
     }
-    if (!isMissingGenreTablesError(error)) throw error;
+    if (!isMissingGenreTablesError(error) && !isMissingAuthorRelationsError(error)) throw error;
 
     const { data: legacyData, error: legacyError } = await supabase
       .from("books")
@@ -204,15 +248,19 @@ export type SeriesInput = {
 
 async function insertBookPayload(payload: BookInsert): Promise<Book> {
   const { bookPayload, genreIds } = splitGenrePayload(payload);
+  const normalizedPayload = withoutAuthorsPayload(bookPayload);
   const { error } = await supabase
     .from("books")
-    .insert(bookPayload);
+    .insert(normalizedPayload);
   if (!error) {
+    if (bookPayload.authors) {
+      await replaceBookAuthors(payload.id, payload.user_id, bookPayload.authors);
+    }
     if (genreIds) await replaceBookGenres(payload.id, genreIds);
     return fetchBookById(payload.id);
   }
 
-  if (isMissingAuthorsColumnError(error)) {
+  if (isMissingNormalizedAuthorsSupportError(error)) {
     const { data: legacyData, error: legacyError } = await supabase
       .from("books")
       .insert(toLegacyAuthorPayload(bookPayload))
@@ -263,6 +311,14 @@ async function updateBookPayload(
   payload: BookUpdate,
 ): Promise<Book> {
   const { bookPayload, genreIds } = splitGenrePayload(payload);
+  const normalizedPayload = withoutAuthorsPayload(bookPayload);
+  const { data: existingBook, error: existingBookError } = await supabase
+    .from("books")
+    .select("user_id")
+    .eq("id", id)
+    .single();
+  if (existingBookError) throw existingBookError;
+
   if (Object.keys(bookPayload).length === 0) {
     if (genreIds) await replaceBookGenres(id, genreIds);
     return fetchBookById(id);
@@ -270,14 +326,17 @@ async function updateBookPayload(
 
   const { error } = await supabase
     .from("books")
-    .update(bookPayload)
+    .update(normalizedPayload)
     .eq("id", id);
   if (!error) {
+    if (bookPayload.authors) {
+      await replaceBookAuthors(id, existingBook.user_id, bookPayload.authors);
+    }
     if (genreIds) await replaceBookGenres(id, genreIds);
     return fetchBookById(id);
   }
 
-  if (isMissingAuthorsColumnError(error)) {
+  if (isMissingNormalizedAuthorsSupportError(error)) {
     const { data: legacyData, error: legacyError } = await supabase
       .from("books")
       .update(toLegacyAuthorPayload(bookPayload))
@@ -321,7 +380,7 @@ export async function resumeBook(id: string): Promise<Book> {
 async function fetchBookById(id: string): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
-    .select("*, book_genres(genre:genres(*)), book_pause_periods(*)")
+    .select("*, book_genres(genre:genres(*)), book_authors(position, author:authors(*)), book_pause_periods(*)")
     .eq("id", id)
     .single();
 
@@ -329,13 +388,15 @@ async function fetchBookById(id: string): Promise<Book> {
     if (isMissingPausePeriodsRelationError(error)) {
       const { data: pauseLegacyData, error: pauseLegacyError } = await supabase
         .from("books")
-        .select("*, book_genres(genre:genres(*))")
+        .select("*, book_genres(genre:genres(*)), book_authors(position, author:authors(*))")
         .eq("id", id)
         .single();
       if (!pauseLegacyError) return normalizeBook(pauseLegacyData as LegacyAuthorBookRow);
-      if (!isMissingGenreTablesError(pauseLegacyError)) throw pauseLegacyError;
+      if (!isMissingGenreTablesError(pauseLegacyError) && !isMissingAuthorRelationsError(pauseLegacyError)) {
+        throw pauseLegacyError;
+      }
     }
-    if (!isMissingGenreTablesError(error)) throw error;
+    if (!isMissingGenreTablesError(error) && !isMissingAuthorRelationsError(error)) throw error;
 
     const { data: legacyData, error: legacyError } = await supabase
       .from("books")
@@ -375,40 +436,20 @@ export async function deleteBook(id: string): Promise<void> {
 
 // ── Cover Storage ──────────────────────────────────────────────────────────
 
-function coverPath(userId: string, bookId: string, ext: string): string {
-  return `${userId}/${bookId}.${ext}`;
-}
-
-const VALID_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "avif"];
-
 export async function uploadCover(
   userId: string,
   bookId: string,
   file: File
 ): Promise<string> {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (!VALID_IMAGE_EXTENSIONS.includes(ext)) {
-    throw new Error(`Invalid file type ".${ext}". Allowed: ${VALID_IMAGE_EXTENSIONS.join(", ")}`);
-  }
-  const path = coverPath(userId, bookId, ext);
-  const { error } = await supabase.storage
-    .from("covers")
-    .upload(path, file, { upsert: true });
-  if (error) throw error;
-  const { data } = supabase.storage.from("covers").getPublicUrl(path);
-  const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `${data.publicUrl}?v=${cacheBuster}`;
+  const { publicUrl } = await uploadPublicImage("covers", userId, bookId, file);
+  return publicUrl;
 }
 
 export async function deleteCover(
   userId: string,
   bookId: string
 ): Promise<void> {
-  // Best-effort — try common extensions; doesn't throw if not found
-  const paths = ["jpg", "jpeg", "png", "webp", "avif"].map((e) =>
-    coverPath(userId, bookId, e)
-  );
-  await supabase.storage.from("covers").remove(paths);
+  await deletePublicImageVariants("covers", userId, bookId);
 }
 
 // ── Series ─────────────────────────────────────────────────────────────────

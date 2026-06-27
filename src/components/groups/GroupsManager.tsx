@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context";
+import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import {
   attachmentTitle,
@@ -200,7 +201,9 @@ function attachmentHref(attachment: ChatAttachmentPayload): string | null {
     if (!attachment.note.book_id) return null;
     return `/books/${attachment.note.book_id}/annotations`;
   }
-  if (attachment.type === "author") return `/authors/${encodeURIComponent(attachment.author.name)}`;
+  if (attachment.type === "author") {
+    return `/authors/${encodeURIComponent(attachment.author.id ?? attachment.author.name)}`;
+  }
   if (attachment.series.id) return `/series/${attachment.series.id}`;
   return null;
 }
@@ -595,6 +598,7 @@ function AttachmentCard({
 
 export function GroupsManager() {
   const { user } = useAuth();
+  const { authors: authorRecords } = useAuthorsContext();
   const { books, addBook } = useBooksContext();
   const { series: librarySeries, addSeries } = useSeries();
   const navigate = useNavigate();
@@ -670,7 +674,10 @@ export function GroupsManager() {
     return map;
   }, [notes]);
 
-  const authorSummaries = useMemo(() => buildAuthorSummaries(books, notes), [books, notes]);
+  const authorSummaries = useMemo(
+    () => buildAuthorSummaries(authorRecords, books, notes),
+    [authorRecords, books, notes],
+  );
   const seriesById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item])), [librarySeries]);
   const seriesBooksById = useMemo(() => {
     const map = new Map<string, Book[]>();
@@ -1248,6 +1255,7 @@ export function GroupsManager() {
         .filter((note): note is BookNote => Boolean(note));
       setSelectedAttachment(
         buildAuthorAttachment({
+          authorId: selectedAuthor.id,
           authorName: selectedAuthor.name,
           books: selectedAuthor.books,
           includedQuotes,

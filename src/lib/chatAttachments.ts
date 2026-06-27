@@ -78,10 +78,12 @@ export function buildNoteAttachment(note: BookNote, book?: Book | null): ChatNot
 }
 
 export function buildAuthorAttachment({
+  authorId,
   authorName,
   books,
   includedQuotes,
 }: {
+  authorId?: string;
   authorName: string;
   books: Book[];
   includedQuotes: BookNote[];
@@ -89,6 +91,7 @@ export function buildAuthorAttachment({
   return {
     type: "author",
     author: {
+      id: authorId,
       name: authorName,
       books: books.map((book) => buildSharedBookSnapshot(book)),
       included_quotes: includedQuotes

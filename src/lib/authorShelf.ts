@@ -1,5 +1,6 @@
+import type { Author, Book, BookNote } from "@/types";
 import { sortBookNotes } from "@/lib/bookNotes";
-import type { Book, BookNote, BookStatus } from "@/types";
+import { formatPublicationDateForDisplay } from "@/lib/publicationDate";
 
 export type AuthorShelfGroupKey = "read" | "reading" | "want-to-read" | "uncategorized";
 
@@ -9,8 +10,7 @@ export type AuthorShelfGroup = {
   books: Book[];
 };
 
-export type AuthorSummary = {
-  name: string;
+export type AuthorSummary = Author & {
   books: Book[];
   quotes: BookNote[];
   bookCount: number;
@@ -38,7 +38,7 @@ const shelfGroupTitles: Record<AuthorShelfGroupKey, string> = {
 };
 
 function cleanAuthorName(author: string): string {
-  return author.trim();
+  return author.trim().replace(/\s+/g, " ");
 }
 
 function authorKey(author: string): string {
@@ -76,6 +76,20 @@ function getAverageRating(books: Book[]): number | null {
   return Math.round((total / ratings.length) * 10) / 10;
 }
 
+export function getAuthorPagesWritten(author: Pick<AuthorSummary, "books">): number {
+  return author.books.reduce((total, book) => total + (book.total_pages ?? 0), 0);
+}
+
+export function getAuthorAverageRating(author: Pick<AuthorSummary, "books">): number | null {
+  const ratings = author.books
+    .map((book) => book.rating)
+    .filter((rating): rating is number => typeof rating === "number");
+
+  if (ratings.length === 0) return null;
+
+  return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+}
+
 function getReadingDateBounds(books: Book[]): {
   firstReadDate: string | null;
   latestReadDate: string | null;
@@ -91,7 +105,7 @@ function getReadingDateBounds(books: Book[]): {
   };
 }
 
-function shelfKeyForStatus(status: BookStatus): AuthorShelfGroupKey {
+function shelfKeyForStatus(status: Book["status"]): AuthorShelfGroupKey {
   if (status === "Finished") return "read";
   if (status === "Reading" || status === "Paused") return "reading";
   if (["Wishlist", "Not Started", "Up Next"].includes(status)) return "want-to-read";
@@ -134,15 +148,89 @@ function sortAuthors(authors: AuthorSummary[]): AuthorSummary[] {
   });
 }
 
-export function buildAuthorSummaries(books: Book[], notes: BookNote[] = []): AuthorSummary[] {
-  const authorBooks = new Map<string, { name: string; books: Book[] }>();
+function makeSyntheticAuthorSummary(name: string): AuthorSummary {
+  return {
+    id: `legacy:${encodeURIComponent(name)}`,
+    user_id: "",
+    name,
+    photo_url: null,
+    birth_date: null,
+    birth_date_precision: null,
+    death_date: null,
+    death_date_precision: null,
+    bio: null,
+    is_favorite: false,
+    nationality: null,
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+    books: [],
+    quotes: [],
+    bookCount: 0,
+    quoteCount: 0,
+    averageRating: null,
+    firstReadDate: null,
+    latestReadDate: null,
+    isFavorite: false,
+    coverBooks: [],
+    statusCounts: {
+      read: 0,
+      reading: 0,
+      wantToRead: 0,
+    },
+    shelfGroups: [],
+  };
+}
+
+export function buildAuthorSummaries(
+  first: Author[] | Book[],
+  second: Book[] | BookNote[] = [],
+  third: BookNote[] = [],
+): AuthorSummary[] {
+  const firstItem = first[0] as Author | Book | undefined;
+  const secondItem = second[0] as Book | BookNote | undefined;
+  const firstLooksLikeAuthor = Boolean(firstItem && !("title" in firstItem) && !("status" in firstItem));
+  const secondLooksLikeBook = Boolean(secondItem && "title" in secondItem && "status" in secondItem);
+  const usesNewSignature = firstLooksLikeAuthor || third.length > 0 || secondLooksLikeBook;
+  const authorsInput = usesNewSignature ? (first as Author[]) : [];
+  const books = usesNewSignature ? (second as Book[]) : (first as Book[]);
+  const notes = usesNewSignature ? third : (second as BookNote[]);
+
+  const authorGroups = new Map<string, { author: AuthorSummary; books: Book[] }>();
+
+  authorsInput.forEach((author) => {
+    const summary: AuthorSummary = {
+      ...author,
+      isFavorite: author.is_favorite,
+      books: [],
+      quotes: [],
+      bookCount: 0,
+      quoteCount: 0,
+      averageRating: null,
+      firstReadDate: null,
+      latestReadDate: null,
+      coverBooks: [],
+      statusCounts: {
+        read: 0,
+        reading: 0,
+        wantToRead: 0,
+      },
+      shelfGroups: [],
+    };
+    authorGroups.set(authorKey(author.name), { author: summary, books: [] });
+  });
 
   books.forEach((book) => {
-    uniqueAuthorNames(book).forEach((author) => {
-      const key = authorKey(author);
-      const group = authorBooks.get(key) ?? { name: author, books: [] };
-      group.books.push(book);
-      authorBooks.set(key, group);
+    uniqueAuthorNames(book).forEach((name) => {
+      const key = authorKey(name);
+      const existing = authorGroups.get(key);
+      if (existing) {
+        existing.books.push(book);
+        return;
+      }
+
+      const synthetic = makeSyntheticAuthorSummary(name);
+      synthetic.books.push(book);
+      authorGroups.set(key, { author: synthetic, books: [book] });
     });
   });
 
@@ -153,14 +241,21 @@ export function buildAuthorSummaries(books: Book[], notes: BookNote[] = []): Aut
   });
 
   return sortAuthors(
-    Array.from(authorBooks.values()).map(({ name, books: authorGroupBooks }) => {
-      const sortedBooks = [...authorGroupBooks].sort(compareBooksByReadingDateDesc);
+    Array.from(authorGroups.values()).map(({ author, books: authorBooks }) => {
+      const sortedBooks = [...authorBooks].sort(compareBooksByReadingDateDesc);
       const quotes = sortedBooks.flatMap((book) => quotesByBookId.get(book.id) ?? []);
       const { firstReadDate, latestReadDate } = getReadingDateBounds(sortedBooks);
       const shelfGroups = buildShelfGroups(sortedBooks);
+      const statusCounts = {
+        read: sortedBooks.filter((book) => book.status === "Finished").length,
+        reading: sortedBooks.filter((book) => book.status === "Reading" || book.status === "Paused").length,
+        wantToRead: sortedBooks.filter((book) =>
+          ["Wishlist", "Not Started", "Up Next"].includes(book.status),
+        ).length,
+      };
 
       return {
-        name,
+        ...author,
         books: sortedBooks,
         quotes,
         bookCount: sortedBooks.length,
@@ -168,15 +263,9 @@ export function buildAuthorSummaries(books: Book[], notes: BookNote[] = []): Aut
         averageRating: getAverageRating(sortedBooks),
         firstReadDate,
         latestReadDate,
-        isFavorite: sortedBooks.some((book) => book.is_favorite),
+        isFavorite: author.is_favorite,
         coverBooks: getCoverBooks(sortedBooks),
-        statusCounts: {
-          read: sortedBooks.filter((book) => book.status === "Finished").length,
-          reading: sortedBooks.filter((book) => book.status === "Reading" || book.status === "Paused").length,
-          wantToRead: sortedBooks.filter((book) =>
-            ["Wishlist", "Not Started", "Up Next"].includes(book.status),
-          ).length,
-        },
+        statusCounts,
         shelfGroups,
       };
     }),
@@ -185,18 +274,21 @@ export function buildAuthorSummaries(books: Book[], notes: BookNote[] = []): Aut
 
 export function findAuthorSummary(
   authors: AuthorSummary[],
-  authorName: string | undefined,
+  identifier: string | undefined,
 ): AuthorSummary | null {
-  if (!authorName) return null;
+  if (!identifier) return null;
 
-  let decodedName = authorName;
+  let decoded = identifier;
   try {
-    decodedName = decodeURIComponent(authorName);
+    decoded = decodeURIComponent(identifier);
   } catch {
-    decodedName = authorName;
+    decoded = identifier;
   }
 
-  const key = authorKey(decodedName);
+  const byId = authors.find((author) => author.id === decoded);
+  if (byId) return byId;
+
+  const key = authorKey(decoded);
   return authors.find((author) => authorKey(author.name) === key) ?? null;
 }
 
@@ -220,6 +312,13 @@ export function formatAuthorYear(date: string | null): string {
   if (Number.isNaN(parsedDate.getTime())) return "No date yet";
 
   return new Intl.DateTimeFormat(undefined, { year: "numeric" }).format(parsedDate);
+}
+
+export function formatAuthorPartialDate(
+  value: string | null | undefined,
+  precision: Author["birth_date_precision"] | Author["death_date_precision"] | null | undefined,
+): string {
+  return formatPublicationDateForDisplay(value ?? null, precision ?? null);
 }
 
 export function getAuthorInitials(name: string): string {

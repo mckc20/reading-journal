@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Heart } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import QuoteBlock from "@/components/QuoteBlock";
@@ -28,13 +29,22 @@ function labelText(label: BookNoteLabel): string {
 
 interface AnnotationCardProps {
   note: BookNote;
+  bookId?: string | null;
+  bookTitle?: string | null;
   compact?: boolean;
   className?: string;
 }
 
-export default function AnnotationCard({ note, compact = false, className }: AnnotationCardProps) {
+export default function AnnotationCard({ note, bookId, bookTitle, compact = false, className }: AnnotationCardProps) {
   const pageRangeLabel = formatBookNotePageRange(note);
   const visibleDate = note.note_date ?? note.created_at;
+  const bookLabel = bookTitle && bookId ? (
+    <Link to={`/books/${bookId}`} className="text-muted-foreground transition-colors hover:text-foreground">
+      From {bookTitle}
+    </Link>
+  ) : bookTitle ? (
+    <span>{bookTitle}</span>
+  ) : null;
 
   if (note.label === "quote") {
     return (
@@ -43,6 +53,7 @@ export default function AnnotationCard({ note, compact = false, className }: Ann
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <time dateTime={visibleDate}>{formatNoteDate(visibleDate)}</time>
             {pageRangeLabel && <span>{pageRangeLabel}</span>}
+            {bookLabel}
           </div>
           {note.is_favorite && <Heart className="h-4 w-4 fill-favorite text-favorite" />}
         </div>
@@ -72,9 +83,8 @@ export default function AnnotationCard({ note, compact = false, className }: Ann
           <Badge variant="outline" className={LABEL_STYLES[note.label]}>
             {labelText(note.label)}
           </Badge>
-          {pageRangeLabel && (
-            <span className="text-xs font-medium text-muted-foreground">{pageRangeLabel}</span>
-          )}
+          {pageRangeLabel && <span className="text-xs font-medium text-muted-foreground">{pageRangeLabel}</span>}
+          {bookLabel}
         </div>
         <div className="flex items-center gap-2">
           {note.is_favorite && <Heart className="h-4 w-4 fill-favorite text-favorite" />}

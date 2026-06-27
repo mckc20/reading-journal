@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-06-21-pause-books");
-  assert.equal(entries[0].title, "Chat, groups, attachments, and pause mode");
-  assert.equal(entries[0].summary, "You can now chat with other readers, organize conversations into groups, share attachments, and pause books when you need to step away.");
+  assert.equal(entries[0].version, "2026-06-27-authors-normalization");
+  assert.equal(entries[0].title, "Database-backed authors and author picker");
+  assert.equal(entries[0].summary, "Authors now come from their own database table, and book forms use a searchable picker with inline author creation.");
   assert.equal(entries[0].highlights.length, 3);
-  assert.equal(entries[0].highlights[0].title, "Direct chats and group spaces");
-  assert.equal(entries[0].highlights[0].description, "Start one-to-one conversations or create shared spaces for reading clubs and friends.");
+  assert.equal(entries[0].highlights[0].title, "Author picker for books");
+  assert.equal(entries[0].highlights[0].description, "You can now pick existing authors or open the Add Author dialog directly from the book form.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 

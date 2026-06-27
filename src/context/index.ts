@@ -1,4 +1,5 @@
 export { AuthProvider, useAuth } from "./AuthContext";
+export { AuthorsProvider, useAuthorsContext } from "./AuthorsContext";
 export { BooksProvider, useBooksContext } from "./BooksContext";
 export { GenresProvider, useGenresContext } from "./GenresContext";
 export { ProfileProvider, useProfile } from "./ProfileContext";

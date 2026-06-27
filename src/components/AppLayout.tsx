@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
+import { AuthorsProvider } from "@/context/AuthorsContext";
 import { BooksProvider } from "@/context/BooksContext";
 import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
@@ -492,12 +493,14 @@ function MobileBottomNav({ pathname, search }: { pathname: string; search: strin
 
 export default function AppLayout() {
   return (
-    <GenresProvider>
-      <BooksProvider>
-        <ProfileProvider>
-          <AppLayoutContent />
-        </ProfileProvider>
-      </BooksProvider>
-    </GenresProvider>
+    <AuthorsProvider>
+      <GenresProvider>
+        <BooksProvider>
+          <ProfileProvider>
+            <AppLayoutContent />
+          </ProfileProvider>
+        </BooksProvider>
+      </GenresProvider>
+    </AuthorsProvider>
   );
 }

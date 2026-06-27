@@ -1,88 +1,103 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, Heart, PauseCircle, Star } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
+import AddAuthorDialog from "@/components/AddAuthorDialog";
+import AnnotationCard from "@/components/AnnotationCard";
+import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
-import QuoteBlock from "@/components/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
+import { useSeries } from "@/hooks/useSeries";
 import {
   buildAuthorSummaries,
   findAuthorSummary,
-  formatAuthorDate,
-  formatAuthorYear,
+  formatAuthorPartialDate,
+  getAuthorAverageRating,
   getAuthorInitials,
+  getAuthorPagesWritten,
 } from "@/lib/authorShelf";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
+import { fetchAllBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { cn } from "@/lib/utils";
-import type { Book, BookNote } from "@/types";
+import SeriesStackCard from "@/pages/library/SeriesStackCard";
+import type { BookNote, PublicationDatePrecision } from "@/types";
 
-function countLabel(count: number, singular: string): string {
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
-function BookCover({ book, size = "md" }: { book: Book; size?: "sm" | "md" }) {
-  const isPaused = book.status === "Paused";
+function formatAverageRating(value: number | null): string {
+  return value === null ? "No rating" : value.toFixed(2);
+}
+
+function buildLifeLine({
+  nationality,
+  birth_date,
+  birth_date_precision,
+  death_date,
+  death_date_precision,
+}: {
+  nationality?: string | null;
+  birth_date?: string | null;
+  birth_date_precision?: PublicationDatePrecision | null;
+  death_date?: string | null;
+  death_date_precision?: PublicationDatePrecision | null;
+}): string {
+  const parts: string[] = [];
+
+  if (nationality) parts.push(nationality);
+  if (birth_date) parts.push(`Born ${formatAuthorPartialDate(birth_date, birth_date_precision)}`);
+  if (death_date) parts.push(`Died ${formatAuthorPartialDate(death_date, death_date_precision)}`);
+
+  return parts.join(" · ") || "No author details yet.";
+}
+
+function AuthorPhoto({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
   return (
-    <Link
-      to={`/books/${book.id}`}
-      className={cn(
-        "group block shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        size === "sm" ? "w-14" : "w-20",
+    <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-5xl font-medium text-primary-foreground shadow-sm sm:h-40 sm:w-40 sm:text-6xl">
+      {photoUrl ? (
+        <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        getAuthorInitials(name)
       )}
-    >
-      <div
-        className={cn(
-          "overflow-hidden rounded-md border bg-muted shadow-sm",
-          size === "sm" ? "h-20 w-14" : "h-[120px] w-20",
-          isPaused && "opacity-70",
-        )}
-      >
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            loading="lazy"
-            className={cn(
-              "h-full w-full object-cover transition-transform group-hover:scale-105",
-              isPaused && "grayscale",
-            )}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="h-5 w-5 text-muted-foreground/50" />
-          </div>
-        )}
-        {isPaused && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-            <PauseCircle className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
-      </div>
-      <p className="mt-2 line-clamp-2 text-xs font-medium leading-tight">{book.title}</p>
-      {book.rating ? (
-        <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Star className="h-3 w-3 fill-current text-rating" />
-          {book.rating}
-        </p>
-      ) : null}
-    </Link>
+    </div>
   );
 }
 
-function SectionHeader({
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Icon className="h-4 w-4 shrink-0" />
+        <span>{label}</span>
+      </div>
+      <p className="mt-1 font-heading text-2xl font-medium leading-none sm:text-3xl">{value}</p>
+    </div>
+  );
+}
+
+function SectionTitle({
   title,
   action,
 }: {
-  title: string;
+  title: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="font-heading text-lg font-medium leading-snug">{title}</h2>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-2xl font-heading leading-snug font-medium">{title}</h2>
       {action}
     </div>
   );
@@ -90,28 +105,32 @@ function SectionHeader({
 
 function EmptySection({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
       {message}
     </div>
   );
 }
 
-function AuthorPlaceholder({ name }: { name: string }) {
-  return (
-    <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-full bg-primary text-5xl font-medium text-primary-foreground shadow-sm sm:h-40 sm:w-40 sm:text-6xl">
-      {getAuthorInitials(name)}
-    </div>
-  );
-}
-
 export default function AuthorDetails() {
-  const { authorName } = useParams();
+  const { authorId } = useParams();
   const navigate = useNavigate();
+  const {
+    authors: authorRecords,
+    loading: authorsLoading,
+    error: authorsError,
+    editAuthor,
+    removeAuthor,
+  } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [notes, setNotes] = useState<BookNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(true);
   const [notesError, setNotesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [bioExpanded, setBioExpanded] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -124,6 +143,9 @@ export default function AuthorDetails() {
         if (!ignore) {
           setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
         }
+      })
+      .finally(() => {
+        if (!ignore) setNotesLoading(false);
       });
 
     return () => {
@@ -131,18 +153,77 @@ export default function AuthorDetails() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(books, notes), [books, notes]);
-  const author = useMemo(() => findAuthorSummary(authors, authorName), [authors, authorName]);
-  const featuredQuote = author?.quotes.find((quote) => quote.is_favorite) ?? author?.quotes[0];
-  const featuredQuoteBook = featuredQuote
-    ? author?.books.find((book) => book.id === featuredQuote.book_id)
-    : undefined;
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, notes), [authorRecords, books, notes]);
+  const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
+  const authorBooks = author?.books ?? [];
+  const previewBooks = authorBooks.slice(0, 4);
+  const bookTitleById = useMemo(
+    () => new Map(authorBooks.map((book) => [book.id, book.title])),
+    [authorBooks],
+  );
+  const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
+  const authorNotes = useMemo(
+    () => sortBookNotes(notes.filter((note) => authorBooks.some((book) => book.id === note.book_id))),
+    [authorBooks, notes],
+  );
+  const noteCountsByLabel = useMemo(
+    () => ({
+      quote: authorNotes.filter((note) => note.label === "quote"),
+      note: authorNotes.filter((note) => note.label === "note"),
+      review: authorNotes.filter((note) => note.label === "review"),
+    }),
+    [authorNotes],
+  );
+  const previewNotesByLabel = useMemo(
+    () => ({
+      quote: noteCountsByLabel.quote.slice(0, 3),
+      note: noteCountsByLabel.note.slice(0, 3),
+      review: noteCountsByLabel.review.slice(0, 3),
+    }),
+    [noteCountsByLabel],
+  );
+  const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
+  const pagesWritten = useMemo(() => (author ? getAuthorPagesWritten(author) : 0), [author]);
+  const loading = authorsLoading || booksLoading || notesLoading || seriesLoading;
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
   }
 
-  if (booksLoading) {
+  async function handleDeleteAuthor() {
+    if (!author) return;
+
+    try {
+      setActionError(null);
+      await removeAuthor(author.id);
+      navigate("/authors", { replace: true });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to delete author");
+    }
+  }
+
+  async function handleToggleFavorite() {
+    if (!author) return;
+
+    try {
+      setActionError(null);
+      await editAuthor(author.id, {
+        name: author.name,
+        photo_url: author.photo_url,
+        birth_date: author.birth_date,
+        birth_date_precision: author.birth_date_precision,
+        death_date: author.death_date,
+        death_date_precision: author.death_date_precision,
+        bio: author.bio,
+        is_favorite: !author.isFavorite,
+        nationality: author.nationality,
+      });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to update author");
+    }
+  }
+
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
@@ -153,11 +234,15 @@ export default function AuthorDetails() {
   }
 
   if (booksError) {
-    return (
-      <div className="rounded-lg border bg-card p-4 text-sm text-destructive">
-        {booksError}
-      </div>
-    );
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{booksError}</div>;
+  }
+
+  if (authorsError) {
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{authorsError}</div>;
+  }
+
+  if (seriesError) {
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{seriesError}</div>;
   }
 
   if (!author) {
@@ -165,7 +250,7 @@ export default function AuthorDetails() {
       <div className="space-y-4">
         <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
           <ArrowLeft className="h-4 w-4" />
-          Back to authors
+          Back
         </Button>
         <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="font-heading text-lg font-medium">Author not found</p>
@@ -177,241 +262,235 @@ export default function AuthorDetails() {
     );
   }
 
+  const lifeLine = buildLifeLine(author);
+  const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
+  const quotesViewAllPath = `/authors/${encodeURIComponent(author.id)}/quotes`;
+  const bio = author.bio?.trim() || "";
+  const shouldClampBio = bio.length > 320 && !bioExpanded;
+
   return (
-    <div className="space-y-8">
-      <div className="space-y-5 border-b pb-6">
-        <div className="flex items-center justify-between gap-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
-            <ArrowLeft className="h-4 w-4" />
-            Back to authors
-          </Button>
-          <div className="flex items-center gap-3">
-            {author.isFavorite && (
-              <div className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm">
-                <Heart className="h-4 w-4 fill-favorite text-favorite" />
-                Favorite
-              </div>
-            )}
-            <DetailActionsMenu
-              kind="author"
-              label={author.name}
-              shareAttachmentLabel="Send the author as attachment in a chat"
-              onDelete={() => navigate("/authors", { replace: true })}
-              onSendAttachment={openAttachmentPicker}
-              deleteTitle="Delete this author view?"
-              deleteDescription="This only removes the author page from view. The books stay in your library."
-            />
-          </div>
-        </div>
+    <div className="space-y-10">
+      <div className="flex items-start justify-between gap-3">
+        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
 
-        {shareStatus && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
-            {shareStatus}
-          </div>
-        )}
-
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
-          <AuthorPlaceholder name={author.name} />
-          <div className="max-w-3xl space-y-3">
-            <h1 className="font-heading text-3xl font-medium leading-tight sm:text-4xl">
-              {author.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              <span>{countLabel(author.bookCount, "book")}</span>
-              <span>{countLabel(author.quoteCount, "quote")}</span>
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-4 w-4 fill-current text-rating" />
-                {author.averageRating ?? "No rating"} average rating
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              First read in {formatAuthorYear(author.firstReadDate)}
-              <span className="px-2">.</span>
-              Latest read in {formatAuthorYear(author.latestReadDate)}
-            </p>
-
-            {featuredQuote && (
-              <QuoteBlock
-                contentClassName="text-base leading-7"
-                attribution={
-                  <>
-                    {featuredQuote.quote_speaker ? `${featuredQuote.quote_speaker}, ` : ""}
-                    {featuredQuoteBook?.title ?? formatAuthorDate(featuredQuote.note_date)}
-                  </>
-                }
-              >
-                {featuredQuote.content}
-              </QuoteBlock>
-            )}
-          </div>
-        </div>
+        <DetailActionsMenu
+          kind="author"
+          label={author.name}
+          shareAttachmentLabel="Send the author as attachment in a chat"
+          onEdit={() => setAuthorDialogOpen(true)}
+          onDelete={() => void handleDeleteAuthor()}
+          onSendAttachment={openAttachmentPicker}
+          deleteTitle="Delete this author?"
+          deleteDescription="Deleting this author removes the record and unlinks it from books. The books stay in your library."
+        />
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList
-          variant="line"
-          className="w-full justify-start gap-8 rounded-none border-b pb-0"
-        >
-          <TabsTrigger value="overview" className="min-w-20 px-0">
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="books" className="min-w-20 px-0">
-            Books
-          </TabsTrigger>
-          <TabsTrigger value="quotes" className="min-w-20 px-0">
-            Quotes
-          </TabsTrigger>
-        </TabsList>
+      {actionError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {actionError}
+        </div>
+      )}
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="space-y-4 rounded-lg border bg-card p-4">
-              <SectionHeader
-                title={`Books by ${author.name}`}
-                action={
-                  <Link
-                    to={`/library/explore?view=authors&value=${encodeURIComponent(author.name)}`}
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    View all
-                  </Link>
-                }
+      {shareStatus && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
+          {shareStatus}
+        </div>
+      )}
+
+      <section className="flex items-start gap-4 sm:gap-6">
+        <AuthorPhoto name={author.name} photoUrl={author.photo_url} />
+        <div className="min-w-0 flex-1 space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-2xl font-medium leading-tight sm:text-3xl">{author.name}</h1>
+            <button
+              type="button"
+              onClick={handleToggleFavorite}
+              aria-label={author.isFavorite ? "Remove from favorites" : "Add to favorites"}
+              className="shrink-0 rounded p-1 transition-colors hover:bg-muted"
+            >
+              <Heart
+                className={cn(
+                  "h-5 w-5",
+                  author.isFavorite ? "fill-favorite text-favorite" : "text-muted-foreground",
+                )}
               />
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {author.books.slice(0, 5).map((book) => (
-                  <BookCover key={book.id} book={book} size="sm" />
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-4 rounded-lg border bg-card p-4">
-              <SectionHeader title="Favorite Quote" />
-              {notesError ? (
-                <p className="text-sm text-muted-foreground">Quotes could not be loaded right now.</p>
-              ) : featuredQuote ? (
-                <QuoteBlock
-                  contentClassName="text-base leading-7"
-                  attribution={`- ${
-                    featuredQuoteBook?.title ?? formatAuthorDate(featuredQuote.note_date)
-                  }`}
-                >
-                  {featuredQuote.content}
-                </QuoteBlock>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Quotes from this author's books will appear here.
-                </p>
-              )}
-            </section>
+            </button>
           </div>
 
-          <section className="space-y-4">
-            <SectionHeader title="Reading Journey" />
-            {author.books.length === 0 ? (
-              <EmptySection message="Books by this author will appear here." />
-            ) : (
-              <div className="overflow-x-auto pb-2">
-                <div className="flex min-w-max items-start gap-6">
-                  {author.books.map((book, index) => (
-                    <div key={book.id} className="relative w-24 shrink-0">
-                      {index > 0 && (
-                        <div className="absolute -left-6 top-10 h-px w-6 bg-border" aria-hidden />
-                      )}
-                      <BookCover book={book} size="sm" />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatAuthorYear(book.date_finished ?? book.date_started ?? null)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        </TabsContent>
+          <p className="text-sm text-muted-foreground">{lifeLine}</p>
 
-        <TabsContent value="books" className="space-y-4">
-          <SectionHeader
-            title="Books"
-            action={
-              <Link
-                to={`/library/explore?view=authors&value=${encodeURIComponent(author.name)}`}
-                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-              >
-                View all books
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            <StatTile icon={BookOpen} label="Books Written" value={formatNumber(author.bookCount)} />
+            <StatTile icon={FileText} label="Pages Written" value={`~${formatNumber(pagesWritten)}`} />
+            <StatTile icon={Star} label="Avg. Rating" value={formatAverageRating(averageRating)} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-4">
+          <h2 className="mb-4 text-2xl font-heading leading-snug font-medium">
+            <span className="font-serif italic">About</span> this author
+          </h2>
+          {bio ? (
+            <div className="space-y-4">
+              <p className={cn("whitespace-pre-line text-sm leading-7 text-muted-foreground", shouldClampBio && "line-clamp-4")}>
+                {bio}
+              </p>
+              {bio.length > 320 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-0 text-sm text-muted-foreground"
+                  onClick={() => setBioExpanded((current) => !current)}
+                >
+                  {bioExpanded ? "Show less" : "Show more"}
+                  <ChevronRight className={cn("h-4 w-4 transition-transform", bioExpanded && "rotate-90")} />
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No bio yet.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <SectionTitle
+          title={
+            <>
+              <span className="font-serif italic">Books</span>
+            </>
+          }
+          action={
+            <Button asChild variant="link" className="px-0 text-primary">
+              <Link to={booksViewAllPath}>
+                View all
                 <ChevronRight className="h-4 w-4" />
               </Link>
-            }
-          />
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {author.shelfGroups.map((group) => (
-              <div key={group.key} className="min-w-0 border-l pl-4">
-                <h3 className="mb-3 text-sm font-medium">
-                  {group.title} ({group.books.length})
-                </h3>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {group.books.slice(0, 4).map((book) => (
-                    <BookCover key={book.id} book={book} size="sm" />
-                  ))}
-                  {group.books.length > 4 && (
-                    <Link
-                      to={`/library/explore?view=authors&value=${encodeURIComponent(author.name)}`}
-                      className="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      +{group.books.length - 4}
-                    </Link>
-                  )}
-                </div>
-              </div>
+            </Button>
+          }
+        />
+        {previewBooks.length === 0 ? (
+          <EmptySection message="Books by this author will appear here." />
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4">
+            {previewBooks.map((book) => (
+              <BookCard key={book.id} book={book} onClick={() => navigate(`/books/${book.id}`)} textSize="compact" />
             ))}
           </div>
-        </TabsContent>
+        )}
+      </section>
 
-        <TabsContent value="quotes" className="space-y-4">
-          <SectionHeader title="Quotes" />
-          {notesError ? (
-            <EmptySection message="Quotes could not be loaded right now." />
-          ) : author.quotes.length === 0 ? (
-            <EmptySection message="Quotes from this author's books will appear here." />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              {author.quotes.map((quote) => {
-                const quoteBook = author.books.find((book) => book.id === quote.book_id);
+      {authorSeries.length > 0 && (
+        <section className="space-y-4">
+          <SectionTitle
+            title={
+              <>
+                <span className="font-serif italic">Series</span>
+              </>
+            }
+          />
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-4">
+            {authorSeries.map((group) => (
+              <SeriesStackCard key={group.seriesId} group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
+            ))}
+          </div>
+        </section>
+      )}
 
-                return (
-                  <article key={quote.id} className="min-h-44 rounded-lg border bg-card p-4">
-                    <QuoteBlock
-                      contentClassName="line-clamp-5"
-                      attribution={
-                        quoteBook ? `- ${quoteBook.title}` : formatAuthorDate(quote.note_date)
-                      }
-                      actions={
-                        quote.is_favorite ? (
-                          <Heart className="h-4 w-4 shrink-0 fill-favorite text-favorite" />
-                        ) : null
-                      }
-                    >
-                      {quote.content}
-                    </QuoteBlock>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      <section className="space-y-4">
+        <SectionTitle
+          title={
+            <>
+              <span className="font-serif italic">Annotations</span>
+            </>
+          }
+          action={
+            <Button asChild variant="link" className="px-0 text-primary">
+              <Link to={quotesViewAllPath}>
+                View all
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          }
+        />
+
+        <Tabs defaultValue="quote" className="space-y-4">
+          <TabsList
+            variant="line"
+            className="h-auto w-full justify-start gap-6 rounded-none border-0 border-b border-border bg-transparent p-0"
+          >
+            <TabsTrigger
+              value="quote"
+              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
+            >
+              Quotes ({noteCountsByLabel.quote.length})
+            </TabsTrigger>
+            <TabsTrigger
+              value="note"
+              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
+            >
+              Notes ({noteCountsByLabel.note.length})
+            </TabsTrigger>
+            <TabsTrigger
+              value="review"
+              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
+            >
+              Review ({noteCountsByLabel.review.length})
+            </TabsTrigger>
+          </TabsList>
+
+          {(["quote", "note", "review"] as const).map((label) => (
+            <TabsContent key={label} value={label}>
+              {notesLoading ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
+                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
+                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
+                </div>
+              ) : notesError ? (
+                <EmptySection message={notesError} />
+              ) : previewNotesByLabel[label].length === 0 ? (
+                <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+                  No {label === "quote" ? "quotes" : label === "review" ? "review" : "notes"} yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {previewNotesByLabel[label].map((note) => (
+                    <AnnotationCard
+                      key={note.id}
+                      note={note}
+                      bookId={note.book_id}
+                      bookTitle={bookTitleById.get(note.book_id) ?? null}
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+      </section>
 
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}
         attachment={buildAuthorAttachment({
+          authorId: author.id,
           authorName: author.name,
-          books: author.books,
+          books: authorBooks,
           includedQuotes: author.quotes.slice(0, 3),
         })}
         title={`Send "${author.name}" to chat`}
         description="Add a message, then pick the chat you want to send this author to."
         onSent={() => setShareStatus("Author sent to chat.")}
       />
+      <AddAuthorDialog open={authorDialogOpen} onOpenChange={setAuthorDialogOpen} initialAuthor={author} />
     </div>
   );
 }
