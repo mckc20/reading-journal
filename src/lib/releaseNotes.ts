@@ -1,53 +1,31 @@
-export type ReleaseNoteHighlight = {
-  title: string;
-  description: string;
-};
+import changelogMarkdown from "@/content/changelog.md?raw";
+import {
+  formatReleaseNoteDate,
+  isUnreadReleaseNote,
+  parseChangelogMarkdown,
+  type ReleaseNote,
+  type ReleaseNoteHighlight,
+} from "@/lib/changelog";
 
-export type ReleaseNote = {
-  version: string;
-  published_at: string;
-  title: string;
-  summary: string;
-  highlights: ReleaseNoteHighlight[];
-};
+const CHANGELOG_ENTRIES = parseChangelogMarkdown(changelogMarkdown);
 
-export const CURRENT_RELEASE_NOTE: ReleaseNote = {
-  version: "2026-06-21-pause-books",
-  published_at: "2026-06-21",
-  title: "Chat, groups, and pause mode",
-  summary:
-    "You can now chat with other readers, organize conversations into groups, and pause books when you need to step away.",
-  highlights: [
-    {
-      title: "Direct chats and groups",
-      description:
-        "Start one-to-one conversations or create group spaces for reading clubs and friends.",
-    },
-    {
-      title: "Attachments and library saves",
-      description:
-        "Share books, notes, authors, and series in chat, then save shared items to your own library.",
-    },
-    {
-      title: "Pause and resume books",
-      description:
-        "Pause a book when you are away, then resume later so that paused time does not affect your reading analytics.",
-    },
-  ],
-};
+export type { ReleaseNote, ReleaseNoteHighlight };
+
+export function getChangelogEntries(): ReleaseNote[] {
+  return [...CHANGELOG_ENTRIES];
+}
 
 export function getLatestReleaseNote(): ReleaseNote {
-  return CURRENT_RELEASE_NOTE;
+  const [latestReleaseNote] = CHANGELOG_ENTRIES;
+  if (!latestReleaseNote) {
+    throw new Error("Changelog is empty.");
+  }
+
+  return latestReleaseNote;
 }
 
 export function hasUnreadReleaseNote(lastSeenVersion?: string | null): boolean {
-  return lastSeenVersion !== CURRENT_RELEASE_NOTE.version;
+  return isUnreadReleaseNote(lastSeenVersion, getLatestReleaseNote().version);
 }
 
-export function formatReleaseNoteDate(publishedAt: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(new Date(`${publishedAt}T00:00:00Z`));
-}
+export { formatReleaseNoteDate };

@@ -1053,6 +1053,11 @@ function AboutSettings() {
             {showReleaseNotes ? ` · update ${latestReleaseNote.version} available` : ""}
           </span>
         </SettingRow>
+        <SettingRow title="Changelog">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/changelog">Open changelog</Link>
+          </Button>
+        </SettingRow>
         {showReleaseNotes && (
           <SettingRow title="What's new">
             <Button

@@ -18,6 +18,7 @@ const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
 const BookAnalytics = lazy(() => import("@/pages/BookAnalytics"));
 const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
+const Changelog = lazy(() => import("@/pages/Changelog"));
 const Groups = lazy(() => import("@/pages/Groups"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/books/:bookId/analytics", element: lazyRoute(<BookAnalytics />) },
           { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
+          { path: "/changelog", element: lazyRoute(<Changelog />) },
           { path: "/discover", element: lazyRoute(<Analytics />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
           { path: "/analytics/:category", element: lazyRoute(<Analytics />) },
