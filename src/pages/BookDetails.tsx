@@ -19,6 +19,8 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
+import AddAuthorDialog from "@/components/AddAuthorDialog";
+import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import AnnotationCard from "@/components/AnnotationCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
@@ -40,6 +42,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
+import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -55,6 +58,7 @@ import {
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import { buildBookAttachment } from "@/lib/chatAttachments";
+import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
   formatPublicationDateForDisplay,
@@ -63,9 +67,7 @@ import {
   trimPublicationDateInputForPrecision,
 } from "@/lib/publicationDate";
 import {
-  formatAuthorsInput,
   getTodayLocalDate,
-  parseAuthorsInput,
   cn,
 } from "@/lib/utils";
 import type {
@@ -82,7 +84,7 @@ import type {
 
 interface FormValues {
   title: string;
-  authorsInput: string;
+  authors: string[];
   status: BookStatus;
   genres: string[];
   isbn: string;
@@ -120,7 +122,7 @@ type ProgressStat = {
 function bookToFormValues(book: Book): FormValues {
   return {
     title: book.title,
-    authorsInput: formatAuthorsInput(book.authors),
+    authors: book.authors,
     status: book.status,
     genres: book.genre_ids ?? [],
     isbn: book.isbn ?? "",
@@ -236,7 +238,10 @@ export default function BookDetails() {
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
+  const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const { authors } = useAuthorsContext();
   const {
     register,
     control,
@@ -362,6 +367,11 @@ export default function BookDetails() {
       .slice(0, 3);
   }, [book, books]);
 
+  const authorSummaries = useMemo(
+    () => buildAuthorSummaries(authors, books, notes),
+    [authors, books, notes],
+  );
+
   const relatedByGenre = useMemo(() => {
     if (!book || !book.genre_ids?.length) return [];
     const genreIds = new Set(book.genre_ids);
@@ -456,13 +466,44 @@ export default function BookDetails() {
     }
   }
 
+  function handleCreateAuthor(initialName: string) {
+    setAuthorDialogInitialName(initialName);
+    setAuthorDialogOpen(true);
+  }
+
+  function handleSavedAuthor(authorName: string) {
+    const currentAuthors = watch("authors") ?? [];
+    const nextAuthors = Array.from(
+      new Map(
+        [...currentAuthors, authorName]
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .map((name) => [name.toLowerCase(), name] as const),
+      ).values(),
+    );
+    setValue("authors", nextAuthors, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }
+
+  const authorDialog = (
+    <AddAuthorDialog
+      open={authorDialogOpen}
+      onOpenChange={setAuthorDialogOpen}
+      initialName={authorDialogInitialName}
+      onSaved={(author) => handleSavedAuthor(author.name)}
+    />
+  );
+
   async function onSubmit(values: FormValues) {
     if (!book) return;
     const payload: Partial<Book> = {};
 
     if (dirtyFields.title) payload.title = values.title.trim();
-    if (dirtyFields.authorsInput) {
-      const authors = parseAuthorsInput(values.authorsInput);
+    if (dirtyFields.authors) {
+      const authors = values.authors.map((author) => author.trim()).filter(Boolean);
       if (authors.length === 0) {
         setErrorMsg("At least one author is required");
         return;
@@ -601,7 +642,7 @@ export default function BookDetails() {
       <div className="space-y-6">
         <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back
+          Back to author
         </Button>
 
         {errorMsg && (
@@ -628,7 +669,9 @@ export default function BookDetails() {
           clearPublicationDateError={() => clearErrors("publication_date")}
           uploadingCover={uploadingCover}
           handleCoverChange={handleCoverChange}
+          onCreateAuthor={handleCreateAuthor}
         />
+        {authorDialog}
       </div>
     );
   }
@@ -734,13 +777,12 @@ export default function BookDetails() {
     note: notes.filter((note) => note.label === "note").length,
     review: notes.filter((note) => note.label === "review").length,
   };
-
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
         <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back
+          Back to author
         </Button>
 
         <DetailActionsMenu
@@ -822,7 +864,7 @@ export default function BookDetails() {
                 <Fragment key={author}>
                   {index > 0 ? ", " : ""}
                   <Link
-                    to={`/authors/${encodeURIComponent(author)}`}
+                    to={`/authors/${encodeURIComponent(findAuthorSummary(authorSummaries, author)?.id ?? author)}`}
                     className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {author}
@@ -1003,6 +1045,7 @@ export default function BookDetails() {
         description="Add a message, then pick the chat you want to send this book to."
         onSent={() => setShareStatus("Book sent to chat.")}
       />
+      {authorDialog}
 
       {!isEditMode && (
         <>
@@ -1388,6 +1431,7 @@ function EditDetailsForm({
   clearPublicationDateError,
   uploadingCover,
   handleCoverChange,
+  onCreateAuthor,
 }: {
   bookTitle: string;
   coverUrl?: string | null;
@@ -1406,6 +1450,7 @@ function EditDetailsForm({
   clearPublicationDateError: () => void;
   uploadingCover: boolean;
   handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onCreateAuthor: (initialName: string) => void;
 }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
@@ -1447,14 +1492,22 @@ function EditDetailsForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="detail-authors">Authors</Label>
-            <Input
-              id="detail-authors"
-              {...register("authorsInput", {
-                validate: (value) => parseAuthorsInput(value).length > 0 || "At least one author is required",
-              })}
+            <Label>Authors</Label>
+            <Controller
+              name="authors"
+              control={control}
+              rules={{
+                validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
+              }}
+              render={({ field }) => (
+                <AuthorMultiSelect
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  onCreateNew={onCreateAuthor}
+                />
+              )}
             />
-            {errors.authorsInput && <p className="text-xs text-destructive">{errors.authorsInput.message}</p>}
+            {errors.authors && <p className="text-xs text-destructive">{errors.authors.message}</p>}
           </div>
 
           <div className="space-y-1.5">

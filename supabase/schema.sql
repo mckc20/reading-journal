@@ -16,6 +16,24 @@ CREATE TABLE IF NOT EXISTS series (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
+-- ── AUTHORS ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS authors (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name          text NOT NULL CHECK (btrim(name) <> ''),
+  photo_url     text,
+  birth_date    date,
+  birth_date_precision text CHECK (birth_date_precision IN ('year','month','day')),
+  death_date    date,
+  death_date_precision text CHECK (death_date_precision IN ('year','month','day')),
+  bio           text,
+  is_favorite   boolean NOT NULL DEFAULT false,
+  nationality   text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CHECK (death_date IS NULL OR birth_date IS NULL OR death_date >= birth_date)
+);
+
 -- ── BOOKS ─────────────────────────────────────────────────
 -- Uses CHECK constraints rather than PG enums so adding new
 -- values never requires a schema migration.
@@ -23,7 +41,6 @@ CREATE TABLE IF NOT EXISTS books (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title           text NOT NULL,
-  authors         text[] NOT NULL CHECK (cardinality(authors) > 0),
   genres          text[],
   status          text NOT NULL DEFAULT 'Wishlist'
                     CHECK (status IN ('Wishlist','Not Started','Up Next','Reading','Paused','Finished','DNF')),
@@ -69,6 +86,14 @@ CREATE TABLE IF NOT EXISTS book_genres (
   book_id  uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   genre_id uuid NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
   PRIMARY KEY (book_id, genre_id)
+);
+
+CREATE TABLE IF NOT EXISTS book_authors (
+  book_id   uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  author_id uuid NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
+  position  integer NOT NULL CHECK (position >= 0),
+  PRIMARY KEY (book_id, author_id),
+  UNIQUE (book_id, position)
 );
 
 DO $$
@@ -335,6 +360,13 @@ CREATE TRIGGER user_settings_set_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS authors_set_updated_at ON authors;
+
+CREATE TRIGGER authors_set_updated_at
+  BEFORE UPDATE ON authors
+  FOR EACH ROW
+  EXECUTE FUNCTION set_updated_at();
+
 -- ── GROUPS ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -397,10 +429,16 @@ CREATE TABLE IF NOT EXISTS group_message_reactions (
 -- supports the "currently reading" dashboard card query.
 CREATE INDEX IF NOT EXISTS books_user_id_idx        ON books(user_id);
 CREATE INDEX IF NOT EXISTS books_status_idx         ON books(user_id, status);
+CREATE INDEX IF NOT EXISTS authors_user_id_idx      ON authors(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS authors_unique_user_name_idx
+  ON authors (user_id, lower(name));
+CREATE INDEX IF NOT EXISTS authors_is_favorite_idx  ON authors(user_id, is_favorite);
 CREATE INDEX IF NOT EXISTS genres_parent_id_idx     ON genres(parent_id);
 CREATE INDEX IF NOT EXISTS genres_user_id_idx       ON genres(user_id);
 CREATE INDEX IF NOT EXISTS genres_is_system_idx     ON genres(is_system);
 CREATE INDEX IF NOT EXISTS book_genres_genre_id_idx ON book_genres(genre_id);
+CREATE INDEX IF NOT EXISTS book_authors_author_id_idx ON book_authors(author_id);
+CREATE INDEX IF NOT EXISTS book_authors_book_id_idx   ON book_authors(book_id);
 CREATE INDEX IF NOT EXISTS series_user_id_idx       ON series(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_user_id_idx ON reading_logs(user_id);
 CREATE INDEX IF NOT EXISTS reading_logs_book_id_idx ON reading_logs(book_id);
@@ -444,9 +482,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS genres_unique_user_sibling_name_idx
 
 -- ── ROW LEVEL SECURITY ────────────────────────────────────
 ALTER TABLE series       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE authors      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE books        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE genres       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_genres  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_authors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_pause_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
@@ -456,6 +496,121 @@ ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_message_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS authors_select_own ON authors;
+CREATE POLICY authors_select_own
+  ON authors
+  FOR SELECT
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS authors_insert_own ON authors;
+CREATE POLICY authors_insert_own
+  ON authors
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS authors_update_own ON authors;
+CREATE POLICY authors_update_own
+  ON authors
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS authors_delete_own ON authors;
+CREATE POLICY authors_delete_own
+  ON authors
+  FOR DELETE
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS book_authors_select_own ON book_authors;
+CREATE POLICY book_authors_select_own
+  ON book_authors
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_authors.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = book_authors.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS book_authors_insert_own ON book_authors;
+CREATE POLICY book_authors_insert_own
+  ON book_authors
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_authors.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = book_authors.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS book_authors_update_own ON book_authors;
+CREATE POLICY book_authors_update_own
+  ON book_authors
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_authors.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = book_authors.author_id
+        AND authors.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_authors.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = book_authors.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS book_authors_delete_own ON book_authors;
+CREATE POLICY book_authors_delete_own
+  ON book_authors
+  FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM books
+      WHERE books.id = book_authors.book_id
+        AND books.user_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = book_authors.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
 
 DROP VIEW IF EXISTS public_profiles;
 
@@ -1228,4 +1383,52 @@ CREATE POLICY "group_message_reactions: member delete own"
       WHERE group_messages.id = group_message_reactions.message_id
         AND is_active_group_member(group_messages.group_id, auth.uid())
     )
+  );
+
+-- ── STORAGE ────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('author-photos', 'author-photos', true)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS author_photos_public_read ON storage.objects;
+CREATE POLICY author_photos_public_read
+  ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'author-photos');
+
+DROP POLICY IF EXISTS author_photos_insert_own ON storage.objects;
+CREATE POLICY author_photos_insert_own
+  ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'author-photos'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS author_photos_update_own ON storage.objects;
+CREATE POLICY author_photos_update_own
+  ON storage.objects
+  FOR UPDATE
+  USING (
+    bucket_id = 'author-photos'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = 'author-photos'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS author_photos_delete_own ON storage.objects;
+CREATE POLICY author_photos_delete_own
+  ON storage.objects
+  FOR DELETE
+  USING (
+    bucket_id = 'author-photos'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
   );

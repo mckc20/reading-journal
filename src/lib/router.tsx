@@ -10,7 +10,10 @@ const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
 const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
+const AuthorsExplore = lazy(() => import("@/pages/AuthorsExplore"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
+const AuthorBooks = lazy(() => import("@/pages/AuthorBooks"));
+const AuthorQuotes = lazy(() => import("@/pages/AuthorQuotes"));
 const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Genres = lazy(() => import("@/pages/Genres"));
@@ -56,7 +59,10 @@ export const router = createBrowserRouter([
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
           { path: "/library/explore", element: lazyRoute(<ExploreLibrary />) },
           { path: "/authors", element: lazyRoute(<Authors />) },
-          { path: "/authors/:authorName", element: lazyRoute(<AuthorDetails />) },
+          { path: "/authors/explore", element: lazyRoute(<AuthorsExplore />) },
+          { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
+          { path: "/authors/:authorId/books", element: lazyRoute(<AuthorBooks />) },
+          { path: "/authors/:authorId/quotes", element: lazyRoute(<AuthorQuotes />) },
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/genres", element: lazyRoute(<Genres />) },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },

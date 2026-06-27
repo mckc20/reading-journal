@@ -1,6 +1,8 @@
 import { useRef, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { ImagePlus, ScanBarcode, Loader2 } from "lucide-react";
+import AddAuthorDialog from "@/components/AddAuthorDialog";
+import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
 import { fetchBookByISBN } from "@/lib/bookLookup";
@@ -26,10 +28,6 @@ import {
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
-import {
-  formatAuthorsInput,
-  parseAuthorsInput,
-} from "@/lib/utils";
 import { mapGenreLabelsToIds } from "@/lib/genres";
 import {
   formatPublicationDateInput,
@@ -47,7 +45,7 @@ import type {
 
 interface FormValues {
   title: string;
-  authorsInput: string;
+  authors: string[];
   status: BookStatus;
   genres: string[];
   language: BookLanguage | "";
@@ -92,6 +90,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   const [addingNewSeries, setAddingNewSeries] = useState(false);
   const [isCreatingSeries, setIsCreatingSeries] = useState(false);
   const [pendingSeriesSelectionId, setPendingSeriesSelectionId] = useState<string | null>(null);
+  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
+  const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showScanner, setShowScanner] = useState(false);
@@ -114,12 +114,14 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   } = useForm<FormValues>({
     defaultValues: {
       status: "Not Started",
-      authorsInput: "",
+      authors: [],
       genres: [],
       publication_date_precision: "",
     },
   });
 
+  const status = watch("status");
+  const seriesId = watch("series_id");
   const publicationDate = watch("publication_date") ?? "";
   const publicationDatePrecision = watch("publication_date_precision") ?? "";
 
@@ -170,7 +172,11 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       setMetadataSource(bookData.metadataSource);
       setMetadataSourceUrl(bookData.metadataSourceUrl);
       setValue("title", bookData.title);
-      setValue("authorsInput", formatAuthorsInput(bookData.authors), { shouldValidate: true });
+      setValue("authors", bookData.authors, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
       if (bookData.publisher) setValue("publisher", bookData.publisher);
       if (bookData.publicationDate) {
@@ -234,11 +240,33 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     }
   }
 
+  function handleCreateAuthor(initialName: string) {
+    setAuthorDialogInitialName(initialName);
+    setAuthorDialogOpen(true);
+  }
+
+  function handleSavedAuthor(authorName: string) {
+    const currentAuthors = watch("authors");
+    const nextAuthors = Array.from(
+      new Map(
+        [...currentAuthors, authorName]
+          .map((name) => name.trim())
+          .filter(Boolean)
+          .map((name) => [name.toLowerCase(), name] as const),
+      ).values(),
+    );
+    setValue("authors", nextAuthors, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }
+
   async function onSubmit(values: FormValues) {
     try {
-      const authors = parseAuthorsInput(values.authorsInput);
+      const authors = values.authors.map((author) => author.trim()).filter(Boolean);
       if (authors.length === 0) {
-        setError("authorsInput", { message: "At least one author is required" });
+        setError("authors", { message: "At least one author is required" });
         return;
       }
       const parsedPublicationDate = parsePublicationDateInput(
@@ -285,7 +313,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       if (result.warning) {
         reset({
           status: "Not Started",
-          authorsInput: "",
+          authors: [],
           genres: [],
           publication_date_precision: "",
         });
@@ -308,7 +336,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
       reset({
         status: "Not Started",
-        authorsInput: "",
+        authors: [],
         genres: [],
         publication_date_precision: "",
       });
@@ -333,6 +361,9 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     }
   }
 
+  const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
+  const showDateFinished = ["Finished", "DNF"].includes(status);
+
   function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
     setValue(
       "publication_date",
@@ -350,7 +381,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     if (!nextOpen) {
       reset({
         status: "Not Started",
-        authorsInput: "",
+        authors: [],
         genres: [],
         publication_date_precision: "",
       });
@@ -373,13 +404,13 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Book</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          <ScrollArea className="max-h-[68vh] pr-4">
+          <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-1">
               {/* ISBN Scanner */}
               {showScanner ? (
@@ -467,289 +498,288 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
               </div>
 
               {/* Title */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    {...register("title", { required: "Title is required" })}
-                    aria-invalid={!!errors.title}
-                  />
-                  {errors.title && (
-                    <p className="text-xs text-destructive">{errors.title.message}</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  {...register("title", { required: "Title is required" })}
+                  aria-invalid={!!errors.title}
+                />
+                {errors.title && (
+                  <p className="text-xs text-destructive">{errors.title.message}</p>
+                )}
+              </div>
+
+              {/* Authors */}
+              <div className="space-y-1.5">
+                <Label>Authors *</Label>
+                <Controller
+                  name="authors"
+                  control={control}
+                  rules={{
+                    validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
+                  }}
+                  render={({ field }) => (
+                    <AuthorMultiSelect
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      onCreateNew={handleCreateAuthor}
+                    />
                   )}
-                </div>
+                />
+                {errors.authors && (
+                  <p className="text-xs text-destructive">{errors.authors.message}</p>
+                )}
+              </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="authorsInput">Authors *</Label>
-                  <Input
-                    id="authorsInput"
-                    {...register("authorsInput", {
-                      validate: (value) =>
-                        parseAuthorsInput(value).length > 0 || "At least one author is required",
-                    })}
-                    aria-invalid={!!errors.authorsInput}
-                  />
-                  {errors.authorsInput && (
-                    <p className="text-xs text-destructive">{errors.authorsInput.message}</p>
+              {/* Status */}
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
-                </div>
+                />
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label>Status</Label>
-                  <Controller
-                    name="status"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Language</Label>
-                  <Controller
-                    name="language"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select language" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Not set</SelectItem>
-                          {(["German", "Spanish", "English"] as BookLanguage[]).map((l) => (
-                            <SelectItem key={l} value={l}>
-                              {l}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Format</Label>
-                  <Controller
-                    name="format"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select format" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Not set</SelectItem>
-                          {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
-                            (f) => (
-                              <SelectItem key={f} value={f}>
-                                {f}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Source</Label>
-                  <Controller
-                    name="source"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Not set</SelectItem>
-                          {SOURCE_OPTIONS.map((source) => (
-                            <SelectItem key={source} value={source}>
-                              {source}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="total_pages">Total pages</Label>
-                  <Input
-                    id="total_pages"
-                    type="number"
-                    min={1}
-                    {...register("total_pages")}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Genres</Label>
-                  <Controller
-                    name="genres"
-                    control={control}
-                    render={({ field }) => (
-                      <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="publisher">Publisher</Label>
-                  <Input id="publisher" {...register("publisher")} />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="publication_date">Publication date</Label>
-                  <Input
-                    id="publication_date"
-                    placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
-                    aria-invalid={!!errors.publication_date}
-                    {...register("publication_date", {
-                      onChange: () => clearErrors("publication_date"),
-                    })}
-                  />
-                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-primary"
-                        checked={!!publicationDatePrecision}
-                        onChange={(event) =>
-                          updatePublicationDatePrecision(event.target.checked ? "year" : "")
-                        }
-                      />
-                      Year
-                    </label>
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-primary"
-                        checked={
-                          publicationDatePrecision === "month" || publicationDatePrecision === "day"
-                        }
-                        onChange={(event) =>
-                          updatePublicationDatePrecision(event.target.checked ? "month" : "year")
-                        }
-                      />
-                      Month
-                    </label>
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-primary"
-                        checked={publicationDatePrecision === "day"}
-                        onChange={(event) =>
-                          updatePublicationDatePrecision(event.target.checked ? "day" : "month")
-                        }
-                      />
-                      Day
-                    </label>
-                  </div>
-                  {errors.publication_date && (
-                    <p className="text-xs text-destructive">
-                      {errors.publication_date.message}
-                    </p>
+              {/* Genres */}
+              <div className="space-y-1.5">
+                <Label>Genres</Label>
+                <Controller
+                  name="genres"
+                  control={control}
+                  render={({ field }) => (
+                    <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
                   )}
-                </div>
+                />
+              </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" rows={4} {...register("description")} />
-                </div>
+              {/* Language */}
+              <div className="space-y-1.5">
+                <Label>Language</Label>
+                <Controller
+                  name="language"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {(["German", "Spanish", "English"] as BookLanguage[]).map((l) => (
+                          <SelectItem key={l} value={l}>
+                            {l}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
 
+              {/* Format */}
+              <div className="space-y-1.5">
+                <Label>Format</Label>
+                <Controller
+                  name="format"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
+                          (f) => (
+                            <SelectItem key={f} value={f}>
+                              {f}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              {/* Source */}
+              <div className="space-y-1.5">
+                <Label>Source</Label>
+                <Controller
+                  name="source"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {SOURCE_OPTIONS.map((source) => (
+                          <SelectItem key={source} value={source}>
+                            {source}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              {/* Publication metadata */}
+              <div className="space-y-1.5">
+                <Label htmlFor="publisher">Publisher</Label>
+                <Input id="publisher" {...register("publisher")} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="publication_date">Publication date</Label>
+                <Input
+                  id="publication_date"
+                  placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
+                  aria-invalid={!!errors.publication_date}
+                  {...register("publication_date", {
+                    onChange: () => clearErrors("publication_date"),
+                  })}
+                />
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={!!publicationDatePrecision}
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "year" : "")
+                      }
+                    />
+                    Year
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={
+                        publicationDatePrecision === "month" || publicationDatePrecision === "day"
+                      }
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "month" : "year")
+                      }
+                    />
+                    Month
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-primary"
+                      checked={publicationDatePrecision === "day"}
+                      onChange={(event) =>
+                        updatePublicationDatePrecision(event.target.checked ? "day" : "month")
+                      }
+                    />
+                    Day
+                  </label>
+                </div>
+                {errors.publication_date && (
+                  <p className="text-xs text-destructive">
+                    {errors.publication_date.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" rows={5} {...register("description")} />
+              </div>
+
+              {/* Pages */}
+              <div className="space-y-1.5">
+                <Label htmlFor="total_pages">Total pages</Label>
+                <Input
+                  id="total_pages"
+                  type="number"
+                  min={1}
+                  {...register("total_pages")}
+                />
+              </div>
+
+              {/* Current progress (Reading only) */}
+              {status === "Reading" && (
                 <div className="space-y-1.5">
                   <Label htmlFor="current_page">Current page</Label>
-                  <Input id="current_page" type="number" min={0} {...register("current_page")} />
+                  <Input
+                    id="current_page"
+                    type="number"
+                    min={0}
+                    {...register("current_page")}
+                  />
                 </div>
+              )}
 
+              {/* Dates (conditional) */}
+              {showDateStarted && (
                 <div className="space-y-1.5">
                   <Label htmlFor="date_started">Date started</Label>
                   <Input id="date_started" type="date" {...register("date_started")} />
                 </div>
-
+              )}
+              {showDateFinished && (
                 <div className="space-y-1.5">
                   <Label htmlFor="date_finished">Date finished</Label>
                   <Input id="date_finished" type="date" {...register("date_finished")} />
                 </div>
+              )}
 
-                <div className="space-y-1.5">
-                  <Label>Series</Label>
-                  <Controller
-                    name="series_id"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) => {
-                          if (v === "__new__") {
-                            setAddingNewSeries(true);
-                          } else if (v === "__none__") {
-                            field.onChange("");
-                          } else {
-                            field.onChange(v);
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {series.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__new__">+ Add new series…</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="volume_number">Volume number</Label>
-                  <Input
-                    id="volume_number"
-                    type="number"
-                    min={0.5}
-                    step="any"
-                    {...register("volume_number")}
-                  />
-                </div>
-              </div>
-
-              {addingNewSeries && (
-                <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Add new series
-                  </Label>
-                  <div className="flex gap-2">
+              {/* Series */}
+              <div className="space-y-1.5">
+                <Label>Series</Label>
+                <Controller
+                  name="series_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || "__none__"}
+                      onValueChange={(v) => {
+                        if (v === "__new__") {
+                          setAddingNewSeries(true);
+                        } else if (v === "__none__") {
+                          field.onChange("");
+                        } else {
+                          field.onChange(v);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {series.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__new__">+ Add new series…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {addingNewSeries && (
+                  <div className="flex gap-2 mt-1">
                     <Input
                       placeholder="Series name"
                       value={newSeriesName}
@@ -774,6 +804,20 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                       Cancel
                     </Button>
                   </div>
+                )}
+              </div>
+
+              {/* Volume number (conditional) */}
+              {seriesId && seriesId !== "__new__" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="volume_number">Volume number</Label>
+                  <Input
+                    id="volume_number"
+                    type="number"
+                    min={0.5}
+                    step="any"
+                    {...register("volume_number")}
+                  />
                 </div>
               )}
 
@@ -794,6 +838,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           </DialogFooter>
         </form>
       </DialogContent>
+      <AddAuthorDialog
+        open={authorDialogOpen}
+        onOpenChange={setAuthorDialogOpen}
+        initialName={authorDialogInitialName}
+        onSaved={(author) => handleSavedAuthor(author.name)}
+      />
     </Dialog>
   );
 }
