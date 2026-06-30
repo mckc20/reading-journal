@@ -226,6 +226,7 @@ function authorMatchesSort(authors: AuthorSummary[], sort: AuthorSort): AuthorSu
   if (sort === "latest-read") return sortAuthorsByRecentlyRead(authors);
   if (sort === "top-rated") {
     return [...authors].sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
       if ((b.averageRating ?? -1) !== (a.averageRating ?? -1)) {
         return (b.averageRating ?? -1) - (a.averageRating ?? -1);
       }

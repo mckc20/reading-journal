@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BookOpen, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -17,10 +17,6 @@ import { fetchAllBookNotes } from "@/lib/bookNotes";
 import type { BookNote } from "@/types";
 
 const ALL_AUTHORS_PREVIEW_LIMIT = 6;
-
-function countLabel(count: number, singular: string): string {
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
-}
 
 function LoadingAuthors() {
   return (
@@ -53,68 +49,153 @@ function AuthorAvatar({ author }: { author: AuthorSummary }) {
   );
 }
 
-function useVisibleShelfCount(itemWidth = 64, gap = 12) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  const [visibleCount, setVisibleCount] = useState(1);
-
-  useEffect(() => {
-    const row = rowRef.current;
-    if (!row) return;
-    const observedRow = row;
-
-    function updateVisibleCount() {
-      const width = observedRow.clientWidth;
-      const count = Math.floor((width + gap) / (itemWidth + gap));
-      setVisibleCount(Math.max(1, count));
-    }
-
-    updateVisibleCount();
-
-    const resizeObserver = new ResizeObserver(updateVisibleCount);
-    resizeObserver.observe(observedRow);
-
-    return () => resizeObserver.disconnect();
-  }, [gap, itemWidth]);
-
-  return [rowRef, visibleCount] as const;
+function buildExplorePath(sort: "top-rated" | "latest-read" | "most-read") {
+  const params = new URLSearchParams();
+  params.set("sort", sort);
+  return `/authors/explore?${params.toString()}`;
 }
 
 function AuthorShelfRow({
   title,
   authors,
   emptyMessage,
+  viewAllPath,
 }: {
   title: string;
   authors: AuthorSummary[];
   emptyMessage: string;
+  viewAllPath: string;
 }) {
-  const [rowRef, visibleCount] = useVisibleShelfCount();
-  const visibleAuthors = authors.slice(0, visibleCount);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  function updateScrollButtons() {
+    const row = rowRef.current;
+    if (!row) return;
+
+    setCanScrollLeft(row.scrollLeft > 1);
+    setCanScrollRight(row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+  }
+
+  function scrollOneAuthor(direction: "left" | "right") {
+    const row = rowRef.current;
+    const firstItem = row?.querySelector<HTMLElement>("[data-shelf-item]");
+    if (!row || !firstItem) return;
+
+    const gap = parseFloat(getComputedStyle(row).columnGap || "0");
+    const step = firstItem.offsetWidth + gap;
+
+    row.scrollBy({
+      left: direction === "right" ? step : -step,
+      behavior: "smooth",
+    });
+  }
+
+  function handleRowWheel(event: WheelEvent<HTMLDivElement>) {
+    const row = rowRef.current;
+    if (!row) return;
+
+    if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+
+    const rawDelta = event.deltaX;
+    if (rawDelta === 0) return;
+
+    const scrollLeft = row.scrollLeft;
+    const maxScrollLeft = row.scrollWidth - row.clientWidth;
+    const canMoveLeft = rawDelta < 0 && scrollLeft > 1;
+    const canMoveRight = rawDelta > 0 && scrollLeft < maxScrollLeft - 1;
+
+    if (!canMoveLeft && !canMoveRight) return;
+
+    event.preventDefault();
+    row.scrollBy({
+      left: rawDelta,
+      behavior: "auto",
+    });
+  }
+
+  useEffect(() => {
+    updateScrollButtons();
+
+    const row = rowRef.current;
+    if (!row) return;
+
+    const resizeObserver = new ResizeObserver(updateScrollButtons);
+    resizeObserver.observe(row);
+
+    return () => resizeObserver.disconnect();
+  }, [authors.length]);
 
   return (
-    <section className="min-w-0 border-b px-4 py-4 last:border-b-0 sm:px-5">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-heading text-lg font-medium leading-snug">{title}</h2>
-        <p className="text-xs text-muted-foreground">{countLabel(authors.length, "author")}</p>
+    <section className="min-w-0 border-b px-4 py-3 last:border-b-0 sm:px-5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-sm font-semibold leading-snug">{title}</h3>
+            <p className="text-xs text-muted-foreground">{authors.length}</p>
+          </div>
+        </div>
+        <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
+          <Link to={viewAllPath}>
+            View all
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </Button>
       </div>
       {authors.length > 0 ? (
-        <div ref={rowRef} className="flex gap-3 overflow-hidden pb-1">
-          {visibleAuthors.map((author) => (
-            <Link
-              key={author.id}
-              to={`/authors/${encodeURIComponent(author.id)}`}
-              title={author.name}
-              aria-label={`Open ${author.name}`}
-              className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        <div className="relative">
+          {canScrollLeft && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background shadow-sm"
+              onClick={() => scrollOneAuthor("left")}
+              aria-label={`Scroll ${title} left`}
             >
-              <AuthorAvatar author={author} />
-            </Link>
-          ))}
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+
+          <div
+            ref={rowRef}
+            aria-label={`${title} shelf`}
+            className="flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onScroll={updateScrollButtons}
+            onWheel={handleRowWheel}
+          >
+            {authors.map((author) => (
+              <div key={author.id} data-shelf-item className="shrink-0">
+                <Link
+                  to={`/authors/${encodeURIComponent(author.id)}`}
+                  title={author.name}
+                  aria-label={`Open ${author.name}`}
+                  className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <AuthorAvatar author={author} />
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          {canScrollRight && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background shadow-sm"
+              onClick={() => scrollOneAuthor("right")}
+              aria-label={`Scroll ${title} right`}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed bg-background/55 px-4 py-5 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed bg-background/55 p-4 text-sm text-muted-foreground">
           {emptyMessage}
-        </p>
+        </div>
       )}
     </section>
   );
@@ -173,7 +254,10 @@ export default function Authors() {
     [authorRecords, books, notes],
   );
   const authorsByName = useMemo(() => sortAuthorsByName(authors), [authors]);
-  const topAuthors = useMemo(() => sortAuthorsForTopShelf(authors), [authors]);
+  const topAuthors = useMemo(
+    () => sortAuthorsForTopShelf(authors).filter((author) => (author.averageRating ?? 0) > 4),
+    [authors],
+  );
   const recentlyReadAuthors = useMemo(
     () => sortAuthorsByRecentlyRead(authors.filter((author) => wasReadInRecentWindow(author))),
     [authors],
@@ -240,16 +324,19 @@ export default function Authors() {
               title="Top Authors"
               authors={topAuthors}
               emptyMessage="No favorite or highly rated authors yet."
+              viewAllPath={buildExplorePath("top-rated")}
             />
             <AuthorShelfRow
               title="Recently Read"
               authors={recentlyReadAuthors}
               emptyMessage="Authors from recently finished books will appear here."
+              viewAllPath={buildExplorePath("latest-read")}
             />
             <AuthorShelfRow
               title="Most Read"
               authors={mostReadAuthors}
               emptyMessage="Authors with more than two finished books will appear here."
+              viewAllPath={buildExplorePath("most-read")}
             />
           </section>
 
