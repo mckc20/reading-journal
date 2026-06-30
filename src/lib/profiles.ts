@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { deletePublicImageVariants, uploadPublicImage } from "./storage";
 import type {
   Group,
   GroupMembership,
@@ -48,6 +49,11 @@ export type ProfilePayload = Partial<
   >
 >;
 
+export type ProfileSaveInput = ProfilePayload & {
+  avatar_file?: File | null;
+  remove_avatar?: boolean;
+};
+
 export type GroupPayload = Pick<Group, "name"> &
   Partial<Pick<Group, "description" | "avatar_url">>;
 
@@ -72,6 +78,35 @@ function normalizeProfile(row: NullableProfileRow): Profile {
     language: row.language ?? undefined,
     created_at: row.created_at,
   };
+}
+
+function normalizeProfileInput(input: ProfileSaveInput): ProfileSaveInput {
+  return {
+    display_name: input.display_name?.trim() || undefined,
+    username: input.username?.trim() || undefined,
+    first_name: input.first_name?.trim() || undefined,
+    last_name: input.last_name?.trim() || undefined,
+    avatar_url: input.avatar_url?.trim() || undefined,
+    bio: input.bio?.trim() || undefined,
+    timezone: input.timezone?.trim() || undefined,
+    language: input.language?.trim() || undefined,
+    avatar_file: input.avatar_file ?? null,
+    remove_avatar: input.remove_avatar ?? false,
+  };
+}
+
+function withoutAvatarUploadFields(input: ProfileSaveInput) {
+  const { avatar_url: _avatarUrl, avatar_file: _avatarFile, remove_avatar: _removeAvatar, ...rest } = input;
+  return rest;
+}
+
+async function saveProfileAvatar(userId: string, file: File): Promise<{ publicUrl: string; extension: string }> {
+  const { publicUrl, extension } = await uploadPublicImage("profile-avatars", userId, userId, file);
+  return { publicUrl, extension };
+}
+
+async function deleteProfileAvatarVariants(userId: string, keepExtension?: string | null): Promise<void> {
+  await deletePublicImageVariants("profile-avatars", userId, userId, keepExtension);
 }
 
 function normalizeGroup(row: NullableGroupRow): Group {
@@ -110,29 +145,85 @@ export async function getMyProfile(): Promise<Profile | null> {
   return data ? normalizeProfile(data as NullableProfileRow) : null;
 }
 
-export async function createMyProfile(profile: ProfilePayload): Promise<Profile> {
+export async function createMyProfile(profile: ProfileSaveInput): Promise<Profile> {
   const userId = await getCurrentUserId();
+  const normalized = normalizeProfileInput(profile);
   const { data, error } = await supabase
     .from("profiles")
-    .insert({ id: userId, ...profile })
+    .insert({
+      id: userId,
+      ...withoutAvatarUploadFields(normalized),
+      avatar_url:
+        normalized.remove_avatar || normalized.avatar_file ? undefined : normalized.avatar_url ?? null,
+    })
     .select()
     .single();
 
   if (error) throw error;
-  return normalizeProfile(data as NullableProfileRow);
+  const created = normalizeProfile(data as NullableProfileRow);
+  if (!normalized.avatar_file) return created;
+
+  try {
+    const { publicUrl, extension } = await saveProfileAvatar(userId, normalized.avatar_file);
+    const { data: updated, error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl })
+      .eq("id", userId)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+    await deleteProfileAvatarVariants(userId, extension).catch(() => {});
+    return normalizeProfile(updated as NullableProfileRow);
+  } catch (avatarError) {
+    console.warn("Profile avatar upload failed after creating profile:", avatarError);
+    return created;
+  }
 }
 
-export async function updateMyProfile(profile: ProfilePayload): Promise<Profile> {
+export async function updateMyProfile(profile: ProfileSaveInput): Promise<Profile> {
   const userId = await getCurrentUserId();
+  const normalized = normalizeProfileInput(profile);
   const { data, error } = await supabase
     .from("profiles")
-    .update(profile)
+    .update({
+      ...withoutAvatarUploadFields(normalized),
+      ...(normalized.remove_avatar
+        ? { avatar_url: null }
+        : normalized.avatar_file
+          ? {}
+          : normalized.avatar_url !== undefined
+            ? { avatar_url: normalized.avatar_url }
+            : {}),
+    })
     .eq("id", userId)
     .select()
     .single();
 
   if (error) throw error;
-  return normalizeProfile(data as NullableProfileRow);
+  const updated = normalizeProfile(data as NullableProfileRow);
+
+  if (normalized.remove_avatar) {
+    await deleteProfileAvatarVariants(userId).catch(() => {});
+    return updated;
+  }
+
+  if (!normalized.avatar_file) return updated;
+
+  try {
+    const { publicUrl, extension } = await saveProfileAvatar(userId, normalized.avatar_file);
+    const { data: savedAvatar, error: avatarUpdateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl })
+      .eq("id", userId)
+      .select()
+      .single();
+    if (avatarUpdateError) throw avatarUpdateError;
+    await deleteProfileAvatarVariants(userId, extension).catch(() => {});
+    return normalizeProfile(savedAvatar as NullableProfileRow);
+  } catch (avatarError) {
+    console.warn("Profile avatar upload failed while updating profile:", avatarError);
+    return updated;
+  }
 }
 
 export async function getMyGroups(): Promise<Group[]> {

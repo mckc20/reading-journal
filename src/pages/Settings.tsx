@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
   Bell,
   BookOpen,
   Database,
   Download,
+  ImagePlus,
   Info,
   KeyRound,
   Lock,
@@ -89,7 +90,6 @@ type SettingsTab =
 type ProfileSettingsForm = {
   display_name: string;
   username: string;
-  avatar_url: string;
   bio: string;
 };
 
@@ -230,7 +230,6 @@ function profileToSettingsForm(profile: ReturnType<typeof useProfile>["profile"]
   return {
     display_name: profile?.display_name ?? fallbackName,
     username: profile?.username ?? "",
-    avatar_url: profile?.avatar_url ?? "",
     bio: profile?.bio ?? "",
   };
 }
@@ -241,7 +240,6 @@ function cleanProfileSettingsForm(form: ProfileSettingsForm) {
   return {
     display_name: form.display_name.trim() || undefined,
     username: username || undefined,
-    avatar_url: form.avatar_url.trim() || undefined,
     bio: form.bio.trim() || undefined,
   };
 }
@@ -401,6 +399,10 @@ function DisabledActionButton({
 function ProfileSettings() {
   const { profile, loading, error: profileError, saveProfile } = useProfile();
   const [form, setForm] = useState<ProfileSettingsForm>(() => profileToSettingsForm(profile));
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -408,6 +410,36 @@ function ProfileSettings() {
   useEffect(() => {
     setForm(profileToSettingsForm(profile));
   }, [profile]);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    const preview = URL.createObjectURL(avatarFile);
+    setAvatarPreviewUrl(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [avatarFile]);
+
+  const currentAvatarUrl = removeAvatar ? null : avatarPreviewUrl ?? profile?.avatar_url?.trim() ?? null;
+  const avatarAlt = profile?.display_name?.trim() || profile?.username?.trim() || "Profile avatar";
+
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setAvatarFile(file);
+    setRemoveAvatar(false);
+    event.target.value = "";
+  }
+
+  function handleRemoveAvatar() {
+    setAvatarFile(null);
+    setAvatarPreviewUrl(null);
+    setRemoveAvatar(true);
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = "";
+    }
+  }
 
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -424,8 +456,18 @@ function ProfileSettings() {
     }
 
     try {
-      const savedProfile = await saveProfile(cleanForm);
+      const savedProfile = await saveProfile({
+        ...cleanForm,
+        avatar_file: avatarFile,
+        remove_avatar: removeAvatar,
+      });
       setForm(profileToSettingsForm(savedProfile));
+      setAvatarFile(null);
+      setAvatarPreviewUrl(null);
+      setRemoveAvatar(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
       setMessage("Profile saved.");
     } catch (saveError) {
       setError(getErrorMessage(saveError, "Could not save profile."));
@@ -445,47 +487,72 @@ function ProfileSettings() {
         {error && <p className="text-sm text-destructive">{error}</p>}
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-[9rem_1fr] sm:items-start">
           <div className="space-y-2">
-            <Label htmlFor="display-name">Display name</Label>
-            <Input
-              id="display-name"
-              value={form.display_name}
-              disabled={loading}
-              onChange={(event) => setForm({ ...form, display_name: event.target.value })}
-            />
+            <Label>Profile photo</Label>
+            <div className="flex flex-col items-start gap-2">
+              <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted shadow-sm">
+                {currentAvatarUrl ? (
+                  <img src={currentAvatarUrl} alt={avatarAlt} className="h-full w-full object-cover" />
+                ) : (
+                  <ImagePlus className="h-8 w-8 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground/70" />
+                )}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                  <ImagePlus className="h-5 w-5 text-white" />
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  ref={avatarInputRef}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  disabled={loading}
+                  onChange={handleAvatarChange}
+                />
+              </label>
+              {(currentAvatarUrl || avatarFile || removeAvatar) && (
+                <Button type="button" variant="ghost" onClick={handleRemoveAvatar} className="gap-2 px-2" disabled={loading}>
+                  <Trash2 className="h-4 w-4" />
+                  Remove photo
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground">PNG, JPG, WEBP, or AVIF. Click the photo to upload.</p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={form.username}
-              disabled={loading}
-              placeholder="martina_reads"
-              onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
-            />
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="display-name">Display name</Label>
+                <Input
+                  id="display-name"
+                  value={form.display_name}
+                  disabled={loading}
+                  onChange={(event) => setForm({ ...form, display_name: event.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  value={form.username}
+                  disabled={loading}
+                  placeholder="martina_reads"
+                  onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={form.bio}
+                disabled={loading}
+                onChange={(event) => setForm({ ...form, bio: event.target.value })}
+              />
+            </div>
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="avatar-url">Avatar URL</Label>
-          <Input
-            id="avatar-url"
-            value={form.avatar_url}
-            disabled={loading}
-            onChange={(event) => setForm({ ...form, avatar_url: event.target.value })}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="bio">Bio</Label>
-          <Textarea
-            id="bio"
-            value={form.bio}
-            disabled={loading}
-            onChange={(event) => setForm({ ...form, bio: event.target.value })}
-          />
         </div>
 
         <Button type="submit" disabled={saving || loading}>

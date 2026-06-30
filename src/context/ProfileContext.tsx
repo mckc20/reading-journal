@@ -13,7 +13,7 @@ import {
   getErrorMessage,
   getMyProfile,
   updateMyProfile,
-  type ProfilePayload,
+  type ProfileSaveInput,
 } from "@/lib/profiles";
 import type { Profile } from "@/types";
 
@@ -22,7 +22,7 @@ interface ProfileContextValue {
   loading: boolean;
   error: string | null;
   refreshProfile: () => Promise<Profile | null>;
-  saveProfile: (payload: ProfilePayload) => Promise<Profile>;
+  saveProfile: (payload: ProfileSaveInput) => Promise<Profile>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -60,7 +60,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [refreshProfile]);
 
   const saveProfile = useCallback(
-    async (payload: ProfilePayload) => {
+    async (payload: ProfileSaveInput) => {
       const savedProfile = profile
         ? await updateMyProfile(payload)
         : await createMyProfile(payload);
