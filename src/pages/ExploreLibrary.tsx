@@ -7,10 +7,10 @@ import {
   Download,
   Grid2X2,
   Heart,
+  List,
   MoreHorizontal,
   RefreshCw,
   Star,
-  Table2,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -720,11 +720,11 @@ function LibraryViewModeSwitcher({
         type="button"
         size="icon-sm"
         variant={display === "table" ? "secondary" : "ghost"}
-        aria-label="Table view"
+        aria-label="List view"
         aria-pressed={display === "table"}
         onClick={() => onDisplayChange("table")}
       >
-        <Table2 className="h-4 w-4" />
+        <List className="h-4 w-4" />
       </Button>
     </div>
   );
