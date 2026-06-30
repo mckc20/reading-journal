@@ -1,13 +1,12 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
   ChevronRight,
   ListTree,
 } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { buildGenreSlugLookup, getBooksForGenreSubtree, getGenreBookCount, getGenrePath, resolveGenreSlug } from "@/lib/genres";
@@ -69,19 +68,14 @@ export default function GenreDetails() {
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <ListTree className="h-10 w-10 text-muted-foreground/40" />
         <h1 className="text-lg font-heading leading-snug font-medium">Genre not found</h1>
-        <Button asChild size="sm" variant="outline">
-          <Link to="/genres">Back to Genres</Link>
-        </Button>
+        <BackButton fallbackTo="/genres" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-7">
-      <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-        <ArrowLeft className="mr-1.5 h-4 w-4" />
-        Back
-      </Button>
+      <BackButton fallbackTo="/genres" />
 
       <section className={cn("overflow-hidden rounded-xl border bg-card", metadata.accentClassName)}>
         <div className={cn("bg-gradient-to-br p-5", metadata.accentClassName ?? "from-primary/10 via-accent/10 to-muted/20")}>

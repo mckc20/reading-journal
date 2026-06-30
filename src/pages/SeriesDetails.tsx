@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Check, Flag, Heart, PauseCircle, Star } from "lucide-react";
+import { BookOpen, Check, Flag, Heart, PauseCircle, Star } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
@@ -936,9 +937,7 @@ export default function SeriesDetails() {
         <p className="text-sm text-muted-foreground">
           This series may have been deleted or you may not have access.
         </p>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/series">Back to Series</Link>
-        </Button>
+        <BackButton fallbackTo="/series" />
       </div>
     );
   }
@@ -956,12 +955,7 @@ export default function SeriesDetails() {
         </div>
       )}
       <div className="flex items-start justify-between gap-3">
-        <Button variant="ghost" size="sm" className="px-2" asChild>
-          <Link to="/series">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back to Series
-          </Link>
-        </Button>
+        <BackButton fallbackTo="/series" />
         <DetailActionsMenu
           kind="series"
           label={seriesRecord.name}

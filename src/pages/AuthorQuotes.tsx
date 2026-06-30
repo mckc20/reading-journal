@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { BookOpen } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
-import { Button } from "@/components/ui/button";
+import BackButton from "@/components/BackButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -27,7 +27,6 @@ function EmptyState({ message }: { message: string }) {
 
 export default function AuthorQuotes() {
   const { authorId } = useParams();
-  const navigate = useNavigate();
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const [notes, setNotes] = useState<BookNote[]>([]);
@@ -98,10 +97,7 @@ export default function AuthorQuotes() {
   if (!author) {
     return (
       <div className="space-y-4">
-        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
-          <ArrowLeft className="h-4 w-4" />
-          Back to authors
-        </Button>
+        <BackButton fallbackTo="/authors" />
         <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="font-heading text-lg font-medium">Author not found</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -114,10 +110,7 @@ export default function AuthorQuotes() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(`/authors/${author.id}`)}>
-        <ArrowLeft className="mr-1.5 h-4 w-4" />
-        Back to author
-      </Button>
+      <BackButton fallbackTo="/authors" />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>

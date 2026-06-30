@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AnnotationCard from "@/components/AnnotationCard";
+import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
@@ -248,10 +249,7 @@ export default function AuthorDetails() {
   if (!author) {
     return (
       <div className="space-y-4">
-        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+        <BackButton fallbackTo="/authors" />
         <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="font-heading text-lg font-medium">Author not found</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -271,10 +269,7 @@ export default function AuthorDetails() {
   return (
     <div className="space-y-10">
       <div className="flex items-start justify-between gap-3">
-        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/authors")}>
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+        <BackButton fallbackTo="/authors" />
 
         <DetailActionsMenu
           kind="author"

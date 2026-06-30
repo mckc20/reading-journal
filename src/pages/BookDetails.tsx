@@ -10,7 +10,6 @@ import {
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Calendar,
@@ -30,6 +29,7 @@ import {
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import AnnotationCard from "@/components/AnnotationCard";
+import BackButton from "@/components/BackButton";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
 import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
@@ -663,9 +663,7 @@ export default function BookDetails() {
         <p className="max-w-md text-sm text-muted-foreground">
           This book may not exist, may have been deleted, or you may not have access.
         </p>
-        <Button asChild size="sm" variant="outline">
-          <Link to="/library">Back to Library</Link>
-        </Button>
+        <BackButton fallbackTo="/library" />
       </div>
     );
   }
@@ -673,10 +671,7 @@ export default function BookDetails() {
   if (isEditMode) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back to author
-        </Button>
+        <BackButton fallbackTo="/library" />
 
         {errorMsg && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -815,10 +810,7 @@ export default function BookDetails() {
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
-        <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          Back to author
-        </Button>
+        <BackButton fallbackTo="/library" />
 
         <DetailActionsMenu
           kind="book"

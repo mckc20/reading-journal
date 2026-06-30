@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, MessageSquarePlus, RefreshCw } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { BookOpen, MessageSquarePlus, RefreshCw } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
+import BackButton from "@/components/BackButton";
 import BookNotesPanel from "@/components/BookNotesPanel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +19,6 @@ const TAB_LABELS: Record<BookNoteLabel, string> = {
 export default function BookAnnotations() {
   const { bookId } = useParams<{ bookId: string }>();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
@@ -88,19 +88,14 @@ export default function BookAnnotations() {
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <BookOpen className="h-10 w-10 text-muted-foreground/40" />
         <h1 className="text-lg font-heading leading-snug font-medium">Book not found</h1>
-        <Button asChild size="sm" variant="outline">
-          <Link to="/library">Back to Library</Link>
-        </Button>
+        <BackButton fallbackTo="/library" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" className="px-2" onClick={() => navigate(-1)}>
-        <ArrowLeft className="mr-1.5 h-4 w-4" />
-        Back
-      </Button>
+      <BackButton fallbackTo="/library" />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
