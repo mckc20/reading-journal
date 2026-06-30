@@ -120,10 +120,10 @@ function normalizeLibrarySettings(settings: LibrarySettings): LibrarySettings {
   const storedDefaultView = String(settings.default_view);
 
   if (storedDefaultView === "compact") {
-    return { ...settings, default_view: "gallery" };
+    return { ...settings, default_view: "grid" };
   }
 
-  if (!["grid", "list", "gallery"].includes(storedDefaultView)) {
+  if (!["grid", "list"].includes(storedDefaultView)) {
     return { ...settings, default_view: DEFAULT_LIBRARY_SETTINGS.default_view };
   }
 

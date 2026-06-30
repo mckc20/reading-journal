@@ -7,7 +7,6 @@ import {
   Download,
   Grid2X2,
   Heart,
-  Images,
   MoreHorizontal,
   RefreshCw,
   Star,
@@ -104,7 +103,7 @@ type LibrarySort =
   | "continue-reading"
   | "near-completion";
 
-type LibraryDisplay = "grid" | "gallery" | "table";
+type LibraryDisplay = "grid" | "table";
 
 type LibraryFilterKey =
   | "status"
@@ -206,7 +205,7 @@ const validSorts = new Set<LibrarySort>([
   "continue-reading",
   "near-completion",
 ]);
-const validDisplays = new Set<LibraryDisplay>(["grid", "gallery", "table"]);
+const validDisplays = new Set<LibraryDisplay>(["grid", "table"]);
 const primaryShelves: PrimaryShelf[] = [
   {
     value: "all",
@@ -303,7 +302,7 @@ function isLibraryDisplay(value: string | null): value is LibraryDisplay {
 }
 
 function normalizeLibraryDisplay(value: string | null): LibraryDisplay {
-  if (value === "compact") return "gallery";
+  if (value === "compact") return "grid";
   return isLibraryDisplay(value) ? value : "grid";
 }
 
@@ -322,43 +321,6 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void
     <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
       {books.map((book) => (
         <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" />
-      ))}
-    </div>
-  );
-}
-
-function GalleryBooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
-  if (books.length === 0) return null;
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-      {books.map((book) => (
-        <button
-          key={book.id}
-          type="button"
-          onClick={() => onBook(book)}
-          className="group block min-w-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-muted shadow-sm">
-            {book.cover_url ? (
-              <img
-                src={book.cover_url}
-                alt={book.title}
-                loading="lazy"
-                className="absolute inset-0 block h-full w-full scale-[1.035] object-cover transition duration-200 ease-out group-hover:scale-[1.055]"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <BookOpen className="h-8 w-8 text-muted-foreground/40" />
-              </div>
-            )}
-            {book.is_favorite && (
-              <Heart
-                className="absolute right-2 top-2 h-4 w-4 fill-favorite text-favorite drop-shadow"
-                aria-label="Favorite"
-              />
-            )}
-          </div>
-        </button>
       ))}
     </div>
   );
@@ -489,7 +451,6 @@ function BooksView({
   if (display === "table") {
     return <BooksTable books={books} onBook={onBook} />;
   }
-  if (display === "gallery") return <GalleryBooksGrid books={books} onBook={onBook} />;
   return <BooksGrid books={books} onBook={onBook} />;
 }
 
@@ -754,16 +715,6 @@ function LibraryViewModeSwitcher({
         onClick={() => onDisplayChange("grid")}
       >
         <Grid2X2 className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        size="icon-sm"
-        variant={display === "gallery" ? "secondary" : "ghost"}
-        aria-label="Gallery view"
-        aria-pressed={display === "gallery"}
-        onClick={() => onDisplayChange("gallery")}
-      >
-        <Images className="h-4 w-4" />
       </Button>
       <Button
         type="button"
@@ -2129,7 +2080,7 @@ export default function Library() {
     if (displayParam !== "compact") return;
 
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("display", "gallery");
+    nextParams.set("display", "grid");
     setSearchParams(nextParams, { replace: true });
   }, [displayParam, searchParams, setSearchParams]);
 

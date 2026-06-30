@@ -190,7 +190,6 @@ const librarySortingOptions = [
 const libraryViewOptions = [
   { value: "grid", label: "Grid" },
   { value: "list", label: "List" },
-  { value: "gallery", label: "Gallery" },
 ] satisfies Array<SelectOption<LibraryView>>;
 
 const collectionVisibilityOptions = [
