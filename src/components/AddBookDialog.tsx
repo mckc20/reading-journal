@@ -69,8 +69,8 @@ interface AddBookDialogProps {
 }
 
 const STATUS_OPTIONS: BookStatus[] = [
-  "Not Started",
   "Wishlist",
+  "Unread",
   "Up Next",
   "Reading",
   "Finished",
@@ -113,7 +113,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
-      status: "Not Started",
+      status: "Unread",
       authors: [],
       genres: [],
       publication_date_precision: "",
@@ -312,7 +312,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
 
       if (result.warning) {
         reset({
-          status: "Not Started",
+          status: "Unread",
           authors: [],
           genres: [],
           publication_date_precision: "",
@@ -335,7 +335,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       }
 
       reset({
-        status: "Not Started",
+        status: "Unread",
         authors: [],
         genres: [],
         publication_date_precision: "",
@@ -380,7 +380,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       reset({
-        status: "Not Started",
+        status: "Unread",
         authors: [],
         genres: [],
         publication_date_precision: "",

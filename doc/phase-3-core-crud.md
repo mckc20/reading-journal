@@ -65,7 +65,7 @@ Delete uses a confirm-on-second-click pattern: first click changes the label to 
 
 **`src/pages/Library.tsx`** — three `<Tabs>` views:
 - **All Books** — full grid, newest first
-- **TBR** — Wishlist + Not Started + Up Next, with count in the tab trigger
+- **TBR** — Wishlist + Unread + Up Next, with count in the tab trigger
 - **Series** — groups books by `series_id`, sorted by `volume_number`; standalone books (no series) appear in a separate "Standalone" group
 
 ## Bugs fixed during phase

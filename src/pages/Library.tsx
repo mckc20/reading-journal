@@ -117,9 +117,7 @@ function wasFinishedInRecentWindow(book: Book, now = Date.now()): boolean {
 function buildSmartShelves(books: Book[]): SmartShelf[] {
   const now = Date.now();
   const currentlyReading = books.filter((book) => book.status === "Reading");
-  const wantToRead = books.filter((book) =>
-    ["Wishlist", "Not Started", "Up Next"].includes(book.status),
-  );
+  const wantToRead = books.filter((book) => book.status === "Unread");
   const recentlyFinished = books
     .filter((book) => wasFinishedInRecentWindow(book, now))
     .sort(compareRecentlyFinishedBooks);
@@ -136,7 +134,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
       key: "want-to-read",
       title: "Want to Read",
       books: wantToRead,
-      emptyMessage: "Wishlist, Not Started, and Up Next books will appear here.",
+      emptyMessage: "Unread books will appear here.",
     },
     {
       key: "recently-finished",
@@ -159,7 +157,7 @@ function buildShelfExplorePath(shelf: SmartShelf): string {
   if (shelf.key === "currently-reading") {
     params.set("status", "Currently Reading");
   } else if (shelf.key === "want-to-read") {
-    params.set("status", "Want to Read");
+    params.set("status", "Unread");
   } else if (shelf.key === "recently-finished") {
     params.set("sort", "date-finished");
   } else if (shelf.key === "favorites") {

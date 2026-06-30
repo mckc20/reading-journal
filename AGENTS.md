@@ -64,7 +64,7 @@ All tables use Row Level Security so queries are automatically scoped to `auth.u
 
 ### Key Domain Values
 
-- **Status:** `Wishlist` | `Not Started` | `Up Next` | `Reading` | `Finished` | `DNF`
+- **Status:** `Wishlist` | `Unread` | `Up Next` | `Reading` | `Finished` | `DNF`
 - **Language:** `German` | `Spanish` | `English`
 - **Belongs to:** `Me` | `Family` | `Friends` | `Library`
 - **Format:** `eBook` | `Audiobook` | `Paperback` | `Hardcover`

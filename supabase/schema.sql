@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS books (
   title           text NOT NULL,
   genres          text[],
   status          text NOT NULL DEFAULT 'Wishlist'
-                    CHECK (status IN ('Wishlist','Not Started','Up Next','Reading','Paused','Finished','DNF')),
+                    CHECK (status IN ('Wishlist','Unread','Up Next','Reading','Paused','Finished','DNF')),
   cover_url       text,
   rating          smallint CHECK (rating BETWEEN 1 AND 5),
   is_favorite     boolean NOT NULL DEFAULT false,

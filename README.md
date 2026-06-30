@@ -35,7 +35,7 @@ Each book entity must support the following properties:
   - Cover Image (stored in Supabase Storage)
   - Author
   - Genre
-  - Status: `Wishlist`, `Not Started`, `Up Next`, `Reading`, `Finished`, `DNF` (Did Not Finish)
+  - Status: `Wishlist`, `Unread`, `Up Next`, `Reading`, `Finished`, `DNF` (Did Not Finish)
   - Progress: Visual percentage bar calculated from current/total pages
   - Rating: 1-5 stars (with an exclusive "Heart" toggle for all-time favorites)
   - Current Page / Total Pages

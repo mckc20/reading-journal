@@ -138,7 +138,7 @@ type SmartShelf = {
 
 const filterableBookStatuses: BookStatus[] = [
   "Wishlist",
-  "Not Started",
+  "Unread",
   "Up Next",
   "Reading",
   "Paused",
@@ -148,7 +148,7 @@ const filterableBookStatuses: BookStatus[] = [
 
 const bulkEditableBookStatuses: BookStatus[] = [
   "Wishlist",
-  "Not Started",
+  "Unread",
   "Up Next",
   "Reading",
   "Finished",
@@ -216,7 +216,7 @@ const primaryShelves: PrimaryShelf[] = [
   {
     value: "tbr",
     label: "Want to Read",
-    matches: (book) => ["Wishlist", "Not Started", "Up Next"].includes(book.status),
+    matches: (book) => book.status === "Unread",
     emptyMessage: "No books in your reading list.",
   },
   {
@@ -264,7 +264,7 @@ const categoryShelves: CategoryShelf[] = [
 
 const statusFilterLabels: Record<BookStatus, string> = {
   Wishlist: "Wishlist",
-  "Not Started": "Not Started",
+  Unread: "Unread",
   "Up Next": "Up Next",
   Reading: "Currently Reading",
   Paused: "Paused",
@@ -272,10 +272,7 @@ const statusFilterLabels: Record<BookStatus, string> = {
   DNF: "DNF",
 };
 
-const statusFilterOptions = [
-  "Want to Read",
-  ...filterableBookStatuses.map((status) => statusFilterLabels[status]),
-];
+const statusFilterOptions = filterableBookStatuses.map((status) => statusFilterLabels[status]);
 
 const progressFilterOptions = [
   "Not started",
@@ -904,7 +901,6 @@ function matchesAnyFilterValue(values: string[], matches: (value: string) => boo
 
 function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: Series[]): boolean {
   if (!matchesAnyFilterValue(filters.status, (filter) => {
-    if (filter === "Want to Read") return ["Wishlist", "Not Started", "Up Next"].includes(book.status);
     const matchingStatus = filterableBookStatuses.find((status) => statusFilterLabels[status] === filter);
     return Boolean(matchingStatus && book.status === matchingStatus);
   })) return false;
@@ -958,7 +954,7 @@ function buildActiveFilterChips(filters: LibraryFilters): ActiveFilterChip[] {
 
 function getBookProgress(book: Book): number {
   if (book.status === "Finished") return 100;
-  if (["Wishlist", "Not Started", "Up Next"].includes(book.status)) return 0;
+  if (["Wishlist", "Unread", "Up Next"].includes(book.status)) return 0;
 
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
@@ -1875,9 +1871,7 @@ function wasFinishedInRecentWindow(book: Book, now = Date.now()): boolean {
 function buildSmartShelves(books: Book[]): SmartShelf[] {
   const now = Date.now();
   const currentlyReading = books.filter((book) => book.status === "Reading");
-  const wantToRead = books.filter((book) =>
-    ["Wishlist", "Not Started", "Up Next"].includes(book.status),
-  );
+  const wantToRead = books.filter((book) => book.status === "Unread");
   const recentlyFinished = books
     .filter((book) => wasFinishedInRecentWindow(book, now))
     .sort(compareRecentlyFinishedBooks);
@@ -1894,7 +1888,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
       key: "want-to-read",
       title: "Want to Read",
       books: wantToRead,
-      emptyMessage: "Wishlist, Not Started, and Up Next books will appear here.",
+      emptyMessage: "Unread books will appear here.",
     },
     {
       key: "recently-finished",
@@ -1913,7 +1907,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
 
 function getShelfFilters(shelf: SmartShelf): Partial<LibraryFilters> {
   if (shelf.key === "currently-reading") return { status: ["Currently Reading"] };
-  if (shelf.key === "want-to-read") return { status: ["Want to Read"] };
+  if (shelf.key === "want-to-read") return { status: ["Unread"] };
   if (shelf.key === "favorites") return { rating: ["Favorite"] };
   return {};
 }

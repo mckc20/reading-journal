@@ -160,7 +160,7 @@ const densityOptions = [
 
 const statusOptions = [
   { value: "Wishlist", label: "Wishlist" },
-  { value: "Not Started", label: "Not Started" },
+  { value: "Unread", label: "Unread" },
   { value: "Up Next", label: "Up Next" },
   { value: "Reading", label: "Reading" },
   { value: "Finished", label: "Finished" },

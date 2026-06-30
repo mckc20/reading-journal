@@ -1,6 +1,6 @@
 export type BookStatus =
   | "Wishlist"
-  | "Not Started"
+  | "Unread"
   | "Up Next"
   | "Reading"
   | "Paused"

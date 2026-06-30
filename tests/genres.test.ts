@@ -42,7 +42,7 @@ const genres = [
 function makeBook(overrides: Partial<Book> & Pick<Book, "id" | "title" | "genre_ids">): Book {
   return {
     authors: ["Unknown"],
-    status: "Not Started",
+    status: "Unread",
     is_favorite: false,
     user_id: "user-1",
     created_at: "2026-01-01T00:00:00.000Z",

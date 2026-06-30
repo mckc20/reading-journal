@@ -1059,7 +1059,7 @@ function buildSeriesAnalytics(books: Book[], series: Series[]) {
         totalBooks: seriesBooks.length,
         finishedBooks,
         completed: seriesBooks.length > 0 && finishedBooks === seriesBooks.length,
-        ongoing: seriesBooks.some((book) => book.status === "Reading" || book.status === "Paused" || book.status === "Up Next" || book.status === "Not Started"),
+        ongoing: seriesBooks.some((book) => book.status === "Reading" || book.status === "Paused" || book.status === "Up Next" || book.status === "Unread"),
         pagesRead,
         averageRating,
       };
