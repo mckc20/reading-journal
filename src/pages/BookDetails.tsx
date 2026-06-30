@@ -1,4 +1,12 @@
-import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
@@ -42,6 +50,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
+import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -56,7 +65,7 @@ import {
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
-import { fetchReadingLogsForBook } from "@/lib/books";
+import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
@@ -194,6 +203,7 @@ export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
   const { setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
+  const { user } = useAuth();
   const {
     books,
     loading,
@@ -201,7 +211,6 @@ export default function BookDetails() {
     updateBook,
     pauseBook,
     resumeBook,
-    updateCover,
     deleteBook,
     reload,
   } = useBooksContext();
@@ -229,6 +238,9 @@ export default function BookDetails() {
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const coverPreviewUrlRef = useRef<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
@@ -266,8 +278,15 @@ export default function BookDetails() {
     setIsEditMode(false);
     setErrorMsg(null);
     setDescriptionExpanded(false);
+    clearCoverDraft();
     reset(bookToFormValues(book));
   }, [book, reset]);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     setDetailEditingOpen(isEditMode);
@@ -387,9 +406,19 @@ export default function BookDetails() {
 
   function exitEditMode() {
     if (!book) return;
+    clearCoverDraft();
     reset(bookToFormValues(book));
     setErrorMsg(null);
     setIsEditMode(false);
+  }
+
+  function clearCoverDraft() {
+    if (coverPreviewUrlRef.current) {
+      URL.revokeObjectURL(coverPreviewUrlRef.current);
+      coverPreviewUrlRef.current = null;
+    }
+    setCoverFile(null);
+    setCoverPreviewUrl(null);
   }
 
   async function toggleFavorite() {
@@ -454,16 +483,12 @@ export default function BookDetails() {
     if (!book) return;
     const file = event.target.files?.[0];
     if (!file) return;
-    try {
-      setUploadingCover(true);
-      setErrorMsg(null);
-      await updateCover(book.id, file);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to update cover");
-    } finally {
-      setUploadingCover(false);
-      event.currentTarget.value = "";
-    }
+    if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
+    setCoverFile(file);
+    const nextPreviewUrl = URL.createObjectURL(file);
+    coverPreviewUrlRef.current = nextPreviewUrl;
+    setCoverPreviewUrl(nextPreviewUrl);
+    event.currentTarget.value = "";
   }
 
   function handleCreateAuthor(initialName: string) {
@@ -498,7 +523,7 @@ export default function BookDetails() {
   );
 
   async function onSubmit(values: FormValues) {
-    if (!book) return;
+    if (!book || !user) return;
     const payload: Partial<Book> = {};
 
     if (dirtyFields.title) payload.title = values.title.trim();
@@ -551,18 +576,26 @@ export default function BookDetails() {
       payload.volume_number = values.volume_number ? Number(values.volume_number) : undefined;
     }
 
-    if (Object.keys(payload).length === 0) return;
+    if (Object.keys(payload).length === 0 && !coverFile) return;
 
     try {
       setSaving(true);
       setErrorMsg(null);
+      setUploadingCover(Boolean(coverFile));
+
+      if (coverFile) {
+        payload.cover_url = await uploadCover(user.id, book.id, coverFile);
+      }
+
       await updateBook(book.id, payload);
+      clearCoverDraft();
       reset(values);
       setIsEditMode(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setSaving(false);
+      setUploadingCover(false);
     }
   }
 
@@ -654,6 +687,7 @@ export default function BookDetails() {
         <EditDetailsForm
           bookTitle={book.title}
           coverUrl={book.cover_url}
+          coverPreviewUrl={coverPreviewUrl}
           control={control}
           register={register}
           handleSubmit={handleSubmit}
@@ -661,6 +695,7 @@ export default function BookDetails() {
           onCancel={exitEditMode}
           saving={saving}
           isDirty={isDirty}
+          hasStagedCover={Boolean(coverFile)}
           errors={errors}
           series={series}
           watchedSeriesId={watchedSeriesId}
@@ -1416,6 +1451,7 @@ function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Bo
 function EditDetailsForm({
   bookTitle,
   coverUrl,
+  coverPreviewUrl,
   control,
   register,
   handleSubmit,
@@ -1423,6 +1459,7 @@ function EditDetailsForm({
   onCancel,
   saving,
   isDirty,
+  hasStagedCover,
   errors,
   series,
   watchedSeriesId,
@@ -1435,6 +1472,7 @@ function EditDetailsForm({
 }: {
   bookTitle: string;
   coverUrl?: string | null;
+  coverPreviewUrl?: string | null;
   control: ReturnType<typeof useForm<FormValues>>["control"];
   register: ReturnType<typeof useForm<FormValues>>["register"];
   handleSubmit: ReturnType<typeof useForm<FormValues>>["handleSubmit"];
@@ -1442,6 +1480,7 @@ function EditDetailsForm({
   onCancel: () => void;
   saving: boolean;
   isDirty: boolean;
+  hasStagedCover: boolean;
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
   series: { id: string; name: string }[];
   watchedSeriesId: string;
@@ -1452,6 +1491,8 @@ function EditDetailsForm({
   handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onCreateAuthor: (initialName: string) => void;
 }) {
+  const activeCoverUrl = coverPreviewUrl ?? coverUrl;
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
       <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
@@ -1460,8 +1501,8 @@ function EditDetailsForm({
             htmlFor="cover-change"
             className="group relative block w-[min(7rem,38vw)] aspect-[2/3] cursor-pointer overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
           >
-            {coverUrl ? (
-              <img src={coverUrl} alt={bookTitle} className="h-full w-full object-cover" />
+            {activeCoverUrl ? (
+              <img src={activeCoverUrl} alt={bookTitle} className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <ImagePlus className="h-8 w-8 text-muted-foreground/40" />
@@ -1480,9 +1521,10 @@ function EditDetailsForm({
               accept="image/*"
               className="sr-only"
               onChange={handleCoverChange}
-              disabled={uploadingCover}
+              disabled={saving || uploadingCover}
             />
           </label>
+          {coverPreviewUrl && <p className="mt-2 text-xs text-muted-foreground">New cover staged for save.</p>}
         </div>
 
         <div className="min-w-0 space-y-4">
@@ -1634,7 +1676,7 @@ function EditDetailsForm({
           <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" disabled={saving || !isDirty}>
+          <Button type="submit" size="sm" disabled={saving || (!isDirty && !hasStagedCover)}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
