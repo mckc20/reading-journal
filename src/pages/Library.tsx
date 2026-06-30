@@ -208,9 +208,9 @@ function SeriesShelf({
     const row = rowRef.current;
     if (!row) return;
 
-    const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY;
+    if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+
+    const rawDelta = event.deltaX;
     if (rawDelta === 0) return;
 
     const scrollLeft = row.scrollLeft;

@@ -15,10 +15,10 @@ export default function ShelfCarousel({
   ariaLabel,
 }: ShelfCarouselProps) {
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
 
     event.preventDefault();
-    event.currentTarget.scrollLeft += event.deltaY;
+    event.currentTarget.scrollLeft += event.deltaX;
   }
 
   return (
