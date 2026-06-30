@@ -48,6 +48,7 @@ Before creating a PR, update the user-facing release content for any user-facing
 - Make sure `src/components/ReleaseNotesDialog.tsx` will surface the new release note to users after deployment.
 - Treat this as a required pre-PR step, not a follow-up task.
 - If the change is visible to users, include a short note about what they should notice.
+- Only add a new changelog entry when the user explicitly asks for one.
 
 ## Architecture
 
