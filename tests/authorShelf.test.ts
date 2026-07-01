@@ -50,7 +50,7 @@ test("builds author summaries from author rows and linked books", () => {
         id: "dance",
         title: "Dance Dance Dance",
         authors: ["Haruki Murakami"],
-        status: "Wishlist",
+        status: "To Read",
       }),
       makeBook({
         id: "other",

@@ -40,7 +40,7 @@ export const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
 };
 
 export const DEFAULT_READING_SETTINGS: ReadingSettings = {
-  default_reading_status: "Wishlist",
+  default_reading_status: "To Read",
   reading_pace_calculation: "recent_logs",
   progress_display: "percentage",
   reading_streak_enabled: true,

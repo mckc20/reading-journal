@@ -137,8 +137,7 @@ type SmartShelf = {
 };
 
 const filterableBookStatuses: BookStatus[] = [
-  "Wishlist",
-  "Unread",
+  "To Read",
   "Up Next",
   "Reading",
   "Paused",
@@ -147,8 +146,7 @@ const filterableBookStatuses: BookStatus[] = [
 ];
 
 const bulkEditableBookStatuses: BookStatus[] = [
-  "Wishlist",
-  "Unread",
+  "To Read",
   "Up Next",
   "Reading",
   "Finished",
@@ -216,7 +214,7 @@ const primaryShelves: PrimaryShelf[] = [
   {
     value: "tbr",
     label: "Want to Read",
-    matches: (book) => book.status === "Unread",
+    matches: (book) => book.status === "To Read",
     emptyMessage: "No books in your reading list.",
   },
   {
@@ -230,12 +228,6 @@ const primaryShelves: PrimaryShelf[] = [
     label: "Finished",
     matches: (book) => book.status === "Finished",
     emptyMessage: "No finished books yet.",
-  },
-  {
-    value: "wishlist",
-    label: "Wishlist",
-    matches: (book) => book.status === "Wishlist",
-    emptyMessage: "No wishlist books yet.",
   },
   {
     value: "dnf",
@@ -263,8 +255,7 @@ const categoryShelves: CategoryShelf[] = [
 ];
 
 const statusFilterLabels: Record<BookStatus, string> = {
-  Wishlist: "Wishlist",
-  Unread: "Unread",
+  "To Read": "To Read",
   "Up Next": "Up Next",
   Reading: "Currently Reading",
   Paused: "Paused",
@@ -954,7 +945,7 @@ function buildActiveFilterChips(filters: LibraryFilters): ActiveFilterChip[] {
 
 function getBookProgress(book: Book): number {
   if (book.status === "Finished") return 100;
-  if (["Wishlist", "Unread", "Up Next"].includes(book.status)) return 0;
+  if (["To Read", "Up Next"].includes(book.status)) return 0;
 
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
@@ -1871,7 +1862,7 @@ function wasFinishedInRecentWindow(book: Book, now = Date.now()): boolean {
 function buildSmartShelves(books: Book[]): SmartShelf[] {
   const now = Date.now();
   const currentlyReading = books.filter((book) => book.status === "Reading");
-  const wantToRead = books.filter((book) => book.status === "Unread");
+  const wantToRead = books.filter((book) => book.status === "To Read");
   const recentlyFinished = books
     .filter((book) => wasFinishedInRecentWindow(book, now))
     .sort(compareRecentlyFinishedBooks);
@@ -1888,7 +1879,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
       key: "want-to-read",
       title: "Want to Read",
       books: wantToRead,
-      emptyMessage: "Unread books will appear here.",
+      emptyMessage: "To Read books will appear here.",
     },
     {
       key: "recently-finished",
@@ -1907,7 +1898,7 @@ function buildSmartShelves(books: Book[]): SmartShelf[] {
 
 function getShelfFilters(shelf: SmartShelf): Partial<LibraryFilters> {
   if (shelf.key === "currently-reading") return { status: ["Currently Reading"] };
-  if (shelf.key === "want-to-read") return { status: ["Unread"] };
+  if (shelf.key === "want-to-read") return { status: ["To Read"] };
   if (shelf.key === "favorites") return { rating: ["Favorite"] };
   return {};
 }

@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS books (
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title           text NOT NULL,
   genres          text[],
-  status          text NOT NULL DEFAULT 'Wishlist'
-                    CHECK (status IN ('Wishlist','Unread','Up Next','Reading','Paused','Finished','DNF')),
+  status          text NOT NULL DEFAULT 'To Read'
+                    CHECK (status IN ('To Read','Up Next','Reading','Paused','Finished','DNF')),
   cover_url       text,
   rating          smallint CHECK (rating BETWEEN 1 AND 5),
   is_favorite     boolean NOT NULL DEFAULT false,
@@ -282,7 +282,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "density": "comfortable"
   }'::jsonb,
   reading jsonb NOT NULL DEFAULT '{
-    "default_reading_status": "Wishlist",
+    "default_reading_status": "To Read",
     "reading_pace_calculation": "recent_logs",
     "progress_display": "percentage",
     "reading_streak_enabled": true,

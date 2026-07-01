@@ -112,8 +112,7 @@ interface FormValues {
 }
 
 const STATUS_OPTIONS: BookStatus[] = [
-  "Wishlist",
-  "Unread",
+  "To Read",
   "Up Next",
   "Reading",
   "Finished",
@@ -365,7 +364,7 @@ export default function BookDetails() {
   const estimatedFinish = useMemo(
     () =>
       getEstimatedFinish({
-        status: book?.status ?? "Unread",
+        status: book?.status ?? "To Read",
         currentPage: book?.current_page,
         totalPages: book?.total_pages,
         logs: readingLogs,

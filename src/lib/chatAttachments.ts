@@ -133,7 +133,7 @@ export function bookSnapshotToAddBookPayload(
     title: book.title,
     authors: book.authors.length > 0 ? book.authors : ["Unknown"],
     genres: book.genres,
-    status: "Wishlist",
+    status: "To Read",
     total_pages: book.total_pages ?? undefined,
     language: book.language ?? undefined,
     format: book.format ?? undefined,

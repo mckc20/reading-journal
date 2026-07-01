@@ -185,7 +185,7 @@ test("calculates completion rate from finished and DNF outcomes only", () => {
       makeBook({ id: "finished-1" }),
       makeBook({ id: "finished-2", title: "Second" }),
       makeBook({ id: "dnf", status: "DNF", title: "Abandoned", date_finished: undefined }),
-      makeBook({ id: "wishlist", status: "Wishlist", title: "Wishlist", date_finished: undefined }),
+      makeBook({ id: "to-read", status: "To Read", title: "To Read", date_finished: undefined }),
     ],
     [],
   );

@@ -159,8 +159,7 @@ const densityOptions = [
 ] satisfies Array<SelectOption<DensityPreference>>;
 
 const statusOptions = [
-  { value: "Wishlist", label: "Wishlist" },
-  { value: "Unread", label: "Unread" },
+  { value: "To Read", label: "To Read" },
   { value: "Up Next", label: "Up Next" },
   { value: "Reading", label: "Reading" },
   { value: "Finished", label: "Finished" },

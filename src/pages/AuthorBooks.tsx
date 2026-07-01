@@ -57,7 +57,7 @@ function formatTimelineLabel(
   value: string | null | undefined,
   sort: AuthorTimelineSort,
 ): { year: string; month: string } {
-  if (!value) return sort === "read-date" ? { year: "Unread", month: "" } : { year: "Unknown", month: "" };
+  if (!value) return sort === "read-date" ? { year: "To Read", month: "" } : { year: "Unknown", month: "" };
 
   const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
   if (!Number.isFinite(date.getTime())) return { year: "Unknown", month: "" };

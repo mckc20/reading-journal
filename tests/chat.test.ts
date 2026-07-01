@@ -124,7 +124,7 @@ test("builds clean book import payloads without personal reading state", () => {
   const payload = bookSnapshotToAddBookPayload(attachment.book);
 
   assert.equal(payload.title, "Private Progress Book");
-  assert.equal(payload.status, "Wishlist");
+  assert.equal(payload.status, "To Read");
   assert.equal(payload.is_favorite, false);
   assert.equal("rating" in payload, false);
   assert.equal("current_page" in payload, false);
@@ -280,7 +280,7 @@ function makeBook(overrides: Partial<Book> = {}): Book {
     title: "Book One",
     authors: ["Author One"],
     genres: ["Fantasy"],
-    status: "Wishlist",
+    status: "To Read",
     cover_url: "https://example.com/cover.jpg",
     rating: null,
     is_favorite: false,

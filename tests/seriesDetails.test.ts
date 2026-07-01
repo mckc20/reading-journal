@@ -83,7 +83,7 @@ test("chooses next up by series order rather than explicit up-next status", () =
   const nextUp = getNextUpBook([
     makeBook({ id: "volume-3", status: "Up Next", volume_number: 3 }),
     makeBook({ id: "volume-1", status: "Finished", volume_number: 1 }),
-    makeBook({ id: "volume-2", status: "Unread", volume_number: 2 }),
+    makeBook({ id: "volume-2", status: "To Read", volume_number: 2 }),
   ]);
 
   assert.equal(nextUp?.id, "volume-2");
@@ -221,7 +221,7 @@ test("builds series stats overview using read pages, series logs, and active jou
         current_page: 40,
         date_started: "2026-02-01",
       }),
-      makeBook({ id: "unread", status: "Unread", total_pages: 250 }),
+      makeBook({ id: "to-read", status: "To Read", total_pages: 250 }),
     ],
     [
       makeLog({ id: "first", book_id: "finished", reading_time_minutes: 90 }),
@@ -425,7 +425,7 @@ function makeBook(overrides: Partial<Book> = {}): Book {
     id: "volume",
     title: "Volume",
     authors: ["Author"],
-    status: "Unread",
+    status: "To Read",
     rating: null,
     is_favorite: false,
     user_id: "user-1",

@@ -382,7 +382,7 @@ function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) 
           ? "Paused"
         : book.status === "DNF"
           ? "DNF"
-          : "Unread";
+          : "To Read";
 
   return (
     <Link
