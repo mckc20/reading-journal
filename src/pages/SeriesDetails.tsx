@@ -482,7 +482,7 @@ function ExploreBooksCard({
 }) {
   return (
     <article className="rounded-xl border bg-card p-4">
-      <h3 className="font-heading text-lg font-medium leading-snug">{title}</h3>
+      <h3 className="text-sm font-medium">{title}</h3>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
           {emptyLabel}
@@ -1216,7 +1216,7 @@ export default function SeriesDetails() {
                 onBook={(book) => navigate(`/books/${book.id}`)}
               />
               <article className="rounded-xl border bg-card p-4">
-                <h3 className="font-heading text-lg font-medium leading-snug">
+                <h3 className="text-sm font-medium">
                   You Might Also <span className="font-serif italic">Like</span>
                 </h3>
                 <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">

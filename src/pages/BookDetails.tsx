@@ -1420,7 +1420,7 @@ function ProgressStatItem({
 function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Book[] }) {
   return (
     <div className="rounded-xl border bg-card p-4">
-      <h3 className="font-heading text-lg font-medium leading-snug">{title}</h3>
+      <h3 className="text-sm font-medium">{title}</h3>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           No matches in your library yet.

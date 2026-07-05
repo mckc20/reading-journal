@@ -8,6 +8,7 @@ export type BookGroup = {
 
 export type SeriesBookGroup = BookGroup & {
   seriesId: string;
+  isFavorite?: boolean;
 };
 
 export type LibraryNote = BookNote & {
@@ -164,6 +165,7 @@ export function buildSeriesGroups(books: Book[], series: Series[], options: { in
     Array.from(groups, ([seriesId, groupBooks]) => ({
       seriesId,
       name: seriesById.get(seriesId)!.name,
+      isFavorite: seriesById.get(seriesId)!.is_favorite,
       books: sortBooksByVolume(groupBooks),
     })),
   );
