@@ -1,4 +1,4 @@
-import { BookOpen, PauseCircle } from "lucide-react";
+import { BookOpen, Heart, PauseCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SeriesBookGroup } from "@/lib/libraryShelves";
 import type { Book } from "@/types";
@@ -10,9 +10,11 @@ function bookCountLabel(count: number) {
 function SeriesCoverLayer({
   book,
   index,
+  isFavorite,
 }: {
   book: Book;
   index: number;
+  isFavorite?: boolean;
 }) {
   const layerStyles = [
     "z-30 translate-x-0 translate-y-0 rotate-0 opacity-100 group-hover:translate-x-0.5 group-hover:rotate-[-0.5deg]",
@@ -46,6 +48,12 @@ function SeriesCoverLayer({
           <PauseCircle className="h-7 w-7 text-muted-foreground" />
         </div>
       )}
+      {isFavorite && index === 0 && (
+        <span className="absolute right-1.5 top-1.5 z-40 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-border">
+          <Heart className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
+          <span className="sr-only">Favorite series</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -53,9 +61,11 @@ function SeriesCoverLayer({
 export default function SeriesStackCard({
   group,
   onSeries,
+  showFavorite = false,
 }: {
   group: SeriesBookGroup;
   onSeries: (seriesId: string) => void;
+  showFavorite?: boolean;
 }) {
   const visibleBooks = group.books.slice(0, 3);
 
@@ -70,7 +80,14 @@ export default function SeriesStackCard({
         {[...visibleBooks].reverse().map((book, reversedIndex) => {
           const index = visibleBooks.length - 1 - reversedIndex;
 
-          return <SeriesCoverLayer key={book.id} book={book} index={index} />;
+          return (
+            <SeriesCoverLayer
+              key={book.id}
+              book={book}
+              index={index}
+              isFavorite={showFavorite && group.isFavorite}
+            />
+          );
         })}
       </div>
       <div className="mt-2 min-w-0">
