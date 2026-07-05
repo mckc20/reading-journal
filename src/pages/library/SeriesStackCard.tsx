@@ -49,8 +49,8 @@ function SeriesCoverLayer({
         </div>
       )}
       {isFavorite && index === 0 && (
-        <span className="absolute right-1.5 top-1.5 z-40 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-border">
-          <Heart className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
+        <span className="absolute right-1.5 top-1.5 z-40">
+          <Heart className="h-4 w-4 fill-favorite text-favorite drop-shadow" aria-hidden="true" />
           <span className="sr-only">Favorite series</span>
         </span>
       )}
@@ -61,11 +61,9 @@ function SeriesCoverLayer({
 export default function SeriesStackCard({
   group,
   onSeries,
-  showFavorite = false,
 }: {
   group: SeriesBookGroup;
   onSeries: (seriesId: string) => void;
-  showFavorite?: boolean;
 }) {
   const visibleBooks = group.books.slice(0, 3);
 
@@ -85,7 +83,7 @@ export default function SeriesStackCard({
               key={book.id}
               book={book}
               index={index}
-              isFavorite={showFavorite && group.isFavorite}
+              isFavorite={group.isFavorite}
             />
           );
         })}

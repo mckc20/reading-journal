@@ -37,8 +37,8 @@ function EmptySeriesCard({
         <div className="absolute left-0 top-2 flex h-[135px] w-[90px] items-center justify-center overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-colors group-hover:bg-muted/80 sm:h-[168px] sm:w-[112px]">
           <BookOpen className="h-8 w-8 text-muted-foreground/40" />
           {group.isFavorite && (
-            <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-border">
-              <Heart className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
+            <span className="absolute right-1.5 top-1.5">
+              <Heart className="h-4 w-4 fill-favorite text-favorite drop-shadow" aria-hidden="true" />
               <span className="sr-only">Favorite series</span>
             </span>
           )}
@@ -95,7 +95,7 @@ export default function Series() {
             group.books.length === 0 ? (
               <EmptySeriesCard key={group.seriesId} group={group} onSeries={openSeries} />
             ) : (
-              <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} showFavorite />
+              <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} />
             )
           ))}
         </div>
