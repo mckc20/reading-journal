@@ -75,6 +75,8 @@ import {
   parsePublicationDateInput,
   trimPublicationDateInputForPrecision,
 } from "@/lib/publicationDate";
+import { bookHasGenreName, getBookGenreNames, getMostPopularMatchingGenre } from "@/lib/recommendations";
+import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import {
   getTodayLocalDate,
   cn,
@@ -390,18 +392,22 @@ export default function BookDetails() {
     [authors, books, notes],
   );
 
+  const exploreGenre = useMemo(
+    () => (book ? getMostPopularMatchingGenre(getBookGenreNames(book), books) : null),
+    [book, books],
+  );
+
   const relatedByGenre = useMemo(() => {
-    if (!book || !book.genre_ids?.length) return [];
-    const genreIds = new Set(book.genre_ids);
+    if (!book || !exploreGenre) return [];
     return books
       .filter(
         (item) =>
           item.id !== book.id &&
-          item.genre_ids?.some((genreId) => genreIds.has(genreId)) &&
+          bookHasGenreName(item, exploreGenre) &&
           !relatedByAuthor.some((authorBook) => authorBook.id === item.id),
       )
       .slice(0, 3);
-  }, [book, books, relatedByAuthor]);
+  }, [book, books, exploreGenre, relatedByAuthor]);
 
   function exitEditMode() {
     if (!book) return;
@@ -572,7 +578,16 @@ export default function BookDetails() {
     if (dirtyFields.date_finished) payload.date_finished = values.date_finished || undefined;
     if (dirtyFields.series_id) payload.series_id = values.series_id || undefined;
     if (dirtyFields.volume_number) {
-      payload.volume_number = values.volume_number ? Number(values.volume_number) : undefined;
+      const parsedVolumeNumber = values.volume_number
+        ? parseVolumeNumberInput(values.volume_number)
+        : null;
+      if (values.volume_number && parsedVolumeNumber === null) {
+        setError("volume_number", {
+          message: "Use a positive number with at most two decimal places.",
+        });
+        return;
+      }
+      payload.volume_number = parsedVolumeNumber ?? undefined;
     }
 
     if (Object.keys(payload).length === 0 && !coverFile) return;
@@ -1310,9 +1325,9 @@ export default function BookDetails() {
               />
               <RelatedBooksGroup
                 title={
-                  book.genres?.[0] ? (
+                  exploreGenre ? (
                     <>
-                      More in <span className="font-serif italic">{book.genres[0]}</span>
+                      More in <span className="font-serif italic">{exploreGenre}</span>
                     </>
                   ) : (
                     "More in this genre"
@@ -1405,7 +1420,7 @@ function ProgressStatItem({
 function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Book[] }) {
   return (
     <div className="rounded-xl border bg-card p-4">
-      <h3 className="text-sm font-medium">{title}</h3>
+      <h3 className="font-heading text-lg font-medium leading-snug">{title}</h3>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           No matches in your library yet.
@@ -1413,12 +1428,17 @@ function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Bo
       ) : (
         <div className="mt-4 grid grid-cols-3 gap-3">
           {books.slice(0, 3).map((book) => (
-            <Link key={book.id} to={`/books/${book.id}`} className="group min-w-0">
+            <Link
+              key={book.id}
+              to={`/books/${book.id}`}
+              className="group min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Open ${book.title}`}
+            >
               <div className="aspect-[2/3] overflow-hidden rounded-md border bg-muted">
                 {book.cover_url ? (
                   <img
                     src={book.cover_url}
-                    alt={book.title}
+                    alt=""
                     className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
                   />
                 ) : (
@@ -1427,10 +1447,6 @@ function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Bo
                   </div>
                 )}
               </div>
-              <p className="mt-2 line-clamp-2 text-xs font-medium leading-5">{book.title}</p>
-              <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                {book.authors.join(", ")}
-              </p>
             </Link>
           ))}
         </div>
@@ -1646,7 +1662,10 @@ function EditDetailsForm({
           {watchedSeriesId && (
             <div className="space-y-1.5">
               <Label htmlFor="detail-volume-number">Volume number</Label>
-              <Input id="detail-volume-number" type="number" min={0.5} step="any" {...register("volume_number")} />
+              <Input id="detail-volume-number" type="number" min={0.01} step="0.01" {...register("volume_number")} />
+              {errors.volume_number && (
+                <p className="text-xs text-destructive">{errors.volume_number.message}</p>
+              )}
             </div>
           )}
 

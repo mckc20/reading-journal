@@ -2,6 +2,19 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-07-05 - Series detail and analytics redesign
+Version: `2026-07-05-series-detail-analytics`
+Summary: Series pages now feel more complete, with a redesigned detail page, dedicated subpages, richer analytics, and better recommendations.
+
+- Redesigned series detail page
+  Series pages now have a stronger hero, editable banner support, polished progress cards, focused book and quote sections, and a cleaner More to Explore area.
+- Dedicated series subpages
+  Added separate pages for all series books, favorite series quotes, and full series analytics so the main detail page stays easier to scan.
+- Better series analytics
+  Added shared analytics stats, book comparison charts, podium-style rankings, active-book pace handling, and favorite-aware top-rated rankings.
+- Easier series management
+  Improved series creation and editing with drag-and-drop volume ordering, banner uploads, favorite series support, and clearer volume-number validation.
+
 ## 2026-06-27 - Database-backed authors and author picker
 Version: `2026-06-27-authors-normalization`
 Summary: Authors now come from their own database table, and book forms use a searchable picker with inline author creation.

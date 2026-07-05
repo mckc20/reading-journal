@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   filterSeriesLogs,
+  buildSeriesRecommendations,
+  getDerivedSeriesStatus,
   getAverageSeriesRating,
   getBookReadingMinutes,
   getFeaturedNoteCandidates,
@@ -11,13 +13,15 @@ import {
   getMostCommonGenre,
   getNextUpBook,
   getSeriesAuthors,
+  getSeriesPublicationRange,
+  getSeriesQuoteEntries,
   getSeriesJourneyRecap,
   getSeriesJourneyTransition,
   getSeriesProgress,
   getSeriesStats,
   sortSeriesBooks,
 } from "../src/lib/seriesDetails";
-import type { Book, BookNote, ReadingLog } from "../src/types";
+import type { Book, BookNote, ReadingLog, Series } from "../src/types";
 
 test("orders numbered series books before unnumbered books with title fallback", () => {
   const sorted = sortSeriesBooks([
@@ -45,6 +49,32 @@ test("builds series banner metadata from all books", () => {
   assert.deepEqual(getSeriesAuthors(books), ["Editor", "Robin Hobb"]);
   assert.equal(getMostCommonGenre(books), "Drama");
   assert.equal(getAverageSeriesRating(books), 4);
+});
+
+test("derives user-facing series status from book statuses", () => {
+  assert.equal(getDerivedSeriesStatus([]), "Not Started");
+  assert.equal(getDerivedSeriesStatus([makeBook({ status: "To Read" })]), "Not Started");
+  assert.equal(getDerivedSeriesStatus([makeBook({ status: "Up Next" })]), "Ongoing");
+  assert.equal(getDerivedSeriesStatus([makeBook({ status: "Finished" })]), "Completed");
+  assert.equal(
+    getDerivedSeriesStatus([
+      makeBook({ status: "Finished" }),
+      makeBook({ id: "dnf", status: "DNF" }),
+    ]),
+    "DNF",
+  );
+});
+
+test("formats series publication ranges from book publication dates", () => {
+  assert.equal(
+    getSeriesPublicationRange([
+      makeBook({ publication_date: "2026-05-01" }),
+      makeBook({ id: "older", publication_date: "2024-01-01" }),
+    ]),
+    "2024-2026",
+  );
+  assert.equal(getSeriesPublicationRange([makeBook({ publication_date: "2026-01-01" })]), "2026");
+  assert.equal(getSeriesPublicationRange([makeBook()]), null);
 });
 
 test("calculates page-based progress with finished books full and reading or DNF pages recorded", () => {
@@ -363,9 +393,70 @@ test("builds rankings with favorite books first among equal ratings and includes
   const stats = getSeriesStats(books, [], notes);
 
   assert.deepEqual(stats.rankings.rating.map((row) => row.book.id), ["favorite-five", "two", "three", "one"]);
-  assert.deepEqual(stats.rankings.pace.map((row) => row.book.id), ["two", "one"]);
+  assert.deepEqual(stats.rankings.length.map((row) => row.book.id), ["two", "one"]);
   assert.deepEqual(stats.rankings.annotations.map((row) => row.book.id), ["one", "two", "three"]);
   assert.deepEqual(stats.favoriteQuotes.map((entry) => entry.note.id), ["favorite-one", "favorite-three"]);
+});
+
+test("ranks favorite books above regular five-star books", () => {
+  const stats = getSeriesStats(
+    [
+      makeBook({ id: "five-star", rating: 5 }),
+      makeBook({ id: "favorite-unrated", title: "B Favorite", is_favorite: true, rating: null }),
+      makeBook({ id: "favorite-rated", title: "A Favorite", is_favorite: true, rating: 4 }),
+    ],
+    [],
+    [],
+  );
+
+  assert.deepEqual(stats.rankings.rating.map((row) => row.book.id), [
+    "favorite-rated",
+    "favorite-unrated",
+    "five-star",
+  ]);
+  assert.deepEqual(stats.rankings.rating.map((row) => row.value), [6, 6, 5]);
+});
+
+test("filters and sorts series quote entries", () => {
+  const books = [makeBook({ id: "one" }), makeBook({ id: "two", title: "Second" })];
+  const notes = [
+    makeNote({ id: "older", book_id: "one", label: "quote", content: "Bridge four", note_date: "2026-01-01" }),
+    makeNote({ id: "newer", book_id: "two", label: "quote", content: "Stormlight", note_date: "2026-02-01", is_favorite: true }),
+    makeNote({ id: "note", book_id: "one", label: "note", content: "Not a quote" }),
+  ];
+
+  assert.deepEqual(getSeriesQuoteEntries(books, notes).map((entry) => entry.note.id), ["newer", "older"]);
+  assert.deepEqual(
+    getSeriesQuoteEntries(books, notes, { sort: "oldest" }).map((entry) => entry.note.id),
+    ["older", "newer"],
+  );
+  assert.deepEqual(
+    getSeriesQuoteEntries(books, notes, { search: "second" }).map((entry) => entry.note.id),
+    ["newer"],
+  );
+  assert.deepEqual(
+    getSeriesQuoteEntries(books, notes, { favoritesOnly: true }).map((entry) => entry.note.id),
+    ["newer"],
+  );
+});
+
+test("builds local series recommendations by author and genre", () => {
+  const current = [
+    makeBook({ id: "current", series_id: "series-1", authors: ["Author"], genres: ["Fantasy"] }),
+  ];
+  const authorMatch = makeBook({ id: "author-match", series_id: undefined, authors: ["Author"], genres: ["Memoir"], rating: 4 });
+  const genreMatch = makeBook({ id: "genre-match", series_id: "series-2", authors: ["Other"], genres: ["Fantasy"], rating: 5 });
+  const allBooks = [...current, authorMatch, genreMatch];
+  const recommendations = buildSeriesRecommendations(
+    "series-1",
+    current,
+    allBooks,
+    [makeSeries({ id: "series-1" }), makeSeries({ id: "series-2", name: "Similar" })],
+  );
+
+  assert.deepEqual(recommendations.moreByAuthor.map((book) => book.id), ["author-match"]);
+  assert.deepEqual(recommendations.similarSeries.map((entry) => entry.series.id), ["series-2"]);
+  assert.deepEqual(recommendations.youMightAlsoLike.map((book) => book.id), ["genre-match"]);
 });
 
 test("builds duration and pace chart rows in series order and excludes unusable pace data", () => {
@@ -387,15 +478,24 @@ test("builds duration and pace chart rows in series order and excludes unusable 
         date_finished: "2026-01-05",
       }),
       makeBook({ id: "unread", volume_number: 3, total_pages: 100 }),
+      makeBook({
+        id: "reading",
+        volume_number: 4,
+        status: "Reading",
+        current_page: 45,
+        total_pages: 200,
+        date_started: "2026-03-01",
+      }),
     ],
     [],
     [],
+    new Date("2026-03-10T09:00:00"),
   );
 
-  assert.deepEqual(stats.durationChart.map((row) => row.book.id), ["volume-1", "volume-2"]);
-  assert.deepEqual(stats.durationChart.map((row) => row.days), [4, 2]);
-  assert.deepEqual(stats.paceChart.map((row) => row.book.id), ["volume-1"]);
-  assert.equal(stats.paceChart[0].pagesPerDay, 20);
+  assert.deepEqual(stats.durationChart.map((row) => row.book.id), ["volume-1", "volume-2", "reading"]);
+  assert.deepEqual(stats.durationChart.map((row) => row.days), [4, 2, 9]);
+  assert.deepEqual(stats.paceChart.map((row) => row.book.id), ["volume-1", "reading"]);
+  assert.deepEqual(stats.paceChart.map((row) => row.pagesPerDay), [20, 5]);
 });
 
 test("keeps series stats neutral when required data is absent", () => {
@@ -404,7 +504,7 @@ test("keeps series stats neutral when required data is absent", () => {
   assert.equal(empty.overview.journeySpan, null);
   assert.deepEqual(empty.durationChart, []);
   assert.deepEqual(empty.paceChart, []);
-  assert.deepEqual(empty.rankings, { rating: [], pace: [], annotations: [] });
+  assert.deepEqual(empty.rankings, { rating: [], length: [], annotations: [] });
   assert.deepEqual(empty.favoriteQuotes, []);
 
   const incomplete = getSeriesStats(
@@ -456,6 +556,18 @@ function makeNote(overrides: Partial<BookNote>): BookNote {
     note_date: "2026-05-01",
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
+    ...overrides,
+  };
+}
+
+function makeSeries(overrides: Partial<Series> = {}): Series {
+  return {
+    id: "series",
+    name: "Series",
+    status: "ongoing",
+    is_favorite: false,
+    user_id: "user-1",
+    created_at: "2026-05-01T08:00:00Z",
     ...overrides,
   };
 }

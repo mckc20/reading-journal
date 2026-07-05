@@ -1,36 +1,47 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { AddBookDialogLaunchOptions } from "@/components/AppLayout";
+import SeriesBooksEditor, {
+  parseVolumeInput,
+  type EditableSeriesBook,
+} from "@/components/series/SeriesBooksEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
+import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { uploadCover } from "@/lib/books";
-import type { SeriesStatus } from "@/types";
+import { deleteSeriesBanner, uploadSeriesBanner } from "@/lib/books";
+import type { Series } from "@/types";
 
 interface AddSeriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  openAddBook: (options?: AddBookDialogLaunchOptions) => void;
 }
 
-const SERIES_STATUS_OPTIONS: SeriesStatus[] = ["ongoing", "completed"];
-
-function formatSeriesStatus(value: SeriesStatus): string {
-  return value === "ongoing" ? "Ongoing" : "Completed";
+function getNextVolume(rows: EditableSeriesBook[]): number {
+  const visibleRows = rows.filter((row) => !row.removed);
+  const largestVolume = visibleRows.reduce((largest, row) => {
+    const volume = parseVolumeInput(row.volumeInput);
+    return volume === null ? largest : Math.max(largest, volume);
+  }, 0);
+  return largestVolume + 1 || visibleRows.length + 1;
 }
 
-export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogProps) {
+export default function AddSeriesDialog({ open, onOpenChange, openAddBook }: AddSeriesDialogProps) {
   const { user } = useAuth();
   const { addSeries, editSeries } = useSeries();
+  const { books, updateBookSeriesPlacement } = useBooksContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
-  const [status, setStatus] = useState<SeriesStatus>("ongoing");
   const [description, setDescription] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [rows, setRows] = useState<EditableSeriesBook[]>([]);
+  const [draftSeries, setDraftSeries] = useState<Series | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +53,12 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
 
   function reset() {
     setName("");
-    setStatus("ongoing");
     setDescription("");
     setCoverFile(null);
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverPreview(null);
+    setRows([]);
+    setDraftSeries(null);
     setError(null);
     setSaving(false);
   }
@@ -59,27 +71,111 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
     setCoverPreview(URL.createObjectURL(file));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function ensureDraftSeries(): Promise<Series> {
     const trimmedName = name.trim();
-    if (!trimmedName || saving) return;
+    if (!trimmedName) throw new Error("Add a series name before creating a book.");
+
+    if (draftSeries) {
+      return editSeries(draftSeries.id, {
+        name: trimmedName,
+        description: description.trim() || null,
+      });
+    }
+
+    const created = await addSeries({
+      name: trimmedName,
+      description: description.trim() || null,
+    });
+    setDraftSeries(created);
+    return created;
+  }
+
+  async function handleCreateBook() {
+    if (saving) return;
 
     setSaving(true);
     setError(null);
 
     try {
-      const created = await addSeries({
-        name: trimmedName,
-        status,
-        description: description.trim() || null,
+      const seriesRecord = await ensureDraftSeries();
+      const nextVolume = getNextVolume(rows);
+      openAddBook({
+        initialSeriesId: seriesRecord.id,
+        initialVolumeNumber: nextVolume,
+        onSaved: (book) => {
+          setRows((currentRows) => {
+            if (currentRows.some((row) => row.book.id === book.id)) return currentRows;
+            return [
+              ...currentRows,
+              {
+                book,
+                volumeInput: book.volume_number ? String(book.volume_number) : String(nextVolume),
+                removed: false,
+              },
+            ];
+          });
+        },
       });
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Failed to prepare series.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName || saving) return;
+
+    const invalidRow = rows.find((row) => !row.removed && parseVolumeInput(row.volumeInput) === null);
+    if (invalidRow) {
+      setError(`Add a positive volume number with at most two decimal places for "${invalidRow.book.title}" before saving.`);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const created = draftSeries
+        ? await editSeries(draftSeries.id, {
+            name: trimmedName,
+            description: description.trim() || null,
+          })
+        : await addSeries({
+            name: trimmedName,
+            description: description.trim() || null,
+          });
 
       if (coverFile && user) {
         try {
-          const cover_url = await uploadCover(user.id, created.id, coverFile);
+          const { publicUrl, extension } = await uploadSeriesBanner(user.id, created.id, coverFile);
+          const cover_url = publicUrl;
           await editSeries(created.id, { cover_url });
+          await deleteSeriesBanner(user.id, created.id, extension).catch(() => {});
         } catch {
-          // Cover upload is optional, so a failure should not block saving the series.
+          // Banner upload is optional, so a failure should not block saving the series.
+        }
+      }
+
+      for (const row of rows) {
+        if (row.removed) {
+          if (row.book.series_id === created.id) {
+            await updateBookSeriesPlacement(row.book.id, {
+              series_id: null,
+              volume_number: null,
+            });
+          }
+          continue;
+        }
+
+        const nextVolume = parseVolumeInput(row.volumeInput);
+        if (nextVolume !== null) {
+          await updateBookSeriesPlacement(row.book.id, {
+            series_id: created.id,
+            volume_number: nextVolume,
+          });
         }
       }
 
@@ -103,7 +199,7 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
         <DialogHeader>
           <DialogTitle>Add Series</DialogTitle>
           <DialogDescription>
-            Create a series entry with a description, status, and optional cover image.
+            Create a series entry with a description and optional banner image.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,10 +208,10 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
             <div className="flex items-center gap-4">
               <label
                 htmlFor="series-cover"
-                className="flex h-24 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
+                className="flex h-24 w-40 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
               >
                 {coverPreview ? (
-                  <img src={coverPreview} alt="Series cover preview" className="h-full w-full object-cover" />
+                  <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
                 ) : (
                   <ImagePlus className="h-6 w-6 text-muted-foreground/50" />
                 )}
@@ -129,7 +225,7 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
                 onChange={handleFileChange}
               />
               <div className="flex-1">
-                <p className="text-sm font-medium">Cover image</p>
+                <p className="text-sm font-medium">Banner image</p>
                 <p className="text-xs text-muted-foreground">
                   {coverFile ? coverFile.name : "Click to upload"}
                 </p>
@@ -148,22 +244,6 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
             </div>
 
             <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as SeriesStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SERIES_STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {formatSeriesStatus(option)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
               <Label htmlFor="series-description">Description</Label>
               <Textarea
                 id="series-description"
@@ -174,11 +254,32 @@ export default function AddSeriesDialog({ open, onOpenChange }: AddSeriesDialogP
               />
             </div>
 
+            <div className="space-y-3">
+              <div>
+                <Label>Books</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Search for existing books or create a new book for this series.
+                </p>
+              </div>
+              <SeriesBooksEditor
+                rows={rows}
+                allBooks={books}
+                saving={saving}
+                enableSearch
+                emptyLabel="No books are added to this series yet."
+                removedLabel={(count) =>
+                  `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
+                }
+                onRowsChange={setRows}
+                onCreateBook={handleCreateBook}
+              />
+            </div>
+
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
 
           <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving || !name.trim()}>

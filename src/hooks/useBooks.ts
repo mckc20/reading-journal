@@ -4,6 +4,8 @@ import {
   fetchBooks,
   createBook,
   updateBook as updateBookDb,
+  updateBookSeriesPlacement as updateBookSeriesPlacementDb,
+  updateBookVolumeNumber as updateBookVolumeNumberDb,
   pauseBook as pauseBookDb,
   resumeBook as resumeBookDb,
   deleteBook as deleteBookDb,
@@ -17,6 +19,7 @@ export interface AddBookPayload
   extends Omit<BookInsert, "id" | "cover_url" | "user_id"> {}
 
 export interface AddBookResult {
+  book: Book;
   warning?: string;
 }
 
@@ -60,16 +63,17 @@ export function useBooks() {
       const book = await createBook({ ...payload, id: bookId, user_id: user.id });
       setBooks((prev) => [book, ...prev]);
 
-      if (!coverFile) return {};
+      if (!coverFile) return { book };
 
       try {
         const cover_url = await uploadCover(user.id, bookId, coverFile);
         const updated = await updateBookDb(bookId, { cover_url });
         setBooks((prev) => prev.map((b) => (b.id === bookId ? updated : b)));
-        return {};
+        return { book: updated };
       } catch (error) {
         const detail = getErrorMessage(error, "Upload request failed.");
         return {
+          book,
           warning: `Book saved, but cover upload failed: ${detail} You can add the cover later from book details.`,
         };
       }
@@ -83,6 +87,27 @@ export function useBooks() {
       setBooks((prev) => prev.map((b) => (b.id === id ? updated : b)));
     },
     []
+  );
+
+  const updateBookSeriesPlacement = useCallback(
+    async (
+      id: string,
+      payload: { series_id?: string | null; volume_number?: number | null },
+    ): Promise<void> => {
+      const updated = await updateBookSeriesPlacementDb(id, payload);
+      setBooks((prev) => prev.map((book) => (book.id === id ? updated : book)));
+    },
+    [],
+  );
+
+  const updateBookVolumeNumber = useCallback(
+    async (id: string, volumeNumber: number): Promise<void> => {
+      await updateBookVolumeNumberDb(id, volumeNumber);
+      setBooks((prev) =>
+        prev.map((book) => (book.id === id ? { ...book, volume_number: volumeNumber } : book)),
+      );
+    },
+    [],
   );
 
   const updateCover = useCallback(
@@ -126,6 +151,8 @@ export function useBooks() {
     error,
     addBook,
     updateBook,
+    updateBookSeriesPlacement,
+    updateBookVolumeNumber,
     updateCover,
     pauseBook,
     resumeBook,

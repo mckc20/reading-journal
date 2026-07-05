@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { BookOpen, Grid2X2, Heart, Star, Timeline } from "lucide-react";
+import { BookOpen, Grid2X2, Timeline } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
+import BookTimeline, { type BookTimelineItem } from "@/components/BookTimeline";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,9 +18,7 @@ import { useSeries } from "@/hooks/useSeries";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { fetchAllBookNotes } from "@/lib/bookNotes";
 import { fetchReadingLogs } from "@/lib/books";
-import { statusVariant } from "@/lib/utils";
 import type { Book, BookNote, ReadingLog, Series } from "@/types";
-import { Badge } from "@/components/ui/badge";
 
 type AuthorDisplay = "cards" | "timeline";
 type AuthorTimelineSort = "publication-date" | "read-date" | "date-added";
@@ -35,22 +34,10 @@ function normalizeTimelineSort(value: string | null): AuthorTimelineSort {
   return "publication-date";
 }
 
-function sortBooksByPublicationOrder(books: Book[]): Book[] {
-  return [...books].sort((a, b) => {
-    const aValue = a.publication_date ? new Date(a.publication_date).getTime() : Number.POSITIVE_INFINITY;
-    const bValue = b.publication_date ? new Date(b.publication_date).getTime() : Number.POSITIVE_INFINITY;
-    return aValue - bValue || a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
-  });
-}
-
 function getSeriesLabel(book: Book, series: Series[]): string {
   const seriesName = book.series_id ? series.find((item) => item.id === book.series_id)?.name ?? "" : "";
   if (!seriesName) return "";
   return book.volume_number != null ? `${seriesName} · Book ${book.volume_number}` : seriesName;
-}
-
-function formatRating(value: number | null | undefined): string {
-  return value == null ? "-" : value.toFixed(1);
 }
 
 function formatTimelineLabel(
@@ -142,74 +129,6 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (book: Book) => v
   );
 }
 
-function TimelineBookRow({
-  book,
-  series,
-  dateLabel,
-  showDate,
-  showPoint,
-  showDivider,
-  onBook,
-}: {
-  book: Book;
-  series: Series[];
-  dateLabel: { year: string; month: string };
-  showDate: boolean;
-  showPoint: boolean;
-  showDivider: boolean;
-  onBook: (book: Book) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onBook(book)}
-      className="group relative grid w-full grid-cols-[2rem_4.5rem_minmax(0,1fr)_auto] items-center gap-4 py-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
-    >
-      {showDivider && (
-        <span className="pointer-events-none absolute bottom-0 left-[6.75rem] right-0 h-px bg-border/70" />
-      )}
-      <div className="relative flex h-full min-h-[4.5rem] items-center justify-center">
-        {showPoint && (
-          <span className="relative z-10 h-3 w-3 rounded-full border-2 border-primary bg-background transition-colors group-hover:border-muted-foreground" />
-        )}
-      </div>
-      <div className={`space-y-0.5 text-sm text-muted-foreground ${showDate ? "" : "invisible"}`} aria-hidden={!showDate}>
-        <div className="font-medium text-foreground">{dateLabel.month}</div>
-        {dateLabel.year && <div className="text-xs tracking-[0.18em]">{dateLabel.year}</div>}
-      </div>
-      <div className="flex min-w-0 gap-3">
-        <div className="h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm sm:h-[86px] sm:w-14">
-          {book.cover_url ? (
-            <img src={book.cover_url} alt={book.title} loading="lazy" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 space-y-1">
-          <p className="line-clamp-2 font-heading text-base font-medium leading-snug">{book.title}</p>
-          {getSeriesLabel(book, series) && (
-            <p className="truncate text-sm text-muted-foreground">{getSeriesLabel(book, series)}</p>
-          )}
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Star className="h-3.5 w-3.5 fill-current text-rating" />
-              {formatRating(book.rating)}
-            </span>
-            {book.is_favorite && <Heart className="h-4 w-4 fill-favorite text-favorite" />}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-start justify-end">
-        <Badge variant={statusVariant(book.status)} className="text-[10px]">
-          {book.status}
-        </Badge>
-      </div>
-    </button>
-  );
-}
-
 export default function AuthorBooks() {
   const { authorId } = useParams();
   const navigate = useNavigate();
@@ -273,15 +192,35 @@ export default function AuthorBooks() {
   const author = useMemo(() => findAuthorSummary(authorSummaries, authorId), [authorSummaries, authorId]);
   const latestReadDateByBook = useMemo(() => getReadingLogDateByBook(readingLogs), [readingLogs]);
 
-  const displayBooks = useMemo(() => {
-    if (!author) return [];
-    return sortBooksByPublicationOrder(author.books);
-  }, [author]);
-
   const timelineBooks = useMemo(() => {
     if (!author) return [];
     return sortTimelineBooks(author.books, timelineSort, latestReadDateByBook);
   }, [author, latestReadDateByBook, timelineSort]);
+
+  const timelineItems = useMemo<BookTimelineItem[]>(() => {
+    return timelineBooks.map((book, index) => {
+      const dateValue = getTimelineSortDate(book, timelineSort, latestReadDateByBook);
+      const currentKey = formatTimelineGroupKey(dateValue, timelineSort);
+      const previousBook = timelineBooks[index - 1];
+      const previousValue = previousBook
+        ? getTimelineSortDate(previousBook, timelineSort, latestReadDateByBook)
+        : null;
+      const previousKey = previousBook ? formatTimelineGroupKey(previousValue, timelineSort) : null;
+      const nextBook = timelineBooks[index + 1];
+      const nextValue = nextBook ? getTimelineSortDate(nextBook, timelineSort, latestReadDateByBook) : null;
+      const nextKey = nextBook ? formatTimelineGroupKey(nextValue, timelineSort) : null;
+      const isGroupStart = currentKey !== previousKey;
+
+      return {
+        book,
+        dateLabel: formatTimelineLabel(dateValue, timelineSort),
+        subtitle: getSeriesLabel(book, series),
+        showDate: isGroupStart,
+        showPoint: isGroupStart,
+        showDivider: Boolean(nextBook) && currentKey !== nextKey,
+      };
+    });
+  }, [latestReadDateByBook, series, timelineBooks, timelineSort]);
 
   if (authorsLoading || booksLoading || notesLoading || seriesLoading || readingLogsLoading) {
     return (
@@ -376,32 +315,30 @@ export default function AuthorBooks() {
                 <Timeline className="h-4 w-4" />
               </Button>
             </div>
-            {display === "timeline" && (
-              <Select
-                value={timelineSort}
-                onValueChange={(value) =>
-                  setSearchParams(
-                    (current) => {
-                      const next = new URLSearchParams(current);
-                      if (value === "publication-date") next.delete("sort");
-                      else next.set("sort", value);
-                      return next;
-                    },
-                    { replace: true },
-                  )
-                }
-              >
-                <SelectTrigger className="w-[14rem] justify-between gap-1.5" aria-label="Sort timeline">
-                  <span className="text-muted-foreground">Sort by:</span>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="publication-date">Publication Date</SelectItem>
-                  <SelectItem value="read-date">Read Date</SelectItem>
-                  <SelectItem value="date-added">Added Date</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+            <Select
+              value={timelineSort}
+              onValueChange={(value) =>
+                setSearchParams(
+                  (current) => {
+                    const next = new URLSearchParams(current);
+                    if (value === "publication-date") next.delete("sort");
+                    else next.set("sort", value);
+                    return next;
+                  },
+                  { replace: true },
+                )
+              }
+            >
+              <SelectTrigger className="w-[14rem] justify-between gap-1.5" aria-label="Sort books">
+                <span className="text-muted-foreground">Sort by:</span>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="publication-date">Publication Date</SelectItem>
+                <SelectItem value="read-date">Reading Order</SelectItem>
+                <SelectItem value="date-added">Date Added</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -409,40 +346,12 @@ export default function AuthorBooks() {
           timelineBooks.length === 0 ? (
             <EmptyState message="Books by this author will appear here." />
           ) : (
-            <div className="relative space-y-0">
-              <span className="pointer-events-none absolute left-[1rem] top-0 bottom-0 w-px bg-border" />
-              {timelineBooks.map((book, index) => {
-                const dateValue = getTimelineSortDate(book, timelineSort, latestReadDateByBook);
-                const currentKey = formatTimelineGroupKey(dateValue, timelineSort);
-                const previousBook = timelineBooks[index - 1];
-                const previousValue = previousBook
-                  ? getTimelineSortDate(previousBook, timelineSort, latestReadDateByBook)
-                  : null;
-                const previousKey = previousBook ? formatTimelineGroupKey(previousValue, timelineSort) : null;
-                const nextBook = timelineBooks[index + 1];
-                const nextValue = nextBook ? getTimelineSortDate(nextBook, timelineSort, latestReadDateByBook) : null;
-                const nextKey = nextBook ? formatTimelineGroupKey(nextValue, timelineSort) : null;
-                const isGroupStart = currentKey !== previousKey;
-
-                return (
-                  <TimelineBookRow
-                    key={book.id}
-                    book={book}
-                    series={series}
-                    dateLabel={formatTimelineLabel(dateValue, timelineSort)}
-                    showDate={isGroupStart}
-                    showPoint={isGroupStart}
-                    showDivider={Boolean(nextBook) && currentKey !== nextKey}
-                    onBook={(item) => navigate(`/books/${item.id}`)}
-                  />
-                );
-              })}
-            </div>
+            <BookTimeline items={timelineItems} onBook={(item) => navigate(`/books/${item.id}`)} />
           )
-        ) : displayBooks.length === 0 ? (
+        ) : timelineBooks.length === 0 ? (
           <EmptyState message="Books by this author will appear here." />
         ) : (
-          <BooksGrid books={displayBooks} onBook={(book) => navigate(`/books/${book.id}`)} />
+          <BooksGrid books={timelineBooks} onBook={(book) => navigate(`/books/${book.id}`)} />
         )}
       </section>
     </div>

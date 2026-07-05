@@ -1,63 +1,69 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
+  type FormEvent,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, Check, Flag, Heart, PauseCircle, Star } from "lucide-react";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { BookOpen, CalendarDays, ChevronRight, Gauge, Heart, ImagePlus, Loader2, PauseCircle, Route, Star, Trash2 } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import QuoteBlock from "@/components/QuoteBlock";
-import ReadingProgressDialog from "@/components/ReadingProgressDialog";
+import type { AppLayoutOutletContext } from "@/components/AppLayout";
+import { SeriesAnalyticsOverview, SeriesAnalyticsPaceChart } from "@/components/series/SeriesAnalyticsSections";
+import SeriesBooksEditor, {
+  buildEditableSeriesBooks,
+  parseVolumeInput,
+  type EditableSeriesBook,
+} from "@/components/series/SeriesBooksEditor";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { parseLocalDateOnly, type CalendarSpan } from "@/lib/bookAnalytics";
+import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookNotes } from "@/lib/bookNotes";
-import { fetchReadingLogs } from "@/lib/books";
+import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import {
   filterSeriesLogs,
+  estimateSeriesCompletionDate,
   getAverageSeriesRating,
   getBookProgressPercent,
-  getFeaturedNoteCandidates,
+  getCurrentSeriesBook,
+  getDerivedSeriesStatus,
   getJourneyBookDates,
-  getJourneyDurationDays,
-  getLatestSeriesActivity,
-  getMostCommonGenre,
-  getNextUpBook,
   getSeriesAuthors,
+  getSeriesGenres,
   getSeriesJourneyRecap,
-  getSeriesJourneyTransition,
+  getSeriesQuoteEntries,
   getSeriesProgress,
   getSeriesStats,
   sortSeriesBooks,
-  type SeriesJourneyTransition,
 } from "@/lib/seriesDetails";
+import { bookHasGenreName, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { cn, getTodayLocalDate } from "@/lib/utils";
-import type { Book, BookNote, ReadingLog } from "@/types";
+import type { Book, BookNote, ReadingLog, Series } from "@/types";
 
 function bookCountLabel(count: number): string {
   return `${count} book${count === 1 ? "" : "s"}`;
 }
 
-function formatAverageRating(value: number | null): string {
-  return value === null ? "No rating" : `${value.toFixed(1)} avg rating`;
-}
-
-function formatActivityDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return fallback;
 }
 
 function formatDate(value: string | null): string {
@@ -70,15 +76,48 @@ function formatDate(value: string | null): string {
   });
 }
 
-function formatMonthYear(value: string | null): string {
-  const date = parseLocalDateOnly(value ?? undefined);
-  if (!date) return "--";
-  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+function formatJourneyLength(
+  value: { months: number; weeks: number; days: number } | null,
+): string {
+  if (!value) return "--";
+  const parts = [
+    value.months > 0 ? `${value.months} mo` : null,
+    value.weeks > 0 ? `${value.weeks} wk` : null,
+    value.days > 0 ? `${value.days} d` : null,
+  ].filter(Boolean);
+  return parts.join(" ") || "0 d";
 }
 
-function formatDaysSpent(days: number | null): string {
-  if (days === null) return "--";
-  return `${days} day${days === 1 ? "" : "s"}`;
+function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started: string | null; finished: string | null } {
+  const dates = sortSeriesBooks(books).map((book) => getJourneyBookDates(book, logs));
+  const finishedDates = dates.flatMap((date) => (date.finished ? [date.finished] : [])).sort();
+  return {
+    started: dates.flatMap((date) => (date.started ? [date.started] : [])).sort()[0] ?? null,
+    finished: finishedDates[finishedDates.length - 1] ?? null,
+  };
+}
+
+function formatPagesRead(readPages: number | null, totalPages: number | null): string {
+  if (readPages === null || totalPages === null) return "--";
+  return `${readPages.toLocaleString()} / ~${totalPages.toLocaleString()}`;
+}
+
+function formatReadingPace(books: Book[], logs: ReadingLog[]): string {
+  const activeBook = getCurrentSeriesBook(books);
+  if (!activeBook) return "--";
+  const activeLogs = logs
+    .filter((log) => log.book_id === activeBook.id && log.current_page > 0)
+    .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
+  if (activeLogs.length < 2) return "--";
+  const first = activeLogs[0];
+  const last = activeLogs[activeLogs.length - 1];
+  const days = Math.max(
+    1,
+    Math.round((new Date(last.logged_at).getTime() - new Date(first.logged_at).getTime()) / (24 * 60 * 60 * 1000)),
+  );
+  const pageDelta = last.current_page - first.current_page;
+  if (pageDelta <= 0) return "--";
+  return `~${Math.round(pageDelta / days)} pages / day`;
 }
 
 function BookThumbnail({ book }: { book: Book }) {
@@ -110,240 +149,6 @@ function BookThumbnail({ book }: { book: Book }) {
   );
 }
 
-function SummaryCard({
-  title,
-  children,
-  className = "",
-  compact = false,
-}: {
-  title?: string;
-  children: ReactNode;
-  className?: string;
-  compact?: boolean;
-}) {
-  return (
-    <section className={`rounded-xl border bg-card ${compact ? "p-4" : "p-5"} ${className}`}>
-      {title && <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>}
-      <div className={title ? (compact ? "mt-3" : "mt-4") : ""}>{children}</div>
-    </section>
-  );
-}
-
-function formatStatsReadingTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (hours === 0 && remainingMinutes === 0) return "0h";
-  if (hours === 0) return `${remainingMinutes}m`;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-}
-
-function formatStatsJourneySpan(span: CalendarSpan): string {
-  const parts: string[] = [];
-  if (span.months > 0) parts.push(`${span.months} mo`);
-  if (span.weeks > 0) parts.push(`${span.weeks} wk`);
-  if (span.days > 0) parts.push(`${span.days} d`);
-  return parts.join(" ") || "0 d";
-}
-
-function StatsOverviewCard({
-  label,
-  value,
-  unavailableLabel,
-}: {
-  label: string;
-  value: ReactNode | null;
-  unavailableLabel?: string;
-}) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 font-heading text-2xl font-semibold">{value ?? "--"}</p>
-      {value === null && unavailableLabel && (
-        <p className="mt-2 text-xs text-muted-foreground">{unavailableLabel}</p>
-      )}
-    </div>
-  );
-}
-
-function WinnerStatsCard({
-  title,
-  books,
-  detail,
-  emptyLabel,
-  coveredByPair = false,
-}: {
-  title: string;
-  books: Book[];
-  detail: string | null;
-  emptyLabel: string;
-  coveredByPair?: boolean;
-}) {
-  return (
-    <SummaryCard
-      title={title}
-      compact
-      className={cn("h-full", coveredByPair && "pr-12")}
-    >
-      {books.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="space-y-2">
-          {books.map((book) => (
-            <SmallBookRow key={book.id} book={book} metadata={detail} />
-          ))}
-        </div>
-      )}
-    </SummaryCard>
-  );
-}
-
-function StatsBarChart({
-  title,
-  rows,
-  emptyLabel,
-}: {
-  title: string;
-  rows: Array<{ book: Book; value: number; formattedValue: string }>;
-  emptyLabel: string;
-}) {
-  const maximumValue = Math.max(...rows.map((row) => row.value), 0);
-
-  return (
-    <SummaryCard title={title} compact>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="space-y-4">
-          {rows.map((row) => (
-            <div key={row.book.id} className="grid gap-2 sm:grid-cols-[minmax(9rem,13rem)_minmax(0,1fr)_7rem] sm:items-center">
-              <Link to={`/books/${row.book.id}`} className="truncate text-sm font-medium hover:underline">
-                {row.book.title}
-              </Link>
-              <div className="h-3 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${maximumValue > 0 ? (row.value / maximumValue) * 100 : 0}%` }}
-                />
-              </div>
-              <p className="text-sm tabular-nums text-muted-foreground sm:text-right">
-                {row.formattedValue}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </SummaryCard>
-  );
-}
-
-function SmallBookRow({
-  book,
-  prefix,
-  metadata,
-}: {
-  book: Book;
-  prefix?: string;
-  metadata?: string | null;
-}) {
-  return (
-    <Link
-      to={`/books/${book.id}`}
-      className="flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-muted/50"
-    >
-      <BookThumbnail book={book} />
-      <div className="min-w-0">
-        {prefix && <p className="text-xs text-muted-foreground">{prefix}</p>}
-        <p className="line-clamp-2 text-sm font-medium">{book.title}</p>
-        {metadata ? (
-          <p className="text-xs font-medium text-muted-foreground">{metadata}</p>
-        ) : book.volume_number != null && (
-          <p className="text-xs text-muted-foreground">Volume {book.volume_number}</p>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-function SeriesRankingCard({
-  title,
-  rows,
-  formatValue,
-  emptyLabel,
-  getTieKey = (row) => row.value,
-}: {
-  title: string;
-  rows: Array<{ book: Book; value: number }>;
-  formatValue: (value: number, book: Book) => string;
-  emptyLabel: string;
-  getTieKey?: (row: { book: Book; value: number }) => string | number;
-}) {
-  const rankingGroups = rows.reduce<
-    Array<{ key: string | number; value: number; rows: Array<{ book: Book; value: number }> }>
-  >(
-    (groups, row) => {
-      const key = getTieKey(row);
-      const lastGroup = groups[groups.length - 1];
-      if (lastGroup?.key === key) {
-        lastGroup.rows.push(row);
-      } else {
-        groups.push({ key, value: row.value, rows: [row] });
-      }
-      return groups;
-    },
-    [],
-  );
-
-  return (
-    <SummaryCard title={title} compact>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <ol className="space-y-3">
-          {rankingGroups.map((group, index) => {
-            const rank = index + 1;
-            const hasSharedFirstPlace = rank === 1 && group.rows.length > 1;
-            return (
-              <li key={`${group.value}-${group.rows[0].book.id}`}>
-                <div
-                  className={cn(
-                    "space-y-3",
-                    hasSharedFirstPlace && "rounded-lg bg-muted/50 p-1 ring-1 ring-border",
-                  )}
-                >
-                  {group.rows.map((row, rowIndex) => (
-                    <Link
-                      key={row.book.id}
-                      to={`/books/${row.book.id}`}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-muted/50",
-                        rank === 1 && !hasSharedFirstPlace && "bg-muted/50 ring-1 ring-border",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "w-5 shrink-0 text-center text-sm font-semibold text-muted-foreground",
-                          rank === 1 && "text-foreground",
-                        )}
-                      >
-                        {rowIndex === 0 ? rank : null}
-                      </span>
-                      <BookThumbnail book={row.book} />
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-medium">{row.book.title}</p>
-                        <p className="text-xs text-muted-foreground">{formatValue(row.value, row.book)}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </SummaryCard>
-  );
-}
-
 function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
   return (
     <article className="flex min-h-48 flex-col rounded-xl border bg-card p-5">
@@ -368,427 +173,348 @@ function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
   );
 }
 
-function SeriesOverviewBookTile({ book, index }: { book: Book; index: number }) {
-  const isFinished = book.status === "Finished";
-  const isReading = book.status === "Reading";
-  const isPaused = book.status === "Paused";
-  const sequenceNumber = book.volume_number ?? index + 1;
-  const percent = getBookProgressPercent(book);
-  const statusLabel = isFinished
-    ? "Completed"
-      : isReading
-        ? "Currently Reading"
-        : isPaused
-          ? "Paused"
-        : book.status === "DNF"
-          ? "DNF"
-          : "To Read";
+function SectionHeader({
+  title,
+  action,
+}: {
+  title: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="font-heading text-2xl font-medium leading-snug">{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+function ViewMoreLink({ to, label = "View More" }: { to: string; label?: string }) {
+  return (
+    <Button asChild variant="link" className="px-0 text-primary">
+      <Link to={to}>
+        {label}
+        <ChevronRight className="h-4 w-4" />
+      </Link>
+    </Button>
+  );
+}
+
+function EmptySection({ message }: { message: string }) {
+  return (
+    <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
+
+function CircularSeriesProgress({ value }: { value: number | null }) {
+  const percentage = value ?? 0;
+  const background = `conic-gradient(var(--primary) ${percentage * 3.6}deg, var(--muted) 0deg)`;
 
   return (
-    <Link
-      to={`/books/${book.id}`}
-      className={cn(
-        "group relative flex min-w-0 flex-col items-center rounded-lg border bg-card px-3 pb-4 pt-3 text-foreground shadow-[var(--shadow-card)] transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-surface-hover/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        isReading && "border-foreground ring-1 ring-foreground",
-        isPaused && "border-muted-foreground/70 bg-muted/10",
-      )}
-      aria-label={`Open ${book.title}`}
-    >
-      <span
-        className={cn(
-          "absolute left-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold shadow-sm",
-          isFinished && "border-primary bg-primary text-primary-foreground",
-          isReading && "border-foreground bg-foreground text-background",
-          isPaused && "border-muted-foreground bg-muted text-muted-foreground",
-          !isFinished && !isReading && "border-border bg-background text-muted-foreground",
-        )}
-      >
-        {sequenceNumber}
-      </span>
+    <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full p-3" style={{ background }}>
+      <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-card text-center">
+        <span className="font-heading text-3xl font-semibold">{value === null ? "--" : `${value}%`}</span>
+        <span className="text-xs text-muted-foreground">Complete</span>
+      </div>
+    </div>
+  );
+}
 
-      <div
-        className={cn(
-          "relative h-[190px] w-[126px] overflow-hidden rounded-md bg-muted shadow-sm sm:h-[210px] sm:w-[140px]",
-          isPaused && "opacity-70",
-        )}
-      >
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            loading="lazy"
-            className={cn(
-              "h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.025]",
-              isPaused && "grayscale",
-            )}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="h-8 w-8 text-muted-foreground/40" />
-          </div>
-        )}
-        {isPaused && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-            <PauseCircle className="h-7 w-7 text-muted-foreground" />
-          </div>
+function ProgressStatRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b py-3 last:border-0">
+      <div className="text-primary">{icon}</div>
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      <div className="text-sm font-semibold tabular-nums text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function FeaturedBookProgress({ book, showProgress = true }: { book: Book | null; showProgress?: boolean }) {
+  const percent = book ? getBookProgressPercent(book) : null;
+
+  if (!book) {
+    return <p className="text-sm text-muted-foreground">No book available</p>;
+  }
+
+  return (
+    <Link to={`/books/${book.id}`} className="flex min-w-0 gap-3 rounded-lg transition-colors hover:text-muted-foreground">
+      <BookThumbnail book={book} />
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-1 text-sm font-semibold">{book.title}</p>
+        {book.volume_number != null && <p className="text-xs text-muted-foreground">Volume {book.volume_number}</p>}
+        {showProgress && (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">{percent === null ? "--" : `${percent}% complete`}</p>
+            {percent !== null && <Progress value={percent} className="mt-2 h-1.5 max-w-40" />}
+          </>
         )}
       </div>
-
-      <p className="mt-3 line-clamp-2 min-h-10 text-center text-sm font-semibold leading-snug">
-        {book.title}
-      </p>
-
-      <div
-        className="mt-0.5 flex items-center gap-0.5 text-muted-foreground"
-        aria-label={book.rating ? `${book.rating} out of 5 stars` : "Not rated"}
-      >
-        {[1, 2, 3, 4, 5].map((rating) => (
-          <Star
-            key={rating}
-            className={cn(
-              "h-4 w-4",
-              book.rating && rating <= book.rating
-                ? "fill-rating text-rating"
-                : "fill-muted text-muted-foreground/45",
-            )}
-          />
-        ))}
-      </div>
-
-      <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-        {isFinished ? (
-          <span
-            className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground"
-            aria-hidden
-          >
-            <Check className="h-2.5 w-2.5 stroke-[3]" />
-          </span>
-        ) : (
-          <span
-            className={cn(
-              "h-3 w-3 rounded-full border",
-              isReading ? "border-foreground bg-foreground" : "border-muted-foreground bg-background",
-            )}
-            aria-hidden
-          />
-        )}
-        {statusLabel}
-      </p>
-
-      {isReading && percent !== null && (
-        <div className="mt-3 flex w-full items-center gap-2">
-          <Progress value={percent} className="h-1.5 bg-muted [&_[data-slot=progress-indicator]]:bg-foreground" />
-          <span className="text-xs text-muted-foreground">{percent}%</span>
-        </div>
-      )}
     </Link>
   );
 }
 
-function RatingStars({ rating }: { rating?: number | null }) {
-  return (
-    <div className="flex items-center gap-1" aria-label={rating ? `${rating} out of 5 stars` : "Not rated"}>
-      {[1, 2, 3, 4, 5].map((value) => (
-        <Star
-          key={value}
-          className={cn(
-            "h-4 w-4",
-            rating && value <= rating
-              ? "fill-foreground text-foreground"
-              : "fill-background text-muted-foreground/50",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-function JourneyFeaturedNote({ bookId, notes }: { bookId: string; notes: BookNote[] }) {
-  const maximumVisibleLines = 4;
-  const candidates = useMemo(() => getFeaturedNoteCandidates(notes), [notes]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const noteRefs = useRef(new Map<string, HTMLParagraphElement>());
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-
-  useLayoutEffect(() => {
-    const selectNote = () => {
-      const nextNote = candidates.find((note) => {
-        const element = noteRefs.current.get(note.id);
-        if (!element) return false;
-        const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
-        return element.scrollHeight <= lineHeight * maximumVisibleLines + 1;
-      });
-      setSelectedNoteId(nextNote?.id ?? null);
+type SeriesProgressDetail =
+  | {
+      kind: "active";
+      book: Book | null;
+      estimatedCompletion: string | null;
+      readingPace: string;
+    }
+  | {
+      kind: "not-started";
+      book: Book | null;
+      onStartReading: () => void;
+      startDisabled: boolean;
+    }
+  | {
+      kind: "completed";
+      book: Book | null;
+      started: string | null;
+      finished: string | null;
+      journeyLength: string;
+    }
+  | {
+      kind: "hidden";
     };
 
-    selectNote();
-    const observer = new ResizeObserver(selectNote);
-    if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [candidates]);
-
-  const selectedNote = candidates.find((note) => note.id === selectedNoteId) ?? null;
-
-  return (
-    <div ref={containerRef} className="relative flex min-h-0 flex-1 flex-col">
-      <div className="pointer-events-none invisible absolute inset-x-0 top-0" aria-hidden>
-        {candidates.map((note) => (
-          <p
-            key={note.id}
-            ref={(element) => {
-              if (element) noteRefs.current.set(note.id, element);
-              else noteRefs.current.delete(note.id);
-            }}
-            className="absolute inset-x-0 whitespace-pre-line font-serif text-sm italic leading-6"
-          >
-            {note.content.trim()}
-          </p>
-        ))}
-      </div>
-      {selectedNote && (
-        selectedNote.label === "quote" ? (
-          <QuoteBlock contentClassName="line-clamp-4 whitespace-pre-line">
-            {selectedNote.content.trim()}
-          </QuoteBlock>
-        ) : (
-          <p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-foreground">
-            {selectedNote.content.trim()}
-          </p>
-        )
-      )}
-      {notes.length > 0 && (
-        <Link
-          to={`/books/${bookId}?tab=notes`}
-          className="mt-auto self-end pt-4 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline"
-        >
-          All Notes -&gt;
-        </Link>
-      )}
-    </div>
-  );
-}
-
-function TimelineMetric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="text-sm font-medium text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function SeriesJourneyTransitionRow({
-  transition,
-  connectsToCurrent,
+function SeriesProgressCard({
+  progress,
+  totalBooks,
+  averageRating,
+  detail,
 }: {
-  transition: SeriesJourneyTransition;
-  connectsToCurrent: boolean;
+  progress: ReturnType<typeof getSeriesProgress>;
+  totalBooks: number;
+  averageRating: number | null;
+  detail: SeriesProgressDetail;
 }) {
   return (
-    <div className="relative grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-      <span
-        className={cn(
-          "absolute bottom-0 left-10 top-0 w-px sm:left-[3.25rem]",
-          connectsToCurrent ? "bg-foreground" : "bg-border",
-        )}
-        aria-hidden
-      />
-      <div />
-      <div className="flex max-w-md items-center gap-4 rounded-lg bg-muted/45 px-5 py-3 text-sm">
-        <Flag className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="font-medium">
-          {transition.kind === "break"
-            ? `Took a ${transition.days} day break`
-            : "Started right after previous book"}
-        </span>
-        <span className="text-muted-foreground">
-          {transition.kind === "break"
-            ? `${formatDate(transition.finished)} - ${formatDate(transition.started)}`
-            : formatDate(transition.started)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SeriesJourneyItem({
-  book,
-  logs,
-  notes,
-  isFirst,
-  isLast,
-  nextBookIsReading,
-  transition,
-}: {
-  book: Book;
-  logs: ReadingLog[];
-  notes: BookNote[];
-  isFirst: boolean;
-  isLast: boolean;
-  nextBookIsReading: boolean;
-  transition: SeriesJourneyTransition | null;
-}) {
-  const isFinished = book.status === "Finished";
-  const isReading = book.status === "Reading";
-  const isPaused = book.status === "Paused";
-  const percent = getBookProgressPercent(book);
-  const dates = getJourneyBookDates(book, logs);
-  const durationDays = getJourneyDurationDays(book, logs);
-  const volumeLabel =
-    book.volume_number != null ? `Volume ${book.volume_number}` : "Volume not set";
-  const pageProgress =
-    book.total_pages && book.current_page != null
-      ? `${book.current_page.toLocaleString()} / ${book.total_pages.toLocaleString()} pages`
-      : null;
-
-  return (
-    <div>
-      <div className="relative grid grid-cols-[5rem_minmax(0,1fr)] gap-4 pb-6 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-        <div className="relative flex flex-col items-center">
-          {!isFirst && (
-            <span
-              className={cn(
-                "absolute top-0 h-7 w-px",
-                isReading ? "bg-foreground" : isPaused ? "bg-muted-foreground" : "bg-border",
-              )}
-              aria-hidden
-            />
-          )}
-          <span
-            className={cn(
-              "relative z-10 mt-7 flex h-7 w-7 items-center justify-center rounded-full border bg-background",
-              isFinished && "border-primary bg-primary text-primary-foreground",
-              isReading && "border-foreground bg-foreground text-background",
-              isPaused && "border-muted-foreground bg-muted text-muted-foreground",
-              !isFinished && !isReading && "border-muted-foreground/70 text-muted-foreground",
-            )}
-            aria-hidden
-          >
-            {isFinished ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : isPaused ? <PauseCircle className="h-3.5 w-3.5" /> : null}
-          </span>
-          <p className="mt-3 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {isFinished
-              ? formatDate(dates.finished)
-              : isReading
-                ? formatDate(dates.started)
-                : isPaused
-                  ? "Paused"
-                : book.status === "Up Next"
-                  ? "Up next"
-                  : "Future"}
-          </p>
-          {!isLast && (
-            <span
-              className={cn(
-                "-mb-6 mt-4 min-h-4 w-px flex-1",
-                isReading || nextBookIsReading ? "bg-foreground" : isPaused ? "bg-muted-foreground" : "bg-border",
-              )}
-              aria-hidden
-            />
-          )}
+    <section className="rounded-xl border bg-card p-5 shadow-[var(--shadow-card)]">
+      <h2 className="font-heading text-lg font-medium">
+        Your Series <span className="font-serif italic">Progress</span>
+      </h2>
+      <div className="mt-4 grid gap-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
+        <div className="flex justify-center lg:justify-start">
+          <CircularSeriesProgress value={progress.percentage} />
         </div>
-
-        <article
-          className={cn(
-            "grid min-w-0 gap-5 rounded-lg border bg-card p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7rem_minmax(13rem,1fr)] lg:grid-cols-[7rem_minmax(17rem,1fr)_minmax(13rem,17rem)]",
-            isReading && "border-foreground ring-1 ring-foreground",
-            isPaused && "border-muted-foreground bg-muted/10",
-          )}
-        >
-          <Link
-            to={`/books/${book.id}`}
-            className={cn(
-              "relative h-[168px] w-28 overflow-hidden rounded-lg bg-muted shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              book.status === "Paused" && "opacity-70",
-            )}
-            aria-label={`Open ${book.title}`}
-          >
-            {book.cover_url ? (
-              <img
-                src={book.cover_url}
-                alt={book.title}
-                className={cn("h-full w-full object-cover", book.status === "Paused" && "grayscale")}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <BookOpen className="h-8 w-8 text-muted-foreground/40" />
-              </div>
-            )}
-            {book.status === "Paused" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-                <PauseCircle className="h-7 w-7 text-muted-foreground" />
-              </div>
-            )}
-          </Link>
-
-          <div className="min-w-0 space-y-6 py-1">
-            <div>
-              <Link
-                to={`/books/${book.id}`}
-                className="line-clamp-2 font-heading text-xl font-semibold hover:underline"
-              >
-                {book.title}
-              </Link>
-              <p className="mt-1 text-sm text-muted-foreground">{volumeLabel}</p>
-            </div>
-
-            {isFinished && (
-              <div className="grid gap-4 sm:grid-cols-3">
-                <TimelineMetric label="Started" value={formatDate(dates.started)} />
-                <TimelineMetric label="Finished" value={formatDate(dates.finished)} />
-                <TimelineMetric
-                  label="Time Spent"
-                  value={formatDaysSpent(durationDays)}
-                />
-              </div>
-            )}
-
-            {(isReading || isPaused) && (
-              <div className="grid gap-4 sm:grid-cols-3">
-                <TimelineMetric label="Started" value={formatDate(dates.started)} />
-                <TimelineMetric
-                  label="Progress"
-                  value={
-                    percent !== null ? (
-                      <div className="space-y-2">
-                        <span>{percent}%</span>
-                        <Progress
-                          value={percent}
-                          className="h-1.5 bg-muted [&_[data-slot=progress-indicator]]:bg-foreground"
-                        />
-                        {pageProgress && (
-                          <p className="text-xs font-normal text-muted-foreground">{pageProgress}</p>
-                        )}
-                      </div>
-                    ) : (
-                      "--"
-                    )
-                  }
-                />
-                <TimelineMetric label="Time Spent" value={formatDaysSpent(durationDays)} />
-              </div>
-            )}
-
-            {!isFinished && !isReading && !isPaused && (
-              <p className="text-sm text-muted-foreground">Not started yet</p>
-            )}
-          </div>
-
-          {(isFinished || isReading || isPaused) && (
-            <div className="flex min-h-full flex-col gap-5 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-2">
-              <RatingStars rating={book.rating} />
-              <JourneyFeaturedNote bookId={book.id} notes={notes} />
-            </div>
-          )}
-        </article>
+        <div className="min-w-0">
+          <ProgressStatRow
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Books Read"
+            value={`${progress.finishedBooks} / ${totalBooks}`}
+          />
+          <ProgressStatRow
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Pages Read"
+            value={formatPagesRead(progress.readPages, progress.totalPages)}
+          />
+          <ProgressStatRow
+            icon={<Star className="h-4 w-4" />}
+            label="Average Rating"
+            value={
+              <span className="inline-flex items-center gap-1">
+                <Star className="h-4 w-4 fill-rating text-rating" />
+                {averageRating === null ? "--" : averageRating.toFixed(1)}
+              </span>
+            }
+          />
+        </div>
       </div>
-      {transition && (
-        <SeriesJourneyTransitionRow
-          transition={transition}
-          connectsToCurrent={nextBookIsReading}
-        />
+      {detail.kind === "active" && (
+        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
+          <div>
+            <p className="mb-2 text-sm font-semibold">Current Book</p>
+            <FeaturedBookProgress book={detail.book} />
+          </div>
+          <div className="space-y-4 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+            <div>
+              <p className="text-sm font-semibold">Estimated Completion</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                {formatDate(detail.estimatedCompletion)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Reading Pace</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Gauge className="h-4 w-4 text-primary" />
+                {detail.readingPace}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+      {detail.kind === "not-started" && (
+        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div>
+            <p className="mb-2 text-sm font-semibold">First Volume</p>
+            <FeaturedBookProgress book={detail.book} showProgress={false} />
+          </div>
+          <Button type="button" onClick={detail.onStartReading} disabled={detail.startDisabled}>
+            {detail.startDisabled ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              "Start Reading"
+            )}
+          </Button>
+        </div>
+      )}
+      {detail.kind === "completed" && (
+        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
+          <div>
+            <p className="mb-2 text-sm font-semibold">Favorite Book</p>
+            <FeaturedBookProgress book={detail.book} showProgress={false} />
+          </div>
+          <div className="space-y-4 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+            <div>
+              <p className="text-sm font-semibold">Start and Finish Date</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                {formatDate(detail.started)} - {formatDate(detail.finished)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Journey Length</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Route className="h-4 w-4 text-primary" />
+                {detail.journeyLength}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SeriesAboutSection({
+  description,
+  expanded,
+  onExpandedChange,
+}: {
+  description: string;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+}) {
+  const measurementRef = useRef<HTMLParagraphElement>(null);
+  const [hasHiddenDescription, setHasHiddenDescription] = useState(false);
+  const shouldClamp = hasHiddenDescription && !expanded;
+
+  useEffect(() => {
+    const element = measurementRef.current;
+    if (!element) {
+      setHasHiddenDescription(false);
+      return;
+    }
+
+    const measure = () => {
+      setHasHiddenDescription(element.scrollHeight > element.clientHeight + 1);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [description]);
+
+  return (
+    <section className="space-y-4">
+      <h2 className="font-heading text-2xl font-medium leading-snug">
+        <span className="font-serif italic">About</span> this Series
+      </h2>
+      <div className="relative space-y-3">
+        {description ? (
+          <>
+            <p
+              ref={measurementRef}
+              className="pointer-events-none invisible absolute inset-x-0 top-0 whitespace-pre-line text-sm leading-7 line-clamp-4 lg:line-clamp-[11]"
+              aria-hidden
+            >
+              {description}
+            </p>
+            <p className={cn("whitespace-pre-line text-sm leading-7 text-muted-foreground", shouldClamp && "line-clamp-4 lg:line-clamp-[11]")}>
+              {description}
+            </p>
+            {hasHiddenDescription && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-0 text-sm text-muted-foreground"
+                onClick={() => onExpandedChange(!expanded)}
+              >
+                {expanded ? "Show Less" : "Show More"}
+                <ChevronRight className={cn("h-4 w-4 transition-transform", expanded && "rotate-90")} />
+              </Button>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No description yet.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ExploreBooksCard({
+  title,
+  books,
+  onBook,
+  emptyLabel = "No matches in your library yet.",
+}: {
+  title: ReactNode;
+  books: Book[];
+  onBook: (book: Book) => void;
+  emptyLabel?: string;
+}) {
+  return (
+    <article className="rounded-xl border bg-card p-4">
+      <h3 className="font-heading text-lg font-medium leading-snug">{title}</h3>
+      {books.length === 0 ? (
+        <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
+          {emptyLabel}
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          {books.slice(0, 3).map((book) => (
+            <button
+              key={book.id}
+              type="button"
+              onClick={() => onBook(book)}
+              className="group min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Open ${book.title}`}
+            >
+              <div className="aspect-[2/3] overflow-hidden rounded-md border bg-muted">
+                {book.cover_url ? (
+                  <img
+                    src={book.cover_url}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <BookOpen className="h-5 w-5 text-muted-foreground/40" />
+                  </div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -805,18 +531,260 @@ function PageLoading() {
   );
 }
 
+function getNextEditableVolume(rows: EditableSeriesBook[]): number {
+  const visibleRows = rows.filter((row) => !row.removed);
+  const largestVolume = visibleRows.reduce((largest, row) => {
+    const volume = parseVolumeInput(row.volumeInput);
+    return volume === null ? largest : Math.max(largest, volume);
+  }, 0);
+  return largestVolume + 1 || visibleRows.length + 1;
+}
+
+function SeriesEditPage({
+  series,
+  seriesBooks,
+  allBooks,
+  userId,
+  saving,
+  onCancel,
+  onSave,
+  onCreateBook,
+}: {
+  series: Series;
+  seriesBooks: Book[];
+  allBooks: Book[];
+  userId: string | undefined;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (input: {
+    name: string;
+    description: string | null;
+    cover_url?: string | null;
+    rows: EditableSeriesBook[];
+  }) => Promise<void>;
+  onCreateBook: (rows: EditableSeriesBook[], onSaved: (book: Book, volumeNumber: number) => void) => void;
+}) {
+  const [name, setName] = useState(series.name);
+  const [description, setDescription] = useState(series.description ?? "");
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [removeBanner, setRemoveBanner] = useState(false);
+  const [rows, setRows] = useState<EditableSeriesBook[]>(() => buildEditableSeriesBooks(seriesBooks));
+  const [error, setError] = useState<string | null>(null);
+  const shownBannerUrl = bannerPreview ?? (!removeBanner ? series.cover_url : null);
+
+  useEffect(() => {
+    return () => {
+      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    };
+  }, [bannerPreview]);
+
+  function handleBannerChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    setBannerFile(file);
+    setBannerPreview(URL.createObjectURL(file));
+    setRemoveBanner(false);
+  }
+
+  function handleRemoveBanner() {
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    setBannerFile(null);
+    setBannerPreview(null);
+    setRemoveBanner(true);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName || saving) return;
+
+    const invalidRow = rows.find((row) => !row.removed && parseVolumeInput(row.volumeInput) === null);
+    if (invalidRow) {
+      setError(`Add a positive volume number with at most two decimal places for "${invalidRow.book.title}" before saving.`);
+      return;
+    }
+
+    setError(null);
+    let coverUrl: string | null | undefined;
+    let keepExtension: string | null | undefined;
+
+    try {
+      if (bannerFile) {
+        if (!userId) throw new Error("You must be signed in to upload a banner.");
+        const upload = await uploadSeriesBanner(userId, series.id, bannerFile);
+        coverUrl = upload.publicUrl;
+        keepExtension = upload.extension;
+      } else if (removeBanner) {
+        coverUrl = null;
+      }
+
+      await onSave({
+        name: trimmedName,
+        description: description.trim() || null,
+        ...(coverUrl !== undefined ? { cover_url: coverUrl } : {}),
+        rows,
+      });
+
+      if (userId && (bannerFile || removeBanner)) {
+        await deleteSeriesBanner(userId, series.id, keepExtension).catch(() => {});
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Failed to save series.");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <BackButton fallbackTo="/series" />
+
+      <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="series-banner">Banner image</Label>
+              <label
+                htmlFor="series-banner"
+                className="flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
+              >
+                {shownBannerUrl ? (
+                  <img src={shownBannerUrl} alt="Series banner preview" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-xs">Click to upload</span>
+                  </div>
+                )}
+              </label>
+              <input
+                id="series-banner"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={saving}
+                onChange={handleBannerChange}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-xs text-muted-foreground">
+                  {bannerFile ? bannerFile.name : "PNG, JPG, WEBP, or AVIF."}
+                </p>
+                {shownBannerUrl && (
+                  <Button type="button" variant="outline" size="sm" disabled={saving} onClick={handleRemoveBanner}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-series-name">Series name *</Label>
+              <Input
+                id="edit-series-name"
+                value={name}
+                disabled={saving}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-series-description">Description</Label>
+              <Textarea
+                id="edit-series-description"
+                rows={6}
+                value={description}
+                disabled={saving}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <section className="space-y-3">
+            <div>
+              <h2 className="font-heading text-lg font-medium">Books in this series</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Search for books, drag by the handle, edit volume numbers, or remove books from this series.
+              </p>
+            </div>
+            <SeriesBooksEditor
+              rows={rows}
+              allBooks={allBooks}
+              saving={saving}
+              enableSearch
+              emptyLabel="No books will remain in this series."
+              removedLabel={(count) =>
+                `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
+              }
+              onRowsChange={setRows}
+              onCreateBook={() =>
+                onCreateBook(rows, (book, volumeNumber) => {
+                  setRows((currentRows) => {
+                    if (currentRows.some((row) => row.book.id === book.id)) return currentRows;
+                    return [
+                      ...currentRows,
+                      {
+                        book,
+                        volumeInput: book.volume_number ? String(book.volume_number) : String(volumeNumber),
+                        removed: false,
+                      },
+                    ];
+                  });
+                })
+              }
+            />
+          </section>
+        </div>
+
+        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+        <div className="mt-5 border-t pt-4">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={saving || !name.trim()}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Series"
+              )}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function SeriesDetails() {
   const { seriesId } = useParams<{ seriesId: string }>();
   const navigate = useNavigate();
-  const { books, loading: booksLoading, error: booksError, updateBook } = useBooksContext();
-  const { series, loading: seriesLoading, error: seriesError, removeSeries } = useSeries();
+  const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
+  const { user } = useAuth();
+  const {
+    books,
+    loading: booksLoading,
+    error: booksError,
+    updateBook,
+    updateBookSeriesPlacement,
+    updateBookVolumeNumber,
+  } = useBooksContext();
+  const { series, loading: seriesLoading, error: seriesError, editSeries, removeSeries } = useSeries();
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [savingSeries, setSavingSeries] = useState(false);
+  const [startingBookId, setStartingBookId] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const seriesBooks = useMemo(
@@ -862,39 +830,129 @@ export default function SeriesDetails() {
 
   const seriesLogs = useMemo(() => filterSeriesLogs(seriesBooks, logs), [logs, seriesBooks]);
   const seriesBookIds = useMemo(() => new Set(seriesBooks.map((book) => book.id)), [seriesBooks]);
-  const notesByBook = useMemo(() => {
-    const map = new Map<string, BookNote[]>();
-    notes
-      .filter((note) => seriesBookIds.has(note.book_id))
-      .forEach((note) => {
-        map.set(note.book_id, [...(map.get(note.book_id) ?? []), note]);
-      });
-    return map;
-  }, [notes, seriesBookIds]);
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesBooks), [seriesBooks]);
-  const primaryGenre = useMemo(() => getMostCommonGenre(seriesBooks), [seriesBooks]);
+  const genres = useMemo(() => getSeriesGenres(seriesBooks), [seriesBooks]);
   const averageRating = useMemo(() => getAverageSeriesRating(seriesBooks), [seriesBooks]);
-  const readingBooks = useMemo(
-    () => seriesBooks.filter((book) => book.status === "Reading"),
-    [seriesBooks],
-  );
-  const nextUp = useMemo(() => getNextUpBook(seriesBooks), [seriesBooks]);
-  const latestActivity = useMemo(
-    () => getLatestSeriesActivity(seriesBooks, seriesLogs),
-    [seriesBooks, seriesLogs],
-  );
+  const currentBook = useMemo(() => getCurrentSeriesBook(seriesBooks), [seriesBooks]);
+  const derivedStatus = useMemo(() => getDerivedSeriesStatus(seriesBooks), [seriesBooks]);
+  const firstVolume = useMemo(() => sortSeriesBooks(seriesBooks)[0] ?? null, [seriesBooks]);
   const journeyRecap = useMemo(
     () => getSeriesJourneyRecap(seriesBooks, seriesLogs),
     [seriesBooks, seriesLogs],
   );
-  const stats = useMemo(
+  const seriesStats = useMemo(
     () => getSeriesStats(seriesBooks, seriesLogs, notes),
     [notes, seriesBooks, seriesLogs],
   );
+  const completionDates = useMemo(
+    () => getSeriesCompletionDates(seriesBooks, seriesLogs),
+    [seriesBooks, seriesLogs],
+  );
+  const estimatedCompletion = useMemo(
+    () => estimateSeriesCompletionDate(seriesBooks, seriesLogs),
+    [seriesBooks, seriesLogs],
+  );
+  const readingPace = useMemo(
+    () => (logsLoading || logsError ? "--" : formatReadingPace(seriesBooks, seriesLogs)),
+    [logsError, logsLoading, seriesBooks, seriesLogs],
+  );
+  const quoteEntries = useMemo(
+    () => getSeriesQuoteEntries(seriesBooks, notes, { sort: "favorites", favoritesOnly: true }).slice(0, 4),
+    [notes, seriesBooks],
+  );
+  const primaryAuthor = authors[0] ?? "this author";
+  const exploreGenre = useMemo(
+    () => getMostPopularMatchingGenre(genres, books),
+    [books, genres],
+  );
+  const moreByAuthor = useMemo(() => {
+    const author = primaryAuthor.toLowerCase();
+    return books
+      .filter(
+        (book) =>
+          !seriesBookIds.has(book.id) &&
+          book.authors.some((bookAuthor) => bookAuthor.toLowerCase() === author),
+      )
+      .slice(0, 3);
+  }, [books, primaryAuthor, seriesBookIds]);
+  const moreByGenre = useMemo(
+    () =>
+      exploreGenre
+        ? books
+            .filter(
+              (book) =>
+                !seriesBookIds.has(book.id) &&
+                !moreByAuthor.some((authorBook) => authorBook.id === book.id) &&
+                bookHasGenreName(book, exploreGenre),
+            )
+            .slice(0, 3)
+        : [],
+    [books, exploreGenre, moreByAuthor, seriesBookIds],
+  );
+
+  const progressDetail = useMemo<SeriesProgressDetail>(() => {
+    if (derivedStatus === "Not Started") {
+      return {
+        kind: "not-started",
+        book: firstVolume,
+        onStartReading: () => {
+          if (firstVolume) void handleStartReading(firstVolume);
+        },
+        startDisabled: !firstVolume || startingBookId === firstVolume.id,
+      };
+    }
+
+    if (derivedStatus === "Completed") {
+      return {
+        kind: "completed",
+        book: journeyRecap.favoriteBook,
+        started: completionDates.started,
+        finished: completionDates.finished,
+        journeyLength: formatJourneyLength(seriesStats.overview.journeySpan),
+      };
+    }
+
+    if (derivedStatus === "Ongoing") {
+      return {
+        kind: "active",
+        book: currentBook,
+        estimatedCompletion,
+        readingPace,
+      };
+    }
+
+    return { kind: "hidden" };
+  }, [
+    completionDates.finished,
+    completionDates.started,
+    currentBook,
+    derivedStatus,
+    estimatedCompletion,
+    firstVolume,
+    journeyRecap.favoriteBook,
+    readingPace,
+    seriesStats.overview.journeySpan,
+    startingBookId,
+  ]);
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
+  }
+
+  async function handleStartReading(book: Book) {
+    try {
+      setActionError(null);
+      setStartingBookId(book.id);
+      await updateBook(book.id, {
+        status: "Reading",
+        ...(book.date_started ? {} : { date_started: getTodayLocalDate() }),
+      });
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Failed to start reading"));
+    } finally {
+      setStartingBookId(null);
+    }
   }
 
   async function handleDeleteSeries() {
@@ -908,19 +966,73 @@ export default function SeriesDetails() {
     }
   }
 
-  async function saveProgress(book: Book, newPage: number) {
-    const shouldFinish = Boolean(book.total_pages && newPage >= book.total_pages);
+  async function handleToggleFavorite() {
+    if (!seriesRecord) return;
+    try {
+      setActionError(null);
+      await editSeries(seriesRecord.id, { is_favorite: !seriesRecord.is_favorite });
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Failed to update series"));
+    }
+  }
 
-    await updateBook(book.id, {
-      current_page: newPage,
-      ...(shouldFinish
-        ? {
-            status: "Finished",
-            ...(book.date_finished ? {} : { date_finished: getTodayLocalDate() }),
+  async function handleSaveSeriesEdit(input: {
+    name: string;
+    description: string | null;
+    cover_url?: string | null;
+    rows: EditableSeriesBook[];
+  }) {
+    if (!seriesRecord) return;
+
+    try {
+      setSavingSeries(true);
+      setActionError(null);
+
+      const seriesPayload: Parameters<typeof editSeries>[1] = {};
+      if (input.name !== seriesRecord.name) seriesPayload.name = input.name;
+      if ((input.description ?? null) !== (seriesRecord.description ?? null)) {
+        seriesPayload.description = input.description;
+      }
+      if (input.cover_url !== undefined && input.cover_url !== (seriesRecord.cover_url ?? null)) {
+        seriesPayload.cover_url = input.cover_url;
+      }
+
+      if (Object.keys(seriesPayload).length > 0) {
+        await editSeries(seriesRecord.id, seriesPayload);
+      }
+
+      for (const row of input.rows) {
+        const nextVolume = parseVolumeInput(row.volumeInput);
+        if (row.removed) {
+          if (row.book.series_id === seriesRecord.id) {
+            await updateBookSeriesPlacement(row.book.id, {
+              series_id: null,
+              volume_number: null,
+            });
           }
-        : {}),
-    });
-    await loadLogs();
+          continue;
+        }
+
+        if (row.book.series_id !== seriesRecord.id) {
+          await updateBookSeriesPlacement(row.book.id, {
+            series_id: seriesRecord.id,
+            volume_number: nextVolume,
+          });
+          continue;
+        }
+
+        if (nextVolume !== null && nextVolume !== row.book.volume_number) {
+          await updateBookVolumeNumber(row.book.id, nextVolume);
+        }
+      }
+
+      setIsEditMode(false);
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Failed to save series"));
+      throw error;
+    } finally {
+      setSavingSeries(false);
+    }
   }
 
   if (booksLoading || seriesLoading) return <PageLoading />;
@@ -943,8 +1055,34 @@ export default function SeriesDetails() {
   }
 
   const headerAuthors = authors.length > 0 ? authors.join(", ") : "Unknown author";
-  const allFinished =
-    seriesBooks.length > 0 && seriesBooks.every((book) => book.status === "Finished");
+
+  if (isEditMode) {
+    return (
+      <div className="space-y-6">
+        {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+        <SeriesEditPage
+          series={seriesRecord}
+          seriesBooks={seriesBooks}
+          allBooks={books}
+          userId={user?.id}
+          saving={savingSeries}
+          onCancel={() => {
+            setActionError(null);
+            setIsEditMode(false);
+          }}
+          onSave={handleSaveSeriesEdit}
+          onCreateBook={(rows, onSaved) => {
+            const nextVolume = getNextEditableVolume(rows);
+            openAddBook({
+              initialSeriesId: seriesRecord.id,
+              initialVolumeNumber: nextVolume,
+              onSaved: (book) => onSaved(book, nextVolume),
+            });
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -960,6 +1098,7 @@ export default function SeriesDetails() {
           kind="series"
           label={seriesRecord.name}
           shareAttachmentLabel="Send the series as attachment in a chat"
+          onEdit={() => setIsEditMode(true)}
           onDelete={handleDeleteSeries}
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this series?"
@@ -968,15 +1107,35 @@ export default function SeriesDetails() {
       </div>
 
       <header className="relative flex min-h-64 items-end overflow-hidden rounded-2xl border bg-muted">
-        <div
-          className="absolute inset-0 bg-primary"
-          aria-label="Series banner placeholder"
-        />
+        {seriesRecord.cover_url ? (
+          <img
+            src={seriesRecord.cover_url}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 bg-primary"
+            aria-label="Series banner placeholder"
+          />
+        )}
         <div className="absolute inset-0 bg-foreground/45" />
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleToggleFavorite()}
+            aria-label={seriesRecord.is_favorite ? "Remove series from favorites" : "Add series to favorites"}
+            className="flex h-10 w-10 items-center justify-center text-white transition-colors hover:text-white/80"
+          >
+            <Heart
+              className={cn(
+                "h-5 w-5",
+                seriesRecord.is_favorite ? "fill-favorite text-favorite" : "text-white",
+              )}
+            />
+          </button>
+        </div>
         <div className="relative space-y-3 p-6 text-white sm:p-8">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/70">
-            Series
-          </p>
           <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl">
             {seriesRecord.name}
           </h1>
@@ -984,365 +1143,90 @@ export default function SeriesDetails() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
             <span>{bookCountLabel(seriesBooks.length)}</span>
             <span aria-hidden>·</span>
-            <span>{primaryGenre ?? "No genre"}</span>
+            <span>{genres.slice(0, 2).join(", ") || "No genre"}</span>
             <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1">
-              <Star className="h-4 w-4 fill-current" />
-              {formatAverageRating(averageRating)}
-            </span>
+            <span>{derivedStatus}</span>
           </div>
         </div>
       </header>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList variant="line" className="w-full justify-start gap-8 rounded-none border-b pb-0">
-          <TabsTrigger value="overview" className="min-w-20 px-0">Overview</TabsTrigger>
-          <TabsTrigger value="journey" className="min-w-20 px-0">Journey</TabsTrigger>
-          <TabsTrigger value="stats" className="min-w-20 px-0">Stats</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview">
-          {seriesBooks.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-              Books added to this series will appear here.
-            </p>
-          ) : (
-            <div className="space-y-8">
-              <div className="grid gap-4 lg:grid-cols-3">
-                <SummaryCard title="Overall Progress">
-              {progress.isAvailable ? (
-                <>
-                  <p className="font-heading text-5xl font-semibold">{progress.percentage}%</p>
-                  <Progress value={progress.percentage ?? 0} className="mt-4 h-2" />
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {progress.finishedBooks} of {seriesBooks.length} books read
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-heading text-3xl font-semibold">--</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Add total pages to every volume to calculate series progress.
-                  </p>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {progress.finishedBooks} of {seriesBooks.length} books read
-                  </p>
-                </>
-              )}
-                </SummaryCard>
-
-                <SummaryCard title="Currently Reading">
-              {readingBooks.length > 0 ? (
-                <div className="space-y-4">
-                  {readingBooks.map((book) => {
-                    const percent = getBookProgressPercent(book);
-                    return (
-                      <div key={book.id} className="space-y-2">
-                        <SmallBookRow book={book} />
-                        {percent !== null && (
-                          <div className="space-y-1">
-                            <Progress value={percent} className="h-1.5" />
-                            <p className="text-xs text-muted-foreground">{percent}% read</p>
-                          </div>
-                        )}
-                        <ReadingProgressDialog
-                          book={book}
-                          onProgressSaved={(newPage) => saveProgress(book, newPage)}
-                          trigger={
-                            <Button type="button" size="sm" variant="outline">
-                              Update Progress
-                            </Button>
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No book currently reading</p>
-              )}
-                </SummaryCard>
-
-                <SummaryCard>
-              <div className="space-y-5">
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Next up
-                  </p>
-                  {nextUp ? (
-                    <SmallBookRow book={nextUp} />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {allFinished ? "Series complete" : "No next book available"}
-                    </p>
-                  )}
-                </div>
-                <div className="border-t pt-5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Latest read
-                  </p>
-                  {logsLoading ? (
-                    <p className="mt-2 text-sm text-muted-foreground">Loading activity...</p>
-                  ) : logsError ? (
-                    <p className="mt-2 text-sm text-muted-foreground">Unavailable</p>
-                  ) : latestActivity ? (
-                    <p className="mt-2 text-sm">
-                      {latestActivity.book.title}
-                      <span className="block text-xs text-muted-foreground">
-                        {formatActivityDate(latestActivity.log.logged_at)}
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-sm text-muted-foreground">No reading activity yet</p>
-                  )}
-                </div>
-              </div>
-                </SummaryCard>
-              </div>
-
-              <section className="space-y-4">
-                <h2 className="font-heading text-xl font-medium">Books</h2>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                  {seriesBooks.map((book, index) => (
-                    <SeriesOverviewBookTile key={book.id} book={book} index={index} />
-                  ))}
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h2 className="font-heading text-xl font-medium">Favorite Quotes</h2>
-                {stats.favoriteQuotes.length === 0 ? (
-                  <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                    Quotes marked as favorite in this series will appear here.
-                  </p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {stats.favoriteQuotes.map(({ book, note }) => (
-                      <FavoriteQuoteCard key={note.id} book={book} note={note} />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="journey" className="space-y-6">
-          <h2 className="font-heading text-xl font-medium">Reading Journey</h2>
-          {seriesBooks.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-              Books added to this series will appear here.
-            </p>
-          ) : (
-            <div className="space-y-8">
-              <section className="grid gap-5 rounded-xl border bg-card p-5 sm:grid-cols-2 xl:grid-cols-4">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Started this series</p>
-                  <p className="mt-2 text-lg font-semibold">{formatMonthYear(journeyRecap.started)}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Journey Length</p>
-                  <p className="mt-2 text-lg font-semibold">
-                    {stats.overview.journeySpan
-                      ? formatStatsJourneySpan(stats.overview.journeySpan)
-                      : "--"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Completed</p>
-                  <p className="mt-2 text-lg font-semibold">
-                    {journeyRecap.finishedBooks} book{journeyRecap.finishedBooks === 1 ? "" : "s"}
-                    {journeyRecap.completedMonths !== null && (
-                      <span className="block text-sm font-normal text-muted-foreground">
-                        over{" "}
-                        {journeyRecap.completedMonths === 0
-                          ? "less than 1 month"
-                          : `${journeyRecap.completedMonths} month${journeyRecap.completedMonths === 1 ? "" : "s"}`}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Favorite book</p>
-                  <p className="mt-2 line-clamp-2 text-lg font-semibold">
-                    {journeyRecap.favoriteBook?.title ?? "No favorite selected"}
-                  </p>
-                </div>
-              </section>
-
-              <div>
-                {seriesBooks.map((book, index) => {
-                  const nextBook = seriesBooks[index + 1];
-                  const transition = nextBook
-                    ? getSeriesJourneyTransition(book, nextBook, seriesLogs)
-                    : null;
-
-                  return (
-                    <SeriesJourneyItem
-                      key={book.id}
-                      book={book}
-                      logs={seriesLogs}
-                      notes={notesByBook.get(book.id) ?? []}
-                      isFirst={index === 0}
-                      isLast={index === seriesBooks.length - 1}
-                      nextBookIsReading={nextBook?.status === "Reading"}
-                      transition={transition}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="stats" className="space-y-7">
-          <h2 className="font-heading text-xl font-medium">Series Stats</h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatsOverviewCard
-              label="Pages Read"
-              value={
-                stats.overview.pagesRead === null
-                  ? null
-                  : stats.overview.pagesRead.toLocaleString()
-              }
-              unavailableLabel="Page progress is incomplete."
+      {seriesBooks.length === 0 ? (
+        <EmptySection message="Books added to this series will appear here." />
+      ) : (
+        <div className="space-y-10">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(24rem,1.1fr)] lg:items-start">
+            <SeriesAboutSection
+              description={seriesRecord.description?.trim() ?? ""}
+              expanded={descriptionExpanded}
+              onExpandedChange={setDescriptionExpanded}
             />
-            <StatsOverviewCard
-              label="Hours Read"
-              value={
-                logsLoading
-                  ? "..."
-                  : logsError
-                    ? null
-                    : formatStatsReadingTime(stats.overview.readingMinutes)
-              }
-              unavailableLabel="Reading logs are unavailable."
-            />
-            <StatsOverviewCard
-              label="Days Read"
-              value={
-                stats.overview.journeyDays !== null
-                  ? formatDaysSpent(stats.overview.journeyDays)
-                  : null
-              }
-              unavailableLabel="Reading dates are incomplete."
-            />
-            <StatsOverviewCard
-              label="Average Days per Book"
-              value={
-                stats.averageDaysPerBook === null
-                  ? null
-                  : `${stats.averageDaysPerBook.toFixed(1)} days`
-              }
-              unavailableLabel="No completed books with dates."
+            <SeriesProgressCard
+              progress={progress}
+              totalBooks={seriesBooks.length}
+              averageRating={averageRating}
+              detail={progressDetail}
             />
           </div>
 
           <section className="space-y-4">
-            <div>
-              <h3 className="font-heading text-lg font-medium">Book Rankings</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Compare volumes by rating, reading pace, and annotations.
-              </p>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <SeriesRankingCard
-                title="Top Rated"
-                rows={stats.rankings.rating}
-                formatValue={(value, book) => (book.is_favorite ? "Favorite" : `${value.toFixed(1)} / 5`)}
-                emptyLabel="No ratings yet"
-                getTieKey={(row) => `${row.value}-${row.book.is_favorite ? "favorite" : "regular"}`}
-              />
-              <SeriesRankingCard
-                title="Fastest Pace"
-                rows={stats.rankings.pace}
-                formatValue={(value) => `${value.toFixed(1)} pages/day`}
-                emptyLabel="No completed books with dates and pages"
-              />
-              <SeriesRankingCard
-                title="Most Annotated"
-                rows={stats.rankings.annotations}
-                formatValue={(value) => `${value} annotation${value === 1 ? "" : "s"}`}
-                emptyLabel="No annotations yet"
-              />
+            <SectionHeader title={<span className="font-serif italic">Books</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/books`} label="View All" />} />
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(144px,1fr))]">
+              {seriesBooks.slice(0, 8).map((book) => (
+                <BookCard key={book.id} book={book} onClick={(item) => navigate(`/books/${item.id}`)} textSize="compact" />
+              ))}
             </div>
           </section>
 
           <section className="space-y-4">
-            <h3 className="font-heading text-lg font-medium">Reading Pace</h3>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <StatsBarChart
-                title="Reading Duration by Book"
-                rows={stats.durationChart.map((row) => ({
-                  book: row.book,
-                  value: row.days,
-                  formattedValue: formatDaysSpent(row.days),
-                }))}
-                emptyLabel="No completed books with start and finish dates yet."
-              />
-              <StatsBarChart
-                title="Reading Pace by Book"
-                rows={stats.paceChart.map((row) => ({
-                  book: row.book,
-                  value: row.pagesPerDay,
-                  formattedValue: `${row.pagesPerDay.toFixed(1)} pages/day`,
-                }))}
-                emptyLabel="Add completed-book dates and page totals to compare reading pace."
-              />
-            </div>
+            <SectionHeader title={<span className="font-serif italic">Analytics</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
+            <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
+            <SeriesAnalyticsPaceChart stats={seriesStats} />
           </section>
 
           <section className="space-y-4">
-            <h3 className="font-heading text-lg font-medium">Records</h3>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] items-start">
-                <div className="relative z-10">
-                  <WinnerStatsCard
-                    title="Longest"
-                    books={stats.longestBook?.books ?? []}
-                    detail={stats.longestBook ? `${stats.longestBook.value.toLocaleString()} pages` : null}
-                    emptyLabel="No page totals yet"
-                    coveredByPair
-                  />
-                </div>
-                <div className="relative z-20 -ml-10">
-                  <WinnerStatsCard
-                    title="Shortest"
-                    books={stats.shortestBook?.books ?? []}
-                    detail={stats.shortestBook ? `${stats.shortestBook.value.toLocaleString()} pages` : null}
-                    emptyLabel="No page totals yet"
-                  />
-                </div>
+            <SectionHeader title={<>Favorite <span className="font-serif italic">Quotes</span></>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/quotes`} label="View All" />} />
+            {quoteEntries.length === 0 ? (
+              <EmptySection message="Favorite quotes from this series will appear here." />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {quoteEntries.map(({ book, note }) => (
+                  <FavoriteQuoteCard key={note.id} book={book} note={note} />
+                ))}
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] items-start">
-                <div className="relative z-10">
-                  <WinnerStatsCard
-                    title="Fastest"
-                    books={stats.fastestRead?.books ?? []}
-                    detail={stats.fastestRead ? `${stats.fastestRead.value.toFixed(1)} pages/day` : null}
-                    emptyLabel="No completed books with dates and pages"
-                    coveredByPair
-                  />
-                </div>
-                <div className="relative z-20 -ml-10">
-                  <WinnerStatsCard
-                    title="Slowest"
-                    books={stats.slowestRead?.books ?? []}
-                    detail={stats.slowestRead ? `${stats.slowestRead.value.toFixed(1)} pages/day` : null}
-                    emptyLabel="No completed books with dates and pages"
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </section>
 
-          {logsError && (
-            <p className="text-sm text-muted-foreground">
-              Reading activity could not be loaded, so logged hours and date fallbacks may be unavailable.
-            </p>
-          )}
-        </TabsContent>
-      </Tabs>
+          <section className="space-y-5">
+            <SectionHeader title={<>More to <span className="font-serif italic">Explore</span></>} />
+            <div className="grid gap-5 lg:grid-cols-3">
+              <ExploreBooksCard
+                title={<>More by <span className="font-serif italic">{primaryAuthor}</span></>}
+                books={moreByAuthor}
+                onBook={(book) => navigate(`/books/${book.id}`)}
+              />
+              <ExploreBooksCard
+                title={
+                  exploreGenre ? (
+                    <>More in <span className="font-serif italic">{exploreGenre}</span></>
+                  ) : (
+                    "More in this genre"
+                  )
+                }
+                books={moreByGenre}
+                onBook={(book) => navigate(`/books/${book.id}`)}
+              />
+              <article className="rounded-xl border bg-card p-4">
+                <h3 className="font-heading text-lg font-medium leading-snug">
+                  You Might Also <span className="font-serif italic">Like</span>
+                </h3>
+                <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
+                  Recommendations coming later.
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+      )}
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}

@@ -4,6 +4,10 @@ import { replaceBookAuthors } from "@/lib/authors";
 import { deletePublicImageVariants, uploadPublicImage } from "@/lib/storage";
 import type { Book, BookPausePeriod, BookUpdate, Genre, ReadingLog, Series, SeriesStatus } from "@/types";
 
+type SeriesRow = Omit<Series, "is_favorite"> & {
+  is_favorite?: boolean | null;
+};
+
 type LegacyAuthorBookRow = Omit<Book, "authors"> & {
   authors?: string[] | null;
   author?: string | null;
@@ -83,6 +87,13 @@ function normalizeBook(row: LegacyAuthorBookRow): Book {
     genre_paths: displayGenres.length > 0 ? displayGenres.map((genre) => genre.name) : genres,
     genres,
     pause_periods: pausePeriods,
+  };
+}
+
+function normalizeSeries(row: SeriesRow): Series {
+  return {
+    ...row,
+    is_favorite: Boolean(row.is_favorite),
   };
 }
 
@@ -242,9 +253,29 @@ export type SeriesInput = {
   name: string;
   description?: string | null;
   status?: SeriesStatus;
+  is_favorite?: boolean;
   cover_url?: string | null;
   journal_content?: string | null;
 };
+
+function isMissingSeriesOptionalColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = "message" in error ? String((error as { message: unknown }).message).toLowerCase() : "";
+  const details = "details" in error ? String((error as { details: unknown }).details).toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return (
+    combined.includes("series") &&
+    combined.includes("column") &&
+    (
+      combined.includes("description") ||
+      combined.includes("status") ||
+      combined.includes("is_favorite") ||
+      combined.includes("cover_url") ||
+      combined.includes("journal_content")
+    )
+  );
+}
 
 async function insertBookPayload(payload: BookInsert): Promise<Book> {
   const { bookPayload, genreIds } = splitGenrePayload(payload);
@@ -304,6 +335,36 @@ export async function updateBook(
       withoutMetadataSourcePayload(payload) as BookUpdate,
     );
   }
+}
+
+export async function updateBookSeriesPlacement(
+  id: string,
+  payload: { series_id?: string | null; volume_number?: number | null },
+): Promise<Book> {
+  const updatePayload: { series_id?: string | null; volume_number?: number | null } = {};
+  if ("series_id" in payload) updatePayload.series_id = payload.series_id;
+  if ("volume_number" in payload) updatePayload.volume_number = payload.volume_number;
+
+  if (Object.keys(updatePayload).length === 0) return fetchBookById(id);
+
+  const { error } = await supabase
+    .from("books")
+    .update(updatePayload)
+    .eq("id", id);
+  if (error) throw error;
+
+  return fetchBookById(id);
+}
+
+export async function updateBookVolumeNumber(
+  id: string,
+  volumeNumber: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("books")
+    .update({ volume_number: volumeNumber })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 async function updateBookPayload(
@@ -452,6 +513,23 @@ export async function deleteCover(
   await deletePublicImageVariants("covers", userId, bookId);
 }
 
+export async function uploadSeriesBanner(
+  userId: string,
+  seriesId: string,
+  file: File
+): Promise<{ publicUrl: string; extension: string }> {
+  const { publicUrl, extension } = await uploadPublicImage("series-banners", userId, seriesId, file);
+  return { publicUrl, extension };
+}
+
+export async function deleteSeriesBanner(
+  userId: string,
+  seriesId: string,
+  keepExtension?: string | null
+): Promise<void> {
+  await deletePublicImageVariants("series-banners", userId, seriesId, keepExtension);
+}
+
 // ── Series ─────────────────────────────────────────────────────────────────
 
 export async function fetchSeries(): Promise<Series[]> {
@@ -460,7 +538,7 @@ export async function fetchSeries(): Promise<Series[]> {
     .select("*")
     .order("name");
   if (error) throw error;
-  return data as Series[];
+  return ((data ?? []) as SeriesRow[]).map(normalizeSeries);
 }
 
 export async function createSeries(userId: string, input: string | SeriesInput): Promise<Series> {
@@ -474,14 +552,31 @@ export async function createSeries(userId: string, input: string | SeriesInput):
       name: payload.name,
       description: payload.description?.trim() || null,
       status: payload.status ?? "ongoing",
+      is_favorite: payload.is_favorite ?? false,
       cover_url: payload.cover_url ?? null,
       journal_content: payload.journal_content ?? null,
       user_id: userId,
     })
     .select()
     .single();
-  if (error) throw error;
-  return data as Series;
+  if (error) {
+    if (!isMissingSeriesOptionalColumnError(error)) throw error;
+    const { data: minimalData, error: minimalError } = await supabase
+      .from("series")
+      .insert({
+        name: payload.name,
+        user_id: userId,
+      })
+      .select()
+      .single();
+    if (minimalError) throw minimalError;
+    return {
+      status: "ongoing",
+      is_favorite: false,
+      ...minimalData,
+    } as Series;
+  }
+  return normalizeSeries(data as SeriesRow);
 }
 
 export async function updateSeries(seriesId: string, input: Partial<SeriesInput>): Promise<Series> {
@@ -489,6 +584,7 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
   if (input.name !== undefined) payload.name = input.name;
   if (input.description !== undefined) payload.description = input.description;
   if (input.status !== undefined) payload.status = input.status;
+  if (input.is_favorite !== undefined) payload.is_favorite = input.is_favorite;
   if (input.cover_url !== undefined) payload.cover_url = input.cover_url;
   if (input.journal_content !== undefined) payload.journal_content = input.journal_content;
 
@@ -500,6 +596,7 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
         ? { description: payload.description?.trim() || null }
         : {}),
       ...(payload.status !== undefined ? { status: payload.status } : {}),
+      ...(payload.is_favorite !== undefined ? { is_favorite: payload.is_favorite } : {}),
       ...(payload.cover_url !== undefined ? { cover_url: payload.cover_url ?? null } : {}),
       ...(payload.journal_content !== undefined
         ? { journal_content: payload.journal_content ?? null }
@@ -509,10 +606,17 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
     .select()
     .single();
   if (error) throw error;
-  return data as Series;
+  return normalizeSeries(data as SeriesRow);
 }
 
 export async function deleteSeries(seriesId: string): Promise<void> {
+  const { data: existingSeries, error: existingSeriesError } = await supabase
+    .from("series")
+    .select("user_id")
+    .eq("id", seriesId)
+    .single();
+  if (existingSeriesError) throw existingSeriesError;
+
   const { error: detachError } = await supabase
     .from("books")
     .update({ series_id: null })
@@ -521,6 +625,8 @@ export async function deleteSeries(seriesId: string): Promise<void> {
 
   const { error } = await supabase.from("series").delete().eq("id", seriesId);
   if (error) throw error;
+
+  await deleteSeriesBanner(existingSeries.user_id, seriesId).catch(() => {});
 }
 
 // ── Reading Logs ──────────────────────────────────────────────────────────

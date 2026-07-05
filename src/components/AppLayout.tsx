@@ -26,6 +26,7 @@ import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useProfile } from "@/context";
 import { cn } from "@/lib/utils";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
+import type { Book } from "@/types";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
@@ -51,7 +52,14 @@ const addActions: Array<{
 
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
+  openAddBook: (options?: AddBookDialogLaunchOptions) => void;
   setDetailEditingOpen: (open: boolean) => void;
+}
+
+export interface AddBookDialogLaunchOptions {
+  initialSeriesId?: string;
+  initialVolumeNumber?: number;
+  onSaved?: (book: Book) => void;
 }
 
 type NavLink = {
@@ -105,6 +113,7 @@ function AppLayoutContent() {
   const { profile } = useProfile();
   const location = useLocation();
   const [addBookOpen, setAddBookOpen] = useState(false);
+  const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
   const [detailEditingOpen, setDetailEditingOpen] = useState(false);
@@ -153,10 +162,20 @@ function AppLayoutContent() {
     };
   }, [addMenuOpen]);
 
+  function openAddBook(options?: AddBookDialogLaunchOptions) {
+    setAddBookOptions(options);
+    setAddBookOpen(true);
+  }
+
+  function closeAddBook(open: boolean) {
+    setAddBookOpen(open);
+    if (!open) setAddBookOptions(undefined);
+  }
+
   function openAddDialog(action: AddAction) {
     setAddMenuOpen(false);
     if (action === "book") {
-      setAddBookOpen(true);
+      openAddBook();
       return;
     }
     setActiveAddAction(action);
@@ -178,7 +197,8 @@ function AppLayoutContent() {
           <Outlet
             context={
               {
-                onAddBookClick: () => setAddBookOpen(true),
+                onAddBookClick: () => openAddBook(),
+                openAddBook,
                 setDetailEditingOpen,
               } satisfies AppLayoutOutletContext
             }
@@ -199,7 +219,13 @@ function AppLayoutContent() {
 
       <Suspense fallback={null}>
         {addBookOpen && (
-          <AddBookDialog open={addBookOpen} onOpenChange={setAddBookOpen} />
+          <AddBookDialog
+            open={addBookOpen}
+            onOpenChange={closeAddBook}
+            initialSeriesId={addBookOptions?.initialSeriesId}
+            initialVolumeNumber={addBookOptions?.initialVolumeNumber}
+            onSaved={addBookOptions?.onSaved}
+          />
         )}
         {activeAddAction === "author" && (
           <AddAuthorDialog
@@ -211,6 +237,7 @@ function AppLayoutContent() {
           <AddSeriesDialog
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
+            openAddBook={openAddBook}
           />
         )}
         {activeAddAction === "note" && (

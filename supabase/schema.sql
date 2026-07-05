@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS series (
   description     text,
   status          text NOT NULL DEFAULT 'ongoing'
                     CHECK (status IN ('ongoing', 'completed')),
+  is_favorite     boolean NOT NULL DEFAULT false,
   cover_url       text,
   journal_content text,
   created_at      timestamptz NOT NULL DEFAULT now()
@@ -1429,6 +1430,53 @@ CREATE POLICY author_photos_delete_own
   FOR DELETE
   USING (
     bucket_id = 'author-photos'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('series-banners', 'series-banners', true)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS series_banners_public_read ON storage.objects;
+CREATE POLICY series_banners_public_read
+  ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'series-banners');
+
+DROP POLICY IF EXISTS series_banners_insert_own ON storage.objects;
+CREATE POLICY series_banners_insert_own
+  ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'series-banners'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS series_banners_update_own ON storage.objects;
+CREATE POLICY series_banners_update_own
+  ON storage.objects
+  FOR UPDATE
+  USING (
+    bucket_id = 'series-banners'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = 'series-banners'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS series_banners_delete_own ON storage.objects;
+CREATE POLICY series_banners_delete_own
+  ON storage.objects
+  FOR DELETE
+  USING (
+    bucket_id = 'series-banners'
     AND auth.uid() IS NOT NULL
     AND split_part(name, '/', 1) = auth.uid()::text
   );

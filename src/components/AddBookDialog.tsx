@@ -34,7 +34,9 @@ import {
   parsePublicationDateInput,
   trimPublicationDateInputForPrecision,
 } from "@/lib/publicationDate";
+import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import type {
+  Book,
   BookStatus,
   BookLanguage,
   BookSource,
@@ -66,6 +68,9 @@ interface FormValues {
 interface AddBookDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialSeriesId?: string;
+  initialVolumeNumber?: number;
+  onSaved?: (book: Book) => void;
 }
 
 const STATUS_OPTIONS: BookStatus[] = [
@@ -78,7 +83,24 @@ const STATUS_OPTIONS: BookStatus[] = [
 
 const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
 
-export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps) {
+function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: number): Partial<FormValues> {
+  return {
+    status: "To Read",
+    authors: [],
+    genres: [],
+    publication_date_precision: "",
+    series_id: initialSeriesId ?? "",
+    volume_number: initialVolumeNumber ? String(initialVolumeNumber) : "",
+  };
+}
+
+export default function AddBookDialog({
+  open,
+  onOpenChange,
+  initialSeriesId,
+  initialVolumeNumber,
+  onSaved,
+}: AddBookDialogProps) {
   const { addBook } = useBooksContext();
   const { genres } = useGenresContext();
   const { series, addSeries } = useSeries();
@@ -111,12 +133,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: {
-      status: "To Read",
-      authors: [],
-      genres: [],
-      publication_date_precision: "",
-    },
+    defaultValues: getInitialFormValues(initialSeriesId, initialVolumeNumber),
   });
 
   const status = watch("status");
@@ -143,6 +160,12 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
     clearErrors("root");
     setPendingSeriesSelectionId(null);
   }, [pendingSeriesSelectionId, series, setValue, clearErrors]);
+
+  useEffect(() => {
+    if (!open) return;
+    setValue("series_id", initialSeriesId ?? "");
+    setValue("volume_number", initialVolumeNumber ? String(initialVolumeNumber) : "");
+  }, [initialSeriesId, initialVolumeNumber, open, setValue]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -282,6 +305,15 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         });
         return;
       }
+      const parsedVolumeNumber = values.volume_number
+        ? parseVolumeNumberInput(values.volume_number)
+        : null;
+      if (values.volume_number && parsedVolumeNumber === null) {
+        setError("volume_number", {
+          message: "Use a positive number with at most two decimal places.",
+        });
+        return;
+      }
       const result = await addBook(
         {
           title: values.title,
@@ -300,7 +332,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
           date_started: values.date_started || undefined,
           date_finished: values.date_finished || undefined,
           series_id: values.series_id || undefined,
-          volume_number: values.volume_number ? Number(values.volume_number) : undefined,
+          volume_number: parsedVolumeNumber ?? undefined,
           isbn: scannedIsbn || undefined,
           metadata_source: metadataSource || undefined,
           metadata_source_url: metadataSourceUrl || undefined,
@@ -310,12 +342,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
       );
 
       if (result.warning) {
-        reset({
-          status: "To Read",
-          authors: [],
-          genres: [],
-          publication_date_precision: "",
-        });
+        onSaved?.(result.book);
+        reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
         setCoverFile(null);
         setCoverPreview(null);
         setShowScanner(false);
@@ -333,12 +361,8 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
         return;
       }
 
-      reset({
-        status: "To Read",
-        authors: [],
-        genres: [],
-        publication_date_precision: "",
-      });
+      onSaved?.(result.book);
+      reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
       setCoverFile(null);
       setCoverPreview(null);
       setShowScanner(false);
@@ -379,10 +403,7 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       reset({
-        status: "To Read",
-        authors: [],
-        genres: [],
-        publication_date_precision: "",
+        ...getInitialFormValues(initialSeriesId, initialVolumeNumber),
       });
       setCoverFile(null);
       setCoverPreview(null);
@@ -813,10 +834,13 @@ export default function AddBookDialog({ open, onOpenChange }: AddBookDialogProps
                   <Input
                     id="volume_number"
                     type="number"
-                    min={0.5}
-                    step="any"
+                    min={0.01}
+                    step="0.01"
                     {...register("volume_number")}
                   />
+                  {errors.volume_number && (
+                    <p className="text-xs text-destructive">{errors.volume_number.message}</p>
+                  )}
                 </div>
               )}
 

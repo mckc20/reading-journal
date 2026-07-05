@@ -14,6 +14,7 @@ interface BookCardProps {
   onClick: (book: Book) => void;
   showQuickProgress?: boolean;
   textSize?: "default" | "compact";
+  cornerLabel?: string;
 }
 
 export default function BookCard({
@@ -21,6 +22,7 @@ export default function BookCard({
   onClick,
   showQuickProgress = false,
   textSize = "default",
+  cornerLabel,
 }: BookCardProps) {
   const { updateBook } = useBooksContext();
 
@@ -76,6 +78,11 @@ export default function BookCard({
           <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
             <PauseCircle className="h-8 w-8 text-muted-foreground" />
           </div>
+        )}
+        {cornerLabel && (
+          <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
+            {cornerLabel}
+          </span>
         )}
         {book.is_favorite && (
           <Heart
