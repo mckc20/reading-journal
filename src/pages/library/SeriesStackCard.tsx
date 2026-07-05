@@ -67,17 +67,11 @@ export default function SeriesStackCard({
       data-shelf-item
     >
       <div className="relative h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
-        {visibleBooks.length === 0 ? (
-          <div className="absolute left-0 top-2 flex h-[135px] w-[90px] items-center justify-center overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-colors group-hover:bg-muted/80 sm:h-[168px] sm:w-[112px]">
-            <BookOpen className="h-8 w-8 text-muted-foreground/40" />
-          </div>
-        ) : (
-          [...visibleBooks].reverse().map((book, reversedIndex) => {
-            const index = visibleBooks.length - 1 - reversedIndex;
+        {[...visibleBooks].reverse().map((book, reversedIndex) => {
+          const index = visibleBooks.length - 1 - reversedIndex;
 
-            return <SeriesCoverLayer key={book.id} book={book} index={index} />;
-          })
-        )}
+          return <SeriesCoverLayer key={book.id} book={book} index={index} />;
+        })}
       </div>
       <div className="mt-2 min-w-0">
         <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">

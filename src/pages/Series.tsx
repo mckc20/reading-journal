@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { buildSeriesGroups } from "@/lib/libraryShelves";
+import { buildSeriesGroups, type SeriesBookGroup } from "@/lib/libraryShelves";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 
 function LoadingSeriesGrid() {
@@ -17,6 +17,34 @@ function LoadingSeriesGrid() {
         </div>
       ))}
     </div>
+  );
+}
+
+function EmptySeriesCard({
+  group,
+  onSeries,
+}: {
+  group: SeriesBookGroup;
+  onSeries: (seriesId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSeries(group.seriesId)}
+      className="group block w-full min-w-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="relative mx-auto h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
+        <div className="absolute left-0 top-2 flex h-[135px] w-[90px] items-center justify-center overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-colors group-hover:bg-muted/80 sm:h-[168px] sm:w-[112px]">
+          <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+        </div>
+      </div>
+      <div className="mt-2 min-w-0">
+        <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">
+          {group.name}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">0 books</p>
+      </div>
+    </button>
   );
 }
 
@@ -58,7 +86,11 @@ export default function Series() {
           className="grid grid-cols-[repeat(auto-fit,minmax(122px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fit,minmax(148px,1fr))] sm:gap-x-6"
         >
           {groups.map((group) => (
-            <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} />
+            group.books.length === 0 ? (
+              <EmptySeriesCard key={group.seriesId} group={group} onSeries={openSeries} />
+            ) : (
+              <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} />
+            )
           ))}
         </div>
       )}
