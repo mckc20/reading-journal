@@ -24,7 +24,7 @@ export default function Series() {
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const navigate = useNavigate();
-  const groups = useMemo(() => buildSeriesGroups(books, series), [books, series]);
+  const groups = useMemo(() => buildSeriesGroups(books, series, { includeEmpty: true }), [books, series]);
   const loading = booksLoading || seriesLoading;
   const error = booksError || seriesError;
 
@@ -49,7 +49,7 @@ export default function Series() {
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <BookOpen className="h-10 w-10 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">
-            Series you add to books will appear here.
+            Series you add will appear here.
           </p>
         </div>
       ) : (

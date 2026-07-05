@@ -8,6 +8,11 @@ interface BooksContextValue {
   error: string | null;
   addBook: (payload: AddBookPayload, coverFile?: File) => Promise<AddBookResult>;
   updateBook: (id: string, payload: BookUpdate) => Promise<void>;
+  updateBookSeriesPlacement: (
+    id: string,
+    payload: { series_id?: string | null; volume_number?: number | null },
+  ) => Promise<void>;
+  updateBookVolumeNumber: (id: string, volumeNumber: number) => Promise<void>;
   updateCover: (id: string, file: File) => Promise<void>;
   pauseBook: (id: string) => Promise<void>;
   resumeBook: (id: string) => Promise<void>;

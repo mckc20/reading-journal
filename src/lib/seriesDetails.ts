@@ -5,7 +5,7 @@ import {
   sumReadingMinutes,
   type CalendarSpan,
 } from "@/lib/bookAnalytics";
-import type { Book, BookNote, ReadingLog } from "@/types";
+import type { Book, BookNote, ReadingLog, Series } from "@/types";
 
 export type SeriesProgress = {
   isAvailable: boolean;
@@ -13,6 +13,16 @@ export type SeriesProgress = {
   readPages: number | null;
   totalPages: number | null;
   finishedBooks: number;
+};
+
+export type DerivedSeriesStatus = "Not Started" | "Ongoing" | "Completed" | "DNF";
+
+export type SeriesQuoteSort = "newest" | "oldest" | "favorites";
+
+export type SeriesRecommendationGroup = {
+  moreByAuthor: Book[];
+  similarSeries: Array<{ series: Series; books: Book[]; sharedGenres: string[] }>;
+  youMightAlsoLike: Book[];
 };
 
 export type LatestSeriesActivity = {
@@ -89,7 +99,7 @@ export type SeriesStats = {
   paceChart: SeriesPaceChartRow[];
   rankings: {
     rating: SeriesRankedBook[];
-    pace: SeriesRankedBook[];
+    length: SeriesRankedBook[];
     annotations: SeriesRankedBook[];
   };
   favoriteQuotes: SeriesFavoriteQuote[];
@@ -137,6 +147,24 @@ export function getSeriesAuthors(books: Book[]): string[] {
   ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }));
 }
 
+export function getSeriesGenres(books: Book[]): string[] {
+  const counts = new Map<string, number>();
+
+  books.forEach((book) => {
+    Array.from(new Set(book.genres?.map((genre) => genre.trim()).filter(Boolean) ?? [])).forEach(
+      (genre) => counts.set(genre, (counts.get(genre) ?? 0) + 1),
+    );
+  });
+
+  return [...counts.entries()]
+    .sort(
+      ([nameA, countA], [nameB, countB]) =>
+        countB - countA ||
+        nameA.localeCompare(nameB, undefined, { sensitivity: "base", numeric: true }),
+    )
+    .map(([name]) => name);
+}
+
 export function getMostCommonGenre(books: Book[]): string | null {
   const counts = new Map<string, number>();
 
@@ -162,6 +190,46 @@ export function getAverageSeriesRating(books: Book[]): number | null {
   if (ratings.length === 0) return null;
 
   return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+}
+
+export function getDerivedSeriesStatus(books: Book[]): DerivedSeriesStatus {
+  if (books.some((book) => book.status === "DNF")) return "DNF";
+  if (books.length > 0 && books.every((book) => book.status === "Finished")) return "Completed";
+  if (
+    books.some(
+      (book) =>
+        book.status === "Finished" ||
+        book.status === "Reading" ||
+        book.status === "Paused" ||
+        book.status === "Up Next" ||
+        (book.current_page ?? 0) > 0,
+    )
+  ) {
+    return "Ongoing";
+  }
+  return "Not Started";
+}
+
+export function getSeriesPublicationRange(books: Book[]): string | null {
+  const years = books
+    .flatMap((book) => {
+      const year = book.publication_date?.slice(0, 4);
+      return year && /^\d{4}$/.test(year) ? [Number(year)] : [];
+    })
+    .sort((a, b) => a - b);
+
+  if (years.length === 0) return null;
+  const first = years[0];
+  const last = years[years.length - 1];
+  return first === last ? String(first) : `${first}-${last}`;
+}
+
+export function getCurrentSeriesBook(books: Book[]): Book | null {
+  return (
+    sortSeriesBooks(books).find((book) => book.status === "Reading") ??
+    sortSeriesBooks(books).find((book) => book.status === "Paused") ??
+    null
+  );
 }
 
 export function getBookProgressPercent(book: Book): number | null {
@@ -204,6 +272,45 @@ export function getSeriesProgress(books: Book[]): SeriesProgress {
     totalPages,
     finishedBooks,
   };
+}
+
+export function estimateSeriesCompletionDate(
+  books: Book[],
+  logs: ReadingLog[],
+  now = new Date(),
+): string | null {
+  const activeBook = getCurrentSeriesBook(books);
+  if (!activeBook || !activeBook.total_pages || activeBook.total_pages <= 0) return null;
+
+  const sortedLogs = getLogsForBook(activeBook, logs)
+    .filter((log) => log.current_page > 0)
+    .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
+  if (sortedLogs.length < 2) return null;
+
+  const first = sortedLogs[0];
+  const last = sortedLogs[sortedLogs.length - 1];
+  const firstDate = new Date(first.logged_at);
+  const lastDate = new Date(last.logged_at);
+  const elapsedDays = Math.max(
+    1,
+    Math.round((lastDate.getTime() - firstDate.getTime()) / (24 * 60 * 60 * 1000)),
+  );
+  const pageDelta = last.current_page - first.current_page;
+  if (pageDelta <= 0) return null;
+
+  const pagesPerDay = pageDelta / elapsedDays;
+  const remainingPages = sortSeriesBooks(books).reduce((total, book) => {
+    const totalPages = book.total_pages ?? 0;
+    if (book.status === "Finished" || totalPages <= 0) return total;
+    const currentPage = book.id === activeBook.id ? last.current_page : book.current_page ?? 0;
+    return total + Math.max(0, totalPages - currentPage);
+  }, 0);
+  if (remainingPages <= 0) return null;
+
+  const daysRemaining = Math.ceil(remainingPages / pagesPerDay);
+  const estimate = new Date(now);
+  estimate.setDate(estimate.getDate() + daysRemaining);
+  return dateToDateOnly(estimate);
 }
 
 export function getNextUpBook(books: Book[]): Book | null {
@@ -390,15 +497,27 @@ export function getSeriesStats(
   const seriesLogs = filterSeriesLogs(sortedBooks, logs);
   const seriesNotes = notes.filter((note) => bookIds.has(note.book_id));
   const finishedBooks = sortedBooks.filter((book) => book.status === "Finished");
-  const durations = finishedBooks.flatMap((book) => {
+  const timingBooks = sortedBooks.filter(
+    (book) => book.status === "Finished" || book.status === "Reading" || book.status === "Paused",
+  );
+  const completedDurations = finishedBooks.flatMap((book) => {
     const days = getJourneyDurationDays(book, seriesLogs, now);
     return days === null ? [] : [{ book, value: days }];
   });
-  const paces = durations.flatMap(({ book, value }) =>
+  const chartDurations = timingBooks.flatMap((book) => {
+    const days = getJourneyDurationDays(book, seriesLogs, now);
+    return days === null ? [] : [{ book, value: days }];
+  });
+  const completedPaces = completedDurations.flatMap(({ book, value }) =>
     value > 0 && typeof book.total_pages === "number" && book.total_pages > 0
       ? [{ book, value: book.total_pages / value }]
       : [],
   );
+  const chartPaces = chartDurations.flatMap(({ book, value }) =>
+    value > 0
+      ? [{ book, value: (book.status === "Finished" ? book.total_pages ?? 0 : book.current_page ?? 0) / value }]
+      : [],
+  ).filter((row) => Number.isFinite(row.value) && row.value > 0);
   const lengths = sortedBooks.flatMap((book) =>
     typeof book.total_pages === "number" && book.total_pages > 0
       ? [{ book, value: book.total_pages }]
@@ -420,10 +539,12 @@ export function getSeriesStats(
   }));
   const ratingRanking = sortedBooks
     .flatMap((book) =>
-      typeof book.rating === "number" ? [{ book, value: book.rating }] : [],
+      book.is_favorite || typeof book.rating === "number"
+        ? [{ book, value: book.is_favorite ? 6 : book.rating ?? 0 }]
+        : [],
     )
-    .sort((a, b) => b.value - a.value || Number(b.book.is_favorite) - Number(a.book.is_favorite));
-  const paceRanking = [...paces].sort((a, b) => b.value - a.value);
+    .sort((a, b) => b.value - a.value || compareBookTitles(a.book, b.book));
+  const lengthRanking = [...lengths].sort((a, b) => b.value - a.value);
   const annotationRanking = annotations
     .filter((candidate) => candidate.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -455,22 +576,104 @@ export function getSeriesStats(
       ...journey,
     },
     averageDaysPerBook:
-      durations.length > 0
-        ? durations.reduce((sum, duration) => sum + duration.value, 0) / durations.length
+      completedDurations.length > 0
+        ? completedDurations.reduce((sum, duration) => sum + duration.value, 0) / completedDurations.length
         : null,
-    fastestRead: getWinnerBooks(paces, (values) => Math.max(...values)),
-    slowestRead: getWinnerBooks(paces, (values) => Math.min(...values)),
+    fastestRead: getWinnerBooks(completedPaces, (values) => Math.max(...values)),
+    slowestRead: getWinnerBooks(completedPaces, (values) => Math.min(...values)),
     longestBook: getWinnerBooks(lengths, (values) => Math.max(...values)),
     shortestBook: getWinnerBooks(lengths, (values) => Math.min(...values)),
-    durationChart: durations.map(({ book, value }) => ({ book, days: value })),
-    paceChart: paces.map(({ book, value }) => ({ book, pagesPerDay: value })),
+    durationChart: chartDurations.map(({ book, value }) => ({ book, days: value })),
+    paceChart: chartPaces.map(({ book, value }) => ({ book, pagesPerDay: value })),
     rankings: {
       rating: ratingRanking,
-      pace: paceRanking,
+      length: lengthRanking,
       annotations: annotationRanking,
     },
     favoriteQuotes,
   };
+}
+
+export function getSeriesQuoteEntries(
+  books: Book[],
+  notes: BookNote[],
+  options: {
+    search?: string;
+    bookId?: string;
+    sort?: SeriesQuoteSort;
+    favoritesOnly?: boolean;
+  } = {},
+): SeriesFavoriteQuote[] {
+  const sortedBooks = sortSeriesBooks(books);
+  const bookById = new Map(sortedBooks.map((book) => [book.id, book]));
+  const normalizedSearch = options.search?.trim().toLowerCase() ?? "";
+  const sort = options.sort ?? "newest";
+
+  return notes
+    .filter((note) => note.label === "quote" && bookById.has(note.book_id) && note.content.trim().length > 0)
+    .filter((note) => !options.bookId || note.book_id === options.bookId)
+    .filter((note) => !options.favoritesOnly || note.is_favorite)
+    .filter((note) => {
+      if (!normalizedSearch) return true;
+      const book = bookById.get(note.book_id);
+      return [note.content, note.quote_speaker ?? "", book?.title ?? ""].some((value) =>
+        value.toLowerCase().includes(normalizedSearch),
+      );
+    })
+    .sort((a, b) => {
+      if (sort === "favorites" && a.is_favorite !== b.is_favorite) {
+        return a.is_favorite ? -1 : 1;
+      }
+      const dateSort = b.note_date.localeCompare(a.note_date) || b.created_at.localeCompare(a.created_at);
+      return sort === "oldest" ? -dateSort : dateSort;
+    })
+    .map((note) => ({ book: bookById.get(note.book_id)!, note }));
+}
+
+export function buildSeriesRecommendations(
+  currentSeriesId: string,
+  seriesBooks: Book[],
+  allBooks: Book[],
+  allSeries: Series[],
+): SeriesRecommendationGroup {
+  const currentBookIds = new Set(seriesBooks.map((book) => book.id));
+  const currentAuthors = new Set(getSeriesAuthors(seriesBooks).map((author) => author.toLowerCase()));
+  const currentGenres = new Set(getSeriesGenres(seriesBooks).map((genre) => genre.toLowerCase()));
+
+  const outsideBooks = allBooks.filter((book) => !currentBookIds.has(book.id));
+  const scoreBook = (book: Book): number => {
+    const authorScore = book.authors.some((author) => currentAuthors.has(author.toLowerCase())) ? 4 : 0;
+    const genreScore = (book.genres ?? []).filter((genre) => currentGenres.has(genre.toLowerCase())).length;
+    const ratingScore = typeof book.rating === "number" ? book.rating / 5 : 0;
+    return authorScore + genreScore + ratingScore;
+  };
+
+  const moreByAuthor = outsideBooks
+    .filter((book) => book.authors.some((author) => currentAuthors.has(author.toLowerCase())))
+    .sort((a, b) => scoreBook(b) - scoreBook(a) || compareBookTitles(a, b))
+    .slice(0, 6);
+
+  const similarSeries = allSeries
+    .filter((item) => item.id !== currentSeriesId)
+    .map((item) => {
+      const books = sortSeriesBooks(allBooks.filter((book) => book.series_id === item.id));
+      const sharedGenres = getSeriesGenres(books).filter((genre) => currentGenres.has(genre.toLowerCase()));
+      return { series: item, books, sharedGenres };
+    })
+    .filter((entry) => entry.books.length > 0 && entry.sharedGenres.length > 0)
+    .sort(
+      (a, b) =>
+        b.sharedGenres.length - a.sharedGenres.length ||
+        a.series.name.localeCompare(b.series.name, undefined, { sensitivity: "base", numeric: true }),
+    )
+    .slice(0, 6);
+
+  const youMightAlsoLike = outsideBooks
+    .filter((book) => !moreByAuthor.some((authorBook) => authorBook.id === book.id) && scoreBook(book) > 0)
+    .sort((a, b) => scoreBook(b) - scoreBook(a) || compareBookTitles(a, b))
+    .slice(0, 6);
+
+  return { moreByAuthor, similarSeries, youMightAlsoLike };
 }
 
 export function getSeriesJourneyTransition(

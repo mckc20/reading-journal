@@ -23,6 +23,7 @@ export interface Series {
   name: string;
   description?: string | null;
   status: SeriesStatus;
+  is_favorite: boolean;
   cover_url?: string | null;
   journal_content?: string;
   user_id: string;

@@ -143,9 +143,13 @@ export function buildSingleValueGroups(books: Book[], getValue: (book: Book) => 
   );
 }
 
-export function buildSeriesGroups(books: Book[], series: Series[]): SeriesBookGroup[] {
+export function buildSeriesGroups(books: Book[], series: Series[], options: { includeEmpty?: boolean } = {}): SeriesBookGroup[] {
   const seriesById = new Map(series.map((item) => [item.id, item]));
   const groups = new Map<string, Book[]>();
+
+  if (options.includeEmpty) {
+    series.forEach((item) => groups.set(item.id, []));
+  }
 
   books.forEach((book) => {
     if (!book.series_id) return;

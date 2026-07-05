@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-06-27-authors-normalization");
-  assert.equal(entries[0].title, "Database-backed authors and author picker");
-  assert.equal(entries[0].summary, "Authors now come from their own database table, and book forms use a searchable picker with inline author creation.");
-  assert.equal(entries[0].highlights.length, 3);
-  assert.equal(entries[0].highlights[0].title, "Author picker for books");
-  assert.equal(entries[0].highlights[0].description, "You can now pick existing authors or open the Add Author dialog directly from the book form.");
+  assert.equal(entries[0].version, "2026-07-05-series-detail-analytics");
+  assert.equal(entries[0].title, "Series detail and analytics redesign");
+  assert.equal(entries[0].summary, "Series pages now feel more complete, with a redesigned detail page, dedicated subpages, richer analytics, and better recommendations.");
+  assert.equal(entries[0].highlights.length, 4);
+  assert.equal(entries[0].highlights[0].title, "Redesigned series detail page");
+  assert.equal(entries[0].highlights[0].description, "Series pages now have a stronger hero, editable banner support, polished progress cards, focused book and quote sections, and a cleaner More to Explore area.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 
