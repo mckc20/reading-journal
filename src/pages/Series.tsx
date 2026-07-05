@@ -8,10 +8,10 @@ import SeriesStackCard from "@/pages/library/SeriesStackCard";
 
 function LoadingSeriesGrid() {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-6">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(122px,1fr))] gap-x-4 gap-y-6 sm:grid-cols-[repeat(auto-fit,minmax(148px,1fr))] sm:gap-x-6">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="w-[122px] sm:w-[148px]">
-          <div className="h-[145px] animate-pulse rounded-md bg-muted sm:h-[178px]" />
+        <div key={index} className="min-w-0">
+          <div className="mx-auto h-[145px] max-w-[148px] animate-pulse rounded-md bg-muted sm:h-[178px]" />
           <div className="mt-2 h-3 w-24 animate-pulse rounded bg-muted" />
           <div className="mt-2 h-3 w-14 animate-pulse rounded bg-muted" />
         </div>
@@ -34,8 +34,8 @@ export default function Series() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-4xl font-bold leading-tight">Series</h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-heading leading-snug font-medium">Series</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Browse the series in your library.
         </p>
@@ -55,7 +55,7 @@ export default function Series() {
       ) : (
         <div
           aria-label="Series collection"
-          className="flex flex-wrap gap-x-4 gap-y-7 sm:gap-x-6"
+          className="grid grid-cols-[repeat(auto-fit,minmax(122px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fit,minmax(148px,1fr))] sm:gap-x-6"
         >
           {groups.map((group) => (
             <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} />
