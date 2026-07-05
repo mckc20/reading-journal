@@ -63,10 +63,10 @@ export default function SeriesStackCard({
     <button
       type="button"
       onClick={() => onSeries(group.seriesId)}
-      className="group block w-full min-w-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group block w-[122px] shrink-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-[148px]"
       data-shelf-item
     >
-      <div className="relative mx-auto h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
+      <div className="relative h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
         {visibleBooks.length === 0 ? (
           <div className="absolute left-0 top-2 flex h-[135px] w-[90px] items-center justify-center overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-colors group-hover:bg-muted/80 sm:h-[168px] sm:w-[112px]">
             <BookOpen className="h-8 w-8 text-muted-foreground/40" />
