@@ -871,7 +871,19 @@ export default function BookDetails() {
         </div>
 
         <div className="space-y-5">
-          <div className="space-y-3">
+          <div className="space-y-2">
+            {seriesName && (
+              <p className="font-heading text-base italic leading-tight text-muted-foreground sm:text-lg">
+                <Link
+                  to={`/series/${book.series_id}`}
+                  className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {seriesName}
+                </Link>
+                {book.volume_number != null ? ` #${book.volume_number}` : ""}
+              </p>
+            )}
+
             <div className="flex items-start gap-3">
               <h1 className="text-4xl font-heading leading-tight font-medium">{book.title}</h1>
               <button
@@ -888,19 +900,7 @@ export default function BookDetails() {
               </button>
             </div>
 
-            {seriesName && (
-              <p className="text-sm text-muted-foreground">
-                <Link
-                  to={`/series/${book.series_id}`}
-                  className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  {seriesName}
-                </Link>
-                {book.volume_number != null ? ` · Book ${book.volume_number}` : ""}
-              </p>
-            )}
-            <p className="text-base text-muted-foreground">
-              by{" "}
+            <p className="text-lg text-muted-foreground">
               {book.authors.map((author, index) => (
                 <Fragment key={author}>
                   {index > 0 ? ", " : ""}
