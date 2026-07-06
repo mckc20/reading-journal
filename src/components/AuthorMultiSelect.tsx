@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +123,7 @@ export default function AuthorMultiSelect({
             </span>
           )}
         </span>
-        <span className="text-muted-foreground">⌄</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Button>
 
       {open && (

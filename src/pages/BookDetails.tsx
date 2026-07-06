@@ -1501,7 +1501,7 @@ function EditDetailsForm({
   const activeCoverUrl = coverPreviewUrl ?? coverUrl;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28 md:pb-24">
       <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
         <div className="md:row-span-3 md:self-start">
           <label
@@ -1681,8 +1681,8 @@ function EditDetailsForm({
         </div>
       </div>
 
-      <div className="mt-5 border-t pt-4">
-        <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border-t bg-card/95 px-5 py-4 shadow-[0_-8px_24px_oklch(0.21_0_0_/_0.08)] backdrop-blur supports-[backdrop-filter]:bg-card/85 md:bottom-0 md:px-10 lg:px-12">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-end gap-2">
           <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
             Cancel
           </Button>
