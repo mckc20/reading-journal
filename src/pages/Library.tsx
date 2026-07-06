@@ -10,6 +10,12 @@ import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { Book } from "@/types";
 
+const allBooksPreviewRows = 2;
+const allBooksPreviewGap = 12;
+const allBooksPreviewMinWidth = 82;
+const allBooksPreviewTargetWidth = 112;
+const allBooksPreviewMaxWidth = 124;
+
 type SmartShelf = {
   key: "currently-reading" | "want-to-read" | "recently-finished" | "favorites";
   title: string;
@@ -103,6 +109,88 @@ function sortByDateAdded(books: Book[]): Book[] {
 
 function bookCountLabel(count: number) {
   return `${count} book${count === 1 ? "" : "s"}`;
+}
+
+function getAllBooksPreviewColumns(width: number): number {
+  if (width <= 0) return 3;
+
+  const maxColumns = Math.max(
+    1,
+    Math.floor((width + allBooksPreviewGap) / (allBooksPreviewMinWidth + allBooksPreviewGap)),
+  );
+  let columns = Math.min(
+    maxColumns,
+    Math.max(
+      2,
+      Math.round((width + allBooksPreviewGap) / (allBooksPreviewTargetWidth + allBooksPreviewGap)),
+    ),
+  );
+
+  while (
+    columns < maxColumns &&
+    (width - allBooksPreviewGap * (columns - 1)) / columns > allBooksPreviewMaxWidth
+  ) {
+    columns += 1;
+  }
+
+  while (
+    columns > 1 &&
+    (width - allBooksPreviewGap * (columns - 1)) / columns < allBooksPreviewMinWidth
+  ) {
+    columns -= 1;
+  }
+
+  return columns;
+}
+
+function AllBooksPreview({
+  books,
+  onBook,
+}: {
+  books: Book[];
+  onBook: (book: Book) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const columns = getAllBooksPreviewColumns(containerWidth);
+  const coverWidth =
+    containerWidth > 0
+      ? Math.floor((containerWidth - allBooksPreviewGap * (columns - 1)) / columns)
+      : allBooksPreviewTargetWidth;
+  const visibleBooks = books.slice(0, columns * allBooksPreviewRows);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observedContainer = container;
+
+    function updateWidth() {
+      setContainerWidth(observedContainer.clientWidth);
+    }
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(observedContainer);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      aria-label="All books preview"
+      className="grid grid-rows-2 justify-start overflow-hidden"
+      style={{
+        gap: allBooksPreviewGap,
+        gridTemplateColumns: `repeat(${columns}, minmax(0, ${coverWidth}px))`,
+      }}
+    >
+      {visibleBooks.map((book) => (
+        <LibraryBookCard key={book.id} book={book} onBook={onBook} variant="shelf" />
+      ))}
+    </div>
+  );
 }
 
 function wasFinishedInRecentWindow(book: Book, now = Date.now()): boolean {
@@ -406,14 +494,7 @@ export default function Library() {
         ) : sortedBooks.length === 0 ? (
           <EmptyLibraryView message="No books yet. Tap + to add one." />
         ) : (
-          <div
-            aria-label="All books preview"
-            className="grid max-h-[282px] grid-cols-[repeat(auto-fill,90px)] justify-start gap-3 overflow-hidden sm:max-h-[348px] sm:grid-cols-[repeat(auto-fill,112px)]"
-          >
-            {sortedBooks.map((book) => (
-              <LibraryBookCard key={book.id} book={book} onBook={openBook} variant="shelf" />
-            ))}
-          </div>
+          <AllBooksPreview books={sortedBooks} onBook={openBook} />
         )}
       </LibrarySection>
     </div>

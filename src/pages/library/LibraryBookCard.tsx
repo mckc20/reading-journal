@@ -42,7 +42,8 @@ export default function LibraryBookCard({
     >
       <div
         className={cn(
-          "relative h-[135px] w-[90px] overflow-hidden bg-muted shadow-sm sm:h-[168px] sm:w-[112px]",
+          "relative overflow-hidden bg-muted shadow-sm",
+          isShelf ? "aspect-[2/3] w-full" : "h-[135px] w-[90px] sm:h-[168px] sm:w-[112px]",
           isShelf && "rounded-md",
           isPaused && "opacity-70",
         )}
