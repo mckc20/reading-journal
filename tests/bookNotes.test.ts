@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  bookNoteErrorToError,
   formatBookNotePageRange,
   getProgressNoteDate,
   normalizeBookNoteFields,
@@ -28,7 +29,6 @@ test("normalizes book note title and content before insert", () => {
       title: null,
       quote_speaker: "Mae Holland",
       content: "This stayed with me.",
-      tags: null,
       page_start: null,
       is_favorite: true,
       note_date: "2026-05-05",
@@ -76,7 +76,6 @@ test("normalizes editable book note fields", () => {
       title: "Final thoughts",
       quote_speaker: null,
       content: "Strong ending.",
-      tags: null,
       page_start: null,
       is_favorite: false,
       note_date: "2026-04-30",
@@ -97,7 +96,6 @@ test("normalizes a single source page", () => {
       title: null,
       quote_speaker: null,
       content: "Important line.",
-      tags: null,
       page_start: 42,
       is_favorite: false,
       note_date: "2026-05-01",
@@ -119,7 +117,6 @@ test("normalizes quote favorite only for quote entries", () => {
       title: null,
       quote_speaker: "Annie",
       content: "Favorite line.",
-      tags: null,
       page_start: null,
       is_favorite: true,
       note_date: "2026-05-02",
@@ -159,6 +156,59 @@ test("stores quote speaker only for quote entries", () => {
     }).quote_speaker,
     null,
   );
+});
+
+test("omits blank tags from new book note inserts", () => {
+  const payload = normalizeBookNoteInput({
+    bookId: "book-1",
+    userId: "user-1",
+    label: "note",
+    content: "A regular note",
+    tags: [" ", ""],
+  });
+
+  assert.equal("tags" in payload, false);
+});
+
+test("includes normalized tags when new book notes have tags", () => {
+  assert.deepEqual(
+    normalizeBookNoteInput({
+      bookId: "book-1",
+      userId: "user-1",
+      label: "note",
+      content: "A regular note",
+      tags: ["  theme  ", "theme", "craft"],
+    }).tags,
+    ["theme", "craft"],
+  );
+});
+
+test("omits tags from editable fields when tags are not provided", () => {
+  const payload = normalizeBookNoteFields({
+    label: "note",
+    content: "A regular note",
+  });
+
+  assert.equal("tags" in payload, false);
+});
+
+test("clears editable tags when an empty tag list is explicitly provided", () => {
+  assert.equal(
+    normalizeBookNoteFields({
+      label: "note",
+      content: "A regular note",
+      tags: [],
+    }).tags,
+    null,
+  );
+});
+
+test("converts Supabase-shaped note errors to readable Error objects", () => {
+  const error = bookNoteErrorToError({
+    message: "Could not find the 'tags' column of 'book_notes' in the schema cache",
+  });
+
+  assert.equal(error.message, "Could not find the 'tags' column of 'book_notes' in the schema cache");
 });
 
 test("formats source page labels", () => {

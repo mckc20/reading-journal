@@ -31,7 +31,7 @@ export interface NormalizedBookNoteInput {
   title: string | null;
   quote_speaker: string | null;
   content: string;
-  tags: string[] | null;
+  tags?: string[];
   page_start: number | null;
   is_favorite: boolean;
   note_date: string;
@@ -42,7 +42,7 @@ export interface NormalizedBookNoteFields {
   title: string | null;
   quote_speaker: string | null;
   content: string;
-  tags: string[] | null;
+  tags?: string[] | null;
   page_start: number | null;
   is_favorite: boolean;
   note_date: string;
@@ -107,6 +107,19 @@ function normalizeTags(value: string[] | null | undefined): string[] | null {
   return uniqueTags.length > 0 ? uniqueTags : null;
 }
 
+export function bookNoteErrorToError(error: unknown): Error {
+  if (error instanceof Error) return error;
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return new Error(message);
+    }
+  }
+
+  return new Error("Book note request failed");
+}
+
 export function formatBookNotePageRange(
   note: Pick<BookNote, "page_start">,
 ): string | null {
@@ -119,32 +132,45 @@ export function normalizeBookNoteFields(
 ): NormalizedBookNoteFields {
   const content = input.content.trim();
   const pageStart = normalizePageValue(input.pageStart, "Start page");
+  const normalizedTags = normalizeTags(input.tags);
 
   if (!content) {
     throw new Error("Note content is required");
   }
 
-  return {
+  const fields: NormalizedBookNoteFields = {
     label: input.label,
     title: input.label === "quote" ? null : input.title?.trim() || null,
     quote_speaker:
       input.label === "quote" ? input.quoteSpeaker?.trim() || null : null,
     content,
-    tags: normalizeTags(input.tags),
     page_start: pageStart,
     is_favorite: input.label === "quote" ? Boolean(input.isFavorite) : false,
     note_date: normalizeNoteDate(input.noteDate),
   };
+
+  if (Object.prototype.hasOwnProperty.call(input, "tags")) {
+    fields.tags = normalizedTags;
+  }
+
+  return fields;
 }
 
 export function normalizeBookNoteInput(
   input: CreateBookNoteInput,
 ): NormalizedBookNoteInput {
-  return {
+  const { tags, ...fields } = normalizeBookNoteFields(input);
+  const payload: NormalizedBookNoteInput = {
     book_id: input.bookId,
     user_id: input.userId,
-    ...normalizeBookNoteFields(input),
+    ...fields,
   };
+
+  if (tags) {
+    payload.tags = tags;
+  }
+
+  return payload;
 }
 
 export function sortBookNotes(notes: BookNote[]): BookNote[] {
@@ -166,7 +192,7 @@ export async function fetchBookNotes(bookId: string): Promise<BookNote[]> {
     .order("note_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
   return sortBookNotes((data ?? []) as BookNote[]);
 }
 
@@ -178,7 +204,7 @@ export async function fetchAllBookNotes(): Promise<BookNote[]> {
     .order("note_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
   return sortBookNotes((data ?? []) as BookNote[]);
 }
 
@@ -193,7 +219,7 @@ export async function createBookNote(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
   return data as BookNote;
 }
 
@@ -212,7 +238,7 @@ export async function updateBookNote(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
   return data as BookNote;
 }
 
@@ -232,7 +258,7 @@ export async function updateBookNoteFavorite(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
   return data as BookNote;
 }
 
@@ -240,5 +266,5 @@ export async function deleteBookNote(noteId: string): Promise<void> {
   const { supabase } = await import("./supabase");
   const { error } = await supabase.from("book_notes").delete().eq("id", noteId);
 
-  if (error) throw error;
+  if (error) throw bookNoteErrorToError(error);
 }
