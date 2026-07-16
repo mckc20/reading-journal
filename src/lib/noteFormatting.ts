@@ -1,12 +1,9 @@
-export type NoteInlineNode =
-  | { type: "text"; text: string }
-  | { type: "bold"; children: NoteInlineNode[] }
-  | { type: "italic"; children: NoteInlineNode[] };
+import DOMPurify from "dompurify";
+import { Marked, Renderer } from "marked";
 
-export type NoteBlockNode =
-  | { type: "paragraph"; children: NoteInlineNode[] }
-  | { type: "quote"; children: NoteInlineNode[] }
-  | { type: "list"; items: NoteInlineNode[][] };
+export type NoteCalloutType = "note" | "idea" | "question" | "favorite" | "spoiler";
+
+const CALLOUT_TYPES = new Set<NoteCalloutType>(["note", "idea", "question", "favorite", "spoiler"]);
 
 const HTML_ESCAPE_MAP: Record<string, string> = {
   "&": "&amp;",
@@ -20,145 +17,131 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
 }
 
-function parseInlineUntil(
-  value: string,
-  startIndex: number,
-  stopMarker?: string,
-): { nodes: NoteInlineNode[]; nextIndex: number; closed: boolean } {
-  const nodes: NoteInlineNode[] = [];
-  let buffer = "";
-  let index = startIndex;
-
-  function flushBuffer() {
-    if (!buffer) return;
-    nodes.push({ type: "text", text: buffer });
-    buffer = "";
-  }
-
-  while (index < value.length) {
-    if (stopMarker && value.startsWith(stopMarker, index)) {
-      flushBuffer();
-      return { nodes, nextIndex: index + stopMarker.length, closed: true };
-    }
-
-    if (value.startsWith("**", index)) {
-      const parsed = parseInlineUntil(value, index + 2, "**");
-      if (parsed.closed) {
-        flushBuffer();
-        nodes.push({ type: "bold", children: parsed.nodes });
-        index = parsed.nextIndex;
-        continue;
-      }
-    }
-
-    if (value[index] === "*" && !value.startsWith("**", index)) {
-      const parsed = parseInlineUntil(value, index + 1, "*");
-      if (parsed.closed) {
-        flushBuffer();
-        nodes.push({ type: "italic", children: parsed.nodes });
-        index = parsed.nextIndex;
-        continue;
-      }
-    }
-
-    buffer += value[index];
-    index += 1;
-  }
-
-  flushBuffer();
-  return { nodes, nextIndex: index, closed: false };
+function escapeAttribute(value: string): string {
+  return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
-export function parseNoteInlineMarkdown(value: string): NoteInlineNode[] {
-  return parseInlineUntil(value, 0).nodes;
+function isSafeUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  try {
+    const url = new URL(trimmed, "https://reading-journal.local");
+    return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
 }
 
-export function parseNoteMarkdown(markdown: string): NoteBlockNode[] {
+function titleForCallout(type: NoteCalloutType): string {
+  if (type === "note") return "Note";
+  if (type === "idea") return "Idea";
+  if (type === "question") return "Question";
+  if (type === "favorite") return "Favorite";
+  return "Spoiler";
+}
+
+function getCalloutFromBlockquote(raw: string): { type: NoteCalloutType; markdown: string } | null {
+  const lines = raw
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/^>\s?/, ""));
+  const marker = lines[0]?.trim().match(/^\[!(note|idea|question|favorite|spoiler)\]$/i);
+
+  if (!marker) return null;
+
+  const type = marker[1].toLowerCase() as NoteCalloutType;
+  if (!CALLOUT_TYPES.has(type)) return null;
+
+  const contentLines = lines.slice(1);
+  if (contentLines[0]?.trim() === "") contentLines.shift();
+
+  return {
+    type,
+    markdown: contentLines.join("\n").trim(),
+  };
+}
+
+const renderer = new Renderer();
+let marked: Marked;
+
+renderer.html = ({ text }) => escapeHtml(text);
+
+renderer.link = function link({ href, title, tokens }) {
+  const label = this.parser.parseInline(tokens);
+  if (!isSafeUrl(href)) return label;
+
+  const titleAttribute = title ? ` title="${escapeAttribute(title)}"` : "";
+  return `<a href="${escapeAttribute(href)}"${titleAttribute} target="_blank" rel="noopener noreferrer">${label}</a>`;
+};
+
+renderer.image = function image({ text }) {
+  return escapeHtml(text);
+};
+
+renderer.blockquote = function blockquote(token) {
+  const callout = getCalloutFromBlockquote(token.raw);
+
+  if (!callout) {
+    return `<blockquote>${this.parser.parse(token.tokens)}</blockquote>`;
+  }
+
+  const body = callout.markdown ? renderMarkdownWithoutSanitizing(callout.markdown) : "";
+  return [
+    `<aside class="journal-callout journal-callout-${callout.type}" data-callout="${callout.type}">`,
+    `<div class="journal-callout-title" data-callout-title="${callout.type}">${titleForCallout(callout.type)}</div>`,
+    body ? `<div class="journal-callout-body">${body}</div>` : "",
+    "</aside>",
+  ].join("");
+};
+
+marked = new Marked({
+  breaks: true,
+  gfm: true,
+  renderer,
+});
+
+function renderMarkdownWithoutSanitizing(markdown: string): string {
+  return marked.parse(markdown, { async: false }) as string;
+}
+
+function sanitizeRenderedHtml(html: string): string {
+  if (typeof window === "undefined") return html;
+
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "a",
+      "aside",
+      "blockquote",
+      "br",
+      "div",
+      "em",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "hr",
+      "li",
+      "ol",
+      "p",
+      "span",
+      "strong",
+      "ul",
+    ],
+    ALLOWED_ATTR: ["class", "data-callout", "data-callout-title", "href", "rel", "target", "title"],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+  });
+}
+
+export function renderNoteMarkdownToHtml(markdown: string): string {
   const normalized = markdown.replace(/\r\n?/g, "\n").trim();
-  if (!normalized) return [];
+  if (!normalized) return "";
 
-  const blocks: NoteBlockNode[] = [];
-  const lines = normalized.split("\n");
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (!line.trim()) {
-      index += 1;
-      continue;
-    }
-
-    if (line.startsWith("> ")) {
-      const quoteLines: string[] = [];
-      while (index < lines.length && lines[index].startsWith("> ")) {
-        quoteLines.push(lines[index].slice(2));
-        index += 1;
-      }
-      blocks.push({
-        type: "quote",
-        children: parseNoteInlineMarkdown(quoteLines.join("\n")),
-      });
-      continue;
-    }
-
-    if (line.startsWith("- ")) {
-      const items: NoteInlineNode[][] = [];
-      while (index < lines.length && lines[index].startsWith("- ")) {
-        items.push(parseNoteInlineMarkdown(lines[index].slice(2)));
-        index += 1;
-      }
-      blocks.push({ type: "list", items });
-      continue;
-    }
-
-    const paragraphLines: string[] = [];
-    while (
-      index < lines.length &&
-      lines[index].trim() &&
-      !lines[index].startsWith("> ") &&
-      !lines[index].startsWith("- ")
-    ) {
-      paragraphLines.push(lines[index]);
-      index += 1;
-    }
-    blocks.push({
-      type: "paragraph",
-      children: parseNoteInlineMarkdown(paragraphLines.join("\n")),
-    });
-  }
-
-  return blocks;
-}
-
-function inlineNodesToHtml(nodes: NoteInlineNode[]): string {
-  return nodes
-    .map((node) => {
-      if (node.type === "text") return escapeHtml(node.text).replace(/\n/g, "<br>");
-      if (node.type === "bold") return `<strong>${inlineNodesToHtml(node.children)}</strong>`;
-      return `<em>${inlineNodesToHtml(node.children)}</em>`;
-    })
-    .join("");
+  return sanitizeRenderedHtml(renderMarkdownWithoutSanitizing(normalized));
 }
 
 export function noteMarkdownToEditorHtml(markdown: string): string {
-  const blocks = parseNoteMarkdown(markdown);
-  if (blocks.length === 0) return "";
-
-  return blocks
-    .map((block) => {
-      if (block.type === "quote") {
-        return `<blockquote>${inlineNodesToHtml(block.children)}</blockquote>`;
-      }
-
-      if (block.type === "list") {
-        const items = block.items
-          .map((item) => `<li>${inlineNodesToHtml(item)}</li>`)
-          .join("");
-        return `<ul>${items}</ul>`;
-      }
-
-      return `<p>${inlineNodesToHtml(block.children)}</p>`;
-    })
-    .join("");
+  return renderNoteMarkdownToHtml(markdown);
 }

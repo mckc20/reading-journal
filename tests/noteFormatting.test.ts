@@ -1,52 +1,45 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  noteMarkdownToEditorHtml,
-  parseNoteInlineMarkdown,
-  parseNoteMarkdown,
-} from "../src/lib/noteFormatting";
+import { renderNoteMarkdownToHtml } from "../src/lib/noteFormatting";
 
-test("parses bold and italic inline Markdown", () => {
-  assert.deepEqual(parseNoteInlineMarkdown("A **bold** and *quiet* line"), [
-    { type: "text", text: "A " },
-    { type: "bold", children: [{ type: "text", text: "bold" }] },
-    { type: "text", text: " and " },
-    { type: "italic", children: [{ type: "text", text: "quiet" }] },
-    { type: "text", text: " line" },
-  ]);
+test("renders common Markdown journal formatting", () => {
+  const html = renderNoteMarkdownToHtml("# Title\n\nA **bold** and *quiet* line\n\n- First\n- Second\n\n1. One\n2. Two\n\n---");
+
+  assert.match(html, /<h1>Title<\/h1>/);
+  assert.match(html, /<strong>bold<\/strong>/);
+  assert.match(html, /<em>quiet<\/em>/);
+  assert.match(html, /<ul>/);
+  assert.match(html, /<ol>/);
+  assert.match(html, /<hr>/);
 });
 
-test("parses quote blocks visually", () => {
-  assert.deepEqual(parseNoteMarkdown("> This stayed with me."), [
-    {
-      type: "quote",
-      children: [{ type: "text", text: "This stayed with me." }],
-    },
-  ]);
-});
-
-test("parses consecutive list items as one list block", () => {
-  assert.deepEqual(parseNoteMarkdown("- First\n- **Second**"), [
-    {
-      type: "list",
-      items: [
-        [{ type: "text", text: "First" }],
-        [{ type: "bold", children: [{ type: "text", text: "Second" }] }],
-      ],
-    },
-  ]);
-});
-
-test("converts existing Markdown journalEntries to editor HTML", () => {
-  assert.equal(
-    noteMarkdownToEditorHtml("A **bold** line\n> quoted\n- listed"),
-    "<p>A <strong>bold</strong> line</p><blockquote>quoted</blockquote><ul><li>listed</li></ul>",
+test("renders links that open in a new tab", () => {
+  assert.match(
+    renderNoteMarkdownToHtml("[OpenAI](https://openai.com)"),
+    /<a href="https:\/\/openai\.com" target="_blank" rel="noopener noreferrer">OpenAI<\/a>/,
   );
 });
 
-test("escapes raw HTML before creating editor HTML", () => {
+test("removes unsafe link targets", () => {
+  assert.equal(renderNoteMarkdownToHtml("[bad](javascript:alert(1))").trim(), "<p>bad</p>");
+});
+
+test("renders custom reading journal callouts", () => {
+  const html = renderNoteMarkdownToHtml("> [!favorite]\n> This mattered.");
+
+  assert.match(html, /journal-callout journal-callout-favorite/);
+  assert.match(html, /data-callout="favorite"/);
+  assert.match(html, /Favorite/);
+  assert.match(html, /This mattered\./);
+});
+
+test("keeps plain text entries backwards compatible", () => {
+  assert.equal(renderNoteMarkdownToHtml("A plain journal entry.").trim(), "<p>A plain journal entry.</p>");
+});
+
+test("escapes raw HTML before rendering", () => {
   assert.equal(
-    noteMarkdownToEditorHtml("<script>alert('x')</script>"),
-    "<p>&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;</p>",
+    renderNoteMarkdownToHtml("<script>alert('x')</script>").trim(),
+    "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;",
   );
 });
