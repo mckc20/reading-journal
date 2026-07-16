@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookOpen, NotebookPen } from "lucide-react";
-import AddNoteDialog from "@/components/AddNoteDialog";
+import AddJournalEntryDialog from "@/components/AddJournalEntryDialog";
 import BackButton from "@/components/BackButton";
 import JournalFilterSwitch from "@/components/JournalFilterSwitch";
 import JournalTimeline from "@/components/JournalTimeline";
@@ -9,16 +9,16 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { fetchAllBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import {
-  authorNotesToJournalEntries,
-  bookNoteToRelatedJournalEntry,
+  authorJournalToJournalEntries,
+  bookJournalEntryToRelatedJournalEntry,
   buildGeneratedAuthorJournalEntries,
   sortJournalEntries,
 } from "@/lib/journal";
 import { suggestAuthorJournalTags } from "@/lib/journalTags";
-import { fetchAuthorNotes, sortAuthorNotes } from "@/lib/authorNotes";
-import type { AuthorNote, Book, BookNote } from "@/types";
+import { fetchAuthorJournalEntryRecords, sortAuthorJournalEntryRecords } from "@/lib/authorJournal";
+import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord } from "@/types";
 
 function BookJournalLink({ book }: { book: Book }) {
   return (
@@ -39,8 +39,8 @@ export default function AuthorJournal() {
   const { user } = useAuth();
   const { authors, loading: authorsLoading } = useAuthorsContext();
   const { books, loading: booksLoading } = useBooksContext();
-  const [notes, setNotes] = useState<AuthorNote[]>([]);
-  const [allBookNotes, setAllBookNotes] = useState<BookNote[]>([]);
+  const [journalEntries, setJournalEntries] = useState<AuthorJournalEntryRecord[]>([]);
+  const [allBookJournalEntryRecords, setAllBookJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -55,18 +55,18 @@ export default function AuthorJournal() {
     [author, books],
   );
   const authorBookById = useMemo(() => new Map(authorBooks.map((book) => [book.id, book])), [authorBooks]);
-  const relatedBookNotes = useMemo(
-    () => allBookNotes.filter((note) => authorBookById.has(note.book_id)),
-    [allBookNotes, authorBookById],
+  const relatedBookJournalEntryRecords = useMemo(
+    () => allBookJournalEntryRecords.filter((note) => authorBookById.has(note.book_id)),
+    [allBookJournalEntryRecords, authorBookById],
   );
 
   useEffect(() => {
     if (!authorId) return;
     let cancelled = false;
     setLoading(true);
-    fetchAuthorNotes(authorId)
+    fetchAuthorJournalEntryRecords(authorId)
       .then((data) => {
-        if (!cancelled) setNotes(data);
+        if (!cancelled) setJournalEntries(data);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Failed to load author journal");
@@ -81,12 +81,12 @@ export default function AuthorJournal() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!cancelled) setAllBookNotes(data);
+        if (!cancelled) setAllBookJournalEntryRecords(data);
       })
       .catch(() => {
-        if (!cancelled) setAllBookNotes([]);
+        if (!cancelled) setAllBookJournalEntryRecords([]);
       });
     return () => {
       cancelled = true;
@@ -94,16 +94,16 @@ export default function AuthorJournal() {
   }, []);
 
   const ownQuoteEntries = useMemo(
-    () => sortJournalEntries(authorNotesToJournalEntries(notes.filter((note) => note.label === "quote"))),
-    [notes],
+    () => sortJournalEntries(authorJournalToJournalEntries(journalEntries.filter((note) => note.label === "quote"))),
+    [journalEntries],
   );
   const bookQuoteEntries = useMemo(
     () =>
       sortJournalEntries(
-        relatedBookNotes
+        relatedBookJournalEntryRecords
           .filter((note) => note.label === "quote")
           .map((note) =>
-            bookNoteToRelatedJournalEntry(note, {
+            bookJournalEntryToRelatedJournalEntry(note, {
               entityType: "Author",
               entityId: authorId ?? "",
               bookTitle: authorBookById.get(note.book_id)?.title,
@@ -111,23 +111,23 @@ export default function AuthorJournal() {
             }),
           ),
       ),
-    [authorBookById, authorId, relatedBookNotes],
+    [authorBookById, authorId, relatedBookJournalEntryRecords],
   );
   const quoteEntries = useMemo(
     () => sortJournalEntries([...ownQuoteEntries, ...(showBookEntries ? bookQuoteEntries : [])]),
     [bookQuoteEntries, ownQuoteEntries, showBookEntries],
   );
   const ownThoughtEntries = useMemo(
-    () => sortJournalEntries(authorNotesToJournalEntries(notes.filter((note) => note.label !== "quote"))),
-    [notes],
+    () => sortJournalEntries(authorJournalToJournalEntries(journalEntries.filter((note) => note.label !== "quote"))),
+    [journalEntries],
   );
   const bookThoughtEntries = useMemo(
     () =>
       sortJournalEntries(
-        relatedBookNotes
+        relatedBookJournalEntryRecords
           .filter((note) => note.label !== "quote")
           .map((note) =>
-            bookNoteToRelatedJournalEntry(note, {
+            bookJournalEntryToRelatedJournalEntry(note, {
               entityType: "Author",
               entityId: authorId ?? "",
               bookTitle: authorBookById.get(note.book_id)?.title,
@@ -135,7 +135,7 @@ export default function AuthorJournal() {
             }),
           ),
       ),
-    [authorBookById, authorId, relatedBookNotes],
+    [authorBookById, authorId, relatedBookJournalEntryRecords],
   );
   const thoughtEntries = useMemo(
     () => sortJournalEntries([...ownThoughtEntries, ...(showBookEntries ? bookThoughtEntries : [])]),
@@ -155,8 +155,8 @@ export default function AuthorJournal() {
     [automaticEntries, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries],
   );
   const tagSuggestions = useMemo(
-    () => suggestAuthorJournalTags(authorBooks, allBookNotes),
-    [allBookNotes, authorBooks],
+    () => suggestAuthorJournalTags(authorBooks, allBookJournalEntryRecords),
+    [allBookJournalEntryRecords, authorBooks],
   );
 
   if (authorsLoading || booksLoading || loading) {
@@ -181,13 +181,13 @@ export default function AuthorJournal() {
         </Button>
       </div>
 
-      <AddNoteDialog
+      <AddJournalEntryDialog
         open={composerOpen}
         onOpenChange={setComposerOpen}
         entity={{ type: "Author", id: author.id }}
         tagSuggestions={tagSuggestions}
         onSaved={(note) => {
-          if ("author_id" in note) setNotes((current) => sortAuthorNotes([note, ...current.filter((item) => item.id !== note.id)]));
+          if ("author_id" in note) setJournalEntries((current) => sortAuthorJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
         }}
       />
 
@@ -215,12 +215,12 @@ export default function AuthorJournal() {
         entries={entries}
         emptyMessage="Author journal entries will appear here."
         onEntryUpdated={(entry) => {
-          if (entry.source === "author_note") setNotes((current) => sortAuthorNotes([entry.authorNote, ...current.filter((note) => note.id !== entry.sourceId)]));
-          if (entry.source === "book_note") setAllBookNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+          if (entry.source === "author_note") setJournalEntries((current) => sortAuthorJournalEntryRecords([entry.authorJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
+          if (entry.source === "book_note") setAllBookJournalEntryRecords((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
         }}
         onEntryDeleted={(entry) => {
-          if (entry.source === "author_note") setNotes((current) => current.filter((note) => note.id !== entry.sourceId));
-          if (entry.source === "book_note") setAllBookNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+          if (entry.source === "author_note") setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
+          if (entry.source === "book_note") setAllBookJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
         }}
       />
     </div>

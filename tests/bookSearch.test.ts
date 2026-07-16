@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getSearchHighlightParts,
-  searchBookNotes,
+  searchBookJournalEntryRecords,
   searchBooks,
   type BookSearchPropertyKey,
 } from "../src/lib/bookSearch";
-import type { Book, BookNote, Series } from "../src/types";
+import type { Book, BookJournalEntryRecord, Series } from "../src/types";
 
 const series: Series[] = [
   {
@@ -42,7 +42,7 @@ function makeBook(overrides: Partial<Book>): Book {
   };
 }
 
-function makeBookNote(overrides: Partial<BookNote>): BookNote {
+function makeBookJournalEntryRecord(overrides: Partial<BookJournalEntryRecord>): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "user-1",
@@ -53,7 +53,7 @@ function makeBookNote(overrides: Partial<BookNote>): BookNote {
     content: "The stone eater scenes reveal the hidden history.",
     page_start: 42,
     is_favorite: false,
-    note_date: "2026-04-15",
+    entry_date: "2026-04-15",
     created_at: "2026-04-15T10:00:00Z",
     updated_at: "2026-04-15T10:00:00Z",
     ...overrides,
@@ -174,8 +174,8 @@ test("searches user-visible property values but not internal fields", () => {
 
 test("matches note body content", () => {
   const book = makeBook({});
-  const note = makeBookNote({});
-  const matches = searchBookNotes([note], [book], "hidden history");
+  const note = makeBookJournalEntryRecord({});
+  const matches = searchBookJournalEntryRecords([note], [book], "hidden history");
 
   assert.equal(matches.length, 1);
   assert.equal(matches[0].note.id, "note-1");
@@ -187,10 +187,10 @@ test("matches note body content", () => {
 
 test("matches note body content case-insensitively and fuzzily", () => {
   const book = makeBook({});
-  const note = makeBookNote({
+  const note = makeBookJournalEntryRecord({
     content: "A careful meditation on memory and survival.",
   });
-  const matches = searchBookNotes([note], [book], "Memmory");
+  const matches = searchBookJournalEntryRecords([note], [book], "Memmory");
 
   assert.deepEqual(
     matches.map((match) => match.note.id),
@@ -199,24 +199,24 @@ test("matches note body content case-insensitively and fuzzily", () => {
 });
 
 test("does not return note matches for books that are not loaded", () => {
-  const note = makeBookNote({ book_id: "missing-book" });
+  const note = makeBookJournalEntryRecord({ book_id: "missing-book" });
 
-  assert.deepEqual(searchBookNotes([note], [makeBook({})], "hidden"), []);
+  assert.deepEqual(searchBookJournalEntryRecords([note], [makeBook({})], "hidden"), []);
 });
 
 test("returns no note matches for an empty query", () => {
-  assert.deepEqual(searchBookNotes([makeBookNote({})], [makeBook({})], "   "), []);
+  assert.deepEqual(searchBookJournalEntryRecords([makeBookJournalEntryRecord({})], [makeBook({})], "   "), []);
 });
 
 test("searches note body content but not hidden note fields", () => {
-  const note = makeBookNote({
+  const note = makeBookJournalEntryRecord({
     id: "hidden-note-id",
     user_id: "hidden-user-id",
     book_id: "book-1",
     content: "Visible reading thought",
   });
 
-  assert.deepEqual(searchBookNotes([note], [makeBook({})], "hidden"), []);
+  assert.deepEqual(searchBookJournalEntryRecords([note], [makeBook({})], "hidden"), []);
 });
 
 test("highlights exact search phrases", () => {

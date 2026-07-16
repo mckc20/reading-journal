@@ -1074,7 +1074,7 @@ function AccountSettings() {
 
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <DisabledActionButton icon={Download}>Export library</DisabledActionButton>
-            <DisabledActionButton icon={Download}>Export notes</DisabledActionButton>
+            <DisabledActionButton icon={Download}>Export journal entries</DisabledActionButton>
             <DisabledActionButton icon={Download}>Export quotes</DisabledActionButton>
             <DisabledActionButton icon={Upload}>Import data</DisabledActionButton>
             <DisabledActionButton>Restore backup</DisabledActionButton>
@@ -1131,7 +1131,7 @@ function AboutSettings() {
               size="sm"
               onClick={() => window.dispatchEvent(new Event(RELEASE_NOTES_EVENT))}
             >
-              Open release notes
+              Open release journalEntries
             </Button>
           </SettingRow>
         )}

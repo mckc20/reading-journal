@@ -190,11 +190,12 @@ CREATE TABLE IF NOT EXISTS book_pause_periods (
   CHECK (resumed_at IS NULL OR resumed_at >= paused_at)
 );
 
--- ── BOOK NOTES ────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS book_notes (
+-- ── BOOK JOURNAL ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS book_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   book_id    uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  parent_entry_id uuid REFERENCES book_journal(id) ON DELETE CASCADE,
   label      text NOT NULL CHECK (label IN ('quote','review','note')),
   title      text,
   quote_speaker text,
@@ -202,16 +203,18 @@ CREATE TABLE IF NOT EXISTS book_notes (
   tags       text[],
   page_start integer CHECK (page_start IS NULL OR page_start > 0),
   is_favorite boolean NOT NULL DEFAULT false,
-  note_date  date NOT NULL DEFAULT CURRENT_DATE,
+  entry_date  date NOT NULL DEFAULT CURRENT_DATE,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (parent_entry_id IS NULL OR parent_entry_id <> id)
 );
 
--- ── SERIES NOTES ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS series_notes (
+-- ── SERIES JOURNAL ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS series_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   series_id  uuid NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+  parent_entry_id uuid REFERENCES series_journal(id) ON DELETE CASCADE,
   label      text NOT NULL DEFAULT 'note' CHECK (label IN ('quote', 'note', 'review')),
   title      text,
   quote_speaker text,
@@ -219,16 +222,18 @@ CREATE TABLE IF NOT EXISTS series_notes (
   tags       text[],
   page_start integer CHECK (page_start IS NULL OR page_start > 0),
   is_favorite boolean NOT NULL DEFAULT false,
-  note_date  date NOT NULL DEFAULT CURRENT_DATE,
+  entry_date  date NOT NULL DEFAULT CURRENT_DATE,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (parent_entry_id IS NULL OR parent_entry_id <> id)
 );
 
--- ── AUTHOR NOTES ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS author_notes (
+-- ── AUTHOR JOURNAL ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS author_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   author_id  uuid NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
+  parent_entry_id uuid REFERENCES author_journal(id) ON DELETE CASCADE,
   label      text NOT NULL DEFAULT 'note' CHECK (label IN ('quote', 'note', 'review')),
   title      text,
   quote_speaker text,
@@ -236,9 +241,37 @@ CREATE TABLE IF NOT EXISTS author_notes (
   tags       text[],
   page_start integer CHECK (page_start IS NULL OR page_start > 0),
   is_favorite boolean NOT NULL DEFAULT false,
-  note_date  date NOT NULL DEFAULT CURRENT_DATE,
+  entry_date  date NOT NULL DEFAULT CURRENT_DATE,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (parent_entry_id IS NULL OR parent_entry_id <> id)
+);
+
+CREATE TABLE IF NOT EXISTS book_journal_entry_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_a_id uuid NOT NULL REFERENCES book_journal(id) ON DELETE CASCADE,
+  entry_b_id uuid NOT NULL REFERENCES book_journal(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (entry_a_id <> entry_b_id),
+  UNIQUE (entry_a_id, entry_b_id)
+);
+
+CREATE TABLE IF NOT EXISTS series_journal_entry_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_a_id uuid NOT NULL REFERENCES series_journal(id) ON DELETE CASCADE,
+  entry_b_id uuid NOT NULL REFERENCES series_journal(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (entry_a_id <> entry_b_id),
+  UNIQUE (entry_a_id, entry_b_id)
+);
+
+CREATE TABLE IF NOT EXISTS author_journal_entry_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_a_id uuid NOT NULL REFERENCES author_journal(id) ON DELETE CASCADE,
+  entry_b_id uuid NOT NULL REFERENCES author_journal(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (entry_a_id <> entry_b_id),
+  UNIQUE (entry_a_id, entry_b_id)
 );
 
 -- ── JOURNAL ENTRY VISIBILITY ──────────────────────────────
@@ -415,6 +448,105 @@ CREATE TRIGGER authors_set_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION set_updated_at();
 
+CREATE OR REPLACE FUNCTION inherit_book_journal_reply_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  parent_record book_journal%ROWTYPE;
+BEGIN
+  IF NEW.parent_entry_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT * INTO parent_record
+  FROM book_journal
+  WHERE id = NEW.parent_entry_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.user_id := parent_record.user_id;
+  NEW.book_id := parent_record.book_id;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION inherit_series_journal_reply_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  parent_record series_journal%ROWTYPE;
+BEGIN
+  IF NEW.parent_entry_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT * INTO parent_record
+  FROM series_journal
+  WHERE id = NEW.parent_entry_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.user_id := parent_record.user_id;
+  NEW.series_id := parent_record.series_id;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION inherit_author_journal_reply_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  parent_record author_journal%ROWTYPE;
+BEGIN
+  IF NEW.parent_entry_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT * INTO parent_record
+  FROM author_journal
+  WHERE id = NEW.parent_entry_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.user_id := parent_record.user_id;
+  NEW.author_id := parent_record.author_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS book_journal_inherit_reply_fields ON book_journal;
+
+CREATE TRIGGER book_journal_inherit_reply_fields
+  BEFORE INSERT OR UPDATE OF parent_entry_id ON book_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION inherit_book_journal_reply_fields();
+
+DROP TRIGGER IF EXISTS series_journal_inherit_reply_fields ON series_journal;
+
+CREATE TRIGGER series_journal_inherit_reply_fields
+  BEFORE INSERT OR UPDATE OF parent_entry_id ON series_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION inherit_series_journal_reply_fields();
+
+DROP TRIGGER IF EXISTS author_journal_inherit_reply_fields ON author_journal;
+
+CREATE TRIGGER author_journal_inherit_reply_fields
+  BEFORE INSERT OR UPDATE OF parent_entry_id ON author_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION inherit_author_journal_reply_fields();
+
 -- ── GROUPS ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -495,16 +627,22 @@ CREATE INDEX IF NOT EXISTS book_pause_periods_book_id_idx ON book_pause_periods(
 CREATE UNIQUE INDEX IF NOT EXISTS book_pause_periods_open_book_idx
   ON book_pause_periods(book_id)
   WHERE resumed_at IS NULL;
-CREATE INDEX IF NOT EXISTS book_notes_user_id_idx ON book_notes(user_id);
-CREATE INDEX IF NOT EXISTS book_notes_book_id_idx ON book_notes(book_id);
-CREATE INDEX IF NOT EXISTS book_notes_book_created_at_idx ON book_notes(book_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS book_notes_book_note_date_idx ON book_notes(book_id, note_date DESC, created_at DESC);
-CREATE INDEX IF NOT EXISTS series_notes_user_id_idx ON series_notes(user_id);
-CREATE INDEX IF NOT EXISTS series_notes_series_id_idx ON series_notes(series_id);
-CREATE INDEX IF NOT EXISTS series_notes_series_note_date_idx ON series_notes(series_id, note_date DESC, created_at DESC);
-CREATE INDEX IF NOT EXISTS author_notes_user_id_idx ON author_notes(user_id);
-CREATE INDEX IF NOT EXISTS author_notes_author_id_idx ON author_notes(author_id);
-CREATE INDEX IF NOT EXISTS author_notes_author_note_date_idx ON author_notes(author_id, note_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS book_journal_user_id_idx ON book_journal(user_id);
+CREATE INDEX IF NOT EXISTS book_journal_book_id_idx ON book_journal(book_id);
+CREATE INDEX IF NOT EXISTS book_journal_parent_entry_id_idx ON book_journal(parent_entry_id);
+CREATE INDEX IF NOT EXISTS book_journal_book_created_at_idx ON book_journal(book_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS book_journal_book_entry_date_idx ON book_journal(book_id, entry_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS series_journal_user_id_idx ON series_journal(user_id);
+CREATE INDEX IF NOT EXISTS series_journal_series_id_idx ON series_journal(series_id);
+CREATE INDEX IF NOT EXISTS series_journal_parent_entry_id_idx ON series_journal(parent_entry_id);
+CREATE INDEX IF NOT EXISTS series_journal_series_entry_date_idx ON series_journal(series_id, entry_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS author_journal_user_id_idx ON author_journal(user_id);
+CREATE INDEX IF NOT EXISTS author_journal_author_id_idx ON author_journal(author_id);
+CREATE INDEX IF NOT EXISTS author_journal_parent_entry_id_idx ON author_journal(parent_entry_id);
+CREATE INDEX IF NOT EXISTS author_journal_author_entry_date_idx ON author_journal(author_id, entry_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS book_journal_entry_links_entry_b_id_idx ON book_journal_entry_links(entry_b_id);
+CREATE INDEX IF NOT EXISTS series_journal_entry_links_entry_b_id_idx ON series_journal_entry_links(entry_b_id);
+CREATE INDEX IF NOT EXISTS author_journal_entry_links_entry_b_id_idx ON author_journal_entry_links(entry_b_id);
 CREATE INDEX IF NOT EXISTS journal_entry_visibility_entity_idx
   ON journal_entry_visibility(user_id, entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS profiles_created_at_idx ON profiles(created_at);
@@ -545,9 +683,12 @@ ALTER TABLE book_genres  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_authors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_pause_periods ENABLE ROW LEVEL SECURITY;
-ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE series_notes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE author_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_journal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE series_journal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE author_journal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_journal_entry_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE series_journal_entry_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE author_journal_entry_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entry_visibility ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
@@ -1245,107 +1386,174 @@ CREATE POLICY "book_pause_periods: owner delete"
   ON book_pause_periods FOR DELETE
   USING (auth.uid() = user_id);
 
--- book_notes
-CREATE POLICY "book_notes: owner select"
-  ON book_notes FOR SELECT
+-- book_journal
+CREATE POLICY "book_journal: owner select"
+  ON book_journal FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "book_notes: owner insert"
-  ON book_notes FOR INSERT
+CREATE POLICY "book_journal: owner insert"
+  ON book_journal FOR INSERT
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM books
-      WHERE books.id = book_notes.book_id
+      WHERE books.id = book_journal.book_id
         AND books.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "book_notes: owner update"
-  ON book_notes FOR UPDATE
+CREATE POLICY "book_journal: owner update"
+  ON book_journal FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM books
-      WHERE books.id = book_notes.book_id
+      WHERE books.id = book_journal.book_id
         AND books.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "book_notes: owner delete"
-  ON book_notes FOR DELETE
+CREATE POLICY "book_journal: owner delete"
+  ON book_journal FOR DELETE
   USING (auth.uid() = user_id);
 
--- series_notes
-CREATE POLICY "series_notes: owner select"
-  ON series_notes FOR SELECT
+-- series_journal
+CREATE POLICY "series_journal: owner select"
+  ON series_journal FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "series_notes: owner insert"
-  ON series_notes FOR INSERT
+CREATE POLICY "series_journal: owner insert"
+  ON series_journal FOR INSERT
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM series
-      WHERE series.id = series_notes.series_id
+      WHERE series.id = series_journal.series_id
         AND series.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "series_notes: owner update"
-  ON series_notes FOR UPDATE
+CREATE POLICY "series_journal: owner update"
+  ON series_journal FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM series
-      WHERE series.id = series_notes.series_id
+      WHERE series.id = series_journal.series_id
         AND series.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "series_notes: owner delete"
-  ON series_notes FOR DELETE
+CREATE POLICY "series_journal: owner delete"
+  ON series_journal FOR DELETE
   USING (auth.uid() = user_id);
 
--- author_notes
-CREATE POLICY "author_notes: owner select"
-  ON author_notes FOR SELECT
+-- author_journal
+CREATE POLICY "author_journal: owner select"
+  ON author_journal FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "author_notes: owner insert"
-  ON author_notes FOR INSERT
+CREATE POLICY "author_journal: owner insert"
+  ON author_journal FOR INSERT
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM authors
-      WHERE authors.id = author_notes.author_id
+      WHERE authors.id = author_journal.author_id
         AND authors.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "author_notes: owner update"
-  ON author_notes FOR UPDATE
+CREATE POLICY "author_journal: owner update"
+  ON author_journal FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1
       FROM authors
-      WHERE authors.id = author_notes.author_id
+      WHERE authors.id = author_journal.author_id
         AND authors.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "author_notes: owner delete"
-  ON author_notes FOR DELETE
+CREATE POLICY "author_journal: owner delete"
+  ON author_journal FOR DELETE
   USING (auth.uid() = user_id);
+
+-- journal entry links
+CREATE POLICY "book_journal_entry_links: owner select"
+  ON book_journal_entry_links FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM book_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM book_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "book_journal_entry_links: owner insert"
+  ON book_journal_entry_links FOR INSERT
+  WITH CHECK (
+    entry_a_id < entry_b_id
+    AND EXISTS (SELECT 1 FROM book_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM book_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "book_journal_entry_links: owner delete"
+  ON book_journal_entry_links FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM book_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM book_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "series_journal_entry_links: owner select"
+  ON series_journal_entry_links FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM series_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM series_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "series_journal_entry_links: owner insert"
+  ON series_journal_entry_links FOR INSERT
+  WITH CHECK (
+    entry_a_id < entry_b_id
+    AND EXISTS (SELECT 1 FROM series_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM series_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "series_journal_entry_links: owner delete"
+  ON series_journal_entry_links FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM series_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM series_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "author_journal_entry_links: owner select"
+  ON author_journal_entry_links FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM author_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM author_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "author_journal_entry_links: owner insert"
+  ON author_journal_entry_links FOR INSERT
+  WITH CHECK (
+    entry_a_id < entry_b_id
+    AND EXISTS (SELECT 1 FROM author_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM author_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
+
+CREATE POLICY "author_journal_entry_links: owner delete"
+  ON author_journal_entry_links FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM author_journal WHERE id = entry_a_id AND user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM author_journal WHERE id = entry_b_id AND user_id = auth.uid())
+  );
 
 -- journal_entry_visibility
 CREATE POLICY "journal_entry_visibility: owner select"

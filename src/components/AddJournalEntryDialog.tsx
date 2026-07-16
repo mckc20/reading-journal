@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Bold, Italic, PlusCircle, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,32 +10,48 @@ import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { createBookNote, updateBookNote } from "@/lib/bookNotes";
-import { createAuthorNote, updateAuthorNote } from "@/lib/authorNotes";
-import { normalizeJournalTags } from "@/lib/journalTags";
+import { createBookJournalEntryRecord, updateBookJournalEntryRecord } from "@/lib/bookJournal";
+import { createAuthorJournalEntryRecord, updateAuthorJournalEntryRecord } from "@/lib/authorJournal";
+import { isInternalJournalTag, normalizeJournalTags, visibleJournalTags } from "@/lib/journalTags";
 import { noteMarkdownToEditorHtml } from "@/lib/noteFormatting";
-import { createSeriesNote, updateSeriesNote } from "@/lib/seriesNotes";
+import { createSeriesJournalEntryRecord, updateSeriesJournalEntryRecord } from "@/lib/seriesJournal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
-import type { AuthorNote, BookNote, SeriesNote } from "@/types";
+import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 
-interface AddNoteDialogProps {
+interface AddJournalEntryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialBookId?: string;
   entity?: { type: "Book"; id?: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
-  initialEntry?: BookNote | SeriesNote | AuthorNote | null;
+  initialEntry?: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null;
+  parentEntryId?: string | null;
+  initialPageStart?: string | number | null;
+  initialNoteDate?: string | null;
+  preferInitialPageAndDate?: boolean;
+  systemTags?: string[];
+  replaceSystemTagPrefixes?: string[];
   tagSuggestions?: string[];
-  onSaved?: (note: BookNote | SeriesNote | AuthorNote) => void;
+  onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
 
 interface JournalEntryFormProps {
   active?: boolean;
   initialBookId?: string;
   entity?: { type: "Book"; id?: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
-  initialEntry?: BookNote | SeriesNote | AuthorNote | null;
+  initialEntry?: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null;
+  parentEntryId?: string | null;
+  initialPageStart?: string | number | null;
+  initialNoteDate?: string | null;
+  preferInitialPageAndDate?: boolean;
+  systemTags?: string[];
+  replaceSystemTagPrefixes?: string[];
   tagSuggestions?: string[];
+  variant?: "dialog" | "inline";
+  heading?: ReactNode;
+  hideEntitySelector?: boolean;
+  footerStart?: ReactNode;
   onCancel: () => void;
-  onSaved?: (note: BookNote | SeriesNote | AuthorNote) => void;
+  onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
 
 type ManualJournalEntryType = "quote" | "thought";
@@ -98,6 +114,16 @@ export function JournalEntryForm({
   entity,
   tagSuggestions = [],
   initialEntry = null,
+  parentEntryId = null,
+  initialPageStart = null,
+  initialNoteDate = null,
+  preferInitialPageAndDate = false,
+  systemTags = [],
+  replaceSystemTagPrefixes = [],
+  variant = "dialog",
+  heading,
+  hideEntitySelector = false,
+  footerStart,
   onCancel,
   onSaved,
 }: JournalEntryFormProps) {
@@ -145,8 +171,8 @@ export function JournalEntryForm({
       entryType: "thought",
       title: "",
       content: "",
-      pageStart: "",
-      noteDate: getTodayLocalDate(),
+      pageStart: initialPageStart ? String(initialPageStart) : "",
+      noteDate: initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
       tags: [],
     },
@@ -156,6 +182,18 @@ export function JournalEntryForm({
   const content = watch("content");
   const tags = watch("tags");
   const tagDraft = watch("tagDraft");
+  const isInline = variant === "inline";
+  const hiddenInitialTags = useMemo(
+    () =>
+      normalizeJournalTags(initialEntry?.tags)
+        .filter(isInternalJournalTag)
+        .filter((tag) => !replaceSystemTagPrefixes.some((prefix) => tag.startsWith(prefix))),
+    [initialEntry, replaceSystemTagPrefixes],
+  );
+  const hiddenSystemTags = useMemo(
+    () => normalizeJournalTags([...hiddenInitialTags, ...systemTags]),
+    [hiddenInitialTags, systemTags],
+  );
   const availableTagSuggestions = useMemo(() => {
     const selected = new Set(normalizeJournalTags(tags).map((tag) => tag.toLocaleLowerCase()));
     return normalizeJournalTags(tagSuggestions).filter((tag) => !selected.has(tag.toLocaleLowerCase()));
@@ -171,15 +209,19 @@ export function JournalEntryForm({
       entryType: isQuote ? "quote" : "thought",
       title: isQuote && "quote_speaker" in initialEntry ? initialEntry.quote_speaker ?? "" : initialEntry?.title ?? "",
       content: initialEntry?.content ?? "",
-      pageStart: "page_start" in (initialEntry ?? {}) && initialEntry?.page_start ? String(initialEntry.page_start) : "",
-      noteDate: initialEntry?.note_date ?? getTodayLocalDate(),
+      pageStart: preferInitialPageAndDate
+        ? initialPageStart ? String(initialPageStart) : ""
+        : "page_start" in (initialEntry ?? {}) && initialEntry?.page_start ? String(initialEntry.page_start) : initialPageStart ? String(initialPageStart) : "",
+      noteDate: preferInitialPageAndDate
+        ? initialNoteDate ?? getTodayLocalDate()
+        : initialEntry?.entry_date ?? initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
-      tags: normalizeJournalTags(initialEntry?.tags),
+      tags: visibleJournalTags(initialEntry?.tags),
     });
     if (editorRef.current) {
       editorRef.current.innerHTML = noteMarkdownToEditorHtml(initialEntry?.content ?? "");
     }
-  }, [active, entityId, initialBookId, initialEntry, reset]);
+  }, [active, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, preferInitialPageAndDate, reset]);
 
   function resetForm() {
     reset({
@@ -188,8 +230,8 @@ export function JournalEntryForm({
       entryType: "thought",
       title: "",
       content: "",
-      pageStart: "",
-      noteDate: getTodayLocalDate(),
+      pageStart: initialPageStart ? String(initialPageStart) : "",
+      noteDate: initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
       tags: [],
     });
@@ -240,8 +282,8 @@ export function JournalEntryForm({
     }
 
     try {
-      const normalizedTags = normalizeJournalTags([...values.tags, values.tagDraft]);
-      let note: BookNote | SeriesNote | AuthorNote;
+      const normalizedTags = normalizeJournalTags([...values.tags, values.tagDraft, ...hiddenSystemTags]);
+      let note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
 
       if (entityType === "Series") {
         const selectedSeriesId = values.entityId || entityId;
@@ -256,13 +298,14 @@ export function JournalEntryForm({
         };
         note =
           initialEntry && "series_id" in initialEntry
-            ? await updateSeriesNote({
+            ? await updateSeriesJournalEntryRecord({
                 noteId: initialEntry.id,
                 ...fields,
               })
-            : await createSeriesNote({
+            : await createSeriesJournalEntryRecord({
                 seriesId: selectedSeriesId,
                 userId: user.id,
+                parentEntryId,
                 ...fields,
               });
       } else if (entityType === "Author") {
@@ -278,13 +321,14 @@ export function JournalEntryForm({
         };
         note =
           initialEntry && "author_id" in initialEntry
-            ? await updateAuthorNote({
+            ? await updateAuthorJournalEntryRecord({
                 noteId: initialEntry.id,
                 ...fields,
               })
-            : await createAuthorNote({
+            : await createAuthorJournalEntryRecord({
                 authorId: selectedAuthorId,
                 userId: user.id,
+                parentEntryId,
                 ...fields,
               });
       } else {
@@ -299,10 +343,11 @@ export function JournalEntryForm({
         };
         note =
           initialEntry && "book_id" in initialEntry
-            ? await updateBookNote({ noteId: initialEntry.id, ...fields })
-            : await createBookNote({
+            ? await updateBookJournalEntryRecord({ noteId: initialEntry.id, ...fields })
+            : await createBookJournalEntryRecord({
                 bookId: values.bookId,
                 userId: user.id,
+                parentEntryId,
                 ...fields,
               });
       }
@@ -318,9 +363,14 @@ export function JournalEntryForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="rounded-lg border-0">
-            <div className="border-b px-4 py-4">
-              {entityType === "Book" && (
+      <div className={cn("rounded-lg", isInline ? "border bg-background shadow-sm" : "border-0")}>
+            {heading && (
+              <div className="border-b px-4 py-3">
+                <h3 className="text-sm font-medium">{heading}</h3>
+              </div>
+            )}
+            <div className={cn("border-b px-4 py-4", isInline && "py-3")}>
+              {entityType === "Book" && !hideEntitySelector && (
                 <>
                   <Label htmlFor="note-book">Related book *</Label>
                   <Controller
@@ -349,7 +399,7 @@ export function JournalEntryForm({
                   {errors.bookId && <p className="mt-1 text-xs text-destructive">{errors.bookId.message}</p>}
                 </>
               )}
-              {entityType === "Series" && (
+              {entityType === "Series" && !hideEntitySelector && (
                 <>
                   <Label htmlFor="note-series">Related series *</Label>
                   <Controller
@@ -378,7 +428,7 @@ export function JournalEntryForm({
                   {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
                 </>
               )}
-              {entityType === "Author" && (
+              {entityType === "Author" && !hideEntitySelector && (
                 <>
                   <Label htmlFor="note-author">Related author *</Label>
                   <Controller
@@ -407,7 +457,7 @@ export function JournalEntryForm({
                   {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
                 </>
               )}
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className={cn("flex flex-wrap gap-2", !hideEntitySelector && "mt-4")}>
                 {supportsQuotes && (
                   <button
                     type="button"
@@ -437,7 +487,7 @@ export function JournalEntryForm({
               </div>
             </div>
 
-            <div className="border-b p-3">
+            <div className={cn("border-b p-3", isInline && "py-2")}>
               <Label htmlFor="note-title" className="sr-only">
                 {entryType === "quote" ? "Speaker" : "Title"}
               </Label>
@@ -474,7 +524,7 @@ export function JournalEntryForm({
               </Button>
             </div>
 
-            <div className="p-4">
+            <div className={cn("p-4", isInline && "p-3")}>
               <div className="mb-4 grid gap-4 sm:grid-cols-2">
                 {supportsQuotes && (
                   <div className="space-y-1.5">
@@ -551,35 +601,47 @@ export function JournalEntryForm({
                 data-placeholder={entryType === "quote" ? "Write the quote..." : "Write your thought..."}
                 onInput={syncMarkdownFromEditor}
                 onBlur={syncMarkdownFromEditor}
-                className="min-h-56 rounded-md border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-0"
+                className={cn(
+                  "rounded-md border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-0",
+                  isInline ? "min-h-32" : "min-h-56",
+                )}
               />
               {errors.content && <p className="mt-1 text-xs text-destructive">{errors.content.message}</p>}
             </div>
 
             {errors.root && <p className="px-4 pb-3 text-sm text-destructive">{errors.root.message}</p>}
 
-            <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting || !content.trim()}>
-                {isSubmitting ? "Saving..." : "Save"}
-              </Button>
+            <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>{footerStart}</div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting || !content.trim()}>
+                  {isSubmitting ? "Saving..." : "Save"}
+                </Button>
+              </div>
             </div>
           </div>
     </form>
   );
 }
 
-export default function AddNoteDialog({
+export default function AddJournalEntryDialog({
   open,
   onOpenChange,
   initialBookId = "",
   entity,
   tagSuggestions = [],
   initialEntry = null,
+  parentEntryId = null,
+  initialPageStart = null,
+  initialNoteDate = null,
+  preferInitialPageAndDate = false,
+  systemTags = [],
+  replaceSystemTagPrefixes = [],
   onSaved,
-}: AddNoteDialogProps) {
+}: AddJournalEntryDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
   }
@@ -596,6 +658,12 @@ export default function AddNoteDialog({
           initialBookId={initialBookId}
           entity={entity}
           initialEntry={initialEntry}
+          parentEntryId={parentEntryId}
+          initialPageStart={initialPageStart}
+          initialNoteDate={initialNoteDate}
+          preferInitialPageAndDate={preferInitialPageAndDate}
+          systemTags={systemTags}
+          replaceSystemTagPrefixes={replaceSystemTagPrefixes}
           tagSuggestions={tagSuggestions}
           onCancel={() => onOpenChange(false)}
           onSaved={(note) => {

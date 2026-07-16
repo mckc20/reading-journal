@@ -1,5 +1,5 @@
-import type { Author, Book, BookNote } from "@/types";
-import { sortBookNotes } from "@/lib/bookNotes";
+import type { Author, Book, BookJournalEntryRecord } from "@/types";
+import { sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { formatPublicationDateForDisplay } from "@/lib/publicationDate";
 
 export type AuthorShelfGroupKey = "read" | "reading" | "want-to-read" | "uncategorized";
@@ -12,7 +12,7 @@ export type AuthorShelfGroup = {
 
 export type AuthorSummary = Author & {
   books: Book[];
-  quotes: BookNote[];
+  quotes: BookJournalEntryRecord[];
   bookCount: number;
   quoteCount: number;
   averageRating: number | null;
@@ -183,17 +183,17 @@ function makeSyntheticAuthorSummary(name: string): AuthorSummary {
 
 export function buildAuthorSummaries(
   first: Author[] | Book[],
-  second: Book[] | BookNote[] = [],
-  third: BookNote[] = [],
+  second: Book[] | BookJournalEntryRecord[] = [],
+  third: BookJournalEntryRecord[] = [],
 ): AuthorSummary[] {
   const firstItem = first[0] as Author | Book | undefined;
-  const secondItem = second[0] as Book | BookNote | undefined;
+  const secondItem = second[0] as Book | BookJournalEntryRecord | undefined;
   const firstLooksLikeAuthor = Boolean(firstItem && !("title" in firstItem) && !("status" in firstItem));
   const secondLooksLikeBook = Boolean(secondItem && "title" in secondItem && "status" in secondItem);
   const usesNewSignature = firstLooksLikeAuthor || third.length > 0 || secondLooksLikeBook;
   const authorsInput = usesNewSignature ? (first as Author[]) : [];
   const books = usesNewSignature ? (second as Book[]) : (first as Book[]);
-  const notes = usesNewSignature ? third : (second as BookNote[]);
+  const journalEntries = usesNewSignature ? third : (second as BookJournalEntryRecord[]);
 
   const authorGroups = new Map<string, { author: AuthorSummary; books: Book[] }>();
 
@@ -234,9 +234,9 @@ export function buildAuthorSummaries(
     });
   });
 
-  const quoteNotes = sortBookNotes(notes.filter((note) => note.label === "quote"));
-  const quotesByBookId = new Map<string, BookNote[]>();
-  quoteNotes.forEach((note) => {
+  const quoteJournalEntries = sortBookJournalEntryRecords(journalEntries.filter((note) => note.label === "quote"));
+  const quotesByBookId = new Map<string, BookJournalEntryRecord[]>();
+  quoteJournalEntries.forEach((note) => {
     quotesByBookId.set(note.book_id, [...(quotesByBookId.get(note.book_id) ?? []), note]);
   });
 

@@ -31,7 +31,7 @@ import type { Book } from "@/types";
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
-const AddNoteDialog = lazy(() => import("./AddNoteDialog"));
+const AddJournalEntryDialog = lazy(() => import("./AddJournalEntryDialog"));
 const AddChatDialog = lazy(() => import("./AddChatDialog"));
 const AddGenreDialog = lazy(() => import("./AddGenreDialog"));
 
@@ -240,7 +240,7 @@ function AppLayoutContent() {
           />
         )}
         {activeAddAction === "note" && (
-          <AddNoteDialog
+          <AddJournalEntryDialog
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
           />

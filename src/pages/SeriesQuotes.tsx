@@ -6,9 +6,9 @@ import BackButton from "@/components/BackButton";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { getSeriesQuoteEntries, sortSeriesBooks } from "@/lib/seriesDetails";
-import type { BookNote } from "@/types";
+import type { BookJournalEntryRecord } from "@/types";
 
 const PREVIEW_QUOTES_PER_BOOK = 2;
 
@@ -25,22 +25,22 @@ export default function SeriesQuotes() {
   const { seriesId } = useParams<{ seriesId: string }>();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let ignore = false;
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch((error) => {
-        if (!ignore) setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
+        if (!ignore) setJournalEntriesError(error instanceof Error ? error.message : "Failed to load quotes");
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -54,8 +54,8 @@ export default function SeriesQuotes() {
     [books, seriesId],
   );
   const quoteEntries = useMemo(
-    () => getSeriesQuoteEntries(seriesBooks, notes, { sort: "newest" }),
-    [notes, seriesBooks],
+    () => getSeriesQuoteEntries(seriesBooks, journalEntries, { sort: "newest" }),
+    [journalEntries, seriesBooks],
   );
   const quoteGroups = useMemo(
     () =>
@@ -76,7 +76,7 @@ export default function SeriesQuotes() {
     });
   }
 
-  if (booksLoading || seriesLoading || notesLoading) {
+  if (booksLoading || seriesLoading || journalEntriesLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
@@ -85,8 +85,8 @@ export default function SeriesQuotes() {
     );
   }
 
-  if (booksError || seriesError || notesError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{booksError || seriesError || notesError}</div>;
+  if (booksError || seriesError || journalEntriesError) {
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{booksError || seriesError || journalEntriesError}</div>;
   }
 
   if (!seriesRecord) {

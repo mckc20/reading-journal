@@ -15,7 +15,7 @@ import {
   buildSeriesAttachment,
   noteSnapshotToCreateInput,
 } from "../src/lib/chatAttachments";
-import type { Book, BookNote, Group, GroupMembership, GroupMessage } from "../src/types";
+import type { Book, BookJournalEntryRecord, Group, GroupMembership, GroupMessage } from "../src/types";
 
 type TestChatThread = {
   group: Group;
@@ -136,7 +136,7 @@ test("maps note snapshots to a selected target book", () => {
   const note = makeNote({ label: "quote", content: "A quote", quote_speaker: "Author" });
   const attachment = buildBookAttachment(makeBook(), [note]);
   const input = noteSnapshotToCreateInput({
-    note: attachment.book.included_notes?.[0] as NonNullable<typeof attachment.book.included_notes>[number],
+    note: attachment.book.included_journalEntries?.[0] as NonNullable<typeof attachment.book.included_journalEntries>[number],
     bookId: "target-book",
     userId: "current-user",
   });
@@ -300,7 +300,7 @@ function makeBook(overrides: Partial<Book> = {}): Book {
   };
 }
 
-function makeNote(overrides: Partial<BookNote> = {}): BookNote {
+function makeNote(overrides: Partial<BookJournalEntryRecord> = {}): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "current-user",
@@ -311,7 +311,7 @@ function makeNote(overrides: Partial<BookNote> = {}): BookNote {
     content: "A note",
     page_start: null,
     is_favorite: false,
-    note_date: "2026-06-20",
+    entry_date: "2026-06-20",
     created_at: "2026-06-20T08:00:00Z",
     updated_at: "2026-06-20T08:00:00Z",
     ...overrides,

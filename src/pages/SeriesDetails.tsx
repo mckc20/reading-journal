@@ -31,7 +31,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import {
@@ -50,13 +50,13 @@ import {
   sortSeriesBooks,
 } from "@/lib/seriesDetails";
 import {
-  fetchSeriesNotes,
-  sortSeriesNotes,
-} from "@/lib/seriesNotes";
-import { seriesNotesToJournalEntries, sortJournalEntries } from "@/lib/journal";
+  fetchSeriesJournalEntryRecords,
+  sortSeriesJournalEntryRecords,
+} from "@/lib/seriesJournal";
+import { seriesJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { bookHasGenreName, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { cn, getTodayLocalDate } from "@/lib/utils";
-import type { Book, BookNote, ReadingLog, Series, SeriesNote } from "@/types";
+import type { Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
 
 function bookCountLabel(count: number): string {
   return `${count} book${count === 1 ? "" : "s"}`;
@@ -192,30 +192,30 @@ function SeriesJournalSection({
 }: {
   series: Series;
 }) {
-  const [seriesNotes, setSeriesNotes] = useState<SeriesNote[]>([]);
+  const [seriesJournal, setSeriesJournalEntryRecords] = useState<SeriesJournalEntryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const journalEntries = useMemo(
-    () => sortJournalEntries(seriesNotesToJournalEntries(seriesNotes)).slice(0, 3),
-    [seriesNotes],
+    () => sortJournalEntries(seriesJournalToJournalEntries(seriesJournal)).slice(0, 3),
+    [seriesJournal],
   );
 
-  const loadSeriesNotes = useCallback(async () => {
+  const loadSeriesJournalEntryRecords = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      setSeriesNotes(await fetchSeriesNotes(series.id));
+      setSeriesJournalEntryRecords(await fetchSeriesJournalEntryRecords(series.id));
     } catch (loadError) {
-      setError(getErrorMessage(loadError, "Failed to load series notes"));
+      setError(getErrorMessage(loadError, "Failed to load series journal entries"));
     } finally {
       setLoading(false);
     }
   }, [series.id]);
 
   useEffect(() => {
-    void loadSeriesNotes();
-  }, [loadSeriesNotes]);
+    void loadSeriesJournalEntryRecords();
+  }, [loadSeriesJournalEntryRecords]);
 
   return (
     <section className="space-y-4">
@@ -252,11 +252,11 @@ function SeriesJournalSection({
             emptyMessage="Series journal entries will appear here."
             onEntryUpdated={(entry) => {
               if (entry.source === "series_note") {
-                setSeriesNotes((current) => sortSeriesNotes([entry.seriesNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+                setSeriesJournalEntryRecords((current) => sortSeriesJournalEntryRecords([entry.seriesJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
               }
             }}
             onEntryDeleted={(entry) => {
-              if (entry.source === "series_note") setSeriesNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+              if (entry.source === "series_note") setSeriesJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
             }}
           />
         )
@@ -835,7 +835,7 @@ export default function SeriesDetails() {
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<BookNote[]>([]);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -862,11 +862,11 @@ export default function SeriesDetails() {
     }
   }, []);
 
-  const loadNotes = useCallback(async () => {
+  const loadJournalEntries = useCallback(async () => {
     try {
-      setNotes(await fetchAllBookNotes());
+      setJournalEntries(await fetchAllBookJournalEntryRecords());
     } catch {
-      setNotes([]);
+      setJournalEntries([]);
     }
   }, []);
 
@@ -877,14 +877,14 @@ export default function SeriesDetails() {
     }
     if (seriesBooks.length === 0) {
       setLogs([]);
-      setNotes([]);
+      setJournalEntries([]);
       setLogsError(null);
       setLogsLoading(false);
       return;
     }
     void loadLogs();
-    void loadNotes();
-  }, [loadLogs, loadNotes, seriesBooks.length, seriesLoading, seriesRecord]);
+    void loadJournalEntries();
+  }, [loadLogs, loadJournalEntries, seriesBooks.length, seriesLoading, seriesRecord]);
 
   const seriesLogs = useMemo(() => filterSeriesLogs(seriesBooks, logs), [logs, seriesBooks]);
   const seriesBookIds = useMemo(() => new Set(seriesBooks.map((book) => book.id)), [seriesBooks]);
@@ -900,8 +900,8 @@ export default function SeriesDetails() {
     [seriesBooks, seriesLogs],
   );
   const seriesStats = useMemo(
-    () => getSeriesStats(seriesBooks, seriesLogs, notes),
-    [notes, seriesBooks, seriesLogs],
+    () => getSeriesStats(seriesBooks, seriesLogs, journalEntries),
+    [journalEntries, seriesBooks, seriesLogs],
   );
   const completionDates = useMemo(
     () => getSeriesCompletionDates(seriesBooks, seriesLogs),
@@ -1277,7 +1277,7 @@ export default function SeriesDetails() {
           seriesId: seriesRecord.id,
           seriesName: seriesRecord.name,
           books: seriesBooks,
-          includedQuotes: notes
+          includedQuotes: journalEntries
             .filter((note) => note.label === "quote" && seriesBookIds.has(note.book_id))
             .slice(0, 3),
         })}

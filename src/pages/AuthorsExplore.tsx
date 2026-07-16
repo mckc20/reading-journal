@@ -23,9 +23,9 @@ import {
   sortAuthorsByRecentlyRead,
   uniqueSortedValues,
 } from "@/lib/authorsView";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import type { AuthorSummary } from "@/lib/authorShelf";
-import type { BookNote } from "@/types";
+import type { BookJournalEntryRecord } from "@/types";
 
 type AuthorDisplay = "grid" | "table";
 type AuthorSort = "name" | "recently-added" | "latest-read" | "top-rated" | "most-read";
@@ -276,9 +276,9 @@ export default function AuthorsExplore() {
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
@@ -291,19 +291,19 @@ export default function AuthorsExplore() {
 
   useEffect(() => {
     let ignore = false;
-    setNotesLoading(true);
+    setJournalEntriesLoading(true);
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch((error) => {
         if (!ignore) {
-          setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
+          setJournalEntriesError(error instanceof Error ? error.message : "Failed to load quotes");
         }
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -311,7 +311,7 @@ export default function AuthorsExplore() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, notes), [authorRecords, books, notes]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const authorCountLabel = countLabel(authors.length, "author");
   const filteredAuthors = useMemo(() => {
     return authorMatchesSort(filterAuthors(authors, filters), sort);
@@ -421,7 +421,7 @@ export default function AuthorsExplore() {
     });
   }, [isManageMode, visibleAuthors]);
 
-  if (authorsLoading || booksLoading || notesLoading) {
+  if (authorsLoading || booksLoading || journalEntriesLoading) {
     return (
       <div className="space-y-6">
         <div className="space-y-1">
@@ -455,7 +455,7 @@ export default function AuthorsExplore() {
             {isManageMode ? "Exit management" : "Management mode"}
           </Button>
         </div>
-        {notesError && (
+        {journalEntriesError && (
           <p className="text-xs text-muted-foreground">
             Quotes could not be loaded right now, so some counts may be incomplete.
           </p>

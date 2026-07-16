@@ -1,29 +1,29 @@
 import type {
-  AuthorNote,
+  AuthorJournalEntryRecord,
   Book,
-  BookNote,
-  BookNoteLabel,
+  BookJournalEntryRecord,
+  JournalEntryLabel,
   JournalEntry,
   JournalEntryType,
   ReadingLog,
-  SeriesNote,
+  SeriesJournalEntryRecord,
 } from "@/types";
 
-export interface BookNoteJournalEntry extends JournalEntry {
+export interface BookJournalEntryRecordJournalEntry extends JournalEntry {
   source: "book_note";
-  bookNote: BookNote;
+  bookJournalEntry: BookJournalEntryRecord;
   relatedBookTitle?: string;
   relatedContext?: "series" | "author";
 }
 
-export interface SeriesNoteJournalEntry extends JournalEntry {
+export interface SeriesJournalEntryRecordJournalEntry extends JournalEntry {
   source: "series_note";
-  seriesNote: SeriesNote;
+  seriesJournalEntry: SeriesJournalEntryRecord;
 }
 
-export interface AuthorNoteJournalEntry extends JournalEntry {
+export interface AuthorJournalEntryRecordJournalEntry extends JournalEntry {
   source: "author_note";
-  authorNote: AuthorNote;
+  authorJournalEntry: AuthorJournalEntryRecord;
 }
 
 export type GeneratedBookJournalEventType = Extract<
@@ -58,52 +58,52 @@ export interface GeneratedBookJournalEntry extends JournalEntry {
 }
 
 export type JournalTimelineEntry =
-  | BookNoteJournalEntry
-  | SeriesNoteJournalEntry
-  | AuthorNoteJournalEntry
+  | BookJournalEntryRecordJournalEntry
+  | SeriesJournalEntryRecordJournalEntry
+  | AuthorJournalEntryRecordJournalEntry
   | GeneratedBookJournalEntry;
 
-const BOOK_NOTE_LABEL_TO_JOURNAL_TYPE: Record<BookNoteLabel, JournalEntryType> = {
+const BOOK_NOTE_LABEL_TO_JOURNAL_TYPE: Record<JournalEntryLabel, JournalEntryType> = {
   note: "thought",
   quote: "passage",
   review: "thought",
 };
 
-export function bookNoteLabelToJournalEntryType(
-  label: BookNoteLabel,
+export function bookJournalEntryLabelToJournalEntryType(
+  label: JournalEntryLabel,
 ): JournalEntryType {
   return BOOK_NOTE_LABEL_TO_JOURNAL_TYPE[label];
 }
 
-export function bookNoteToJournalEntry(note: BookNote): BookNoteJournalEntry {
+export function bookJournalEntryToJournalEntry(note: BookJournalEntryRecord): BookJournalEntryRecordJournalEntry {
   return {
     id: `book-note:${note.id}`,
     entityType: "Book",
     entityId: note.book_id,
-    type: bookNoteLabelToJournalEntryType(note.label),
+    type: bookJournalEntryLabelToJournalEntryType(note.label),
     source: "book_note",
     sourceId: note.id,
-    createdAt: note.note_date ?? note.created_at,
+    createdAt: note.entry_date ?? note.created_at,
     updatedAt: note.updated_at,
-    bookNote: note,
+    bookJournalEntry: note,
   };
 }
 
-export function bookNotesToJournalEntries(notes: BookNote[]): BookNoteJournalEntry[] {
-  return notes.map(bookNoteToJournalEntry);
+export function bookJournalToJournalEntries(journalEntries: BookJournalEntryRecord[]): BookJournalEntryRecordJournalEntry[] {
+  return journalEntries.map(bookJournalEntryToJournalEntry);
 }
 
-export function bookNoteToRelatedJournalEntry(
-  note: BookNote,
+export function bookJournalEntryToRelatedJournalEntry(
+  note: BookJournalEntryRecord,
   input: {
     entityType: "Series" | "Author" | "Book";
     entityId: string;
     bookTitle?: string;
     context?: "series" | "author";
   },
-): BookNoteJournalEntry {
+): BookJournalEntryRecordJournalEntry {
   return {
-    ...bookNoteToJournalEntry(note),
+    ...bookJournalEntryToJournalEntry(note),
     id:
       input.entityType === "Book"
         ? `book-note:${note.id}`
@@ -115,40 +115,40 @@ export function bookNoteToRelatedJournalEntry(
   };
 }
 
-export function seriesNoteToJournalEntry(note: SeriesNote): SeriesNoteJournalEntry {
+export function seriesJournalEntryToJournalEntry(note: SeriesJournalEntryRecord): SeriesJournalEntryRecordJournalEntry {
   return {
     id: `series-note:${note.id}`,
     entityType: "Series",
     entityId: note.series_id,
-    type: bookNoteLabelToJournalEntryType(note.label ?? "note"),
+    type: bookJournalEntryLabelToJournalEntryType(note.label ?? "note"),
     source: "series_note",
     sourceId: note.id,
-    createdAt: note.note_date ?? note.created_at,
+    createdAt: note.entry_date ?? note.created_at,
     updatedAt: note.updated_at,
-    seriesNote: note,
+    seriesJournalEntry: note,
   };
 }
 
-export function seriesNotesToJournalEntries(notes: SeriesNote[]): SeriesNoteJournalEntry[] {
-  return notes.map(seriesNoteToJournalEntry);
+export function seriesJournalToJournalEntries(journalEntries: SeriesJournalEntryRecord[]): SeriesJournalEntryRecordJournalEntry[] {
+  return journalEntries.map(seriesJournalEntryToJournalEntry);
 }
 
-export function authorNoteToJournalEntry(note: AuthorNote): AuthorNoteJournalEntry {
+export function authorJournalEntryToJournalEntry(note: AuthorJournalEntryRecord): AuthorJournalEntryRecordJournalEntry {
   return {
     id: `author-note:${note.id}`,
     entityType: "Author",
     entityId: note.author_id,
-    type: bookNoteLabelToJournalEntryType(note.label ?? "note"),
+    type: bookJournalEntryLabelToJournalEntryType(note.label ?? "note"),
     source: "author_note",
     sourceId: note.id,
-    createdAt: note.note_date ?? note.created_at,
+    createdAt: note.entry_date ?? note.created_at,
     updatedAt: note.updated_at,
-    authorNote: note,
+    authorJournalEntry: note,
   };
 }
 
-export function authorNotesToJournalEntries(notes: AuthorNote[]): AuthorNoteJournalEntry[] {
-  return notes.map(authorNoteToJournalEntry);
+export function authorJournalToJournalEntries(journalEntries: AuthorJournalEntryRecord[]): AuthorJournalEntryRecordJournalEntry[] {
+  return journalEntries.map(authorJournalEntryToJournalEntry);
 }
 
 function dateOnlyToTimestamp(value: string): string {
@@ -193,9 +193,17 @@ function createGeneratedBookEvent(
 export function buildGeneratedBookJournalEntries(
   book: Book,
   logs: ReadingLog[] = [],
+  options: {
+    uncompressedReadingLogIds?: Set<string>;
+    sessionBarrierDateKeys?: Set<string>;
+    sessionBarrierPages?: Set<number>;
+  } = {},
 ): GeneratedBookJournalEntry[] {
   const entries: GeneratedBookJournalEntry[] = [];
   const sortedLogs = [...logs].sort((a, b) => a.logged_at.localeCompare(b.logged_at));
+  const uncompressedReadingLogIds = options.uncompressedReadingLogIds ?? new Set<string>();
+  const sessionBarrierDateKeys = options.sessionBarrierDateKeys ?? new Set<string>();
+  const sessionBarrierPages = options.sessionBarrierPages ?? new Set<number>();
 
   if (book.date_started) {
     entries.push(
@@ -243,13 +251,75 @@ export function buildGeneratedBookJournalEntries(
     logsByDay.set(dateKey, [...(logsByDay.get(dateKey) ?? []), log]);
   });
 
-  const dayGroups = [...logsByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+  function hasPageBarrierBetween(previousPage: number, nextPage: number): boolean {
+    const low = Math.min(previousPage, nextPage);
+    const high = Math.max(previousPage, nextPage);
+    return [...sessionBarrierPages].some((page) => page > low && page <= high);
+  }
+
+  function hasDateBarrierBetween(previousDateKey: string, nextDateKey: string): boolean {
+    if (previousDateKey === nextDateKey) return false;
+    return [...sessionBarrierDateKeys].some((dateKey) => dateKey > previousDateKey && dateKey <= nextDateKey);
+  }
+
+  const dayGroups = [...logsByDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([dateKey, dailyLogs]) => {
+      const sortedDailyLogs = [...dailyLogs].sort((a, b) => a.logged_at.localeCompare(b.logged_at));
+      const segments: ReadingLog[][] = [];
+      let currentSegment: ReadingLog[] = [];
+
+      sortedDailyLogs.forEach((log) => {
+        const previousLog = currentSegment[currentSegment.length - 1];
+        const shouldSplitBefore =
+          previousLog &&
+          (uncompressedReadingLogIds.has(previousLog.id) ||
+            uncompressedReadingLogIds.has(log.id) ||
+            hasPageBarrierBetween(previousLog.current_page, log.current_page));
+
+        if (shouldSplitBefore) {
+          segments.push(currentSegment);
+          currentSegment = [];
+        }
+
+        currentSegment.push(log);
+
+        if (uncompressedReadingLogIds.has(log.id)) {
+          segments.push(currentSegment);
+          currentSegment = [];
+        }
+      });
+
+      if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+      }
+
+      return segments.map((segment) => {
+        const firstLog = segment[0];
+        const lastLog = segment[segment.length - 1];
+        const key = segment.length === sortedDailyLogs.length ? dateKey : `${dateKey}:${firstLog.id}:${lastLog.id}`;
+        return [key, segment] as [string, ReadingLog[]];
+      });
+    });
   const consecutiveGroups: Array<Array<[string, ReadingLog[]]>> = [];
 
   dayGroups.forEach((dayGroup) => {
+    const dayDateKey = dayGroup[0].slice(0, 10);
+    const groupLogs = dayGroup[1];
+    const firstGroupLog = groupLogs[0];
+    const hasBarrier = groupLogs.some((log) => uncompressedReadingLogIds.has(log.id));
     const previousGroup = consecutiveGroups[consecutiveGroups.length - 1];
-    const previousDateKey = previousGroup?.[previousGroup.length - 1]?.[0];
-    if (!previousGroup || !previousDateKey || !areConsecutiveDateKeys(previousDateKey, dayGroup[0])) {
+    const previousDateKey = previousGroup?.[previousGroup.length - 1]?.[0].slice(0, 10);
+    const previousLogs = previousGroup?.flatMap(([, logsForDay]) => logsForDay) ?? [];
+    const previousFinalLog = previousLogs[previousLogs.length - 1];
+    const previousHasBarrier = previousGroup?.some(([, logsForDay]) => (
+      logsForDay.some((log) => uncompressedReadingLogIds.has(log.id))
+    )) ?? false;
+    const hasPageBarrier = previousFinalLog && firstGroupLog
+      ? hasPageBarrierBetween(previousFinalLog.current_page, firstGroupLog.current_page)
+      : false;
+    const hasDateBarrier = previousDateKey ? hasDateBarrierBetween(previousDateKey, dayDateKey) : false;
+    if (!previousGroup || !previousDateKey || hasBarrier || previousHasBarrier || hasPageBarrier || hasDateBarrier || !areConsecutiveDateKeys(previousDateKey, dayDateKey)) {
       consecutiveGroups.push([dayGroup]);
       return;
     }
@@ -258,7 +328,6 @@ export function buildGeneratedBookJournalEntries(
   });
 
   consecutiveGroups.forEach((group) => {
-    const dateKeys = group.map(([dateKey]) => dateKey);
     const groupedLogs = group.flatMap(([, dailyLogs]) => dailyLogs);
     const finalLog = groupedLogs[groupedLogs.length - 1];
     const progressPercent = getProgressPercent(finalLog.current_page, book.total_pages);
@@ -268,12 +337,17 @@ export function buildGeneratedBookJournalEntries(
     );
     const sessionCount = groupedLogs.length;
     const dayCount = group.length;
+    const isSingleSession = sessionCount === 1;
+    const entryIdSuffix = isSingleSession ? groupedLogs[0].id : `${groupedLogs[0].id}:${finalLog.id}`;
+    const sourceId = isSingleSession
+      ? `reading_log:${groupedLogs[0].id}`
+      : `reading_logs:${book.id}:${groupedLogs[0].id}:${finalLog.id}`;
 
     entries.push(
       createGeneratedBookEvent(book, {
-        id: `generated:book:${book.id}:reading-session:${dateKeys[0]}:${dateKeys[dateKeys.length - 1]}`,
+        id: `generated:book:${book.id}:reading-session:${entryIdSuffix}`,
         type: "reading_session",
-        sourceId: `reading_logs:${book.id}:${dateKeys[0]}:${dateKeys[dateKeys.length - 1]}`,
+        sourceId,
         createdAt: finalLog.logged_at,
         label: sessionCount === 1 ? "Reading session" : "Reading sessions",
         description:
@@ -446,9 +520,9 @@ export function sortJournalEntries<T extends JournalEntry>(entries: T[]): T[] {
 }
 
 export function getJournalEntryTags(entry: JournalTimelineEntry): string[] {
-  if (entry.source === "book_note") return entry.bookNote.tags ?? [];
-  if (entry.source === "series_note") return entry.seriesNote.tags ?? [];
-  if (entry.source === "author_note") return entry.authorNote.tags ?? [];
+  if (entry.source === "book_note") return entry.bookJournalEntry.tags ?? [];
+  if (entry.source === "series_note") return entry.seriesJournalEntry.tags ?? [];
+  if (entry.source === "author_note") return entry.authorJournalEntry.tags ?? [];
   return [];
 }
 

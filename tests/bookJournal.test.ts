@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  bookNoteErrorToError,
-  formatBookNotePageRange,
+  bookJournalEntryErrorToError,
+  formatBookJournalEntryRecordPageRange,
   getProgressNoteDate,
-  normalizeBookNoteFields,
-  normalizeBookNoteInput,
-  sortBookNotes,
-} from "../src/lib/bookNotes";
-import type { BookNote } from "../src/types";
+  normalizeBookJournalEntryRecordFields,
+  normalizeBookJournalEntryRecordInput,
+  sortBookJournalEntryRecords,
+} from "../src/lib/bookJournal";
+import type { BookJournalEntryRecord } from "../src/types";
 
 test("normalizes book note title and content before insert", () => {
   assert.deepEqual(
-    normalizeBookNoteInput({
+    normalizeBookJournalEntryRecordInput({
       bookId: "book-1",
       userId: "user-1",
       label: "quote",
@@ -31,14 +31,14 @@ test("normalizes book note title and content before insert", () => {
       content: "This stayed with me.",
       page_start: null,
       is_favorite: true,
-      note_date: "2026-05-05",
+      entry_date: "2026-05-05",
     },
   );
 });
 
 test("stores blank book note title as null", () => {
   assert.equal(
-    normalizeBookNoteInput({
+    normalizeBookJournalEntryRecordInput({
       bookId: "book-1",
       userId: "user-1",
       label: "note",
@@ -49,10 +49,23 @@ test("stores blank book note title as null", () => {
   );
 });
 
+test("includes parent entry id for book journal replies", () => {
+  assert.equal(
+    normalizeBookJournalEntryRecordInput({
+      bookId: "book-1",
+      userId: "user-1",
+      label: "note",
+      content: "A reply",
+      parentEntryId: "parent-1",
+    }).parent_entry_id,
+    "parent-1",
+  );
+});
+
 test("rejects blank book note content", () => {
   assert.throws(
     () =>
-      normalizeBookNoteInput({
+      normalizeBookJournalEntryRecordInput({
         bookId: "book-1",
         userId: "user-1",
         label: "review",
@@ -64,7 +77,7 @@ test("rejects blank book note content", () => {
 
 test("normalizes editable book note fields", () => {
   assert.deepEqual(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "review",
       title: "  Final thoughts  ",
       quoteSpeaker: "Should not save",
@@ -78,14 +91,14 @@ test("normalizes editable book note fields", () => {
       content: "Strong ending.",
       page_start: null,
       is_favorite: false,
-      note_date: "2026-04-30",
+      entry_date: "2026-04-30",
     },
   );
 });
 
 test("normalizes a single source page", () => {
   assert.deepEqual(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "quote",
       content: "Important line.",
       pageStart: "42",
@@ -98,14 +111,14 @@ test("normalizes a single source page", () => {
       content: "Important line.",
       page_start: 42,
       is_favorite: false,
-      note_date: "2026-05-01",
+      entry_date: "2026-05-01",
     },
   );
 });
 
 test("normalizes saved state for quote entries", () => {
   assert.deepEqual(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "quote",
       content: "Favorite line.",
       quoteSpeaker: "Annie",
@@ -119,14 +132,14 @@ test("normalizes saved state for quote entries", () => {
       content: "Favorite line.",
       page_start: null,
       is_favorite: true,
-      note_date: "2026-05-02",
+      entry_date: "2026-05-02",
     },
   );
 });
 
-test("stores saved state for reviews and regular notes", () => {
+test("stores saved state for reviews and regular journalEntries", () => {
   assert.equal(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "review",
       content: "Thoughts.",
       isFavorite: true,
@@ -138,7 +151,7 @@ test("stores saved state for reviews and regular notes", () => {
 
 test("stores quote speaker only for quote entries", () => {
   assert.equal(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "quote",
       content: "Quoted text.",
       quoteSpeaker: "  Mae  ",
@@ -148,7 +161,7 @@ test("stores quote speaker only for quote entries", () => {
   );
 
   assert.equal(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "note",
       content: "Regular thought.",
       quoteSpeaker: "Mae",
@@ -159,7 +172,7 @@ test("stores quote speaker only for quote entries", () => {
 });
 
 test("omits blank tags from new book note inserts", () => {
-  const payload = normalizeBookNoteInput({
+  const payload = normalizeBookJournalEntryRecordInput({
     bookId: "book-1",
     userId: "user-1",
     label: "note",
@@ -170,9 +183,9 @@ test("omits blank tags from new book note inserts", () => {
   assert.equal("tags" in payload, false);
 });
 
-test("includes normalized tags when new book notes have tags", () => {
+test("includes normalized tags when new book journalEntries have tags", () => {
   assert.deepEqual(
-    normalizeBookNoteInput({
+    normalizeBookJournalEntryRecordInput({
       bookId: "book-1",
       userId: "user-1",
       label: "note",
@@ -184,7 +197,7 @@ test("includes normalized tags when new book notes have tags", () => {
 });
 
 test("omits tags from editable fields when tags are not provided", () => {
-  const payload = normalizeBookNoteFields({
+  const payload = normalizeBookJournalEntryRecordFields({
     label: "note",
     content: "A regular note",
   });
@@ -194,7 +207,7 @@ test("omits tags from editable fields when tags are not provided", () => {
 
 test("clears editable tags when an empty tag list is explicitly provided", () => {
   assert.equal(
-    normalizeBookNoteFields({
+    normalizeBookJournalEntryRecordFields({
       label: "note",
       content: "A regular note",
       tags: [],
@@ -204,41 +217,41 @@ test("clears editable tags when an empty tag list is explicitly provided", () =>
 });
 
 test("converts Supabase-shaped note errors to readable Error objects", () => {
-  const error = bookNoteErrorToError({
-    message: "Could not find the 'tags' column of 'book_notes' in the schema cache",
+  const error = bookJournalEntryErrorToError({
+    message: "Could not find the 'tags' column of 'book_journal' in the schema cache",
   });
 
-  assert.equal(error.message, "Could not find the 'tags' column of 'book_notes' in the schema cache");
+  assert.equal(error.message, "Could not find the 'tags' column of 'book_journal' in the schema cache");
 });
 
 test("formats source page labels", () => {
-  assert.equal(formatBookNotePageRange({ page_start: null }), null);
-  assert.equal(formatBookNotePageRange({ page_start: 42 }), "p. 42");
+  assert.equal(formatBookJournalEntryRecordPageRange({ page_start: null }), null);
+  assert.equal(formatBookJournalEntryRecordPageRange({ page_start: 42 }), "p. 42");
 });
 
-test("uses the selected progress date for notes created from progress updates", () => {
+test("uses the selected progress date for journalEntries created from progress updates", () => {
   assert.equal(getProgressNoteDate(true, "2026-05-05T23:45"), "2026-05-05");
 });
 
-test("lets progress notes default to today when no progress date is edited", () => {
+test("lets progress journalEntries default to today when no progress date is edited", () => {
   assert.equal(getProgressNoteDate(false, "2026-05-05T23:45"), null);
   assert.equal(getProgressNoteDate(true, ""), null);
 });
 
-test("sorts notes by visible note date newest first", () => {
-  const notes = [
-    makeBookNote({ id: "older-created", note_date: "2026-05-01", created_at: "2026-05-02T08:00:00Z" }),
-    makeBookNote({ id: "newer-date", note_date: "2026-05-03", created_at: "2026-05-01T08:00:00Z" }),
-    makeBookNote({ id: "same-date-newer-created", note_date: "2026-05-01", created_at: "2026-05-03T08:00:00Z" }),
+test("sorts journalEntries by visible note date newest first", () => {
+  const journalEntries = [
+    makeBookJournalEntryRecord({ id: "older-created", entry_date: "2026-05-01", created_at: "2026-05-02T08:00:00Z" }),
+    makeBookJournalEntryRecord({ id: "newer-date", entry_date: "2026-05-03", created_at: "2026-05-01T08:00:00Z" }),
+    makeBookJournalEntryRecord({ id: "same-date-newer-created", entry_date: "2026-05-01", created_at: "2026-05-03T08:00:00Z" }),
   ];
 
   assert.deepEqual(
-    sortBookNotes(notes).map((note) => note.id),
+    sortBookJournalEntryRecords(journalEntries).map((note) => note.id),
     ["newer-date", "same-date-newer-created", "older-created"],
   );
 });
 
-function makeBookNote(overrides: Partial<BookNote>): BookNote {
+function makeBookJournalEntryRecord(overrides: Partial<BookJournalEntryRecord>): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "user-1",
@@ -249,7 +262,7 @@ function makeBookNote(overrides: Partial<BookNote>): BookNote {
     content: "Note",
     page_start: null,
     is_favorite: false,
-    note_date: "2026-05-01",
+    entry_date: "2026-05-01",
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
     ...overrides,

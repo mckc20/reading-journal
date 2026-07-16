@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookOpen, NotebookPen } from "lucide-react";
-import AddNoteDialog from "@/components/AddNoteDialog";
+import AddJournalEntryDialog from "@/components/AddJournalEntryDialog";
 import BackButton from "@/components/BackButton";
 import JournalFilterSwitch from "@/components/JournalFilterSwitch";
 import JournalTimeline from "@/components/JournalTimeline";
@@ -9,17 +9,17 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { fetchAllBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import {
-  bookNoteToRelatedJournalEntry,
+  bookJournalEntryToRelatedJournalEntry,
   buildGeneratedSeriesJournalEntries,
-  seriesNotesToJournalEntries,
+  seriesJournalToJournalEntries,
   sortJournalEntries,
 } from "@/lib/journal";
 import { suggestSeriesJournalTags } from "@/lib/journalTags";
-import { fetchSeriesNotes, sortSeriesNotes } from "@/lib/seriesNotes";
+import { fetchSeriesJournalEntryRecords, sortSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import { sortSeriesBooks } from "@/lib/seriesDetails";
-import type { Book, BookNote, SeriesNote } from "@/types";
+import type { Book, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 
 function BookJournalLink({ book }: { book: Book }) {
   return (
@@ -40,8 +40,8 @@ export default function SeriesJournal() {
   const { user } = useAuth();
   const { books, loading: booksLoading } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
-  const [notes, setNotes] = useState<SeriesNote[]>([]);
-  const [allBookNotes, setAllBookNotes] = useState<BookNote[]>([]);
+  const [journalEntries, setJournalEntries] = useState<SeriesJournalEntryRecord[]>([]);
+  const [allBookJournalEntryRecords, setAllBookJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -60,9 +60,9 @@ export default function SeriesJournal() {
     if (!seriesId) return;
     let cancelled = false;
     setLoading(true);
-    fetchSeriesNotes(seriesId)
+    fetchSeriesJournalEntryRecords(seriesId)
       .then((data) => {
-        if (!cancelled) setNotes(data);
+        if (!cancelled) setJournalEntries(data);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Failed to load series journal");
@@ -77,12 +77,12 @@ export default function SeriesJournal() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!cancelled) setAllBookNotes(data);
+        if (!cancelled) setAllBookJournalEntryRecords(data);
       })
       .catch(() => {
-        if (!cancelled) setAllBookNotes([]);
+        if (!cancelled) setAllBookJournalEntryRecords([]);
       });
     return () => {
       cancelled = true;
@@ -90,22 +90,22 @@ export default function SeriesJournal() {
   }, []);
 
   const seriesBookById = useMemo(() => new Map(seriesBooks.map((book) => [book.id, book])), [seriesBooks]);
-  const relatedBookNotes = useMemo(
-    () => allBookNotes.filter((note) => seriesBookById.has(note.book_id)),
-    [allBookNotes, seriesBookById],
+  const relatedBookJournalEntryRecords = useMemo(
+    () => allBookJournalEntryRecords.filter((note) => seriesBookById.has(note.book_id)),
+    [allBookJournalEntryRecords, seriesBookById],
   );
 
   const ownQuoteEntries = useMemo(
-    () => sortJournalEntries(seriesNotesToJournalEntries(notes.filter((note) => note.label === "quote"))),
-    [notes],
+    () => sortJournalEntries(seriesJournalToJournalEntries(journalEntries.filter((note) => note.label === "quote"))),
+    [journalEntries],
   );
   const bookQuoteEntries = useMemo(
     () =>
       sortJournalEntries(
-        relatedBookNotes
+        relatedBookJournalEntryRecords
           .filter((note) => note.label === "quote")
           .map((note) =>
-            bookNoteToRelatedJournalEntry(note, {
+            bookJournalEntryToRelatedJournalEntry(note, {
               entityType: "Series",
               entityId: seriesId ?? "",
               bookTitle: seriesBookById.get(note.book_id)?.title,
@@ -113,23 +113,23 @@ export default function SeriesJournal() {
             }),
           ),
       ),
-    [relatedBookNotes, seriesBookById, seriesId],
+    [relatedBookJournalEntryRecords, seriesBookById, seriesId],
   );
   const quoteEntries = useMemo(
     () => sortJournalEntries([...ownQuoteEntries, ...(showBookEntries ? bookQuoteEntries : [])]),
     [bookQuoteEntries, ownQuoteEntries, showBookEntries],
   );
   const ownThoughtEntries = useMemo(
-    () => sortJournalEntries(seriesNotesToJournalEntries(notes.filter((note) => note.label !== "quote"))),
-    [notes],
+    () => sortJournalEntries(seriesJournalToJournalEntries(journalEntries.filter((note) => note.label !== "quote"))),
+    [journalEntries],
   );
   const bookThoughtEntries = useMemo(
     () =>
       sortJournalEntries(
-        relatedBookNotes
+        relatedBookJournalEntryRecords
           .filter((note) => note.label !== "quote")
           .map((note) =>
-            bookNoteToRelatedJournalEntry(note, {
+            bookJournalEntryToRelatedJournalEntry(note, {
               entityType: "Series",
               entityId: seriesId ?? "",
               bookTitle: seriesBookById.get(note.book_id)?.title,
@@ -137,7 +137,7 @@ export default function SeriesJournal() {
             }),
           ),
       ),
-    [relatedBookNotes, seriesBookById, seriesId],
+    [relatedBookJournalEntryRecords, seriesBookById, seriesId],
   );
   const thoughtEntries = useMemo(
     () => sortJournalEntries([...ownThoughtEntries, ...(showBookEntries ? bookThoughtEntries : [])]),
@@ -156,7 +156,7 @@ export default function SeriesJournal() {
       ]),
     [automaticEntries, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries],
   );
-  const tagSuggestions = useMemo(() => suggestSeriesJournalTags(notes), [notes]);
+  const tagSuggestions = useMemo(() => suggestSeriesJournalTags(journalEntries), [journalEntries]);
 
   if (booksLoading || seriesLoading || loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-muted" />;
@@ -180,13 +180,13 @@ export default function SeriesJournal() {
         </Button>
       </div>
 
-      <AddNoteDialog
+      <AddJournalEntryDialog
         open={composerOpen}
         onOpenChange={setComposerOpen}
         entity={{ type: "Series", id: seriesRecord.id }}
         tagSuggestions={tagSuggestions}
         onSaved={(note) => {
-          if ("series_id" in note) setNotes((current) => sortSeriesNotes([note, ...current.filter((item) => item.id !== note.id)]));
+          if ("series_id" in note) setJournalEntries((current) => sortSeriesJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
         }}
       />
 
@@ -214,12 +214,12 @@ export default function SeriesJournal() {
         entries={entries}
         emptyMessage="Series journal entries will appear here."
         onEntryUpdated={(entry) => {
-          if (entry.source === "series_note") setNotes((current) => sortSeriesNotes([entry.seriesNote, ...current.filter((note) => note.id !== entry.sourceId)]));
-          if (entry.source === "book_note") setAllBookNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+          if (entry.source === "series_note") setJournalEntries((current) => sortSeriesJournalEntryRecords([entry.seriesJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
+          if (entry.source === "book_note") setAllBookJournalEntryRecords((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
         }}
         onEntryDeleted={(entry) => {
-          if (entry.source === "series_note") setNotes((current) => current.filter((note) => note.id !== entry.sourceId));
-          if (entry.source === "book_note") setAllBookNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+          if (entry.source === "series_note") setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
+          if (entry.source === "book_note") setAllBookJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
         }}
       />
     </div>

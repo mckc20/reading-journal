@@ -5,7 +5,7 @@ import {
   sumReadingMinutes,
   type CalendarSpan,
 } from "@/lib/bookAnalytics";
-import type { Book, BookNote, ReadingLog, Series } from "@/types";
+import type { Book, BookJournalEntryRecord, ReadingLog, Series } from "@/types";
 
 export type SeriesProgress = {
   isAvailable: boolean;
@@ -78,7 +78,7 @@ export type SeriesRankedBook = {
 
 export type SeriesFavoriteQuote = {
   book: Book;
-  note: BookNote;
+  note: BookJournalEntryRecord;
 };
 
 export type SeriesStats = {
@@ -488,14 +488,14 @@ function getSeriesJourneySpan(
 export function getSeriesStats(
   books: Book[],
   logs: ReadingLog[],
-  notes: BookNote[],
+  journalEntries: BookJournalEntryRecord[],
   now = new Date(),
 ): SeriesStats {
   const sortedBooks = sortSeriesBooks(books);
   const bookIds = new Set(sortedBooks.map((book) => book.id));
   const bookOrder = new Map(sortedBooks.map((book, index) => [book.id, index]));
   const seriesLogs = filterSeriesLogs(sortedBooks, logs);
-  const seriesNotes = notes.filter((note) => bookIds.has(note.book_id));
+  const seriesJournal = journalEntries.filter((note) => bookIds.has(note.book_id));
   const finishedBooks = sortedBooks.filter((book) => book.status === "Finished");
   const timingBooks = sortedBooks.filter(
     (book) => book.status === "Finished" || book.status === "Reading" || book.status === "Paused",
@@ -523,11 +523,11 @@ export function getSeriesStats(
       ? [{ book, value: book.total_pages }]
       : [],
   );
-  const notesByBook = new Map(
+  const journalEntriesByBook = new Map(
     sortedBooks.map((book) => [
       book.id,
       {
-        annotated: seriesNotes.filter(
+        annotated: seriesJournal.filter(
           (note) => note.book_id === book.id && (note.label === "note" || note.label === "quote"),
         ).length,
       },
@@ -535,7 +535,7 @@ export function getSeriesStats(
   );
   const annotations = sortedBooks.map((book) => ({
     book,
-    value: notesByBook.get(book.id)?.annotated ?? 0,
+    value: journalEntriesByBook.get(book.id)?.annotated ?? 0,
   }));
   const ratingRanking = sortedBooks
     .flatMap((book) =>
@@ -548,7 +548,7 @@ export function getSeriesStats(
   const annotationRanking = annotations
     .filter((candidate) => candidate.value > 0)
     .sort((a, b) => b.value - a.value);
-  const favoriteQuotes = seriesNotes
+  const favoriteQuotes = seriesJournal
     .filter(
       (note) =>
         note.label === "quote" &&
@@ -559,7 +559,7 @@ export function getSeriesStats(
       (a, b) =>
         (bookOrder.get(a.book_id) ?? Number.MAX_SAFE_INTEGER) -
           (bookOrder.get(b.book_id) ?? Number.MAX_SAFE_INTEGER) ||
-        b.note_date.localeCompare(a.note_date) ||
+        b.entry_date.localeCompare(a.entry_date) ||
         b.created_at.localeCompare(a.created_at),
     )
     .map((note) => ({
@@ -596,7 +596,7 @@ export function getSeriesStats(
 
 export function getSeriesQuoteEntries(
   books: Book[],
-  notes: BookNote[],
+  journalEntries: BookJournalEntryRecord[],
   options: {
     search?: string;
     bookId?: string;
@@ -609,7 +609,7 @@ export function getSeriesQuoteEntries(
   const normalizedSearch = options.search?.trim().toLowerCase() ?? "";
   const sort = options.sort ?? "newest";
 
-  return notes
+  return journalEntries
     .filter((note) => note.label === "quote" && bookById.has(note.book_id) && note.content.trim().length > 0)
     .filter((note) => !options.bookId || note.book_id === options.bookId)
     .filter((note) => !options.favoritesOnly || note.is_favorite)
@@ -624,7 +624,7 @@ export function getSeriesQuoteEntries(
       if (sort === "favorites" && a.is_favorite !== b.is_favorite) {
         return a.is_favorite ? -1 : 1;
       }
-      const dateSort = b.note_date.localeCompare(a.note_date) || b.created_at.localeCompare(a.created_at);
+      const dateSort = b.entry_date.localeCompare(a.entry_date) || b.created_at.localeCompare(a.created_at);
       return sort === "oldest" ? -dateSort : dateSort;
     })
     .map((note) => ({ book: bookById.get(note.book_id)!, note }));
@@ -703,13 +703,13 @@ export function getSeriesJourneyTransition(
   return null;
 }
 
-export function getFeaturedNoteCandidates(notes: BookNote[]): BookNote[] {
-  return [...notes]
+export function getFeaturedNoteCandidates(journalEntries: BookJournalEntryRecord[]): BookJournalEntryRecord[] {
+  return [...journalEntries]
     .filter((note) => note.content.trim().length > 0)
     .sort(
       (a, b) =>
         a.content.trim().length - b.content.trim().length ||
         Number(b.is_favorite) - Number(a.is_favorite) ||
-        b.note_date.localeCompare(a.note_date),
+        b.entry_date.localeCompare(a.entry_date),
     );
 }

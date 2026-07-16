@@ -10,7 +10,7 @@ import {
   sortAuthorsForTopShelf,
   sortAuthorsByMostRead,
 } from "../src/lib/authorsView";
-import type { Author, Book, BookNote } from "../src/types";
+import type { Author, Book, BookJournalEntryRecord } from "../src/types";
 
 test("builds author summaries from author rows and linked books", () => {
   const authors = buildAuthorSummaries(
@@ -190,7 +190,7 @@ function makeBook(overrides: Partial<Book>): Book {
   };
 }
 
-function makeNote(overrides: Partial<BookNote>): BookNote {
+function makeNote(overrides: Partial<BookJournalEntryRecord>): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "user-1",
@@ -201,7 +201,7 @@ function makeNote(overrides: Partial<BookNote>): BookNote {
     content: "A quote",
     page_start: null,
     is_favorite: false,
-    note_date: "2026-05-01",
+    entry_date: "2026-05-01",
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
     ...overrides,

@@ -7,7 +7,7 @@ import {
   buildShelfValueSummaries,
   filterBooksByShelfValue,
 } from "../src/lib/libraryShelves";
-import type { Book, BookNote, Series } from "../src/types";
+import type { Book, BookJournalEntryRecord, Series } from "../src/types";
 
 test("groups favorite books above ratings without duplicating them", () => {
   const groups = buildRatingGroups([
@@ -31,7 +31,7 @@ test("groups favorite books above ratings without duplicating them", () => {
   );
 });
 
-test("groups notes by label and puts favorite quotes first", () => {
+test("groups journalEntries by label and puts favorite quotes first", () => {
   const book = makeBook({ id: "book-1", title: "Book One" });
   const groups = buildNoteGroups(
     [
@@ -39,14 +39,14 @@ test("groups notes by label and puts favorite quotes first", () => {
         id: "regular-quote",
         label: "quote",
         content: "Regular quote",
-        note_date: "2026-05-06",
+        entry_date: "2026-05-06",
       }),
       makeNote({
         id: "favorite-quote",
         label: "quote",
         content: "Favorite quote",
         is_favorite: true,
-        note_date: "2026-05-01",
+        entry_date: "2026-05-01",
       }),
       makeNote({ id: "review", label: "review", content: "Review" }),
       makeNote({ id: "note", label: "note", content: "Note" }),
@@ -57,12 +57,12 @@ test("groups notes by label and puts favorite quotes first", () => {
   assert.deepEqual(
     groups.map((group) => ({
       name: group.name,
-      notes: group.notes.map((note) => note.id),
+      journalEntries: group.journalEntries.map((note) => note.id),
     })),
     [
-      { name: "Quotes", notes: ["favorite-quote", "regular-quote"] },
-      { name: "Reviews", notes: ["review"] },
-      { name: "Notes", notes: ["note"] },
+      { name: "Quotes", journalEntries: ["favorite-quote", "regular-quote"] },
+      { name: "Reviews", journalEntries: ["review"] },
+      { name: "Journal entries", journalEntries: ["note"] },
     ],
   );
 });
@@ -269,7 +269,7 @@ function makeSeries(overrides: Partial<Series>): Series {
   };
 }
 
-function makeNote(overrides: Partial<BookNote>): BookNote {
+function makeNote(overrides: Partial<BookJournalEntryRecord>): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "user-1",
@@ -280,7 +280,7 @@ function makeNote(overrides: Partial<BookNote>): BookNote {
     content: "Note",
     page_start: null,
     is_favorite: false,
-    note_date: "2026-05-01",
+    entry_date: "2026-05-01",
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
     ...overrides,

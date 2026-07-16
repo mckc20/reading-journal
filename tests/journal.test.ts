@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  authorNotesToJournalEntries,
-  authorNoteToJournalEntry,
-  bookNoteLabelToJournalEntryType,
-  bookNotesToJournalEntries,
-  bookNoteToJournalEntry,
+  authorJournalToJournalEntries,
+  authorJournalEntryToJournalEntry,
+  bookJournalEntryLabelToJournalEntryType,
+  bookJournalToJournalEntries,
+  bookJournalEntryToJournalEntry,
   buildGeneratedBookJournalEntries,
   buildGeneratedAuthorJournalEntries,
   buildGeneratedSeriesJournalEntries,
-  seriesNotesToJournalEntries,
-  seriesNoteToJournalEntry,
+  seriesJournalToJournalEntries,
+  seriesJournalEntryToJournalEntry,
   sortJournalEntries,
 } from "../src/lib/journal";
-import type { AuthorNote, Book, BookNote, JournalEntry, ReadingLog, SeriesNote } from "../src/types";
+import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, JournalEntry, ReadingLog, SeriesJournalEntryRecord } from "../src/types";
 
-function makeBookNote(overrides: Partial<BookNote> = {}): BookNote {
+function makeBookJournalEntryRecord(overrides: Partial<BookJournalEntryRecord> = {}): BookJournalEntryRecord {
   return {
     id: "note-1",
     user_id: "user-1",
@@ -27,7 +27,7 @@ function makeBookNote(overrides: Partial<BookNote> = {}): BookNote {
     tags: null,
     page_start: null,
     is_favorite: false,
-    note_date: "2026-07-01",
+    entry_date: "2026-07-01",
     created_at: "2026-07-01T08:00:00.000Z",
     updated_at: "2026-07-01T08:30:00.000Z",
     ...overrides,
@@ -59,7 +59,7 @@ function makeReadingLog(overrides: Partial<ReadingLog> = {}): ReadingLog {
   };
 }
 
-function makeSeriesNote(overrides: Partial<SeriesNote> = {}): SeriesNote {
+function makeSeriesJournalEntryRecord(overrides: Partial<SeriesJournalEntryRecord> = {}): SeriesJournalEntryRecord {
   return {
     id: "series-note-1",
     user_id: "user-1",
@@ -71,14 +71,14 @@ function makeSeriesNote(overrides: Partial<SeriesNote> = {}): SeriesNote {
     tags: null,
     page_start: null,
     is_favorite: false,
-    note_date: "2026-07-05",
+    entry_date: "2026-07-05",
     created_at: "2026-07-05T08:00:00.000Z",
     updated_at: "2026-07-05T08:30:00.000Z",
     ...overrides,
   };
 }
 
-function makeAuthorNote(overrides: Partial<AuthorNote> = {}): AuthorNote {
+function makeAuthorJournalEntryRecord(overrides: Partial<AuthorJournalEntryRecord> = {}): AuthorJournalEntryRecord {
   return {
     id: "author-note-1",
     user_id: "user-1",
@@ -90,7 +90,7 @@ function makeAuthorNote(overrides: Partial<AuthorNote> = {}): AuthorNote {
     tags: null,
     page_start: null,
     is_favorite: false,
-    note_date: "2026-07-06",
+    entry_date: "2026-07-06",
     created_at: "2026-07-06T08:00:00.000Z",
     updated_at: "2026-07-06T08:30:00.000Z",
     ...overrides,
@@ -98,14 +98,14 @@ function makeAuthorNote(overrides: Partial<AuthorNote> = {}): AuthorNote {
 }
 
 test("maps book note labels to journal entry types", () => {
-  assert.equal(bookNoteLabelToJournalEntryType("note"), "thought");
-  assert.equal(bookNoteLabelToJournalEntryType("quote"), "passage");
-  assert.equal(bookNoteLabelToJournalEntryType("review"), "thought");
+  assert.equal(bookJournalEntryLabelToJournalEntryType("note"), "thought");
+  assert.equal(bookJournalEntryLabelToJournalEntryType("quote"), "passage");
+  assert.equal(bookJournalEntryLabelToJournalEntryType("review"), "thought");
 });
 
 test("adapts a book note into the shared journal entry shape", () => {
-  const note = makeBookNote();
-  const entry = bookNoteToJournalEntry(note);
+  const note = makeBookJournalEntryRecord();
+  const entry = bookJournalEntryToJournalEntry(note);
 
   assert.deepEqual(
     {
@@ -129,26 +129,26 @@ test("adapts a book note into the shared journal entry shape", () => {
       updatedAt: "2026-07-01T08:30:00.000Z",
     },
   );
-  assert.equal(entry.bookNote, note);
+  assert.equal(entry.bookJournalEntry, note);
 });
 
-test("adapts multiple book notes without changing the source records", () => {
-  const notes = [
-    makeBookNote({ id: "note-1", label: "note" }),
-    makeBookNote({ id: "quote-1", label: "quote" }),
-    makeBookNote({ id: "review-1", label: "review" }),
+test("adapts multiple book journalEntries without changing the source records", () => {
+  const journalEntries = [
+    makeBookJournalEntryRecord({ id: "note-1", label: "note" }),
+    makeBookJournalEntryRecord({ id: "quote-1", label: "quote" }),
+    makeBookJournalEntryRecord({ id: "review-1", label: "review" }),
   ];
 
   assert.deepEqual(
-    bookNotesToJournalEntries(notes).map((entry) => entry.type),
+    bookJournalToJournalEntries(journalEntries).map((entry) => entry.type),
     ["thought", "passage", "thought"],
   );
-  assert.equal(notes[1].label, "quote");
+  assert.equal(journalEntries[1].label, "quote");
 });
 
 test("adapts a series note into the shared journal entry shape", () => {
-  const note = makeSeriesNote();
-  const entry = seriesNoteToJournalEntry(note);
+  const note = makeSeriesJournalEntryRecord();
+  const entry = seriesJournalEntryToJournalEntry(note);
 
   assert.deepEqual(
     {
@@ -172,12 +172,12 @@ test("adapts a series note into the shared journal entry shape", () => {
       updatedAt: "2026-07-05T08:30:00.000Z",
     },
   );
-  assert.equal(entry.seriesNote, note);
+  assert.equal(entry.seriesJournalEntry, note);
 });
 
 test("adapts an author note into the shared journal entry shape", () => {
-  const note = makeAuthorNote();
-  const entry = authorNoteToJournalEntry(note);
+  const note = makeAuthorJournalEntryRecord();
+  const entry = authorJournalEntryToJournalEntry(note);
 
   assert.deepEqual(
     {
@@ -201,19 +201,19 @@ test("adapts an author note into the shared journal entry shape", () => {
       updatedAt: "2026-07-06T08:30:00.000Z",
     },
   );
-  assert.equal(entry.authorNote, note);
+  assert.equal(entry.authorJournalEntry, note);
 });
 
-test("sorts book, series, and author journal notes together", () => {
+test("sorts book, series, and author journal journalEntries together", () => {
   const entries = [
-    ...bookNotesToJournalEntries([
-      makeBookNote({ id: "book-note", note_date: "2026-07-01" }),
+    ...bookJournalToJournalEntries([
+      makeBookJournalEntryRecord({ id: "book-note", entry_date: "2026-07-01" }),
     ]),
-    ...seriesNotesToJournalEntries([
-      makeSeriesNote({ id: "series-note", note_date: "2026-07-02" }),
+    ...seriesJournalToJournalEntries([
+      makeSeriesJournalEntryRecord({ id: "series-note", entry_date: "2026-07-02" }),
     ]),
-    ...authorNotesToJournalEntries([
-      makeAuthorNote({ id: "author-note", note_date: "2026-07-03" }),
+    ...authorJournalToJournalEntries([
+      makeAuthorJournalEntryRecord({ id: "author-note", entry_date: "2026-07-03" }),
     ]),
   ];
 
@@ -224,17 +224,17 @@ test("sorts book, series, and author journal notes together", () => {
 });
 
 test("sorts note and passage entries together for a shared timeline", () => {
-  const entries = bookNotesToJournalEntries([
-    makeBookNote({
+  const entries = bookJournalToJournalEntries([
+    makeBookJournalEntryRecord({
       id: "older-note",
       label: "note",
-      note_date: "2026-07-01",
+      entry_date: "2026-07-01",
       updated_at: "2026-07-01T08:00:00.000Z",
     }),
-    makeBookNote({
+    makeBookJournalEntryRecord({
       id: "newer-passage",
       label: "quote",
-      note_date: "2026-07-02",
+      entry_date: "2026-07-02",
       updated_at: "2026-07-02T08:00:00.000Z",
     }),
   ]);
@@ -248,24 +248,24 @@ test("sorts note and passage entries together for a shared timeline", () => {
   );
 });
 
-test("sorts notes, passages, and reviews together for a shared timeline", () => {
-  const entries = bookNotesToJournalEntries([
-    makeBookNote({
+test("sorts journalEntries, passages, and reviews together for a shared timeline", () => {
+  const entries = bookJournalToJournalEntries([
+    makeBookJournalEntryRecord({
       id: "old-note",
       label: "note",
-      note_date: "2026-07-01",
+      entry_date: "2026-07-01",
       updated_at: "2026-07-01T08:00:00.000Z",
     }),
-    makeBookNote({
+    makeBookJournalEntryRecord({
       id: "new-review",
       label: "review",
-      note_date: "2026-07-03",
+      entry_date: "2026-07-03",
       updated_at: "2026-07-03T08:00:00.000Z",
     }),
-    makeBookNote({
+    makeBookJournalEntryRecord({
       id: "middle-passage",
       label: "quote",
-      note_date: "2026-07-02",
+      entry_date: "2026-07-02",
       updated_at: "2026-07-02T08:00:00.000Z",
     }),
   ]);
@@ -440,10 +440,10 @@ test("builds generated author milestones every five finished books", () => {
 });
 
 test("merges manual and generated journal entries in chronological order", () => {
-  const manualEntries = bookNotesToJournalEntries([
-    makeBookNote({
+  const manualEntries = bookJournalToJournalEntries([
+    makeBookJournalEntryRecord({
       id: "manual-note",
-      note_date: "2026-07-02",
+      entry_date: "2026-07-02",
       updated_at: "2026-07-02T08:00:00.000Z",
     }),
   ]);
@@ -465,15 +465,15 @@ test("merges manual and generated journal entries in chronological order", () =>
 });
 
 test("keeps note content on the source book note record", () => {
-  const note = makeBookNote({
+  const note = makeBookJournalEntryRecord({
     id: "note-with-content",
     title: "  A saved thought  ",
-    content: "This is still stored on book_notes.",
+    content: "This is still stored on book_journal.",
   });
-  const entry = bookNoteToJournalEntry(note);
+  const entry = bookJournalEntryToJournalEntry(note);
 
   assert.equal("content" in entry, false);
-  assert.equal(entry.bookNote.content, "This is still stored on book_notes.");
+  assert.equal(entry.bookJournalEntry.content, "This is still stored on book_journal.");
 });
 
 test("sorts journal entries newest first with stable tie breakers", () => {

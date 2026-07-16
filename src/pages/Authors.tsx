@@ -13,8 +13,8 @@ import {
   sortAuthorsByMostRead,
   wasReadInRecentWindow,
 } from "@/lib/authorsView";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
-import type { BookNote } from "@/types";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import type { BookJournalEntryRecord } from "@/types";
 
 const ALL_AUTHORS_PREVIEW_LIMIT = 6;
 
@@ -223,25 +223,25 @@ export default function Authors() {
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const navigate = useNavigate();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesError, setNotesError] = useState<string | null>(null);
-  const [notesLoading, setNotesLoading] = useState(false);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
 
   useEffect(() => {
     let ignore = false;
-    setNotesLoading(true);
+    setJournalEntriesLoading(true);
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch((error) => {
         if (!ignore) {
-          setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
+          setJournalEntriesError(error instanceof Error ? error.message : "Failed to load quotes");
         }
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -250,8 +250,8 @@ export default function Authors() {
   }, []);
 
   const authors = useMemo(
-    () => buildAuthorSummaries(authorRecords, books, notes),
-    [authorRecords, books, notes],
+    () => buildAuthorSummaries(authorRecords, books, journalEntries),
+    [authorRecords, books, journalEntries],
   );
   const authorsByName = useMemo(() => sortAuthorsByName(authors), [authors]);
   const topAuthors = useMemo(
@@ -275,7 +275,7 @@ export default function Authors() {
     navigate(`/authors/${encodeURIComponent(authorId)}`);
   }
 
-  if (authorsLoading || booksLoading || notesLoading) {
+  if (authorsLoading || booksLoading || journalEntriesLoading) {
     return (
       <div className="space-y-8">
         <div className="space-y-1">
@@ -308,7 +308,7 @@ export default function Authors() {
       <div className="space-y-1">
         <h1 className="text-2xl font-heading leading-snug font-medium">Authors</h1>
         <p className="text-sm text-muted-foreground">The writers behind your stories</p>
-        {notesError && (
+        {journalEntriesError && (
           <p className="text-xs text-muted-foreground">
             Quotes could not be loaded right now, so some counts may be incomplete.
           </p>
