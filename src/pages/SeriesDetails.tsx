@@ -13,8 +13,8 @@ import { BookOpen, CalendarDays, ChevronRight, Gauge, Heart, ImagePlus, Loader2,
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
+import JournalTimeline from "@/components/JournalTimeline";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
-import QuoteBlock from "@/components/QuoteBlock";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { SeriesAnalyticsOverview, SeriesAnalyticsPaceChart } from "@/components/series/SeriesAnalyticsSections";
 import SeriesBooksEditor, {
@@ -45,14 +45,18 @@ import {
   getSeriesAuthors,
   getSeriesGenres,
   getSeriesJourneyRecap,
-  getSeriesQuoteEntries,
   getSeriesProgress,
   getSeriesStats,
   sortSeriesBooks,
 } from "@/lib/seriesDetails";
+import {
+  fetchSeriesNotes,
+  sortSeriesNotes,
+} from "@/lib/seriesNotes";
+import { seriesNotesToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { bookHasGenreName, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { cn, getTodayLocalDate } from "@/lib/utils";
-import type { Book, BookNote, ReadingLog, Series } from "@/types";
+import type { Book, BookNote, ReadingLog, Series, SeriesNote } from "@/types";
 
 function bookCountLabel(count: number): string {
   return `${count} book${count === 1 ? "" : "s"}`;
@@ -149,30 +153,6 @@ function BookThumbnail({ book }: { book: Book }) {
   );
 }
 
-function FavoriteQuoteCard({ book, note }: { book: Book; note: BookNote }) {
-  return (
-    <article className="flex min-h-48 flex-col rounded-xl border bg-card p-5">
-      <QuoteBlock
-        contentClassName="line-clamp-5 whitespace-pre-line text-base leading-7"
-        attribution={note.quote_speaker ? `- ${note.quote_speaker}` : null}
-        actions={<Heart className="h-4 w-4 fill-foreground text-foreground" aria-hidden />}
-      >
-        {note.content.trim()}
-      </QuoteBlock>
-      <Link
-        to={`/books/${book.id}?tab=notes`}
-        className="mt-auto flex items-center gap-3 pt-5 transition-colors hover:text-muted-foreground"
-      >
-        <BookThumbnail book={book} />
-        <div className="min-w-0">
-          <p className="line-clamp-2 text-sm font-medium">{book.title}</p>
-          <p className="text-xs text-muted-foreground">View quote</p>
-        </div>
-      </Link>
-    </article>
-  );
-}
-
 function SectionHeader({
   title,
   action,
@@ -204,6 +184,84 @@ function EmptySection({ message }: { message: string }) {
     <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
       {message}
     </div>
+  );
+}
+
+function SeriesJournalSection({
+  series,
+}: {
+  series: Series;
+}) {
+  const [seriesNotes, setSeriesNotes] = useState<SeriesNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const journalEntries = useMemo(
+    () => sortJournalEntries(seriesNotesToJournalEntries(seriesNotes)).slice(0, 3),
+    [seriesNotes],
+  );
+
+  const loadSeriesNotes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSeriesNotes(await fetchSeriesNotes(series.id));
+    } catch (loadError) {
+      setError(getErrorMessage(loadError, "Failed to load series notes"));
+    } finally {
+      setLoading(false);
+    }
+  }, [series.id]);
+
+  useEffect(() => {
+    void loadSeriesNotes();
+  }, [loadSeriesNotes]);
+
+  return (
+    <section className="space-y-4">
+      <SectionHeader
+        title={<span className="font-serif italic">Journal</span>}
+        action={
+          <Button asChild variant="link" className="px-0 text-primary">
+            <Link to={`/series/${series.id}/journal`}>
+              Open journal
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
+
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+        </div>
+      ) : (
+        journalEntries.length === 0 ? (
+          <EmptySection message="Series journal entries will appear here." />
+        ) : (
+          <JournalTimeline
+            entries={journalEntries}
+            layout="cards"
+            emptyMessage="Series journal entries will appear here."
+            onEntryUpdated={(entry) => {
+              if (entry.source === "series_note") {
+                setSeriesNotes((current) => sortSeriesNotes([entry.seriesNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+              }
+            }}
+            onEntryDeleted={(entry) => {
+              if (entry.source === "series_note") setSeriesNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+            }}
+          />
+        )
+      )}
+    </section>
   );
 }
 
@@ -857,10 +915,6 @@ export default function SeriesDetails() {
     () => (logsLoading || logsError ? "--" : formatReadingPace(seriesBooks, seriesLogs)),
     [logsError, logsLoading, seriesBooks, seriesLogs],
   );
-  const quoteEntries = useMemo(
-    () => getSeriesQuoteEntries(seriesBooks, notes, { sort: "favorites", favoritesOnly: true }).slice(0, 4),
-    [notes, seriesBooks],
-  );
   const primaryAuthor = authors[0] ?? "this author";
   const exploreGenre = useMemo(
     () => getMostPopularMatchingGenre(genres, books),
@@ -1177,23 +1231,12 @@ export default function SeriesDetails() {
             </div>
           </section>
 
+          <SeriesJournalSection series={seriesRecord} />
+
           <section className="space-y-4">
             <SectionHeader title={<span className="font-serif italic">Analytics</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
             <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
             <SeriesAnalyticsPaceChart stats={seriesStats} />
-          </section>
-
-          <section className="space-y-4">
-            <SectionHeader title={<>Favorite <span className="font-serif italic">Quotes</span></>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/quotes`} label="View All" />} />
-            {quoteEntries.length === 0 ? (
-              <EmptySection message="Favorite quotes from this series will appear here." />
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {quoteEntries.map(({ book, note }) => (
-                  <FavoriteQuoteCard key={note.id} book={book} note={note} />
-                ))}
-              </div>
-            )}
           </section>
 
           <section className="space-y-5">

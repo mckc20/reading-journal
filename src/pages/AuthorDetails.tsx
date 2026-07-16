@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
-import AnnotationCard from "@/components/AnnotationCard";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
+import JournalTimeline from "@/components/JournalTimeline";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -20,12 +19,17 @@ import {
   getAuthorInitials,
   getAuthorPagesWritten,
 } from "@/lib/authorShelf";
+import {
+  fetchAuthorNotes,
+  sortAuthorNotes,
+} from "@/lib/authorNotes";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
-import { fetchAllBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { authorNotesToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { cn } from "@/lib/utils";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
-import type { BookNote, PublicationDatePrecision } from "@/types";
+import type { AuthorNote, BookNote, PublicationDatePrecision } from "@/types";
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
@@ -33,6 +37,14 @@ function formatNumber(value: number): string {
 
 function formatAverageRating(value: number | null): string {
   return value === null ? "No rating" : value.toFixed(2);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return fallback;
 }
 
 function buildLifeLine({
@@ -112,6 +124,80 @@ function EmptySection({ message }: { message: string }) {
   );
 }
 
+function AuthorJournalSection({ author }: { author: { id: string; name: string } }) {
+  const [authorNotes, setAuthorNotes] = useState<AuthorNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const journalEntries = useMemo(
+    () => sortJournalEntries(authorNotesToJournalEntries(authorNotes)).slice(0, 3),
+    [authorNotes],
+  );
+
+  const loadAuthorNotes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setAuthorNotes(await fetchAuthorNotes(author.id));
+    } catch (loadError) {
+      setError(getErrorMessage(loadError, "Failed to load author notes"));
+    } finally {
+      setLoading(false);
+    }
+  }, [author.id]);
+
+  useEffect(() => {
+    void loadAuthorNotes();
+  }, [loadAuthorNotes]);
+
+  return (
+    <section className="space-y-4">
+      <SectionTitle
+        title={<span className="font-serif italic">Journal</span>}
+        action={
+          <Button asChild variant="link" className="px-0 text-primary">
+            <Link to={`/authors/${author.id}/journal`}>
+              Open journal
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
+
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+        </div>
+      ) : (
+        journalEntries.length === 0 ? (
+          <EmptySection message="Author journal entries will appear here." />
+        ) : (
+          <JournalTimeline
+            entries={journalEntries}
+            layout="cards"
+            emptyMessage="Author journal entries will appear here."
+            onEntryUpdated={(entry) => {
+              if (entry.source === "author_note") {
+                setAuthorNotes((current) => sortAuthorNotes([entry.authorNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+              }
+            }}
+            onEntryDeleted={(entry) => {
+              if (entry.source === "author_note") setAuthorNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+            }}
+          />
+        )
+      )}
+    </section>
+  );
+}
+
 export default function AuthorDetails() {
   const { authorId } = useParams();
   const navigate = useNavigate();
@@ -126,7 +212,6 @@ export default function AuthorDetails() {
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [notes, setNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
-  const [notesError, setNotesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
@@ -140,9 +225,9 @@ export default function AuthorDetails() {
       .then((data) => {
         if (!ignore) setNotes(data);
       })
-      .catch((error) => {
+      .catch(() => {
         if (!ignore) {
-          setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
+          setNotes([]);
         }
       })
       .finally(() => {
@@ -158,31 +243,7 @@ export default function AuthorDetails() {
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   const authorBooks = author?.books ?? [];
   const previewBooks = authorBooks.slice(0, 4);
-  const bookTitleById = useMemo(
-    () => new Map(authorBooks.map((book) => [book.id, book.title])),
-    [authorBooks],
-  );
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
-  const authorNotes = useMemo(
-    () => sortBookNotes(notes.filter((note) => authorBooks.some((book) => book.id === note.book_id))),
-    [authorBooks, notes],
-  );
-  const noteCountsByLabel = useMemo(
-    () => ({
-      quote: authorNotes.filter((note) => note.label === "quote"),
-      note: authorNotes.filter((note) => note.label === "note"),
-      review: authorNotes.filter((note) => note.label === "review"),
-    }),
-    [authorNotes],
-  );
-  const previewNotesByLabel = useMemo(
-    () => ({
-      quote: noteCountsByLabel.quote.slice(0, 3),
-      note: noteCountsByLabel.note.slice(0, 3),
-      review: noteCountsByLabel.review.slice(0, 3),
-    }),
-    [noteCountsByLabel],
-  );
   const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
   const pagesWritten = useMemo(() => (author ? getAuthorPagesWritten(author) : 0), [author]);
   const loading = authorsLoading || booksLoading || notesLoading || seriesLoading;
@@ -262,7 +323,6 @@ export default function AuthorDetails() {
 
   const lifeLine = buildLifeLine(author);
   const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
-  const quotesViewAllPath = `/authors/${encodeURIComponent(author.id)}/quotes`;
   const bio = author.bio?.trim() || "";
   const shouldClampBio = bio.length > 320 && !bioExpanded;
 
@@ -354,6 +414,8 @@ export default function AuthorDetails() {
         </div>
       </section>
 
+      <AuthorJournalSection author={author} />
+
       <section className="space-y-4">
         <SectionTitle
           title={
@@ -397,80 +459,6 @@ export default function AuthorDetails() {
           </div>
         </section>
       )}
-
-      <section className="space-y-4">
-        <SectionTitle
-          title={
-            <>
-              <span className="font-serif italic">Annotations</span>
-            </>
-          }
-          action={
-            <Button asChild variant="link" className="px-0 text-primary">
-              <Link to={quotesViewAllPath}>
-                View all
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          }
-        />
-
-        <Tabs defaultValue="quote" className="space-y-4">
-          <TabsList
-            variant="line"
-            className="h-auto w-full justify-start gap-6 rounded-none border-0 border-b border-border bg-transparent p-0"
-          >
-            <TabsTrigger
-              value="quote"
-              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-            >
-              Quotes ({noteCountsByLabel.quote.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="note"
-              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-            >
-              Notes ({noteCountsByLabel.note.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="review"
-              className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-            >
-              Review ({noteCountsByLabel.review.length})
-            </TabsTrigger>
-          </TabsList>
-
-          {(["quote", "note", "review"] as const).map((label) => (
-            <TabsContent key={label} value={label}>
-              {notesLoading ? (
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                  <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                </div>
-              ) : notesError ? (
-                <EmptySection message={notesError} />
-              ) : previewNotesByLabel[label].length === 0 ? (
-                <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                  No {label === "quote" ? "quotes" : label === "review" ? "review" : "notes"} yet.
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-3">
-                  {previewNotesByLabel[label].map((note) => (
-                    <AnnotationCard
-                      key={note.id}
-                      note={note}
-                      bookId={note.book_id}
-                      bookTitle={bookTitleById.get(note.book_id) ?? null}
-                      compact
-                    />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
-      </section>
 
       <SendAttachmentDialog
         open={sendAttachmentOpen}

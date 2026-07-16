@@ -1,29 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { BookOpen, MessageSquarePlus, RefreshCw } from "lucide-react";
-import AnnotationCard from "@/components/AnnotationCard";
+import { BookOpen, NotebookPen, RefreshCw } from "lucide-react";
+import AddNoteDialog from "@/components/AddNoteDialog";
 import BackButton from "@/components/BackButton";
-import BookNotesPanel from "@/components/BookNotesPanel";
+import JournalFilterSwitch from "@/components/JournalFilterSwitch";
+import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBooksContext } from "@/context/BooksContext";
-import { fetchBookNotes } from "@/lib/bookNotes";
-import type { BookNote, BookNoteLabel } from "@/types";
-
-const TAB_LABELS: Record<BookNoteLabel, string> = {
-  quote: "Quotes",
-  note: "Notes",
-  review: "Review",
-};
+import { fetchAllBookNotes, fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { fetchReadingLogsForBook } from "@/lib/books";
+import {
+  bookNotesToJournalEntries,
+  buildGeneratedBookJournalEntries,
+  isThoughtJournalEntry,
+  sortJournalEntries,
+} from "@/lib/journal";
+import { suggestBookJournalTags } from "@/lib/journalTags";
+import type { BookNote, ReadingLog } from "@/types";
 
 export default function BookAnnotations() {
   const { bookId } = useParams<{ bookId: string }>();
   const [searchParams] = useSearchParams();
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
   const [notes, setNotes] = useState<BookNote[]>([]);
+  const [allNotes, setAllNotes] = useState<BookNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(searchParams.get("new") === "1");
+  const [showQuotes, setShowQuotes] = useState(true);
+  const [showThoughts, setShowThoughts] = useState(true);
+  const [showAutomatic, setShowAutomatic] = useState(true);
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
 
@@ -37,13 +46,57 @@ export default function BookAnnotations() {
         setNotesLoading(true);
         setNotesError(null);
         const data = await fetchBookNotes(currentBookId);
-        if (!cancelled) setNotes(data);
+        if (!cancelled) {
+          setNotes(data);
+          setAllNotes((current) => sortBookNotes([...data, ...current.filter((note) => note.book_id !== currentBookId)]));
+        }
       } catch (err) {
         if (!cancelled) {
-          setNotesError(err instanceof Error ? err.message : "Failed to load annotations");
+          setNotesError(err instanceof Error ? err.message : "Failed to load journal entries");
         }
       } finally {
         if (!cancelled) setNotesLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllBookNotes()
+      .then((data) => {
+        if (!cancelled) setAllNotes(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAllNotes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!bookId) return;
+    const currentBookId = bookId;
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setLogsLoading(true);
+        setLogsError(null);
+        const data = await fetchReadingLogsForBook(currentBookId);
+        if (!cancelled) setReadingLogs(data);
+      } catch (err) {
+        if (!cancelled) {
+          setReadingLogs([]);
+          setLogsError(err instanceof Error ? err.message : "Failed to load reading history");
+        }
+      } finally {
+        if (!cancelled) setLogsLoading(false);
       }
     }
 
@@ -60,6 +113,52 @@ export default function BookAnnotations() {
       review: notes.filter((note) => note.label === "review"),
     }),
     [notes],
+  );
+
+  const quoteEntries = useMemo(
+    () =>
+      sortJournalEntries(
+        bookNotesToJournalEntries(notesByLabel.quote).map((entry) => ({
+          ...entry,
+          relatedBookTitle: book?.title,
+        })),
+      ),
+    [book?.title, notesByLabel.quote],
+  );
+
+  const thoughtEntries = useMemo(
+    () =>
+      sortJournalEntries(
+        bookNotesToJournalEntries([...notesByLabel.note, ...notesByLabel.review])
+          .map((entry) => ({ ...entry, relatedBookTitle: book?.title }))
+          .filter(isThoughtJournalEntry),
+      ),
+    [book?.title, notesByLabel.note, notesByLabel.review],
+  );
+
+  const generatedJournalEntries = useMemo(
+    () => (book ? buildGeneratedBookJournalEntries(book, readingLogs) : []),
+    [book, readingLogs],
+  );
+
+  const journalEntries = useMemo(
+    () =>
+      sortJournalEntries([
+        ...(showAutomatic ? generatedJournalEntries : []),
+        ...(showQuotes ? quoteEntries : []),
+        ...(showThoughts ? thoughtEntries : []),
+      ]),
+    [generatedJournalEntries, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries],
+  );
+
+  const entryCounts = {
+    quote: notesByLabel.quote.length,
+    thought: notesByLabel.note.length + notesByLabel.review.length,
+    automatic: generatedJournalEntries.length,
+  };
+  const tagSuggestions = useMemo(
+    () => (book ? suggestBookJournalTags(book, books, allNotes) : []),
+    [allNotes, book, books],
   );
 
   if (booksLoading) {
@@ -100,52 +199,86 @@ export default function BookAnnotations() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">{book.title}</p>
-          <h1 className="text-2xl font-heading leading-snug font-medium">Annotations</h1>
+          <h1 className="text-2xl font-heading leading-snug font-medium">Journal</h1>
         </div>
-        <Button type="button" size="sm" onClick={() => setShowEditor((current) => !current)}>
-          <MessageSquarePlus className="mr-1.5 h-4 w-4" />
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setShowEditor(true);
+          }}
+        >
+          <NotebookPen className="mr-1.5 h-4 w-4" />
           Add entry
         </Button>
       </div>
 
-      {showEditor && <BookNotesPanel book={book} initialComposerOpen={searchParams.get("new") === "1"} />}
+      <AddNoteDialog
+        open={showEditor}
+        onOpenChange={setShowEditor}
+        initialBookId={book.id}
+        entity={{ type: "Book", id: book.id }}
+        tagSuggestions={tagSuggestions}
+        onSaved={(note) => {
+          if ("book_id" in note) {
+            setNotes((current) => sortBookNotes([note, ...current.filter((item) => item.id !== note.id)]));
+            setAllNotes((current) => sortBookNotes([note, ...current.filter((item) => item.id !== note.id)]));
+          }
+        }}
+      />
 
       {notesError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {notesError}
         </div>
       )}
+      {logsError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          Reading history could not be added to the journal: {logsError}
+        </div>
+      )}
 
-      <Tabs defaultValue="quote" className="space-y-4">
-        <TabsList className="w-full sm:w-auto">
-          {(Object.keys(TAB_LABELS) as BookNoteLabel[]).map((label) => (
-            <TabsTrigger key={label} value={label} className="flex-1 sm:flex-none">
-              {TAB_LABELS[label]} ({notesByLabel[label].length})
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="flex flex-wrap gap-2">
+        <JournalFilterSwitch
+          checked={showQuotes}
+          label="Quotes"
+          count={entryCounts.quote}
+          onCheckedChange={setShowQuotes}
+        />
+        <JournalFilterSwitch
+          checked={showThoughts}
+          label="Thoughts"
+          count={entryCounts.thought}
+          onCheckedChange={setShowThoughts}
+        />
+        <JournalFilterSwitch
+          checked={showAutomatic}
+          label="Automatic"
+          count={entryCounts.automatic}
+          onCheckedChange={setShowAutomatic}
+        />
+      </div>
 
-        {(Object.keys(TAB_LABELS) as BookNoteLabel[]).map((label) => (
-          <TabsContent key={label} value={label}>
-            {notesLoading ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="h-40 animate-pulse rounded-lg bg-muted" />
-                <div className="h-40 animate-pulse rounded-lg bg-muted" />
-              </div>
-            ) : notesByLabel[label].length === 0 ? (
-              <div className="flex h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                No {TAB_LABELS[label].toLowerCase()} yet.
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {notesByLabel[label].map((note) => (
-                  <AnnotationCard key={note.id} note={note} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
+      {notesLoading || logsLoading ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          <div className="h-40 animate-pulse rounded-lg bg-muted" />
+        </div>
+      ) : (
+        <JournalTimeline
+          entries={journalEntries}
+          emptyMessage="No journal entries yet."
+          onEntryUpdated={(entry) => {
+            if (entry.source !== "book_note") return;
+            setNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+            setAllNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+          }}
+          onEntryDeleted={(entry) => {
+            setNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+            setAllNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -120,6 +120,12 @@ export function bookNoteErrorToError(error: unknown): Error {
   return new Error("Book note request failed");
 }
 
+function isMissingTagsColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("message" in error)) return false;
+  const message = String((error as { message?: unknown }).message ?? "");
+  return message.includes("'tags' column") || message.includes('"tags" column');
+}
+
 export function formatBookNotePageRange(
   note: Pick<BookNote, "page_start">,
 ): string | null {
@@ -145,7 +151,7 @@ export function normalizeBookNoteFields(
       input.label === "quote" ? input.quoteSpeaker?.trim() || null : null,
     content,
     page_start: pageStart,
-    is_favorite: input.label === "quote" ? Boolean(input.isFavorite) : false,
+    is_favorite: Boolean(input.isFavorite),
     note_date: normalizeNoteDate(input.noteDate),
   };
 
@@ -213,11 +219,22 @@ export async function createBookNote(
 ): Promise<BookNote> {
   const { supabase } = await import("./supabase");
   const payload = normalizeBookNoteInput(input);
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("book_notes")
     .insert(payload)
     .select()
     .single();
+
+  if (error && "tags" in payload && isMissingTagsColumnError(error)) {
+    const { tags: _tags, ...payloadWithoutTags } = payload;
+    const retry = await supabase
+      .from("book_notes")
+      .insert(payloadWithoutTags)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) throw bookNoteErrorToError(error);
   return data as BookNote;
@@ -228,7 +245,7 @@ export async function updateBookNote(
 ): Promise<BookNote> {
   const { supabase } = await import("./supabase");
   const payload = normalizeBookNoteFields(input);
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("book_notes")
     .update({
       ...payload,
@@ -237,6 +254,21 @@ export async function updateBookNote(
     .eq("id", input.noteId)
     .select()
     .single();
+
+  if (error && "tags" in payload && isMissingTagsColumnError(error)) {
+    const { tags: _tags, ...payloadWithoutTags } = payload;
+    const retry = await supabase
+      .from("book_notes")
+      .update({
+        ...payloadWithoutTags,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.noteId)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) throw bookNoteErrorToError(error);
   return data as BookNote;

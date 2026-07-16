@@ -73,7 +73,6 @@ const primaryNavLinks: NavLink[] = [
   { to: "/library", label: "Books", icon: Library },
   { to: "/authors", label: "Authors", icon: UserRound },
   { to: "/discover", label: "Discover", icon: Compass },
-  { to: "/notes", label: "Notes", icon: StickyNote },
 ];
 
 function isActiveRoute(pathname: string, search: string, to: string): boolean {
