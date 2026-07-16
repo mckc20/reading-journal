@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { Bold, Italic, PlusCircle, X } from "lucide-react";
+import { PlusCircle, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import MarkdownEditor from "@/components/MarkdownEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -13,7 +14,6 @@ import { useSeries } from "@/hooks/useSeries";
 import { createBookJournalEntryRecord, updateBookJournalEntryRecord } from "@/lib/bookJournal";
 import { createAuthorJournalEntryRecord, updateAuthorJournalEntryRecord } from "@/lib/authorJournal";
 import { isInternalJournalTag, normalizeJournalTags, visibleJournalTags } from "@/lib/journalTags";
-import { noteMarkdownToEditorHtml } from "@/lib/noteFormatting";
 import { createSeriesJournalEntryRecord, updateSeriesJournalEntryRecord } from "@/lib/seriesJournal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
@@ -68,44 +68,75 @@ interface FormValues {
   tags: string[];
 }
 
-function inlineNodeToMarkdown(node: ChildNode): string {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return (node.textContent ?? "").replace(/\u00a0/g, " ");
-  }
+type JournalEntryDraft = FormValues & {
+  savedAt: string;
+};
 
-  if (!(node instanceof HTMLElement)) return "";
+const JOURNAL_ENTRY_DRAFT_PREFIX = "reading-journal:journal-entry-draft:v1";
 
-  const children = Array.from(node.childNodes).map(inlineNodeToMarkdown).join("");
-  const tagName = node.tagName.toLowerCase();
-
-  if (tagName === "br") return "\n";
-  if (tagName === "strong" || tagName === "b") return `**${children}**`;
-  if (tagName === "em" || tagName === "i") return `*${children}*`;
-  return children;
+function hasDraftContent(values: FormValues): boolean {
+  return Boolean(
+    values.content.trim() ||
+      values.title.trim() ||
+      values.pageStart.trim() ||
+      values.tagDraft.trim() ||
+      values.tags.length > 0,
+  );
 }
 
-function blockNodeToMarkdown(node: ChildNode): string {
-  if (node.nodeType === Node.TEXT_NODE) return inlineNodeToMarkdown(node);
-  if (!(node instanceof HTMLElement)) return "";
+function readJournalEntryDraft(key: string | null): FormValues | null {
+  if (!key || typeof window === "undefined") return null;
 
-  const tagName = node.tagName.toLowerCase();
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
 
-  if (tagName === "div" || tagName === "p") {
-    return Array.from(node.childNodes).map(inlineNodeToMarkdown).join("").trim();
+    const draft = JSON.parse(raw) as Partial<JournalEntryDraft>;
+    if (!draft || typeof draft !== "object") return null;
+
+    return {
+      bookId: typeof draft.bookId === "string" ? draft.bookId : "",
+      entityId: typeof draft.entityId === "string" ? draft.entityId : "",
+      entryType: draft.entryType === "quote" ? "quote" : "thought",
+      title: typeof draft.title === "string" ? draft.title : "",
+      content: typeof draft.content === "string" ? draft.content : "",
+      pageStart: typeof draft.pageStart === "string" ? draft.pageStart : "",
+      noteDate: typeof draft.noteDate === "string" ? draft.noteDate : getTodayLocalDate(),
+      tagDraft: typeof draft.tagDraft === "string" ? draft.tagDraft : "",
+      tags: Array.isArray(draft.tags) ? normalizeJournalTags(draft.tags.filter((tag): tag is string => typeof tag === "string")) : [],
+    };
+  } catch {
+    return null;
   }
-
-  return Array.from(node.childNodes).map(inlineNodeToMarkdown).join("").trim();
 }
 
-function editorHtmlToMarkdown(html: string): string {
-  const container = document.createElement("div");
-  container.innerHTML = html;
+function writeJournalEntryDraft(key: string | null, values: FormValues) {
+  if (!key || typeof window === "undefined") return;
 
-  return Array.from(container.childNodes)
-    .map(blockNodeToMarkdown)
-    .filter((block) => block.trim())
-    .join("\n")
-    .trim();
+  try {
+    if (!hasDraftContent(values)) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    const draft: JournalEntryDraft = {
+      ...values,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(key, JSON.stringify(draft));
+  } catch {
+    // Draft saving is a convenience feature. Storage can fail in private mode or when full.
+  }
+}
+
+function removeJournalEntryDraft(key: string | null) {
+  if (!key || typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures so journal saving and cancelling are not blocked.
+  }
 }
 
 export function JournalEntryForm({
@@ -131,7 +162,6 @@ export function JournalEntryForm({
   const { books } = useBooksContext();
   const { authors } = useAuthorsContext();
   const { series } = useSeries();
-  const editorRef = useRef<HTMLDivElement>(null);
   const entityType = entity?.type ?? (initialEntry && "series_id" in initialEntry ? "Series" : initialEntry && "author_id" in initialEntry ? "Author" : "Book");
   const entityId =
     entity?.id ??
@@ -182,6 +212,8 @@ export function JournalEntryForm({
   const content = watch("content");
   const tags = watch("tags");
   const tagDraft = watch("tagDraft");
+  const formValues = watch();
+  const draftSaveReadyRef = useRef(false);
   const isInline = variant === "inline";
   const hiddenInitialTags = useMemo(
     () =>
@@ -198,12 +230,24 @@ export function JournalEntryForm({
     const selected = new Set(normalizeJournalTags(tags).map((tag) => tag.toLocaleLowerCase()));
     return normalizeJournalTags(tagSuggestions).filter((tag) => !selected.has(tag.toLocaleLowerCase()));
   }, [tagSuggestions, tags]);
+  const draftKey = useMemo(() => {
+    if (initialEntry) return null;
+
+    return [
+      JOURNAL_ENTRY_DRAFT_PREFIX,
+      user?.id ?? "anonymous",
+      entityType,
+      entityId || initialBookId || "unselected",
+      parentEntryId || "root",
+      hiddenSystemTags.join(",") || "manual",
+    ].join(":");
+  }, [entityId, entityType, hiddenSystemTags, initialBookId, initialEntry, parentEntryId, user?.id]);
 
   useEffect(() => {
     if (!active) return;
     const isBookEntry = initialEntry && "book_id" in initialEntry;
     const isQuote = "label" in (initialEntry ?? {}) && initialEntry?.label === "quote";
-    reset({
+    const initialValues: FormValues = {
       bookId: isBookEntry ? initialEntry.book_id : initialBookId,
       entityId,
       entryType: isQuote ? "quote" : "thought",
@@ -217,13 +261,20 @@ export function JournalEntryForm({
         : initialEntry?.entry_date ?? initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
       tags: visibleJournalTags(initialEntry?.tags),
-    });
-    if (editorRef.current) {
-      editorRef.current.innerHTML = noteMarkdownToEditorHtml(initialEntry?.content ?? "");
-    }
-  }, [active, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, preferInitialPageAndDate, reset]);
+    };
+    const draft = readJournalEntryDraft(draftKey);
+
+    reset(draft ? { ...initialValues, ...draft } : initialValues);
+    draftSaveReadyRef.current = true;
+  }, [active, draftKey, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, preferInitialPageAndDate, reset]);
+
+  useEffect(() => {
+    if (!active || !draftSaveReadyRef.current || !draftKey) return;
+    writeJournalEntryDraft(draftKey, formValues);
+  }, [active, draftKey, formValues]);
 
   function resetForm() {
+    removeJournalEntryDraft(draftKey);
     reset({
       bookId: initialBookId,
       entityId,
@@ -235,25 +286,11 @@ export function JournalEntryForm({
       tagDraft: "",
       tags: [],
     });
-    if (editorRef.current) editorRef.current.innerHTML = "";
   }
 
-  function syncMarkdownFromEditor() {
-    if (!editorRef.current) return;
-    setValue("content", editorHtmlToMarkdown(editorRef.current.innerHTML), {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  }
-
-  function runEditorCommand(command: "bold" | "italic") {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    editor.focus();
-    document.execCommand(command);
-
-    window.requestAnimationFrame(syncMarkdownFromEditor);
+  function handleCancel() {
+    removeJournalEntryDraft(draftKey);
+    onCancel();
   }
 
   function setEntryType(value: ManualJournalEntryType) {
@@ -499,31 +536,6 @@ export function JournalEntryForm({
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-1 border-b p-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Bold"
-                title="Bold"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => runEditorCommand("bold")}
-              >
-                <Bold className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Italic"
-                title="Italic"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => runEditorCommand("italic")}
-              >
-                <Italic className="h-4 w-4" />
-              </Button>
-            </div>
-
             <div className={cn("p-4", isInline && "p-3")}>
               <div className="mb-4 grid gap-4 sm:grid-cols-2">
                 {supportsQuotes && (
@@ -591,20 +603,12 @@ export function JournalEntryForm({
               <Label htmlFor="note-content" className="sr-only">
                 Note content
               </Label>
-              <div
+              <MarkdownEditor
                 id="note-content"
-                ref={editorRef}
-                role="textbox"
-                aria-multiline="true"
-                contentEditable
-                suppressContentEditableWarning
-                data-placeholder={entryType === "quote" ? "Write the quote..." : "Write your thought..."}
-                onInput={syncMarkdownFromEditor}
-                onBlur={syncMarkdownFromEditor}
-                className={cn(
-                  "rounded-md border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:ring-0",
-                  isInline ? "min-h-32" : "min-h-56",
-                )}
+                value={content}
+                placeholder={entryType === "quote" ? "Write the quote..." : "Write your thought..."}
+                minHeightClassName={isInline ? "min-h-32" : "min-h-56"}
+                onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
               />
               {errors.content && <p className="mt-1 text-xs text-destructive">{errors.content.message}</p>}
             </div>
@@ -614,7 +618,7 @@ export function JournalEntryForm({
             <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>{footerStart}</div>
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" onClick={onCancel}>
+                <Button type="button" variant="outline" onClick={handleCancel}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting || !content.trim()}>

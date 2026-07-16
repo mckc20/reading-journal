@@ -1,4 +1,4 @@
-import { Bookmark, Reply } from "lucide-react";
+import { Bookmark, Link as LinkIcon, Reply } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ interface JournalEntryCardProps {
   busy?: boolean;
   onToggleSaved?: (entry: JournalTimelineEntry) => void;
   onReply?: (entry: JournalTimelineEntry) => void;
+  onLink?: (entry: JournalTimelineEntry) => void;
 }
 
 function titleForEntry(entry: JournalTimelineEntry): ReactNode {
@@ -35,6 +36,19 @@ function contentForEntry(entry: JournalTimelineEntry): string {
   if (entry.source === "book_note") return entry.bookJournalEntry.content;
   if (entry.source === "series_note") return entry.seriesJournalEntry.content;
   return entry.authorJournalEntry.content;
+}
+
+function isCompactEntry(entry: JournalTimelineEntry): boolean {
+  const title = titleForEntry(entry);
+  const titleText = typeof title === "string" ? title.trim() : "";
+  const content = contentForEntry(entry)
+    .replace(/[#>*_\-[\]()`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const explicitLineCount = contentForEntry(entry).split(/\r?\n/).filter((line) => line.trim()).length;
+  const estimatedLineCount = Math.max(explicitLineCount, Math.ceil((titleText.length + content.length) / 72));
+
+  return estimatedLineCount <= 3;
 }
 
 function quoteSpeakerForEntry(entry: JournalTimelineEntry): string | null {
@@ -69,28 +83,58 @@ function isAttachedGeneratedNote(entry: JournalTimelineEntry): boolean {
   );
 }
 
-export default function JournalEntryCard({ entry, busy = false, onToggleSaved, onReply }: JournalEntryCardProps) {
+export default function JournalEntryCard({ entry, busy = false, onToggleSaved, onReply, onLink }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
   const saved = isSaved(entry);
+  const showReply = ((isManual(entry) && !isReply(entry) && !isAttachedGeneratedNote(entry)) || (entry.source === "generated_book_event" && entry.entityType === "Book")) && onReply;
+  const showLink = isManual(entry) && onLink;
+  const linkWithSave = Boolean(showLink && isCompactEntry(entry));
+  const linkWithReply = Boolean(showLink && !linkWithSave);
 
   return (
-    <article className="relative h-full rounded-lg border bg-background p-4">
-      {isManual(entry) && onToggleSaved && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute right-3 top-3 z-10 h-7 w-7 text-muted-foreground hover:text-primary"
-          aria-label={saved ? "Unsave entry" : "Save entry"}
-          disabled={busy}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleSaved(entry);
-          }}
-        >
-          <Bookmark className={cn("h-4 w-4", saved && "fill-primary text-primary")} />
-        </Button>
+    <article
+      className={cn(
+        "relative h-full rounded-lg border bg-background p-4",
+        linkWithSave ? "pr-20" : isManual(entry) && onToggleSaved ? "pr-12" : "pr-4",
+      )}
+    >
+      {((isManual(entry) && onToggleSaved) || linkWithSave) && (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+          {isManual(entry) && onToggleSaved && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              aria-label={saved ? "Unsave entry" : "Save entry"}
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSaved(entry);
+              }}
+            >
+              <Bookmark className={cn("h-4 w-4", saved && "fill-primary text-primary")} />
+            </Button>
+          )}
+          {linkWithSave && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              aria-label="Link entry"
+              title="Link entry"
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onLink?.(entry);
+              }}
+            >
+              <LinkIcon className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       )}
 
       {title && <h3 className="mb-3 pr-8 text-sm font-medium">{title}</h3>}
@@ -116,22 +160,43 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved, o
         </div>
       )}
 
-      {((isManual(entry) && !isReply(entry) && !isAttachedGeneratedNote(entry)) || (entry.source === "generated_book_event" && entry.entityType === "Book")) && onReply && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute bottom-3 right-3 z-10 h-7 w-7 text-muted-foreground hover:text-primary"
-          aria-label="Add note"
-          title="Add note"
-          disabled={busy}
-          onClick={(event) => {
-            event.stopPropagation();
-            onReply(entry);
-          }}
-        >
-          <Reply className="h-4 w-4" />
-        </Button>
+      {(showReply || linkWithReply) && (
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1">
+          {linkWithReply && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              aria-label="Link entry"
+              title="Link entry"
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onLink?.(entry);
+              }}
+            >
+              <LinkIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {showReply && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              aria-label="Add note"
+              title="Add note"
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReply(entry);
+              }}
+            >
+              <Reply className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       )}
     </article>
   );

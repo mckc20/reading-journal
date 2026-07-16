@@ -382,6 +382,7 @@ export default function BookAnnotations() {
         <JournalTimeline
           entries={timelineEntries}
           generatedReferenceEntries={generatedJournalEntries}
+          sortMode={timelineSort}
           emptyMessage="No journal entries yet."
           onEntryUpdated={(entry) => {
             if (entry.source !== "book_note") return;
