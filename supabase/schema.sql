@@ -207,6 +207,53 @@ CREATE TABLE IF NOT EXISTS book_notes (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- ── SERIES NOTES ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS series_notes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  series_id  uuid NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+  label      text NOT NULL DEFAULT 'note' CHECK (label IN ('quote', 'note', 'review')),
+  title      text,
+  quote_speaker text,
+  content    text NOT NULL CHECK (length(btrim(content)) > 0),
+  tags       text[],
+  page_start integer CHECK (page_start IS NULL OR page_start > 0),
+  is_favorite boolean NOT NULL DEFAULT false,
+  note_date  date NOT NULL DEFAULT CURRENT_DATE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── AUTHOR NOTES ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS author_notes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  author_id  uuid NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
+  label      text NOT NULL DEFAULT 'note' CHECK (label IN ('quote', 'note', 'review')),
+  title      text,
+  quote_speaker text,
+  content    text NOT NULL CHECK (length(btrim(content)) > 0),
+  tags       text[],
+  page_start integer CHECK (page_start IS NULL OR page_start > 0),
+  is_favorite boolean NOT NULL DEFAULT false,
+  note_date  date NOT NULL DEFAULT CURRENT_DATE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── JOURNAL ENTRY VISIBILITY ──────────────────────────────
+CREATE TABLE IF NOT EXISTS journal_entry_visibility (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  entity_type text NOT NULL CHECK (entity_type IN ('Book','Series','Author')),
+  entity_id   uuid NOT NULL,
+  source      text NOT NULL CHECK (source IN ('book_note','series_note','author_note','generated_book_event')),
+  source_id   text NOT NULL,
+  hidden_at   timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, entity_type, entity_id, source, source_id)
+);
+
 -- ── PROFILES ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -452,6 +499,14 @@ CREATE INDEX IF NOT EXISTS book_notes_user_id_idx ON book_notes(user_id);
 CREATE INDEX IF NOT EXISTS book_notes_book_id_idx ON book_notes(book_id);
 CREATE INDEX IF NOT EXISTS book_notes_book_created_at_idx ON book_notes(book_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS book_notes_book_note_date_idx ON book_notes(book_id, note_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS series_notes_user_id_idx ON series_notes(user_id);
+CREATE INDEX IF NOT EXISTS series_notes_series_id_idx ON series_notes(series_id);
+CREATE INDEX IF NOT EXISTS series_notes_series_note_date_idx ON series_notes(series_id, note_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS author_notes_user_id_idx ON author_notes(user_id);
+CREATE INDEX IF NOT EXISTS author_notes_author_id_idx ON author_notes(author_id);
+CREATE INDEX IF NOT EXISTS author_notes_author_note_date_idx ON author_notes(author_id, note_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS journal_entry_visibility_entity_idx
+  ON journal_entry_visibility(user_id, entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS profiles_created_at_idx ON profiles(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_unique_idx ON profiles (lower(username)) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS groups_created_by_idx ON groups(created_by);
@@ -491,6 +546,9 @@ ALTER TABLE book_authors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_pause_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE series_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE author_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entry_visibility ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
@@ -1219,6 +1277,87 @@ CREATE POLICY "book_notes: owner update"
 
 CREATE POLICY "book_notes: owner delete"
   ON book_notes FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- series_notes
+CREATE POLICY "series_notes: owner select"
+  ON series_notes FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "series_notes: owner insert"
+  ON series_notes FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1
+      FROM series
+      WHERE series.id = series_notes.series_id
+        AND series.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "series_notes: owner update"
+  ON series_notes FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1
+      FROM series
+      WHERE series.id = series_notes.series_id
+        AND series.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "series_notes: owner delete"
+  ON series_notes FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- author_notes
+CREATE POLICY "author_notes: owner select"
+  ON author_notes FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "author_notes: owner insert"
+  ON author_notes FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = author_notes.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "author_notes: owner update"
+  ON author_notes FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1
+      FROM authors
+      WHERE authors.id = author_notes.author_id
+        AND authors.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "author_notes: owner delete"
+  ON author_notes FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- journal_entry_visibility
+CREATE POLICY "journal_entry_visibility: owner select"
+  ON journal_entry_visibility FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "journal_entry_visibility: owner insert"
+  ON journal_entry_visibility FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "journal_entry_visibility: owner delete"
+  ON journal_entry_visibility FOR DELETE
   USING (auth.uid() = user_id);
 
 -- profiles

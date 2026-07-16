@@ -199,7 +199,7 @@ function attachmentHref(attachment: ChatAttachmentPayload): string | null {
   if (attachment.type === "book") return attachment.book.id ? `/books/${attachment.book.id}` : null;
   if (attachment.type === "note") {
     if (!attachment.note.book_id) return null;
-    return `/books/${attachment.note.book_id}/annotations`;
+    return `/books/${attachment.note.book_id}/journal`;
   }
   if (attachment.type === "author") {
     return `/authors/${encodeURIComponent(attachment.author.id ?? attachment.author.name)}`;
@@ -210,7 +210,7 @@ function attachmentHref(attachment: ChatAttachmentPayload): string | null {
 
 function quoteHref(note: ChatSharedNoteSnapshot): string | null {
   if (!note.book_id) return null;
-  return `/books/${note.book_id}/annotations`;
+  return `/books/${note.book_id}/journal`;
 }
 
 function sortSeriesByName(series: Series[]): Series[] {

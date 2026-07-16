@@ -126,6 +126,79 @@ export interface BookNote {
   updated_at: string;
 }
 
+export interface SeriesNote {
+  id: string;
+  user_id: string;
+  series_id: string;
+  label: BookNoteLabel;
+  title?: string | null;
+  quote_speaker?: string | null;
+  content: string;
+  tags?: string[] | null;
+  page_start?: number | null;
+  is_favorite: boolean;
+  note_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthorNote {
+  id: string;
+  user_id: string;
+  author_id: string;
+  label: BookNoteLabel;
+  title?: string | null;
+  quote_speaker?: string | null;
+  content: string;
+  tags?: string[] | null;
+  page_start?: number | null;
+  is_favorite: boolean;
+  note_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type JournalEntityType = "Book" | "Series" | "Author";
+
+export type JournalEntryType =
+  | "note"
+  | "thought"
+  | "passage"
+  | "review"
+  | "started_reading"
+  | "finished_reading"
+  | "rating_added"
+  | "reading_progress_milestone"
+  | "reading_session";
+
+export type JournalEntrySource =
+  | "book_note"
+  | "series_note"
+  | "author_note"
+  | "generated_book_event";
+
+export interface JournalEntry {
+  id: string;
+  entityType: JournalEntityType;
+  entityId: string;
+  type: JournalEntryType;
+  source: JournalEntrySource;
+  sourceId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalEntryVisibility {
+  id: string;
+  user_id: string;
+  entity_type: JournalEntityType;
+  entity_id: string;
+  source: JournalEntrySource;
+  source_id: string;
+  hidden_at: string;
+  created_at: string;
+}
+
 export interface ReadingLog {
   id: string;
   book_id: string;

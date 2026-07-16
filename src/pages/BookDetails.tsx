@@ -19,7 +19,7 @@ import {
   Heart,
   ImagePlus,
   Info,
-  MessageSquarePlus,
+  NotebookPen,
   PauseCircle,
   RefreshCw,
   Star,
@@ -28,10 +28,10 @@ import {
 } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
-import AnnotationCard from "@/components/AnnotationCard";
 import BackButton from "@/components/BackButton";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
+import JournalTimeline from "@/components/JournalTimeline";
 import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
@@ -47,7 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -70,6 +69,11 @@ import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
+  bookNotesToJournalEntries,
+  isThoughtJournalEntry,
+  sortJournalEntries,
+} from "@/lib/journal";
+import {
   formatPublicationDateForDisplay,
   formatPublicationDateInput,
   parsePublicationDateInput,
@@ -86,7 +90,6 @@ import type {
   BookFormat,
   BookLanguage,
   BookNote,
-  BookNoteLabel,
   BookSource,
   BookStatus,
   PublicationDatePrecision,
@@ -179,12 +182,6 @@ function getProgressPercent(book: Book): number {
   const totalPages = book.total_pages ?? 0;
   if (totalPages <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)));
-}
-
-function pickPreviewNotes(notes: BookNote[], label: BookNoteLabel): BookNote[] {
-  return sortBookNotes(notes.filter((note) => note.label === label))
-    .sort((a, b) => Number(b.is_favorite) - Number(a.is_favorite))
-    .slice(0, 3);
 }
 
 function buildLibraryFilterPath(
@@ -641,6 +638,34 @@ export default function BookDetails() {
     clearErrors("publication_date");
   }
 
+  const quoteJournalEntries = useMemo(
+    () =>
+      sortJournalEntries(
+        bookNotesToJournalEntries(notes.filter((note) => note.label === "quote")).map((entry) => ({
+          ...entry,
+          relatedBookTitle: book?.title,
+        })),
+      ),
+    [book?.title, notes],
+  );
+  const thoughtJournalEntries = useMemo(
+    () =>
+      sortJournalEntries(
+        bookNotesToJournalEntries(notes.filter((note) => note.label === "note" || note.label === "review"))
+          .map((entry) => ({ ...entry, relatedBookTitle: book?.title }))
+          .filter(isThoughtJournalEntry),
+      ),
+    [book?.title, notes],
+  );
+  const previewJournalEntries = useMemo(
+    () =>
+      sortJournalEntries([
+        ...quoteJournalEntries,
+        ...thoughtJournalEntries,
+      ]).slice(0, 4),
+    [quoteJournalEntries, thoughtJournalEntries],
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -811,16 +836,6 @@ export default function BookDetails() {
           ];
   const description = book.description?.trim() || "";
   const shouldCollapseDescription = description.length > 420;
-  const previewNotes = {
-    quote: pickPreviewNotes(notes, "quote"),
-    note: pickPreviewNotes(notes, "note"),
-    review: pickPreviewNotes(notes, "review"),
-  };
-  const annotationCounts = {
-    quote: notes.filter((note) => note.label === "quote").length,
-    note: notes.filter((note) => note.label === "note").length,
-    review: notes.filter((note) => note.label === "review").length,
-  };
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
@@ -1057,9 +1072,9 @@ export default function BookDetails() {
               </Button>
             )}
             <Button asChild type="button" variant="outline">
-              <Link to={`/books/${book.id}/annotations?new=1`}>
-                <MessageSquarePlus className="mr-1.5 h-4 w-4" />
-                Add Note
+              <Link to={`/books/${book.id}/journal?new=1`}>
+                <NotebookPen className="mr-1.5 h-4 w-4" />
+                Add entry
               </Link>
             </Button>
           </div>
@@ -1249,64 +1264,45 @@ export default function BookDetails() {
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-heading leading-snug font-medium">
-                <span className="font-serif italic">Annotations</span>
+                <span className="font-serif italic">Journal</span>
               </h2>
               <Button asChild variant="link" className="px-0">
-                <Link to={`/books/${book.id}/annotations`} className="text-primary">
-                  View all notes
+                <Link to={`/books/${book.id}/journal`} className="text-primary">
+                  Open journal
                   <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Link>
               </Button>
             </div>
 
-            <Tabs defaultValue="quote" className="space-y-4">
-              <TabsList
-                variant="line"
-                className="h-auto w-full justify-start gap-6 rounded-none border-0 border-b border-border bg-transparent p-0"
-              >
-                <TabsTrigger
-                  value="quote"
-                  className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-                >
-                  Quotes ({annotationCounts.quote})
-                </TabsTrigger>
-                <TabsTrigger
-                  value="note"
-                  className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-                >
-                  Notes ({annotationCounts.note})
-                </TabsTrigger>
-                <TabsTrigger
-                  value="review"
-                  className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
-                >
-                  Review ({annotationCounts.review})
-                </TabsTrigger>
-              </TabsList>
-              {(["quote", "note", "review"] as BookNoteLabel[]).map((label) => (
-                <TabsContent key={label} value={label}>
-                  {notesLoading ? (
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                      <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                      <div className="h-44 animate-pulse rounded-lg bg-muted" />
-                    </div>
-                  ) : notesError ? (
-                    <p className="text-sm text-destructive">{notesError}</p>
-                  ) : previewNotes[label].length === 0 ? (
-                    <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                      No {label === "quote" ? "quotes" : label === "review" ? "review" : "notes"} yet.
-                    </div>
-                  ) : (
-                    <div className="grid gap-3 md:grid-cols-3">
-                      {previewNotes[label].map((note) => (
-                        <AnnotationCard key={note.id} note={note} compact />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              ))}
-            </Tabs>
+            {notesLoading || logsLoading ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="h-40 animate-pulse rounded-lg bg-muted" />
+                <div className="h-40 animate-pulse rounded-lg bg-muted" />
+              </div>
+            ) : notesError ? (
+              <p className="text-sm text-destructive">{notesError}</p>
+            ) : logsError ? (
+              <p className="text-sm text-destructive">{logsError}</p>
+            ) : (
+              previewJournalEntries.length === 0 ? (
+                <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+                  No journal entries yet.
+                </div>
+              ) : (
+                <JournalTimeline
+                  entries={previewJournalEntries}
+                  layout="cards"
+                  emptyMessage="No journal entries yet."
+                  onEntryUpdated={(entry) => {
+                    if (entry.source !== "book_note") return;
+                    setNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+                  }}
+                  onEntryDeleted={(entry) => {
+                    setNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+                  }}
+                />
+              )
+            )}
           </section>
 
           <section className="space-y-4">

@@ -8,6 +8,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
 const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
+const SeriesJournal = lazy(() => import("@/pages/SeriesJournal"));
 const SeriesAnalytics = lazy(() => import("@/pages/SeriesAnalytics"));
 const SeriesBooks = lazy(() => import("@/pages/SeriesBooks"));
 const SeriesQuotes = lazy(() => import("@/pages/SeriesQuotes"));
@@ -15,6 +16,7 @@ const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
 const AuthorsExplore = lazy(() => import("@/pages/AuthorsExplore"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
+const AuthorJournal = lazy(() => import("@/pages/AuthorJournal"));
 const AuthorBooks = lazy(() => import("@/pages/AuthorBooks"));
 const AuthorQuotes = lazy(() => import("@/pages/AuthorQuotes"));
 const Search = lazy(() => import("@/pages/Search"));
@@ -28,7 +30,6 @@ const Changelog = lazy(() => import("@/pages/Changelog"));
 const Groups = lazy(() => import("@/pages/Groups"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
-const Notes = lazy(() => import("@/pages/Notes"));
 
 function lazyRoute(element: ReactNode) {
   return <Suspense fallback={null}>{element}</Suspense>;
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
           { path: "/library", element: lazyRoute(<Library />) },
           { path: "/series", element: lazyRoute(<Series />) },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
+          { path: "/series/:seriesId/journal", element: lazyRoute(<SeriesJournal />) },
           { path: "/series/:seriesId/analytics", element: lazyRoute(<SeriesAnalytics />) },
           { path: "/series/:seriesId/books", element: lazyRoute(<SeriesBooks />) },
           { path: "/series/:seriesId/quotes", element: lazyRoute(<SeriesQuotes />) },
@@ -67,6 +69,7 @@ export const router = createBrowserRouter([
           { path: "/authors", element: lazyRoute(<Authors />) },
           { path: "/authors/explore", element: lazyRoute(<AuthorsExplore />) },
           { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
+          { path: "/authors/:authorId/journal", element: lazyRoute(<AuthorJournal />) },
           { path: "/authors/:authorId/books", element: lazyRoute(<AuthorBooks />) },
           { path: "/authors/:authorId/quotes", element: lazyRoute(<AuthorQuotes />) },
           { path: "/search", element: lazyRoute(<Search />) },
@@ -74,12 +77,12 @@ export const router = createBrowserRouter([
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/books/:bookId/analytics", element: lazyRoute(<BookAnalytics />) },
+          { path: "/books/:bookId/journal", element: lazyRoute(<BookAnnotations />) },
           { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
           { path: "/changelog", element: lazyRoute(<Changelog />) },
           { path: "/discover", element: lazyRoute(<Analytics />) },
           { path: "/analytics", element: lazyRoute(<Analytics />) },
           { path: "/analytics/:category", element: lazyRoute(<Analytics />) },
-          { path: "/notes", element: lazyRoute(<Notes />) },
           { path: "/account", element: <Navigate to="/settings/profile" replace /> },
           { path: "/group", element: <Navigate to="/groups" replace /> },
           { path: "/groups", element: lazyRoute(<Groups />) },

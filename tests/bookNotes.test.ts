@@ -103,7 +103,7 @@ test("normalizes a single source page", () => {
   );
 });
 
-test("normalizes quote favorite only for quote entries", () => {
+test("normalizes saved state for quote entries", () => {
   assert.deepEqual(
     normalizeBookNoteFields({
       label: "quote",
@@ -124,7 +124,7 @@ test("normalizes quote favorite only for quote entries", () => {
   );
 });
 
-test("does not store favorites for reviews or regular notes", () => {
+test("stores saved state for reviews and regular notes", () => {
   assert.equal(
     normalizeBookNoteFields({
       label: "review",
@@ -132,7 +132,7 @@ test("does not store favorites for reviews or regular notes", () => {
       isFavorite: true,
       noteDate: "2026-05-03",
     }).is_favorite,
-    false,
+    true,
   );
 });
 
