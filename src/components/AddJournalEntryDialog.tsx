@@ -110,11 +110,11 @@ function readJournalEntryDraft(key: string | null): FormValues | null {
   }
 }
 
-function writeJournalEntryDraft(key: string | null, values: FormValues) {
+function writeJournalEntryDraft(key: string | null, values: FormValues, preserveEmpty = false) {
   if (!key || typeof window === "undefined") return;
 
   try {
-    if (!hasDraftContent(values)) {
+    if (!preserveEmpty && !hasDraftContent(values)) {
       window.localStorage.removeItem(key);
       return;
     }
@@ -127,6 +127,12 @@ function writeJournalEntryDraft(key: string | null, values: FormValues) {
   } catch {
     // Draft saving is a convenience feature. Storage can fail in private mode or when full.
   }
+}
+
+function journalEntryDraftSource(entry: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord): string {
+  if ("book_id" in entry) return "book";
+  if ("series_id" in entry) return "series";
+  return "author";
 }
 
 function removeJournalEntryDraft(key: string | null) {
@@ -231,11 +237,20 @@ export function JournalEntryForm({
     return normalizeJournalTags(tagSuggestions).filter((tag) => !selected.has(tag.toLocaleLowerCase()));
   }, [tagSuggestions, tags]);
   const draftKey = useMemo(() => {
-    if (initialEntry) return null;
+    if (initialEntry) {
+      return [
+        JOURNAL_ENTRY_DRAFT_PREFIX,
+        user?.id ?? "anonymous",
+        "edit",
+        journalEntryDraftSource(initialEntry),
+        initialEntry.id,
+      ].join(":");
+    }
 
     return [
       JOURNAL_ENTRY_DRAFT_PREFIX,
       user?.id ?? "anonymous",
+      "create",
       entityType,
       entityId || initialBookId || "unselected",
       parentEntryId || "root",
@@ -270,8 +285,8 @@ export function JournalEntryForm({
 
   useEffect(() => {
     if (!active || !draftSaveReadyRef.current || !draftKey) return;
-    writeJournalEntryDraft(draftKey, formValues);
-  }, [active, draftKey, formValues]);
+    writeJournalEntryDraft(draftKey, formValues, Boolean(initialEntry));
+  }, [active, draftKey, formValues, initialEntry]);
 
   function resetForm() {
     removeJournalEntryDraft(draftKey);
