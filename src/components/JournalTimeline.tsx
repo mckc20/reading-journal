@@ -15,6 +15,7 @@ import {
   Reply,
   Star,
   StickyNote,
+  StickyNotePlus,
   TrendingUp,
   Trash2,
   type LucideIcon,
@@ -384,7 +385,7 @@ function TimelineBottomActions({
             onReply(entry);
           }}
         >
-          <Reply className="h-4 w-4" />
+          <StickyNotePlus className="h-4 w-4" />
         </Button>
       )}
     </div>
@@ -2361,7 +2362,7 @@ export default function JournalTimeline({
                               title="Add note"
                               onClick={() => startReply(selectedEntry)}
                             >
-                              <Reply className="h-4 w-4" />
+                              <StickyNotePlus className="h-4 w-4" />
                             </Button>
                           )}
                         </JournalPanelInlineActions>

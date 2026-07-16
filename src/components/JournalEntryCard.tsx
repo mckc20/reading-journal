@@ -1,4 +1,4 @@
-import { Bookmark, Link as LinkIcon, Reply } from "lucide-react";
+import { Bookmark, Link as LinkIcon, StickyNotePlus } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
@@ -193,7 +193,7 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved, o
                 onReply(entry);
               }}
             >
-              <Reply className="h-4 w-4" />
+              <StickyNotePlus className="h-4 w-4" />
             </Button>
           )}
         </div>
