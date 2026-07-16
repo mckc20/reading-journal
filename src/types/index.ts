@@ -108,54 +108,64 @@ export interface BookPausePeriod {
 
 export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at">>;
 
-export type BookNoteLabel = "quote" | "review" | "note";
+export type JournalEntryLabel = "quote" | "review" | "note";
 
-export interface BookNote {
+export interface BookJournalEntryRecord {
   id: string;
   user_id: string;
   book_id: string;
-  label: BookNoteLabel;
+  parent_entry_id?: string | null;
+  label: JournalEntryLabel;
   title?: string | null;
   quote_speaker?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
   is_favorite: boolean;
-  note_date: string;
+  entry_date: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface SeriesNote {
+export interface SeriesJournalEntryRecord {
   id: string;
   user_id: string;
   series_id: string;
-  label: BookNoteLabel;
+  parent_entry_id?: string | null;
+  label: JournalEntryLabel;
   title?: string | null;
   quote_speaker?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
   is_favorite: boolean;
-  note_date: string;
+  entry_date: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface AuthorNote {
+export interface AuthorJournalEntryRecord {
   id: string;
   user_id: string;
   author_id: string;
-  label: BookNoteLabel;
+  parent_entry_id?: string | null;
+  label: JournalEntryLabel;
   title?: string | null;
   quote_speaker?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
   is_favorite: boolean;
-  note_date: string;
+  entry_date: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface JournalEntryLink {
+  id: string;
+  entry_a_id: string;
+  entry_b_id: string;
+  created_at: string;
 }
 
 export type JournalEntityType = "Book" | "Series" | "Author";
@@ -413,7 +423,7 @@ export interface ChatReplySnapshot {
 // if the underlying book, note, author, or series data changes later.
 export type ChatAttachmentType = "book" | "note" | "author" | "series";
 
-export type ChatSharedNoteLabel = BookNoteLabel;
+export type ChatSharedNoteLabel = JournalEntryLabel;
 
 export interface ChatSharedNoteSnapshot {
   id?: string;
@@ -422,7 +432,7 @@ export interface ChatSharedNoteSnapshot {
   content: string;
   quote_speaker?: string | null;
   page_start?: number | null;
-  note_date?: string | null;
+  entry_date?: string | null;
   book_id?: string | null;
   book_title?: string | null;
   book_authors?: string[];
@@ -445,7 +455,7 @@ export interface ChatSharedBookSnapshot {
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
   volume_number?: number | null;
-  included_notes?: ChatSharedNoteSnapshot[];
+  included_journalEntries?: ChatSharedNoteSnapshot[];
 }
 
 export interface ChatBookAttachment {

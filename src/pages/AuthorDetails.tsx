@@ -20,16 +20,16 @@ import {
   getAuthorPagesWritten,
 } from "@/lib/authorShelf";
 import {
-  fetchAuthorNotes,
-  sortAuthorNotes,
-} from "@/lib/authorNotes";
+  fetchAuthorJournalEntryRecords,
+  sortAuthorJournalEntryRecords,
+} from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
-import { authorNotesToJournalEntries, sortJournalEntries } from "@/lib/journal";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { authorJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { cn } from "@/lib/utils";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
-import type { AuthorNote, BookNote, PublicationDatePrecision } from "@/types";
+import type { AuthorJournalEntryRecord, BookJournalEntryRecord, PublicationDatePrecision } from "@/types";
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
@@ -125,30 +125,30 @@ function EmptySection({ message }: { message: string }) {
 }
 
 function AuthorJournalSection({ author }: { author: { id: string; name: string } }) {
-  const [authorNotes, setAuthorNotes] = useState<AuthorNote[]>([]);
+  const [authorJournal, setAuthorJournalEntryRecords] = useState<AuthorJournalEntryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const journalEntries = useMemo(
-    () => sortJournalEntries(authorNotesToJournalEntries(authorNotes)).slice(0, 3),
-    [authorNotes],
+    () => sortJournalEntries(authorJournalToJournalEntries(authorJournal)).slice(0, 3),
+    [authorJournal],
   );
 
-  const loadAuthorNotes = useCallback(async () => {
+  const loadAuthorJournalEntryRecords = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      setAuthorNotes(await fetchAuthorNotes(author.id));
+      setAuthorJournalEntryRecords(await fetchAuthorJournalEntryRecords(author.id));
     } catch (loadError) {
-      setError(getErrorMessage(loadError, "Failed to load author notes"));
+      setError(getErrorMessage(loadError, "Failed to load author journal entries"));
     } finally {
       setLoading(false);
     }
   }, [author.id]);
 
   useEffect(() => {
-    void loadAuthorNotes();
-  }, [loadAuthorNotes]);
+    void loadAuthorJournalEntryRecords();
+  }, [loadAuthorJournalEntryRecords]);
 
   return (
     <section className="space-y-4">
@@ -185,11 +185,11 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
             emptyMessage="Author journal entries will appear here."
             onEntryUpdated={(entry) => {
               if (entry.source === "author_note") {
-                setAuthorNotes((current) => sortAuthorNotes([entry.authorNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+                setAuthorJournalEntryRecords((current) => sortAuthorJournalEntryRecords([entry.authorJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
               }
             }}
             onEntryDeleted={(entry) => {
-              if (entry.source === "author_note") setAuthorNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+              if (entry.source === "author_note") setAuthorJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
             }}
           />
         )
@@ -210,8 +210,8 @@ export default function AuthorDetails() {
   } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
@@ -221,17 +221,17 @@ export default function AuthorDetails() {
   useEffect(() => {
     let ignore = false;
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch(() => {
         if (!ignore) {
-          setNotes([]);
+          setJournalEntries([]);
         }
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -239,14 +239,14 @@ export default function AuthorDetails() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, notes), [authorRecords, books, notes]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   const authorBooks = author?.books ?? [];
   const previewBooks = authorBooks.slice(0, 4);
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
   const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
   const pagesWritten = useMemo(() => (author ? getAuthorPagesWritten(author) : 0), [author]);
-  const loading = authorsLoading || booksLoading || notesLoading || seriesLoading;
+  const loading = authorsLoading || booksLoading || journalEntriesLoading || seriesLoading;
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);

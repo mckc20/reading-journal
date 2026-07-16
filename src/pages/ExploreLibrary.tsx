@@ -37,7 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchReadingLogs } from "@/lib/books";
-import { fetchAllBookNotes, formatBookNotePageRange } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords, formatBookJournalEntryRecordPageRange } from "@/lib/bookJournal";
 import {
   buildMultiValueGroups,
   buildNoteGroups,
@@ -45,7 +45,7 @@ import {
   buildSeriesGroups,
   buildSingleValueGroups,
   filterBooksByShelfValue,
-  filterNotesByShelfValue,
+  filterJournalEntriesByShelfValue,
   type BookGroup,
   type LibraryValueShelf,
   type LibraryNote,
@@ -56,7 +56,7 @@ import BookCard from "@/components/BookCard";
 import BookShelf from "@/pages/library/BookShelf";
 import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
 import ShelfCarousel from "@/pages/library/ShelfCarousel";
-import type { Book, BookNote, BookStatus, BookUpdate, ReadingLog, Series } from "@/types";
+import type { Book, BookJournalEntryRecord, BookStatus, BookUpdate, ReadingLog, Series } from "@/types";
 
 type LibraryView =
   | "all"
@@ -70,7 +70,7 @@ type LibraryView =
   | "authors"
   | "genres"
   | "rating"
-  | "notes"
+  | "journalEntries"
   | "languages"
   | "format"
   | "source";
@@ -248,7 +248,7 @@ const categoryShelves: CategoryShelf[] = [
   { value: "authors", label: "Authors" },
   { value: "genres", label: "Genres" },
   { value: "rating", label: "Rating" },
-  { value: "notes", label: "Notes" },
+  { value: "journalEntries", label: "Journal entries" },
   { value: "languages", label: "Languages" },
   { value: "format", label: "Format" },
   { value: "source", label: "Source" },
@@ -1728,8 +1728,8 @@ function GroupedBooksView({
 }
 
 function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: Book) => void }) {
-  const pageLabel = formatBookNotePageRange(note);
-  const visibleDate = note.note_date ?? note.created_at;
+  const pageLabel = formatBookJournalEntryRecordPageRange(note);
+  const visibleDate = note.entry_date ?? note.created_at;
   const noteMetadata = (
     <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
       {note.label === "quote" && note.is_favorite && (
@@ -1790,7 +1790,7 @@ function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: B
   );
 }
 
-function GroupedNotesView({
+function GroupedJournalEntriesView({
   groups,
   onBook,
 }: {
@@ -1798,7 +1798,7 @@ function GroupedNotesView({
   onBook: (book: Book) => void;
 }) {
   if (groups.length === 0) {
-    return <EmptyLibraryView message="No notes yet." />;
+    return <EmptyLibraryView message="No journal entries yet." />;
   }
 
   return (
@@ -1807,11 +1807,11 @@ function GroupedNotesView({
         <section key={group.name} className="space-y-3">
           <div>
             <h3 className="font-heading leading-snug font-medium">{group.name}</h3>
-            <p className="text-xs text-muted-foreground">{noteGroupCountLabel(group.notes.length)}</p>
+            <p className="text-xs text-muted-foreground">{noteGroupCountLabel(group.journalEntries.length)}</p>
           </div>
           <Separator />
           <div className="space-y-3">
-            {group.notes.map((note) => (
+            {group.journalEntries.map((note) => (
               <LibraryNoteCard key={note.id} note={note} onBook={onBook} />
             ))}
           </div>
@@ -2014,10 +2014,10 @@ function MyBooksOverview({
 export default function Library() {
   const { books, loading: booksLoading, error, reload, updateBook } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesLoaded, setNotesLoaded] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
+  const [journalEntriesLoaded, setJournalEntriesLoaded] = useState(false);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [readingLogsLoaded, setReadingLogsLoaded] = useState(false);
   const navigate = useNavigate();
@@ -2038,15 +2038,15 @@ export default function Library() {
   const librarySort: LibrarySort = isLibrarySort(sortParam) ? sortParam : "title";
   const libraryDisplay = normalizeLibraryDisplay(displayParam);
   const isManageMode = modeParam === "manage";
-  const isNotesView = contentView === "notes";
+  const isJournalEntriesView = contentView === "journalEntries";
   const activeCategoryShelf = categoryShelves.find((shelf) => shelf.value === contentView);
   const activeValueShelf = activeCategoryShelf?.value;
   const selectedValue = activeValueShelf ? valueParam : undefined;
   const showLibraryToolbar = Boolean(
-    !isNotesView && (activePrimaryShelfForView(contentView) || activeValueShelf || activeFilterChips.length)
+    !isJournalEntriesView && (activePrimaryShelfForView(contentView) || activeValueShelf || activeFilterChips.length)
   );
-  const shouldLoadNotes = isNotesView;
-  const loading = booksLoading || seriesLoading || (isNotesView && notesLoading);
+  const shouldLoadJournalEntries = isJournalEntriesView;
+  const loading = booksLoading || seriesLoading || (isJournalEntriesView && journalEntriesLoading);
   const pageTitle = "Your Library";
   const filterOptions = useMemo(() => buildLibraryFilterOptions(books, series), [books, series]);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(() => new Set());
@@ -2078,31 +2078,31 @@ export default function Library() {
   }, [books]);
 
   useEffect(() => {
-    if (!shouldLoadNotes || notesLoaded) return;
+    if (!shouldLoadJournalEntries || journalEntriesLoaded) return;
 
     let isMounted = true;
-    setNotesLoading(true);
-    setNotesError(null);
+    setJournalEntriesLoading(true);
+    setJournalEntriesError(null);
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
         if (!isMounted) return;
-        setNotes(data);
-        setNotesLoaded(true);
+        setJournalEntries(data);
+        setJournalEntriesLoaded(true);
       })
       .catch((fetchError: unknown) => {
         if (!isMounted) return;
-        setNotesLoaded(true);
-        setNotesError(fetchError instanceof Error ? fetchError.message : "Could not load notes.");
+        setJournalEntriesLoaded(true);
+        setJournalEntriesError(fetchError instanceof Error ? fetchError.message : "Could not load journal entries.");
       })
       .finally(() => {
-        if (isMounted) setNotesLoading(false);
+        if (isMounted) setJournalEntriesLoading(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [notesLoaded, shouldLoadNotes]);
+  }, [journalEntriesLoaded, shouldLoadJournalEntries]);
 
   useEffect(() => {
     if (librarySort !== "last-read" || readingLogsLoaded) return;
@@ -2131,9 +2131,9 @@ export default function Library() {
     navigate(`/books/${book.id}`);
   }
 
-  function retryNotes() {
-    setNotesLoaded(false);
-    setNotesError(null);
+  function retryJournalEntries() {
+    setJournalEntriesLoaded(false);
+    setJournalEntriesError(null);
   }
 
   function updateLibraryParam(key: "q" | "sort" | "display", value: string) {
@@ -2325,7 +2325,7 @@ export default function Library() {
   );
 
   const filteredBooks = useMemo(() => {
-    if (!activeValueShelf || !selectedValue || activeValueShelf === "notes") return [];
+    if (!activeValueShelf || !selectedValue || activeValueShelf === "journalEntries") return [];
     return filterAndSortBooks({
       books: applyLibraryFilters(
         filterBooksByShelfValue({
@@ -2364,22 +2364,22 @@ export default function Library() {
     return [];
   }, [contentView, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, series]);
 
-  const groupedNotes = useMemo(() => {
-    if (isNotesView && selectedValue) {
-      return filterNotesByShelfValue({
+  const groupedJournalEntries = useMemo(() => {
+    if (isJournalEntriesView && selectedValue) {
+      return filterJournalEntriesByShelfValue({
         value: selectedValue,
-        notes,
+        journalEntries,
         books,
       });
     }
-    if (!isNotesView) return [];
-    return buildNoteGroups(notes, books);
-  }, [books, isNotesView, notes, selectedValue]);
+    if (!isJournalEntriesView) return [];
+    return buildNoteGroups(journalEntries, books);
+  }, [books, isJournalEntriesView, journalEntries, selectedValue]);
 
   const displayedCountLabel = (() => {
     if (activePrimaryShelf) return itemCountLabel(visibleBooks.length, "book");
-    if (selectedValue && activeValueShelf === "notes") {
-      return itemCountLabel(groupedNotes.reduce((count, group) => count + group.notes.length, 0), "entry", "entries");
+    if (selectedValue && activeValueShelf === "journalEntries") {
+      return itemCountLabel(groupedJournalEntries.reduce((count, group) => count + group.journalEntries.length, 0), "entry", "entries");
     }
     if (selectedValue) return itemCountLabel(filteredBooks.length, "book");
     if (contentView === "series") return itemCountLabel(groupedBooks.length, "series", "series");
@@ -2388,14 +2388,14 @@ export default function Library() {
     if (contentView === "rating") {
       return itemCountLabel(groupedBooks.reduce((count, group) => count + group.books.length, 0), "book");
     }
-    if (contentView === "notes") return itemCountLabel(notes.length, "entry", "entries");
+    if (contentView === "journalEntries") return itemCountLabel(journalEntries.length, "entry", "entries");
     return itemCountLabel(books.length, "book");
   })();
   const hasActiveFilters = activeFilterChips.length > 0;
   const isMyBooksOverview = false;
   const managementBooks = activePrimaryShelf
     ? visibleBooks
-    : selectedValue && activeValueShelf && activeValueShelf !== "notes"
+    : selectedValue && activeValueShelf && activeValueShelf !== "journalEntries"
       ? filteredBooks
       : groupedBooks.flatMap((group) => group.books);
 
@@ -2453,10 +2453,10 @@ export default function Library() {
         </div>
       )}
 
-      {notesError && isNotesView && (
+      {journalEntriesError && isJournalEntriesView && (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <p className="text-sm text-destructive">{notesError}</p>
-          <Button variant="outline" size="sm" onClick={retryNotes}>
+          <p className="text-sm text-destructive">{journalEntriesError}</p>
+          <Button variant="outline" size="sm" onClick={retryJournalEntries}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Try again
           </Button>
@@ -2518,7 +2518,7 @@ export default function Library() {
                     onBook={openBook}
                   />
                 )
-              ) : selectedValue && activeValueShelf && activeValueShelf !== "notes" ? (
+              ) : selectedValue && activeValueShelf && activeValueShelf !== "journalEntries" ? (
                 filteredBooks.length === 0 ? (
                   <EmptyLibraryView
                     message={
@@ -2536,8 +2536,8 @@ export default function Library() {
                     onBook={openBook}
                   />
                 )
-              ) : isNotesView ? (
-                notesError ? null : <GroupedNotesView groups={groupedNotes} onBook={openBook} />
+              ) : isJournalEntriesView ? (
+                journalEntriesError ? null : <GroupedJournalEntriesView groups={groupedJournalEntries} onBook={openBook} />
               ) : (
                 <GroupedBooksView groups={groupedBooks} onBook={openBook} />
               )}

@@ -4,10 +4,10 @@ import BackButton from "@/components/BackButton";
 import { SeriesAnalyticsFull } from "@/components/series/SeriesAnalyticsSections";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogs } from "@/lib/books";
 import { filterSeriesLogs, getSeriesStats, sortSeriesBooks } from "@/lib/seriesDetails";
-import type { BookNote, ReadingLog } from "@/types";
+import type { BookJournalEntryRecord, ReadingLog } from "@/types";
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -24,7 +24,7 @@ export default function SeriesAnalytics() {
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<BookNote[]>([]);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const seriesBooks = useMemo(
@@ -32,7 +32,7 @@ export default function SeriesAnalytics() {
     [books, seriesId],
   );
   const seriesLogs = useMemo(() => filterSeriesLogs(seriesBooks, logs), [logs, seriesBooks]);
-  const stats = useMemo(() => getSeriesStats(seriesBooks, seriesLogs, notes), [notes, seriesBooks, seriesLogs]);
+  const stats = useMemo(() => getSeriesStats(seriesBooks, seriesLogs, journalEntries), [journalEntries, seriesBooks, seriesLogs]);
 
   useEffect(() => {
     if (!seriesId) {
@@ -53,12 +53,12 @@ export default function SeriesAnalytics() {
         if (!ignore) setLogsLoading(false);
       });
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch(() => {
-        if (!ignore) setNotes([]);
+        if (!ignore) setJournalEntries([]);
       });
 
     return () => {

@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  normalizeSeriesNoteFields,
-  normalizeSeriesNoteInput,
-  seriesNoteErrorToError,
-  sortSeriesNotes,
-} from "../src/lib/seriesNotes";
-import type { SeriesNote } from "../src/types";
+  normalizeSeriesJournalEntryRecordFields,
+  normalizeSeriesJournalEntryRecordInput,
+  seriesJournalEntryErrorToError,
+  sortSeriesJournalEntryRecords,
+} from "../src/lib/seriesJournal";
+import type { SeriesJournalEntryRecord } from "../src/types";
 
-function makeSeriesNote(overrides: Partial<SeriesNote> = {}): SeriesNote {
+function makeSeriesJournalEntryRecord(overrides: Partial<SeriesJournalEntryRecord> = {}): SeriesJournalEntryRecord {
   return {
     id: "series-note-1",
     user_id: "user-1",
@@ -19,7 +19,7 @@ function makeSeriesNote(overrides: Partial<SeriesNote> = {}): SeriesNote {
     content: "A series note",
     page_start: null,
     is_favorite: false,
-    note_date: "2026-07-01",
+    entry_date: "2026-07-01",
     created_at: "2026-07-01T08:00:00.000Z",
     updated_at: "2026-07-01T08:30:00.000Z",
     ...overrides,
@@ -28,7 +28,7 @@ function makeSeriesNote(overrides: Partial<SeriesNote> = {}): SeriesNote {
 
 test("normalizes series note fields", () => {
   assert.deepEqual(
-    normalizeSeriesNoteInput({
+    normalizeSeriesJournalEntryRecordInput({
       seriesId: "series-1",
       userId: "user-1",
       title: "  Big thought  ",
@@ -44,14 +44,26 @@ test("normalizes series note fields", () => {
       content: "This belongs to the whole series.",
       page_start: null,
       is_favorite: false,
-      note_date: "2026-07-02",
+      entry_date: "2026-07-02",
     },
+  );
+});
+
+test("includes parent entry id for series journal replies", () => {
+  assert.equal(
+    normalizeSeriesJournalEntryRecordInput({
+      seriesId: "series-1",
+      userId: "user-1",
+      content: "A reply",
+      parentEntryId: "parent-1",
+    }).parent_entry_id,
+    "parent-1",
   );
 });
 
 test("normalizes series quotes with speaker and page", () => {
   assert.deepEqual(
-    normalizeSeriesNoteInput({
+    normalizeSeriesJournalEntryRecordInput({
       seriesId: "series-1",
       userId: "user-1",
       label: "quote",
@@ -70,14 +82,14 @@ test("normalizes series quotes with speaker and page", () => {
       content: "A quote for the whole series.",
       page_start: 42,
       is_favorite: false,
-      note_date: "2026-07-02",
+      entry_date: "2026-07-02",
     },
   );
 });
 
 test("stores blank series note title as null", () => {
   assert.equal(
-    normalizeSeriesNoteFields({
+    normalizeSeriesJournalEntryRecordFields({
       title: "   ",
       content: "A note",
       noteDate: "2026-07-02",
@@ -89,7 +101,7 @@ test("stores blank series note title as null", () => {
 test("rejects blank series note content", () => {
   assert.throws(
     () =>
-      normalizeSeriesNoteFields({
+      normalizeSeriesJournalEntryRecordFields({
         title: "Optional",
         content: "   ",
         noteDate: "2026-07-02",
@@ -98,20 +110,20 @@ test("rejects blank series note content", () => {
   );
 });
 
-test("sorts series notes by visible date newest first", () => {
-  const notes = [
-    makeSeriesNote({ id: "older-created", note_date: "2026-07-01", created_at: "2026-07-02T08:00:00Z" }),
-    makeSeriesNote({ id: "newer-date", note_date: "2026-07-03", created_at: "2026-07-01T08:00:00Z" }),
-    makeSeriesNote({ id: "same-date-newer-created", note_date: "2026-07-01", created_at: "2026-07-03T08:00:00Z" }),
+test("sorts series journalEntries by visible date newest first", () => {
+  const journalEntries = [
+    makeSeriesJournalEntryRecord({ id: "older-created", entry_date: "2026-07-01", created_at: "2026-07-02T08:00:00Z" }),
+    makeSeriesJournalEntryRecord({ id: "newer-date", entry_date: "2026-07-03", created_at: "2026-07-01T08:00:00Z" }),
+    makeSeriesJournalEntryRecord({ id: "same-date-newer-created", entry_date: "2026-07-01", created_at: "2026-07-03T08:00:00Z" }),
   ];
 
   assert.deepEqual(
-    sortSeriesNotes(notes).map((note) => note.id),
+    sortSeriesJournalEntryRecords(journalEntries).map((note) => note.id),
     ["newer-date", "same-date-newer-created", "older-created"],
   );
 });
 
 test("converts Supabase-shaped series note errors to readable Error objects", () => {
-  const error = seriesNoteErrorToError({ message: "permission denied for table series_notes" });
-  assert.equal(error.message, "permission denied for table series_notes");
+  const error = seriesJournalEntryErrorToError({ message: "permission denied for table series_journal" });
+  assert.equal(error.message, "permission denied for table series_journal");
 });

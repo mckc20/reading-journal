@@ -37,7 +37,7 @@ test("parses consecutive list items as one list block", () => {
   ]);
 });
 
-test("converts existing Markdown notes to editor HTML", () => {
+test("converts existing Markdown journalEntries to editor HTML", () => {
   assert.equal(
     noteMarkdownToEditorHtml("A **bold** line\n> quoted\n- listed"),
     "<p>A <strong>bold</strong> line</p><blockquote>quoted</blockquote><ul><li>listed</li></ul>",

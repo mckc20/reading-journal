@@ -1,5 +1,5 @@
-import { sortBookNotes } from "@/lib/bookNotes";
-import type { Book, BookNote, BookNoteLabel, Series } from "@/types";
+import { sortBookJournalEntryRecords } from "@/lib/bookJournal";
+import type { Book, BookJournalEntryRecord, JournalEntryLabel, Series } from "@/types";
 
 export type BookGroup = {
   name: string;
@@ -11,13 +11,13 @@ export type SeriesBookGroup = BookGroup & {
   isFavorite?: boolean;
 };
 
-export type LibraryNote = BookNote & {
+export type LibraryNote = BookJournalEntryRecord & {
   book: Book;
 };
 
 export type NoteGroup = {
   name: string;
-  notes: LibraryNote[];
+  journalEntries: LibraryNote[];
 };
 
 export type LibraryValueShelf =
@@ -25,7 +25,7 @@ export type LibraryValueShelf =
   | "authors"
   | "genres"
   | "rating"
-  | "notes"
+  | "journalEntries"
   | "languages"
   | "format"
   | "source";
@@ -38,10 +38,10 @@ export type ShelfValueSummary = {
 const STAR_RATINGS = [5, 4, 3, 2, 1];
 export const UNCATEGORIZED = "Uncategorized";
 
-const NOTE_GROUPS: Array<{ label: BookNoteLabel; name: string }> = [
+const NOTE_GROUPS: Array<{ label: JournalEntryLabel; name: string }> = [
   { label: "quote", name: "Quotes" },
   { label: "review", name: "Reviews" },
-  { label: "note", name: "Notes" },
+  { label: "note", name: "Journal entries" },
 ];
 
 export function sortBooksByTitle(books: Book[]) {
@@ -203,17 +203,17 @@ export function buildRatingGroups(books: Book[]): BookGroup[] {
   return groups;
 }
 
-export function mergeNotesWithBooks(notes: BookNote[], books: Book[]): LibraryNote[] {
+export function mergeJournalEntriesWithBooks(journalEntries: BookJournalEntryRecord[], books: Book[]): LibraryNote[] {
   const booksById = new Map(books.map((book) => [book.id, book]));
 
-  return notes.flatMap((note) => {
+  return journalEntries.flatMap((note) => {
     const book = booksById.get(note.book_id);
     return book ? [{ ...note, book }] : [];
   });
 }
 
-export function sortLibraryNotes(notes: LibraryNote[]): LibraryNote[] {
-  return (sortBookNotes(notes) as LibraryNote[]).sort((a, b) => {
+export function sortLibraryJournalEntries(journalEntries: LibraryNote[]): LibraryNote[] {
+  return (sortBookJournalEntryRecords(journalEntries) as LibraryNote[]).sort((a, b) => {
     if (a.label === "quote" && b.label === "quote" && a.is_favorite !== b.is_favorite) {
       return a.is_favorite ? -1 : 1;
     }
@@ -222,13 +222,13 @@ export function sortLibraryNotes(notes: LibraryNote[]): LibraryNote[] {
   });
 }
 
-export function buildNoteGroups(notes: BookNote[], books: Book[]): NoteGroup[] {
-  const libraryNotes = mergeNotesWithBooks(notes, books);
+export function buildNoteGroups(journalEntries: BookJournalEntryRecord[], books: Book[]): NoteGroup[] {
+  const libraryJournalEntries = mergeJournalEntriesWithBooks(journalEntries, books);
 
   return NOTE_GROUPS.map(({ label, name }) => ({
     name,
-    notes: sortLibraryNotes(libraryNotes.filter((note) => note.label === label)),
-  })).filter((group) => group.notes.length > 0);
+    journalEntries: sortLibraryJournalEntries(libraryJournalEntries.filter((note) => note.label === label)),
+  })).filter((group) => group.journalEntries.length > 0);
 }
 
 function summarizeBookGroups(groups: BookGroup[]): ShelfValueSummary[] {
@@ -244,7 +244,7 @@ function summarizeBookGroups(groups: BookGroup[]): ShelfValueSummary[] {
 
 function summarizeNoteGroups(groups: NoteGroup[]): ShelfValueSummary[] {
   return groups
-    .map((group) => ({ name: group.name, count: group.notes.length }))
+    .map((group) => ({ name: group.name, count: group.journalEntries.length }))
     .sort((a, b) => {
       if (a.count !== b.count) return b.count - a.count;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
@@ -259,18 +259,18 @@ export function buildShelfValueSummaries({
   shelf,
   books,
   series,
-  notes = [],
+  journalEntries = [],
 }: {
   shelf: LibraryValueShelf;
   books: Book[];
   series: Series[];
-  notes?: BookNote[];
+  journalEntries?: BookJournalEntryRecord[];
 }): ShelfValueSummary[] {
   if (shelf === "series") return summarizeBookGroups(buildSeriesGroups(books, series));
   if (shelf === "authors") return summarizeBookGroups(buildMultiValueGroups(books, (book) => book.authors));
   if (shelf === "genres") return summarizeBookGroups(buildMultiValueGroups(books, (book) => book.genres));
   if (shelf === "rating") return summarizeRatingGroups(buildRatingGroups(books));
-  if (shelf === "notes") return summarizeNoteGroups(buildNoteGroups(notes, books));
+  if (shelf === "journalEntries") return summarizeNoteGroups(buildNoteGroups(journalEntries, books));
   if (shelf === "languages") return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.language));
   if (shelf === "format") return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.format));
   return summarizeBookGroups(buildSingleValueGroups(books, (book) => book.source));
@@ -336,20 +336,20 @@ export function filterBooksByShelfValue({
   return [];
 }
 
-export function filterNotesByShelfValue({
+export function filterJournalEntriesByShelfValue({
   value,
-  notes,
+  journalEntries,
   books,
 }: {
   value: string;
-  notes: BookNote[];
+  journalEntries: BookJournalEntryRecord[];
   books: Book[];
 }): NoteGroup[] {
   const noteGroup = NOTE_GROUPS.find((group) => group.name === value.trim());
   if (!noteGroup) return [];
 
   return buildNoteGroups(
-    notes.filter((note) => note.label === noteGroup.label),
+    journalEntries.filter((note) => note.label === noteGroup.label),
     books,
   );
 }

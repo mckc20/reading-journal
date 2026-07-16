@@ -63,13 +63,13 @@ import {
   getReadingDuration,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
-import { fetchBookNotes, sortBookNotes } from "@/lib/bookNotes";
+import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
-  bookNotesToJournalEntries,
+  bookJournalToJournalEntries,
   isThoughtJournalEntry,
   sortJournalEntries,
 } from "@/lib/journal";
@@ -89,7 +89,7 @@ import type {
   Book,
   BookFormat,
   BookLanguage,
-  BookNote,
+  BookJournalEntryRecord,
   BookSource,
   BookStatus,
   PublicationDatePrecision,
@@ -244,9 +244,9 @@ export default function BookDetails() {
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
@@ -325,14 +325,14 @@ export default function BookDetails() {
 
     async function run() {
       try {
-        setNotesLoading(true);
-        setNotesError(null);
-        const data = await fetchBookNotes(currentBookId);
-        if (!cancelled) setNotes(data);
+        setJournalEntriesLoading(true);
+        setJournalEntriesError(null);
+        const data = await fetchBookJournalEntryRecords(currentBookId);
+        if (!cancelled) setJournalEntries(data);
       } catch (err) {
-        if (!cancelled) setNotesError(err instanceof Error ? err.message : "Failed to load notes");
+        if (!cancelled) setJournalEntriesError(err instanceof Error ? err.message : "Failed to load journal entries");
       } finally {
-        if (!cancelled) setNotesLoading(false);
+        if (!cancelled) setJournalEntriesLoading(false);
       }
     }
 
@@ -385,8 +385,8 @@ export default function BookDetails() {
   }, [book, books]);
 
   const authorSummaries = useMemo(
-    () => buildAuthorSummaries(authors, books, notes),
-    [authors, books, notes],
+    () => buildAuthorSummaries(authors, books, journalEntries),
+    [authors, books, journalEntries],
   );
 
   const exploreGenre = useMemo(
@@ -641,21 +641,21 @@ export default function BookDetails() {
   const quoteJournalEntries = useMemo(
     () =>
       sortJournalEntries(
-        bookNotesToJournalEntries(notes.filter((note) => note.label === "quote")).map((entry) => ({
+        bookJournalToJournalEntries(journalEntries.filter((note) => note.label === "quote")).map((entry) => ({
           ...entry,
           relatedBookTitle: book?.title,
         })),
       ),
-    [book?.title, notes],
+    [book?.title, journalEntries],
   );
   const thoughtJournalEntries = useMemo(
     () =>
       sortJournalEntries(
-        bookNotesToJournalEntries(notes.filter((note) => note.label === "note" || note.label === "review"))
+        bookJournalToJournalEntries(journalEntries.filter((note) => note.label === "note" || note.label === "review"))
           .map((entry) => ({ ...entry, relatedBookTitle: book?.title }))
           .filter(isThoughtJournalEntry),
       ),
-    [book?.title, notes],
+    [book?.title, journalEntries],
   );
   const previewJournalEntries = useMemo(
     () =>
@@ -1274,13 +1274,13 @@ export default function BookDetails() {
               </Button>
             </div>
 
-            {notesLoading || logsLoading ? (
+            {journalEntriesLoading || logsLoading ? (
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="h-40 animate-pulse rounded-lg bg-muted" />
                 <div className="h-40 animate-pulse rounded-lg bg-muted" />
               </div>
-            ) : notesError ? (
-              <p className="text-sm text-destructive">{notesError}</p>
+            ) : journalEntriesError ? (
+              <p className="text-sm text-destructive">{journalEntriesError}</p>
             ) : logsError ? (
               <p className="text-sm text-destructive">{logsError}</p>
             ) : (
@@ -1295,10 +1295,10 @@ export default function BookDetails() {
                   emptyMessage="No journal entries yet."
                   onEntryUpdated={(entry) => {
                     if (entry.source !== "book_note") return;
-                    setNotes((current) => sortBookNotes([entry.bookNote, ...current.filter((note) => note.id !== entry.sourceId)]));
+                    setJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
                   }}
                   onEntryDeleted={(entry) => {
-                    setNotes((current) => current.filter((note) => note.id !== entry.sourceId));
+                    setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
                   }}
                 />
               )

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
 import { Textarea } from "@/components/ui/textarea";
-import { createBookNote, getProgressNoteDate } from "@/lib/bookNotes";
+import { createBookJournalEntryRecord, getProgressNoteDate } from "@/lib/bookJournal";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
 import type { Book, ReadingLog } from "@/types";
@@ -134,7 +134,7 @@ export default function ReadingProgressPanel({
 
       const trimmedNoteContent = noteContent.trim();
       if (trimmedNoteContent) {
-        await createBookNote({
+        await createBookJournalEntryRecord({
           bookId: book.id,
           userId: user.id,
           label: "note",

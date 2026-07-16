@@ -1,4 +1,4 @@
-import type { Book, BookNote, Series } from "@/types";
+import type { Book, BookJournalEntryRecord, Series } from "@/types";
 
 export type BookSearchPropertyKey =
   | "title"
@@ -53,8 +53,8 @@ export interface BookSearchSection {
   matches: BookSearchMatch[];
 }
 
-export interface BookNoteSearchMatch {
-  note: BookNote;
+export interface BookJournalEntryRecordSearchMatch {
+  note: BookJournalEntryRecord;
   book: Book;
   values: string[];
 }
@@ -230,18 +230,18 @@ export function searchBooks(
     .filter((section) => section.matches.length > 0);
 }
 
-export function searchBookNotes(
-  notes: BookNote[],
+export function searchBookJournalEntryRecords(
+  journalEntries: BookJournalEntryRecord[],
   books: Book[],
   query: string,
-): BookNoteSearchMatch[] {
+): BookJournalEntryRecordSearchMatch[] {
   const normalizedQuery = normalize(query);
   if (!normalizedQuery) return [];
 
   const booksById = new Map(books.map((book) => [book.id, book]));
 
-  return notes
-    .map((note): BookNoteSearchMatch | null => {
+  return journalEntries
+    .map((note): BookJournalEntryRecordSearchMatch | null => {
       const book = booksById.get(note.book_id);
       if (!book) return null;
 
@@ -255,7 +255,7 @@ export function searchBookNotes(
         values: matchedValues,
       };
     })
-    .filter((match): match is BookNoteSearchMatch => match !== null);
+    .filter((match): match is BookJournalEntryRecordSearchMatch => match !== null);
 }
 
 export function normalize(value: string): string {

@@ -76,12 +76,12 @@ import {
 } from "@/lib/chat";
 import { supabase } from "@/lib/supabase";
 import { buildAuthorSummaries } from "@/lib/authorShelf";
-import { createBookNote, fetchAllBookNotes } from "@/lib/bookNotes";
+import { createBookJournalEntryRecord, fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
 import type {
   Book,
-  BookNote,
+  BookJournalEntryRecord,
   ChatAttachmentPayload,
   ChatReplySnapshot,
   ChatSharedBookSnapshot,
@@ -225,9 +225,9 @@ function sortBooksByTitle(books: Book[]): Book[] {
   );
 }
 
-function sortNotesForPicker(notes: BookNote[]): BookNote[] {
-  return [...notes].sort((first, second) => {
-    const dateCompare = (second.note_date ?? second.created_at).localeCompare(first.note_date ?? first.created_at);
+function sortJournalEntriesForPicker(journalEntries: BookJournalEntryRecord[]): BookJournalEntryRecord[] {
+  return [...journalEntries].sort((first, second) => {
+    const dateCompare = (second.entry_date ?? second.created_at).localeCompare(first.entry_date ?? first.created_at);
     if (dateCompare !== 0) return dateCompare;
     return second.created_at.localeCompare(first.created_at);
   });
@@ -254,7 +254,7 @@ function ReplyPreview({
   return (
     <div className={cn("flex gap-2 rounded-md border-l-4 border-primary/70 bg-background/70 px-3 py-2", compact && "py-1.5")}>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-primary">Reply to {reply.sender_name}</p>
+        <p className="truncate text-xs font-medium text-primary">Note to {reply.sender_name}</p>
         <p className="line-clamp-1 text-xs text-muted-foreground">
           {reply.attachment_title ? `${reply.attachment_title}: ` : ""}
           {reply.text}
@@ -331,9 +331,9 @@ function AttachmentCard({
             {attachment.book.description && (
               <p className="line-clamp-3 text-xs text-muted-foreground">{attachment.book.description}</p>
             )}
-            {attachment.book.included_notes && attachment.book.included_notes.length > 0 && (
+            {attachment.book.included_journalEntries && attachment.book.included_journalEntries.length > 0 && (
               <div className="space-y-1">
-                {attachment.book.included_notes.map((note, index) => {
+                {attachment.book.included_journalEntries.map((note, index) => {
                   const noteItem = (
                     <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
                       <span className="font-medium">{noteLabel(note.label)}:</span> {note.content}
@@ -607,7 +607,7 @@ export function GroupsManager() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [members, setMembers] = useState<ChatMember[]>([]);
-  const [notes, setNotes] = useState<BookNote[]>([]);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [composeMode, setComposeMode] = useState<ComposeMode>("direct");
   const [directSearch, setDirectSearch] = useState("");
   const [profileResults, setProfileResults] = useState<PublicProfile[]>([]);
@@ -666,17 +666,17 @@ export function GroupsManager() {
     [books],
   );
 
-  const notesByBookId = useMemo(() => {
-    const map = new Map<string, BookNote[]>();
-    notes.forEach((note) => {
+  const journalEntriesByBookId = useMemo(() => {
+    const map = new Map<string, BookJournalEntryRecord[]>();
+    journalEntries.forEach((note) => {
       map.set(note.book_id, [...(map.get(note.book_id) ?? []), note]);
     });
     return map;
-  }, [notes]);
+  }, [journalEntries]);
 
   const authorSummaries = useMemo(
-    () => buildAuthorSummaries(authorRecords, books, notes),
-    [authorRecords, books, notes],
+    () => buildAuthorSummaries(authorRecords, books, journalEntries),
+    [authorRecords, books, journalEntries],
   );
   const seriesById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item])), [librarySeries]);
   const seriesBooksById = useMemo(() => {
@@ -687,17 +687,17 @@ export function GroupsManager() {
     });
     return map;
   }, [books]);
-  const seriesQuoteNotesById = useMemo(() => {
-    const map = new Map<string, BookNote[]>();
+  const seriesQuoteJournalEntriesById = useMemo(() => {
+    const map = new Map<string, BookJournalEntryRecord[]>();
     books.forEach((book) => {
       if (!book.series_id) return;
-      const bookNotes = notesByBookId.get(book.id) ?? [];
-      const quoteNotes = bookNotes.filter((note) => note.label === "quote");
-      if (quoteNotes.length === 0) return;
-      map.set(book.series_id, [...(map.get(book.series_id) ?? []), ...quoteNotes]);
+      const bookJournal = journalEntriesByBookId.get(book.id) ?? [];
+      const quoteJournalEntries = bookJournal.filter((note) => note.label === "quote");
+      if (quoteJournalEntries.length === 0) return;
+      map.set(book.series_id, [...(map.get(book.series_id) ?? []), ...quoteJournalEntries]);
     });
     return map;
-  }, [books, notesByBookId]);
+  }, [books, journalEntriesByBookId]);
 
   const filteredBooks = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
@@ -708,9 +708,9 @@ export function GroupsManager() {
     );
   }, [attachmentSearch, books]);
 
-  const filteredNotes = useMemo(() => {
+  const filteredJournalEntries = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
-    const sorted = sortNotesForPicker(notes);
+    const sorted = sortJournalEntriesForPicker(journalEntries);
     if (!query) return sorted;
     return sorted.filter((note) => {
       const book = booksById.get(note.book_id);
@@ -718,7 +718,7 @@ export function GroupsManager() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
-  }, [attachmentSearch, booksById, notes]);
+  }, [attachmentSearch, booksById, journalEntries]);
 
   const filteredAuthors = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
@@ -734,26 +734,26 @@ export function GroupsManager() {
   }, [attachmentSearch, librarySeries]);
 
   const selectedBook = selectedBookId ? booksById.get(selectedBookId) ?? null : null;
-  const selectedNote = selectedNoteId ? notes.find((note) => note.id === selectedNoteId) ?? null : null;
+  const selectedNote = selectedNoteId ? journalEntries.find((note) => note.id === selectedNoteId) ?? null : null;
   const selectedAuthor = selectedAuthorName
     ? authorSummaries.find((author) => author.name === selectedAuthorName) ?? null
     : null;
   const selectedSeries = selectedSeriesId ? seriesById.get(selectedSeriesId) ?? null : null;
 
-  const selectedBookNotes = selectedBook ? sortNotesForPicker(notesByBookId.get(selectedBook.id) ?? []) : [];
-  const selectedAuthorQuotes = selectedAuthor ? sortNotesForPicker(selectedAuthor.quotes) : [];
+  const selectedBookJournalEntryRecords = selectedBook ? sortJournalEntriesForPicker(journalEntriesByBookId.get(selectedBook.id) ?? []) : [];
+  const selectedAuthorQuotes = selectedAuthor ? sortJournalEntriesForPicker(selectedAuthor.quotes) : [];
   const selectedSeriesBooks = selectedSeries ? sortBooksByTitle(seriesBooksById.get(selectedSeries.id) ?? []) : [];
-  const selectedSeriesQuotes = selectedSeries ? sortNotesForPicker(seriesQuoteNotesById.get(selectedSeries.id) ?? []) : [];
+  const selectedSeriesQuotes = selectedSeries ? sortJournalEntriesForPicker(seriesQuoteJournalEntriesById.get(selectedSeries.id) ?? []) : [];
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchAllBookNotes()
-      .then((nextNotes) => {
-        if (!cancelled) setNotes(nextNotes);
+    fetchAllBookJournalEntryRecords()
+      .then((nextJournalEntries) => {
+        if (!cancelled) setJournalEntries(nextJournalEntries);
       })
       .catch(() => {
-        if (!cancelled) setNotes([]);
+        if (!cancelled) setJournalEntries([]);
       });
 
     return () => {
@@ -1099,7 +1099,7 @@ export function GroupsManager() {
                   onClick={() => openAttachmentPicker("note")}
                 >
                   <StickyNote className="h-4 w-4" />
-                  Attach Notes
+                  Attach JournalEntries
                 </button>
                 <button
                   type="button"
@@ -1239,10 +1239,10 @@ export function GroupsManager() {
 
   function attachSelectedItem() {
     if (attachmentPicker === "book" && selectedBook) {
-      const includedNotes = selectedIncludedNoteIds
-        .map((noteId) => notes.find((note) => note.id === noteId))
-        .filter((note): note is BookNote => Boolean(note));
-      setSelectedAttachment(buildBookAttachment(selectedBook, includedNotes));
+      const includedJournalEntries = selectedIncludedNoteIds
+        .map((noteId) => journalEntries.find((note) => note.id === noteId))
+        .filter((note): note is BookJournalEntryRecord => Boolean(note));
+      setSelectedAttachment(buildBookAttachment(selectedBook, includedJournalEntries));
     }
 
     if (attachmentPicker === "note" && selectedNote) {
@@ -1251,8 +1251,8 @@ export function GroupsManager() {
 
     if (attachmentPicker === "author" && selectedAuthor) {
       const includedQuotes = selectedIncludedNoteIds
-        .map((noteId) => notes.find((note) => note.id === noteId))
-        .filter((note): note is BookNote => Boolean(note));
+        .map((noteId) => journalEntries.find((note) => note.id === noteId))
+        .filter((note): note is BookJournalEntryRecord => Boolean(note));
       setSelectedAttachment(
         buildAuthorAttachment({
           authorId: selectedAuthor.id,
@@ -1265,8 +1265,8 @@ export function GroupsManager() {
 
     if (attachmentPicker === "series" && selectedSeries) {
       const includedQuotes = selectedIncludedNoteIds
-        .map((noteId) => notes.find((note) => note.id === noteId))
-        .filter((note): note is BookNote => Boolean(note));
+        .map((noteId) => journalEntries.find((note) => note.id === noteId))
+        .filter((note): note is BookJournalEntryRecord => Boolean(note));
       setSelectedAttachment(
         buildSeriesAttachment({
           seriesId: selectedSeries.id,
@@ -1355,14 +1355,14 @@ export function GroupsManager() {
     setStatusMessage(null);
 
     try {
-      const savedNote = await createBookNote(
+      const savedNote = await createBookJournalEntryRecord(
         noteSnapshotToCreateInput({
           note: message.attachment_payload.note,
           bookId: noteImportTargetBookId,
           userId: user.id,
         }),
       );
-      setNotes((current) => [savedNote, ...current]);
+      setJournalEntries((current) => [savedNote, ...current]);
       setNoteImportMessageId(null);
       setNoteImportTargetBookId("");
       setStatusMessage("Note saved.");
@@ -1487,7 +1487,7 @@ export function GroupsManager() {
             onClick={() => startReply(actionMenuMessage, actionMenuSenderProfile)}
           >
             <Reply className="h-4 w-4" />
-            Reply
+            Note
           </button>
           <button
             type="button"
@@ -1982,7 +1982,7 @@ export function GroupsManager() {
               {attachmentPicker === "book"
                 ? "Attach Book"
                 : attachmentPicker === "note"
-                  ? "Attach Notes"
+                  ? "Attach journal entries"
                   : attachmentPicker === "author"
                     ? "Attach Author"
                     : "Attach Series"}
@@ -2032,13 +2032,13 @@ export function GroupsManager() {
                 </div>
 
                 <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
-                  <p className="text-sm font-medium">Include notes, reviews, or quotes</p>
+                  <p className="text-sm font-medium">Include journal entries, reviews, or quotes</p>
                   {!selectedBook ? (
                     <p className="text-sm text-muted-foreground">Select a book first.</p>
-                  ) : selectedBookNotes.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">This book has no notes yet.</p>
+                  ) : selectedBookJournalEntryRecords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">This book has no journal entries yet.</p>
                   ) : (
-                    selectedBookNotes.map((note) => (
+                    selectedBookJournalEntryRecords.map((note) => (
                       <label key={note.id} className="flex gap-2 rounded-md p-2 text-sm hover:bg-muted">
                         <input
                           type="checkbox"
@@ -2064,7 +2064,7 @@ export function GroupsManager() {
 
             {attachmentPicker === "note" && (
               <div className="max-h-80 space-y-1 overflow-y-auto">
-                {filteredNotes.map((note) => {
+                {filteredJournalEntries.map((note) => {
                   const book = booksById.get(note.book_id);
                   return (
                     <button
@@ -2144,7 +2144,7 @@ export function GroupsManager() {
                 <div className="max-h-72 space-y-1 overflow-y-auto">
                   {filteredSeries.map((item) => {
                     const booksInSeries = seriesBooksById.get(item.id) ?? [];
-                    const quotesInSeries = seriesQuoteNotesById.get(item.id) ?? [];
+                    const quotesInSeries = seriesQuoteJournalEntriesById.get(item.id) ?? [];
                     return (
                       <button
                         key={item.id}

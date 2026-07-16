@@ -8,17 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { fetchAllBookNotes, formatBookNotePageRange } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords, formatBookJournalEntryRecordPageRange } from "@/lib/bookJournal";
 import {
   BOOK_SEARCH_PROPERTIES,
   getSearchHighlightParts,
-  searchBookNotes,
+  searchBookJournalEntryRecords,
   searchBooks,
   type BookSearchPropertyKey,
-  type BookNoteSearchMatch,
+  type BookJournalEntryRecordSearchMatch,
 } from "@/lib/bookSearch";
 import { cn, statusVariant } from "@/lib/utils";
-import type { Book, BookNote, BookNoteLabel } from "@/types";
+import type { Book, BookJournalEntryRecord, JournalEntryLabel } from "@/types";
 
 const allPropertyKeys = BOOK_SEARCH_PROPERTIES.map((property) => property.key);
 
@@ -30,10 +30,10 @@ export default function Search() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] =
     useState<BookSearchPropertyKey[]>(allPropertyKeys);
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesLoaded, setNotesLoaded] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
+  const [journalEntriesLoaded, setJournalEntriesLoaded] = useState(false);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const hasQuery = query.trim().length > 0;
 
@@ -47,8 +47,8 @@ export default function Search() {
   );
 
   const noteMatches = useMemo(
-    () => searchBookNotes(notes, books, query),
-    [books, notes, query]
+    () => searchBookJournalEntryRecords(journalEntries, books, query),
+    [books, journalEntries, query]
   );
 
   const allPropertiesSelected = selectedProperties.length === allPropertyKeys.length;
@@ -70,33 +70,33 @@ export default function Search() {
   }, [filtersOpen]);
 
   useEffect(() => {
-    if (!hasQuery || notesLoaded) return;
+    if (!hasQuery || journalEntriesLoaded) return;
 
     let isMounted = true;
-    setNotesLoading(true);
-    setNotesError(null);
+    setJournalEntriesLoading(true);
+    setJournalEntriesError(null);
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
         if (!isMounted) return;
-        setNotes(data);
-        setNotesLoaded(true);
+        setJournalEntries(data);
+        setJournalEntriesLoaded(true);
       })
       .catch((fetchError: unknown) => {
         if (!isMounted) return;
-        setNotesLoaded(true);
-        setNotesError(
-          fetchError instanceof Error ? fetchError.message : "Could not load notes."
+        setJournalEntriesLoaded(true);
+        setJournalEntriesError(
+          fetchError instanceof Error ? fetchError.message : "Could not load journal entries."
         );
       })
       .finally(() => {
-        if (isMounted) setNotesLoading(false);
+        if (isMounted) setJournalEntriesLoading(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [hasQuery, notesLoaded]);
+  }, [hasQuery, journalEntriesLoaded]);
 
   function openBook(book: Book) {
     navigate(`/books/${book.id}`);
@@ -136,8 +136,8 @@ export default function Search() {
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search books and notes"
-            aria-label="Search books and notes"
+            placeholder="Search books and journal entries"
+            aria-label="Search books and journal entries"
             autoComplete="off"
             className="h-10"
           />
@@ -212,9 +212,9 @@ export default function Search() {
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {notesError && hasQuery && (
+      {journalEntriesError && hasQuery && (
         <p className="text-sm text-destructive">
-          Notes could not be searched: {notesError}
+          JournalEntries could not be searched: {journalEntriesError}
         </p>
       )}
 
@@ -222,8 +222,8 @@ export default function Search() {
         <EmptyState message="Enter a search term to search your library." />
       )}
 
-      {!loading && !error && hasQuery && !notesLoading && !hasResults && (
-        <EmptyState message="No matching books or notes found." />
+      {!loading && !error && hasQuery && !journalEntriesLoading && !hasResults && (
+        <EmptyState message="No matching books or journal entries found." />
       )}
 
       {sections.map((section) => (
@@ -286,18 +286,18 @@ export default function Search() {
         </section>
       ))}
 
-      {hasQuery && (notesLoading || noteMatches.length > 0) && (
+      {hasQuery && (journalEntriesLoading || noteMatches.length > 0) && (
         <section className="space-y-3">
           <div>
-            <h2 className="font-heading leading-snug font-medium">Notes</h2>
+            <h2 className="font-heading leading-snug font-medium">Journal entries</h2>
             <p className="text-xs text-muted-foreground">
-              {notesLoading
-                ? "Searching notes..."
+              {journalEntriesLoading
+                ? "Searching journal entries..."
                 : `${noteMatches.length} match${noteMatches.length !== 1 ? "es" : ""}`}
             </p>
           </div>
           <Separator />
-          {!notesLoading && (
+          {!journalEntriesLoading && (
             <div className="space-y-2">
               {noteMatches.map((match) => (
                 <NoteSearchResult
@@ -320,13 +320,13 @@ function NoteSearchResult({
   query,
   onBook,
 }: {
-  match: BookNoteSearchMatch;
+  match: BookJournalEntryRecordSearchMatch;
   query: string;
   onBook: (book: Book) => void;
 }) {
   const { note, book } = match;
-  const pageLabel = formatBookNotePageRange(note);
-  const visibleDate = note.note_date ?? note.created_at;
+  const pageLabel = formatBookJournalEntryRecordPageRange(note);
+  const visibleDate = note.entry_date ?? note.created_at;
 
   return (
     <button
@@ -409,7 +409,7 @@ function HighlightedText({
   );
 }
 
-function noteLabelText(label: BookNoteLabel): string {
+function noteLabelText(label: JournalEntryLabel): string {
   if (label === "quote") return "Quote";
   if (label === "review") return "Review";
   return "Note";

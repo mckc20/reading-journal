@@ -1,6 +1,6 @@
 import type {
   Book,
-  BookNote,
+  BookJournalEntryRecord,
   ChatAttachmentPayload,
   ChatAuthorAttachment,
   ChatBookAttachment,
@@ -10,12 +10,12 @@ import type {
   ChatSharedNoteSnapshot,
 } from "@/types";
 import type { AddBookPayload } from "@/hooks/useBooks";
-import type { CreateBookNoteInput } from "@/lib/bookNotes";
+import type { CreateBookJournalEntryRecordInput } from "@/lib/bookJournal";
 
 export const MAX_INCLUDED_ATTACHMENT_NOTES = 3;
 
 export function buildSharedNoteSnapshot(
-  note: BookNote,
+  note: BookJournalEntryRecord,
   book?: Book | null,
 ): ChatSharedNoteSnapshot {
   return {
@@ -25,7 +25,7 @@ export function buildSharedNoteSnapshot(
     content: note.content,
     quote_speaker: note.quote_speaker ?? null,
     page_start: note.page_start ?? null,
-    note_date: note.note_date ?? null,
+    entry_date: note.entry_date ?? null,
     book_id: note.book_id,
     book_title: book?.title ?? null,
     book_authors: book?.authors ?? [],
@@ -34,7 +34,7 @@ export function buildSharedNoteSnapshot(
 
 export function buildSharedBookSnapshot(
   book: Book,
-  includedNotes: BookNote[] = [],
+  includedJournalEntries: BookJournalEntryRecord[] = [],
 ): ChatSharedBookSnapshot {
   return {
     id: book.id,
@@ -53,7 +53,7 @@ export function buildSharedBookSnapshot(
     metadata_source: book.metadata_source ?? null,
     metadata_source_url: book.metadata_source_url ?? null,
     volume_number: book.volume_number ?? null,
-    included_notes: includedNotes
+    included_journalEntries: includedJournalEntries
       .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
       .map((note) => buildSharedNoteSnapshot(note, book)),
   };
@@ -61,15 +61,15 @@ export function buildSharedBookSnapshot(
 
 export function buildBookAttachment(
   book: Book,
-  includedNotes: BookNote[] = [],
+  includedJournalEntries: BookJournalEntryRecord[] = [],
 ): ChatBookAttachment {
   return {
     type: "book",
-    book: buildSharedBookSnapshot(book, includedNotes),
+    book: buildSharedBookSnapshot(book, includedJournalEntries),
   };
 }
 
-export function buildNoteAttachment(note: BookNote, book?: Book | null): ChatNoteAttachment {
+export function buildNoteAttachment(note: BookJournalEntryRecord, book?: Book | null): ChatNoteAttachment {
   return {
     type: "note",
     note: buildSharedNoteSnapshot(note, book),
@@ -86,7 +86,7 @@ export function buildAuthorAttachment({
   authorId?: string;
   authorName: string;
   books: Book[];
-  includedQuotes: BookNote[];
+  includedQuotes: BookJournalEntryRecord[];
 }): ChatAuthorAttachment {
   return {
     type: "author",
@@ -110,7 +110,7 @@ export function buildSeriesAttachment({
   seriesId?: string | null;
   seriesName: string;
   books: Book[];
-  includedQuotes: BookNote[];
+  includedQuotes: BookJournalEntryRecord[];
 }): ChatSeriesAttachment {
   return {
     type: "series",
@@ -158,7 +158,7 @@ export function noteSnapshotToCreateInput({
   note: ChatSharedNoteSnapshot;
   bookId: string;
   userId: string;
-}): CreateBookNoteInput {
+}): CreateBookJournalEntryRecordInput {
   return {
     bookId,
     userId,
@@ -167,7 +167,7 @@ export function noteSnapshotToCreateInput({
     quoteSpeaker: note.quote_speaker ?? undefined,
     content: note.content,
     pageStart: note.page_start ?? undefined,
-    noteDate: note.note_date ?? undefined,
+    noteDate: note.entry_date ?? undefined,
     isFavorite: false,
   };
 }

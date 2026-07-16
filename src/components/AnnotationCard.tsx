@@ -3,11 +3,11 @@ import { Heart } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
-import { formatBookNotePageRange } from "@/lib/bookNotes";
+import { formatBookJournalEntryRecordPageRange } from "@/lib/bookJournal";
 import { cn } from "@/lib/utils";
-import type { BookNote, BookNoteLabel } from "@/types";
+import type { BookJournalEntryRecord, JournalEntryLabel } from "@/types";
 
-const LABEL_STYLES: Record<BookNoteLabel, string> = {
+const LABEL_STYLES: Record<JournalEntryLabel, string> = {
   quote: "border-quote/25 bg-quote/10 text-quote",
   review: "border-insight/25 bg-insight/10 text-insight",
   note: "border-note/25 bg-note/10 text-note",
@@ -23,12 +23,12 @@ function formatNoteDate(value: string): string {
   });
 }
 
-function labelText(label: BookNoteLabel): string {
+function labelText(label: JournalEntryLabel): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 interface AnnotationCardProps {
-  note: BookNote;
+  note: BookJournalEntryRecord;
   bookId?: string | null;
   bookTitle?: string | null;
   compact?: boolean;
@@ -36,8 +36,8 @@ interface AnnotationCardProps {
 }
 
 export default function AnnotationCard({ note, bookId, bookTitle, compact = false, className }: AnnotationCardProps) {
-  const pageRangeLabel = formatBookNotePageRange(note);
-  const visibleDate = note.note_date ?? note.created_at;
+  const pageRangeLabel = formatBookJournalEntryRecordPageRange(note);
+  const visibleDate = note.entry_date ?? note.created_at;
   const bookLabel = bookTitle && bookId ? (
     <Link to={`/books/${bookId}`} className="text-muted-foreground transition-colors hover:text-foreground">
       From {bookTitle}

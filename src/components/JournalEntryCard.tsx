@@ -1,9 +1,9 @@
-import { Bookmark } from "lucide-react";
+import { Bookmark, Reply } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntryTags, type JournalTimelineEntry } from "@/lib/journal";
-import { normalizeJournalTags } from "@/lib/journalTags";
+import { GENERATED_EVENT_NOTE_TAG_PREFIX, READING_LOG_NOTE_TAG_PREFIX, normalizeJournalTags, visibleJournalTags } from "@/lib/journalTags";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
@@ -12,11 +12,12 @@ interface JournalEntryCardProps {
   entry: JournalTimelineEntry;
   busy?: boolean;
   onToggleSaved?: (entry: JournalTimelineEntry) => void;
+  onReply?: (entry: JournalTimelineEntry) => void;
 }
 
 function titleForEntry(entry: JournalTimelineEntry): ReactNode {
   if (entry.source === "generated_book_event") return entry.label;
-  const tags = normalizeJournalTags(getJournalEntryTags(entry));
+  const tags = visibleJournalTags(getJournalEntryTags(entry));
   if (entry.source === "book_note" && tags.some((tag) => tag.toLocaleLowerCase() === "review") && entry.relatedBookTitle) {
     return (
       <>
@@ -24,29 +25,29 @@ function titleForEntry(entry: JournalTimelineEntry): ReactNode {
       </>
     );
   }
-  if (entry.source === "book_note") return entry.bookNote.label === "quote" ? "" : entry.bookNote.title || "";
-  if (entry.source === "series_note") return entry.seriesNote.label === "quote" ? "" : entry.seriesNote.title || "";
-  return entry.authorNote.label === "quote" ? "" : entry.authorNote.title || "";
+  if (entry.source === "book_note") return entry.bookJournalEntry.label === "quote" ? "" : entry.bookJournalEntry.title || "";
+  if (entry.source === "series_note") return entry.seriesJournalEntry.label === "quote" ? "" : entry.seriesJournalEntry.title || "";
+  return entry.authorJournalEntry.label === "quote" ? "" : entry.authorJournalEntry.title || "";
 }
 
 function contentForEntry(entry: JournalTimelineEntry): string {
   if (entry.source === "generated_book_event") return entry.description ?? "";
-  if (entry.source === "book_note") return entry.bookNote.content;
-  if (entry.source === "series_note") return entry.seriesNote.content;
-  return entry.authorNote.content;
+  if (entry.source === "book_note") return entry.bookJournalEntry.content;
+  if (entry.source === "series_note") return entry.seriesJournalEntry.content;
+  return entry.authorJournalEntry.content;
 }
 
 function quoteSpeakerForEntry(entry: JournalTimelineEntry): string | null {
-  if (entry.source === "book_note") return entry.bookNote.quote_speaker ?? null;
-  if (entry.source === "series_note") return entry.seriesNote.quote_speaker ?? null;
-  if (entry.source === "author_note") return entry.authorNote.quote_speaker ?? null;
+  if (entry.source === "book_note") return entry.bookJournalEntry.quote_speaker ?? null;
+  if (entry.source === "series_note") return entry.seriesJournalEntry.quote_speaker ?? null;
+  if (entry.source === "author_note") return entry.authorJournalEntry.quote_speaker ?? null;
   return null;
 }
 
 function isSaved(entry: JournalTimelineEntry): boolean {
-  if (entry.source === "book_note") return entry.bookNote.is_favorite;
-  if (entry.source === "series_note") return entry.seriesNote.is_favorite;
-  if (entry.source === "author_note") return entry.authorNote.is_favorite;
+  if (entry.source === "book_note") return entry.bookJournalEntry.is_favorite;
+  if (entry.source === "series_note") return entry.seriesJournalEntry.is_favorite;
+  if (entry.source === "author_note") return entry.authorJournalEntry.is_favorite;
   return false;
 }
 
@@ -54,8 +55,22 @@ function isManual(entry: JournalTimelineEntry): boolean {
   return entry.source === "book_note" || entry.source === "series_note" || entry.source === "author_note";
 }
 
-export default function JournalEntryCard({ entry, busy = false, onToggleSaved }: JournalEntryCardProps) {
-  const tags = normalizeJournalTags(getJournalEntryTags(entry));
+function isReply(entry: JournalTimelineEntry): boolean {
+  if (entry.source === "book_note") return Boolean(entry.bookJournalEntry.parent_entry_id);
+  if (entry.source === "series_note") return Boolean(entry.seriesJournalEntry.parent_entry_id);
+  if (entry.source === "author_note") return Boolean(entry.authorJournalEntry.parent_entry_id);
+  return false;
+}
+
+function isAttachedGeneratedNote(entry: JournalTimelineEntry): boolean {
+  if (!isManual(entry)) return false;
+  return normalizeJournalTags(getJournalEntryTags(entry)).some(
+    (tag) => tag.startsWith(GENERATED_EVENT_NOTE_TAG_PREFIX) || tag.startsWith(READING_LOG_NOTE_TAG_PREFIX),
+  );
+}
+
+export default function JournalEntryCard({ entry, busy = false, onToggleSaved, onReply }: JournalEntryCardProps) {
+  const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
   const saved = isSaved(entry);
 
@@ -99,6 +114,24 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved }:
             </Badge>
           ))}
         </div>
+      )}
+
+      {((isManual(entry) && !isReply(entry) && !isAttachedGeneratedNote(entry)) || (entry.source === "generated_book_event" && entry.entityType === "Book")) && onReply && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute bottom-3 right-3 z-10 h-7 w-7 text-muted-foreground hover:text-primary"
+          aria-label="Add note"
+          title="Add note"
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onReply(entry);
+          }}
+        >
+          <Reply className="h-4 w-4" />
+        </Button>
       )}
     </article>
   );

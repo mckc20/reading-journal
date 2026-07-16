@@ -16,9 +16,9 @@ import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
-import { fetchAllBookNotes } from "@/lib/bookNotes";
+import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogs } from "@/lib/books";
-import type { Book, BookNote, ReadingLog, Series } from "@/types";
+import type { Book, BookJournalEntryRecord, ReadingLog, Series } from "@/types";
 
 type AuthorDisplay = "cards" | "timeline";
 type AuthorTimelineSort = "publication-date" | "read-date" | "date-added";
@@ -136,9 +136,9 @@ export default function AuthorBooks() {
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [readingLogsLoading, setReadingLogsLoading] = useState(true);
   const [readingLogsError, setReadingLogsError] = useState<string | null>(null);
@@ -149,17 +149,17 @@ export default function AuthorBooks() {
   useEffect(() => {
     let ignore = false;
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch((error) => {
         if (!ignore) {
-          setNotesError(error instanceof Error ? error.message : "Failed to load quotes");
+          setJournalEntriesError(error instanceof Error ? error.message : "Failed to load quotes");
         }
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -188,7 +188,7 @@ export default function AuthorBooks() {
     };
   }, []);
 
-  const authorSummaries = useMemo(() => buildAuthorSummaries(authorRecords, books, notes), [authorRecords, books, notes]);
+  const authorSummaries = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const author = useMemo(() => findAuthorSummary(authorSummaries, authorId), [authorSummaries, authorId]);
   const latestReadDateByBook = useMemo(() => getReadingLogDateByBook(readingLogs), [readingLogs]);
 
@@ -222,7 +222,7 @@ export default function AuthorBooks() {
     });
   }, [latestReadDateByBook, series, timelineBooks, timelineSort]);
 
-  if (authorsLoading || booksLoading || notesLoading || seriesLoading || readingLogsLoading) {
+  if (authorsLoading || booksLoading || journalEntriesLoading || seriesLoading || readingLogsLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
@@ -247,8 +247,8 @@ export default function AuthorBooks() {
     return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{readingLogsError}</div>;
   }
 
-  if (notesError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{notesError}</div>;
+  if (journalEntriesError) {
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{journalEntriesError}</div>;
   }
 
   if (!author) {

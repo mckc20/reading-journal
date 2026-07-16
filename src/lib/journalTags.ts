@@ -1,8 +1,16 @@
 import { getBookGenreNames } from "@/lib/recommendations";
-import type { Book, BookNote, SeriesNote } from "@/types";
+import type { Book, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
+
+export const INTERNAL_JOURNAL_TAG_PREFIX = "__journal:";
+export const GENERATED_EVENT_NOTE_TAG_PREFIX = `${INTERNAL_JOURNAL_TAG_PREFIX}generated-event:`;
+export const READING_LOG_NOTE_TAG_PREFIX = `${INTERNAL_JOURNAL_TAG_PREFIX}reading-log:`;
 
 function normalizeTagKey(value: string): string {
   return value.trim().toLocaleLowerCase();
+}
+
+export function isInternalJournalTag(tag: string): boolean {
+  return normalizeTagKey(tag).startsWith(INTERNAL_JOURNAL_TAG_PREFIX);
 }
 
 export function normalizeJournalTags(tags: string[] | null | undefined): string[] {
@@ -17,9 +25,13 @@ export function normalizeJournalTags(tags: string[] | null | undefined): string[
   return [...unique.values()];
 }
 
+export function visibleJournalTags(tags: string[] | null | undefined): string[] {
+  return normalizeJournalTags(tags).filter((tag) => !isInternalJournalTag(tag));
+}
+
 function rankedTags(tags: string[], limit = 8): string[] {
   const counts = new Map<string, { tag: string; count: number }>();
-  tags.forEach((tag) => {
+  tags.filter((tag) => !isInternalJournalTag(tag)).forEach((tag) => {
     const key = normalizeTagKey(tag);
     if (!key) return;
     const current = counts.get(key);
@@ -35,7 +47,7 @@ function rankedTags(tags: string[], limit = 8): string[] {
 export function suggestBookJournalTags(
   currentBook: Book,
   allBooks: Book[],
-  allNotes: BookNote[],
+  allJournalEntries: BookJournalEntryRecord[],
 ): string[] {
   const targetGenres = new Set(getBookGenreNames(currentBook).map(normalizeTagKey));
   if (targetGenres.size === 0) return [];
@@ -48,17 +60,17 @@ export function suggestBookJournalTags(
   );
 
   return rankedTags(
-    allNotes.flatMap((note) => (similarBookIds.has(note.book_id) ? normalizeJournalTags(note.tags) : [])),
+    allJournalEntries.flatMap((note) => (similarBookIds.has(note.book_id) ? normalizeJournalTags(note.tags) : [])),
   );
 }
 
-export function suggestSeriesJournalTags(seriesNotes: SeriesNote[]): string[] {
-  return rankedTags(seriesNotes.flatMap((note) => normalizeJournalTags(note.tags)));
+export function suggestSeriesJournalTags(seriesJournal: SeriesJournalEntryRecord[]): string[] {
+  return rankedTags(seriesJournal.flatMap((note) => normalizeJournalTags(note.tags)));
 }
 
-export function suggestAuthorJournalTags(authorBooks: Book[], allNotes: BookNote[]): string[] {
+export function suggestAuthorJournalTags(authorBooks: Book[], allJournalEntries: BookJournalEntryRecord[]): string[] {
   const authorBookIds = new Set(authorBooks.map((book) => book.id));
   return rankedTags(
-    allNotes.flatMap((note) => (authorBookIds.has(note.book_id) ? normalizeJournalTags(note.tags) : [])),
+    allJournalEntries.flatMap((note) => (authorBookIds.has(note.book_id) ? normalizeJournalTags(note.tags) : [])),
   );
 }

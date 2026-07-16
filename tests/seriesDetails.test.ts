@@ -21,7 +21,7 @@ import {
   getSeriesStats,
   sortSeriesBooks,
 } from "../src/lib/seriesDetails";
-import type { Book, BookNote, ReadingLog, Series } from "../src/types";
+import type { Book, BookJournalEntryRecord, ReadingLog, Series } from "../src/types";
 
 test("orders numbered series books before unnumbered books with title fallback", () => {
   const sorted = sortSeriesBooks([
@@ -353,13 +353,13 @@ test("selects pace and length winners with ties while excluding missing inputs",
   assert.deepEqual(stats.shortestBook?.books.map((book) => book.id), ["a"]);
 });
 
-test("counts notes and quotes as annotations while excluding reviews", () => {
+test("counts journalEntries and quotes as annotations while excluding reviews", () => {
   const books = [
     makeBook({ id: "one", volume_number: 1, is_favorite: true, rating: 2 }),
     makeBook({ id: "two", volume_number: 2, is_favorite: true, rating: 5 }),
     makeBook({ id: "three", volume_number: 3, rating: 4 }),
   ];
-  const notes = [
+  const journalEntries = [
     makeNote({ id: "one-note", book_id: "one", label: "note" }),
     makeNote({ id: "one-review", book_id: "one", label: "review" }),
     makeNote({ id: "one-quote", book_id: "one", label: "quote" }),
@@ -368,7 +368,7 @@ test("counts notes and quotes as annotations while excluding reviews", () => {
     makeNote({ id: "outside", book_id: "outside", label: "note" }),
   ];
 
-  const stats = getSeriesStats(books, [], notes);
+  const stats = getSeriesStats(books, [], journalEntries);
   assert.deepEqual(stats.rankings.annotations.map((row) => row.book.id), ["one", "two"]);
   assert.deepEqual(stats.rankings.annotations.map((row) => row.value), [2, 1]);
 });
@@ -380,7 +380,7 @@ test("builds rankings with favorite books first among equal ratings and includes
     makeBook({ id: "three", volume_number: 3, rating: 4 }),
     makeBook({ id: "favorite-five", volume_number: 4, rating: 5, is_favorite: true }),
   ];
-  const notes = [
+  const journalEntries = [
     makeNote({ id: "one-annotation", book_id: "one", label: "note" }),
     makeNote({ id: "two-review", book_id: "two", label: "review" }),
     makeNote({ id: "two-annotation", book_id: "two", label: "note" }),
@@ -390,7 +390,7 @@ test("builds rankings with favorite books first among equal ratings and includes
     makeNote({ id: "outside", book_id: "outside", label: "quote", is_favorite: true }),
   ];
 
-  const stats = getSeriesStats(books, [], notes);
+  const stats = getSeriesStats(books, [], journalEntries);
 
   assert.deepEqual(stats.rankings.rating.map((row) => row.book.id), ["favorite-five", "two", "three", "one"]);
   assert.deepEqual(stats.rankings.length.map((row) => row.book.id), ["two", "one"]);
@@ -419,23 +419,23 @@ test("ranks favorite books above regular five-star books", () => {
 
 test("filters and sorts series quote entries", () => {
   const books = [makeBook({ id: "one" }), makeBook({ id: "two", title: "Second" })];
-  const notes = [
-    makeNote({ id: "older", book_id: "one", label: "quote", content: "Bridge four", note_date: "2026-01-01" }),
-    makeNote({ id: "newer", book_id: "two", label: "quote", content: "Stormlight", note_date: "2026-02-01", is_favorite: true }),
+  const journalEntries = [
+    makeNote({ id: "older", book_id: "one", label: "quote", content: "Bridge four", entry_date: "2026-01-01" }),
+    makeNote({ id: "newer", book_id: "two", label: "quote", content: "Stormlight", entry_date: "2026-02-01", is_favorite: true }),
     makeNote({ id: "note", book_id: "one", label: "note", content: "Not a quote" }),
   ];
 
-  assert.deepEqual(getSeriesQuoteEntries(books, notes).map((entry) => entry.note.id), ["newer", "older"]);
+  assert.deepEqual(getSeriesQuoteEntries(books, journalEntries).map((entry) => entry.note.id), ["newer", "older"]);
   assert.deepEqual(
-    getSeriesQuoteEntries(books, notes, { sort: "oldest" }).map((entry) => entry.note.id),
+    getSeriesQuoteEntries(books, journalEntries, { sort: "oldest" }).map((entry) => entry.note.id),
     ["older", "newer"],
   );
   assert.deepEqual(
-    getSeriesQuoteEntries(books, notes, { search: "second" }).map((entry) => entry.note.id),
+    getSeriesQuoteEntries(books, journalEntries, { search: "second" }).map((entry) => entry.note.id),
     ["newer"],
   );
   assert.deepEqual(
-    getSeriesQuoteEntries(books, notes, { favoritesOnly: true }).map((entry) => entry.note.id),
+    getSeriesQuoteEntries(books, journalEntries, { favoritesOnly: true }).map((entry) => entry.note.id),
     ["newer"],
   );
 });
@@ -545,7 +545,7 @@ function makeLog(overrides: Partial<ReadingLog>): ReadingLog {
   };
 }
 
-function makeNote(overrides: Partial<BookNote>): BookNote {
+function makeNote(overrides: Partial<BookJournalEntryRecord>): BookJournalEntryRecord {
   return {
     id: "note",
     book_id: "volume",
@@ -553,7 +553,7 @@ function makeNote(overrides: Partial<BookNote>): BookNote {
     label: "note",
     content: "Note",
     is_favorite: false,
-    note_date: "2026-05-01",
+    entry_date: "2026-05-01",
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
     ...overrides,

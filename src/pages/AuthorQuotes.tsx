@@ -7,12 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
-import { fetchAllBookNotes, sortBookNotes } from "@/lib/bookNotes";
-import type { BookNote, BookNoteLabel } from "@/types";
+import { fetchAllBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
+import type { BookJournalEntryRecord, JournalEntryLabel } from "@/types";
 
-const TAB_LABELS: Record<BookNoteLabel, string> = {
+const TAB_LABELS: Record<JournalEntryLabel, string> = {
   quote: "Quotes",
-  note: "Notes",
+  note: "Journal entries",
   review: "Review",
 };
 
@@ -29,24 +29,24 @@ export default function AuthorQuotes() {
   const { authorId } = useParams();
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
-  const [notes, setNotes] = useState<BookNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [notesError, setNotesError] = useState<string | null>(null);
+  const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
+  const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
 
-    fetchAllBookNotes()
+    fetchAllBookJournalEntryRecords()
       .then((data) => {
-        if (!ignore) setNotes(data);
+        if (!ignore) setJournalEntries(data);
       })
       .catch((error) => {
         if (!ignore) {
-          setNotesError(error instanceof Error ? error.message : "Failed to load annotations");
+          setJournalEntriesError(error instanceof Error ? error.message : "Failed to load annotations");
         }
       })
       .finally(() => {
-        if (!ignore) setNotesLoading(false);
+        if (!ignore) setJournalEntriesLoading(false);
       });
 
     return () => {
@@ -54,26 +54,26 @@ export default function AuthorQuotes() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, notes), [authorRecords, books, notes]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   const bookTitleById = useMemo(
     () => new Map((author?.books ?? []).map((book) => [book.id, book.title])),
     [author],
   );
-  const authorNotes = useMemo(
-    () => sortBookNotes(notes.filter((note) => author?.books.some((book) => book.id === note.book_id))),
-    [author, notes],
+  const authorJournal = useMemo(
+    () => sortBookJournalEntryRecords(journalEntries.filter((note) => author?.books.some((book) => book.id === note.book_id))),
+    [author, journalEntries],
   );
-  const notesByLabel = useMemo(
+  const journalEntriesByLabel = useMemo(
     () => ({
-      quote: authorNotes.filter((note) => note.label === "quote"),
-      note: authorNotes.filter((note) => note.label === "note"),
-      review: authorNotes.filter((note) => note.label === "review"),
+      quote: authorJournal.filter((note) => note.label === "quote"),
+      note: authorJournal.filter((note) => note.label === "note"),
+      review: authorJournal.filter((note) => note.label === "review"),
     }),
-    [authorNotes],
+    [authorJournal],
   );
 
-  if (authorsLoading || booksLoading || notesLoading) {
+  if (authorsLoading || booksLoading || journalEntriesLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
@@ -90,8 +90,8 @@ export default function AuthorQuotes() {
     return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{authorsError}</div>;
   }
 
-  if (notesError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{notesError}</div>;
+  if (journalEntriesError) {
+    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{journalEntriesError}</div>;
   }
 
   if (!author) {
@@ -121,24 +121,24 @@ export default function AuthorQuotes() {
 
       <Tabs defaultValue="quote" className="space-y-4">
         <TabsList variant="line" className="w-full justify-start gap-6 rounded-none border-0 border-b border-border bg-transparent p-0">
-          {(Object.keys(TAB_LABELS) as BookNoteLabel[]).map((label) => (
+          {(Object.keys(TAB_LABELS) as JournalEntryLabel[]).map((label) => (
             <TabsTrigger
               key={label}
               value={label}
               className="h-auto flex-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none data-active:bg-transparent data-active:text-primary data-active:shadow-none"
             >
-              {TAB_LABELS[label]} ({notesByLabel[label].length})
+              {TAB_LABELS[label]} ({journalEntriesByLabel[label].length})
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {(Object.keys(TAB_LABELS) as BookNoteLabel[]).map((label) => (
+        {(Object.keys(TAB_LABELS) as JournalEntryLabel[]).map((label) => (
           <TabsContent key={label} value={label}>
-            {notesByLabel[label].length === 0 ? (
+            {journalEntriesByLabel[label].length === 0 ? (
               <EmptyState message={`No ${TAB_LABELS[label].toLowerCase()} yet.`} />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
-                {notesByLabel[label].map((note) => (
+                {journalEntriesByLabel[label].map((note) => (
                 <AnnotationCard
                   key={note.id}
                   note={note}
