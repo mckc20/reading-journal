@@ -233,7 +233,7 @@
   }
 
   .journal-markdown blockquote {
-    @apply border-l-2 border-quote/45 pl-4 text-foreground;
+    @apply border-l-2 border-note/55 pl-4 text-foreground;
   }
 
   .journal-markdown a {
