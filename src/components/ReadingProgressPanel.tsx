@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, NotebookPen } from "lucide-react";
+import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
-import { Textarea } from "@/components/ui/textarea";
-import { createBookJournalEntryRecord, getProgressNoteDate } from "@/lib/bookJournal";
+import { getProgressNoteDate } from "@/lib/bookJournal";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
 import type { Book, ReadingLog } from "@/types";
@@ -69,7 +69,6 @@ export default function ReadingProgressPanel({
     toDateTimeLocalValue(new Date())
   );
   const [showNoteEditor, setShowNoteEditor] = useState(false);
-  const [noteContent, setNoteContent] = useState("");
 
   // Fetch last reading log on mount
   useEffect(() => {
@@ -98,7 +97,6 @@ export default function ReadingProgressPanel({
       setShowLoggedAtEditor(false);
       setSelectedLoggedAt(toDateTimeLocalValue(new Date()));
       setShowNoteEditor(false);
-      setNoteContent("");
       setErrorMsg(null);
     }
   }, [expanded, lastLog, book.current_page, totalPages]);
@@ -132,18 +130,6 @@ export default function ReadingProgressPanel({
         loggedAtIso
       );
 
-      const trimmedNoteContent = noteContent.trim();
-      if (trimmedNoteContent) {
-        await createBookJournalEntryRecord({
-          bookId: book.id,
-          userId: user.id,
-          label: "note",
-          content: trimmedNoteContent,
-          pageStart: selectedPage,
-          noteDate: getProgressNoteDate(showLoggedAtEditor, selectedLoggedAt),
-        });
-      }
-
       await onProgressSaved(selectedPage);
       // Update lastLog locally so the min page updates
       setLastLog({
@@ -154,7 +140,6 @@ export default function ReadingProgressPanel({
         logged_at: loggedAtIso ?? new Date().toISOString(),
       });
       setShowNoteEditor(false);
-      setNoteContent("");
       setExpanded(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save progress");
@@ -250,25 +235,31 @@ export default function ReadingProgressPanel({
             {!showNoteEditor && (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
+                className="h-auto px-0 text-primary hover:bg-transparent hover:text-primary/85"
                 onClick={() => setShowNoteEditor(true)}
               >
-                Add Note
+                <NotebookPen className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                Add Entry
               </Button>
             )}
 
             {showNoteEditor && (
-              <div className="space-y-1.5">
-                <Label htmlFor="progress-note" className="text-xs text-muted-foreground">
-                  Note for this progress update (optional)
-                </Label>
-                <Textarea
-                  id="progress-note"
-                  value={noteContent}
-                  onChange={(event) => setNoteContent(event.target.value)}
-                  placeholder="Write a note about what you read..."
-                  className="min-h-28"
+              <div className="pt-1">
+                <JournalEntryForm
+                  active={showNoteEditor}
+                  initialBookId={book.id}
+                  entity={{ type: "Book", id: book.id }}
+                  initialEntry={null}
+                  initialPageStart={selectedPage}
+                  initialNoteDate={getProgressNoteDate(showLoggedAtEditor, selectedLoggedAt)}
+                  preferInitialPageAndDate
+                  variant="inline"
+                  heading="Add entry"
+                  hideEntitySelector
+                  onCancel={() => setShowNoteEditor(false)}
+                  onSaved={() => setShowNoteEditor(false)}
                 />
               </div>
             )}
