@@ -17,7 +17,6 @@ import {
   seriesJournalToJournalEntries,
   sortJournalEntries,
 } from "@/lib/journal";
-import { suggestSeriesJournalTags } from "@/lib/journalTags";
 import { fetchSeriesJournalEntryRecords, sortSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import { sortSeriesBooks } from "@/lib/seriesDetails";
 import type { Book, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
@@ -175,7 +174,6 @@ export default function SeriesJournal() {
       ]),
     [automaticEntries, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries],
   );
-  const tagSuggestions = useMemo(() => suggestSeriesJournalTags(journalEntries), [journalEntries]);
 
   if (booksLoading || seriesLoading || loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-muted" />;
@@ -203,7 +201,6 @@ export default function SeriesJournal() {
         open={composerOpen}
         onOpenChange={setComposerOpen}
         entity={{ type: "Series", id: seriesRecord.id }}
-        tagSuggestions={tagSuggestions}
         onSaved={(note) => {
           if ("series_id" in note) setJournalEntries((current) => sortSeriesJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
         }}

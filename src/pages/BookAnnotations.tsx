@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
 import { useUserSettings } from "@/context/UserSettingsContext";
-import { fetchAllBookJournalEntryRecords, fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
+import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import {
   bookJournalToJournalEntries,
@@ -19,7 +19,7 @@ import {
   sortJournalEntries,
   type JournalTimelineEntry,
 } from "@/lib/journal";
-import { READING_LOG_NOTE_TAG_PREFIX, isInternalJournalTag, normalizeJournalTags, suggestBookJournalTags } from "@/lib/journalTags";
+import { READING_LOG_NOTE_TAG_PREFIX, isInternalJournalTag, normalizeJournalTags } from "@/lib/journalTags";
 import type { BookJournalEntryRecord, ReadingLog } from "@/types";
 
 type JournalTimelineSortMode = "entry-date" | "date-added" | "book-progress";
@@ -54,7 +54,6 @@ export default function BookAnnotations() {
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
   const { settings } = useUserSettings();
   const [journalEntryRecords, setJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
-  const [allJournalEntries, setAllJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
@@ -96,7 +95,6 @@ export default function BookAnnotations() {
         const data = await fetchBookJournalEntryRecords(currentBookId);
         if (!cancelled) {
           setJournalEntryRecords(data);
-          setAllJournalEntries((current) => sortBookJournalEntryRecords([...data, ...current.filter((note) => note.book_id !== currentBookId)]));
         }
       } catch (err) {
         if (!cancelled) {
@@ -112,20 +110,6 @@ export default function BookAnnotations() {
       cancelled = true;
     };
   }, [bookId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchAllBookJournalEntryRecords()
-      .then((data) => {
-        if (!cancelled) setAllJournalEntries(data);
-      })
-      .catch(() => {
-        if (!cancelled) setAllJournalEntries([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!bookId) return;
@@ -285,11 +269,6 @@ export default function BookAnnotations() {
     thought: journalEntriesByLabel.note.length + journalEntriesByLabel.review.length,
     automatic: generatedJournalEntries.length,
   };
-  const tagSuggestions = useMemo(
-    () => (book ? suggestBookJournalTags(book, books, allJournalEntries) : []),
-    [allJournalEntries, book, books],
-  );
-
   if (booksLoading) {
     return (
       <div className="space-y-4">
@@ -337,11 +316,9 @@ export default function BookAnnotations() {
         onOpenChange={setShowEditor}
         initialBookId={book.id}
         entity={{ type: "Book", id: book.id }}
-        tagSuggestions={tagSuggestions}
         onSaved={(note) => {
           if ("book_id" in note) {
             setJournalEntryRecords((current) => sortBookJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
-            setAllJournalEntries((current) => sortBookJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
           }
         }}
       />
@@ -405,16 +382,13 @@ export default function BookAnnotations() {
           onEntryUpdated={(entry) => {
             if (entry.source !== "book_note") return;
             setJournalEntryRecords((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-            setAllJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
           }}
           onEntryCreated={(entry) => {
             if (entry.source !== "book_note") return;
             setJournalEntryRecords((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-            setAllJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
           }}
           onEntryDeleted={(entry) => {
             setJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
-            setAllJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
           }}
         />
       )}

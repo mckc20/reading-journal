@@ -30,7 +30,6 @@ interface AddJournalEntryDialogProps {
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
-  tagSuggestions?: string[];
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
 
@@ -45,7 +44,6 @@ interface JournalEntryFormProps {
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
-  tagSuggestions?: string[];
   variant?: "dialog" | "inline";
   heading?: ReactNode;
   hideEntitySelector?: boolean;
@@ -149,7 +147,6 @@ export function JournalEntryForm({
   active = true,
   initialBookId = "",
   entity,
-  tagSuggestions = [],
   initialEntry = null,
   parentEntryId = null,
   initialPageStart = null,
@@ -232,10 +229,6 @@ export function JournalEntryForm({
     () => normalizeJournalTags([...hiddenInitialTags, ...systemTags]),
     [hiddenInitialTags, systemTags],
   );
-  const availableTagSuggestions = useMemo(() => {
-    const selected = new Set(normalizeJournalTags(tags).map((tag) => tag.toLocaleLowerCase()));
-    return normalizeJournalTags(tagSuggestions).filter((tag) => !selected.has(tag.toLocaleLowerCase()));
-  }, [tagSuggestions, tags]);
   const draftKey = useMemo(() => {
     if (initialEntry) {
       return [
@@ -609,16 +602,6 @@ export function JournalEntryForm({
                       }}
                     />
                   </div>
-                  {availableTagSuggestions.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => addTag(tag)}
-                      className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                    >
-                      {tag}
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -658,7 +641,6 @@ export default function AddJournalEntryDialog({
   onOpenChange,
   initialBookId = "",
   entity,
-  tagSuggestions = [],
   initialEntry = null,
   parentEntryId = null,
   initialPageStart = null,
@@ -690,7 +672,6 @@ export default function AddJournalEntryDialog({
           preferInitialPageAndDate={preferInitialPageAndDate}
           systemTags={systemTags}
           replaceSystemTagPrefixes={replaceSystemTagPrefixes}
-          tagSuggestions={tagSuggestions}
           onCancel={() => onOpenChange(false)}
           onSaved={(note) => {
             onSaved?.(note);
