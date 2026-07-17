@@ -317,6 +317,7 @@ function JournalEntryActionsMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [menuPlacement, setMenuPlacement] = useState<"top" | "bottom">("bottom");
   const canReply = Boolean(onReply) && (
     isGeneratedAttachableEntry(entry) ||
     (isManualEntry(entry) && !isReplyEntry(entry) && !isAttachedGeneratedNote(entry))
@@ -330,6 +331,22 @@ function JournalEntryActionsMenu({
   useEffect(() => {
     if (!open) return;
 
+    function updateMenuPlacement() {
+      const button = buttonRef.current;
+      if (!button) return;
+
+      const buttonRect = button.getBoundingClientRect();
+      const menuHeight = menuRef.current?.offsetHeight ?? 280;
+      const viewportPadding = 12;
+      const spaceBelow = window.innerHeight - buttonRect.bottom - viewportPadding;
+      const spaceAbove = buttonRect.top - viewportPadding;
+
+      setMenuPlacement(spaceBelow < menuHeight && spaceAbove > spaceBelow ? "top" : "bottom");
+    }
+
+    updateMenuPlacement();
+    window.requestAnimationFrame(updateMenuPlacement);
+
     function handlePointerDown(event: Event) {
       const target = event.target as Node | null;
       if (target && (buttonRef.current?.contains(target) || menuRef.current?.contains(target))) return;
@@ -342,9 +359,13 @@ function JournalEntryActionsMenu({
 
     window.addEventListener("mousedown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", updateMenuPlacement);
+    window.addEventListener("scroll", updateMenuPlacement, true);
     return () => {
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updateMenuPlacement);
+      window.removeEventListener("scroll", updateMenuPlacement, true);
     };
   }, [open]);
 
@@ -377,7 +398,10 @@ function JournalEntryActionsMenu({
       {open && (
         <div
           ref={menuRef}
-          className="absolute right-0 top-full z-50 mt-1 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
+          className={cn(
+            "absolute right-0 z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]",
+            menuPlacement === "top" ? "bottom-full mb-1" : "top-full mt-1",
+          )}
         >
           {canReply && onReply && (
             <button
