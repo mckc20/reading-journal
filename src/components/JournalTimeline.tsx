@@ -18,6 +18,7 @@ import {
   StickyNote,
   StickyNoteOff,
   StickyNotePlus,
+  StickyNotes,
   TrendingUp,
   Trash2,
   Unlink,
@@ -85,6 +86,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface JournalTimelineProps {
   entries: JournalTimelineEntry[];
@@ -297,10 +299,12 @@ function JournalEntryActionsMenu({
   isHidden,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
+  allowAttach = true,
   className,
 }: {
   entry: JournalTimelineEntry;
@@ -308,25 +312,29 @@ function JournalEntryActionsMenu({
   isHidden: boolean;
   onReply?: (entry: JournalTimelineEntry) => void;
   onLink?: (entry: ManualJournalTimelineEntry) => void;
+  onAttach?: (entry: ManualJournalTimelineEntry) => void;
   onUnattach?: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden?: (entry: JournalTimelineEntry) => void;
   onEdit?: (entry: ManualJournalTimelineEntry) => void;
   onDelete?: (entry: ManualJournalTimelineEntry) => void;
+  allowAttach?: boolean;
   className?: string;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [menuPlacement, setMenuPlacement] = useState<"top" | "bottom">("bottom");
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const canReply = Boolean(onReply) && (
     isGeneratedAttachableEntry(entry) ||
     (isManualEntry(entry) && !isReplyEntry(entry) && !isAttachedGeneratedNote(entry))
   );
   const canLink = isManualEntry(entry) && Boolean(onLink);
+  const canAttach = allowAttach && isManualEntry(entry) && !isAttachedNote(entry) && Boolean(onAttach);
   const canUnattach = isAttachedNote(entry) && Boolean(onUnattach);
   const canEdit = isManualEntry(entry) && Boolean(onEdit);
   const canDelete = isManualEntry(entry) && Boolean(onDelete);
-  const hasActions = canReply || canLink || canUnattach || Boolean(onToggleHidden) || canEdit || canDelete;
+  const hasActions = canReply || canLink || canAttach || canUnattach || Boolean(onToggleHidden) || canEdit || canDelete;
 
   useEffect(() => {
     if (!open) return;
@@ -337,6 +345,7 @@ function JournalEntryActionsMenu({
 
       const buttonRect = button.getBoundingClientRect();
       const menuHeight = menuRef.current?.offsetHeight ?? 280;
+      const menuWidth = menuRef.current?.offsetWidth ?? 176;
       const viewportPadding = 12;
       let clippingTop = viewportPadding;
       let clippingBottom = window.innerHeight - viewportPadding;
@@ -357,8 +366,17 @@ function JournalEntryActionsMenu({
 
       const spaceBelow = clippingBottom - buttonRect.bottom;
       const spaceAbove = buttonRect.top - clippingTop;
+      const placement = spaceBelow < menuHeight && spaceAbove > spaceBelow ? "top" : "bottom";
+      const left = Math.min(
+        Math.max(viewportPadding, buttonRect.right - menuWidth),
+        window.innerWidth - menuWidth - viewportPadding,
+      );
+      const top = placement === "top"
+        ? Math.max(clippingTop, buttonRect.top - menuHeight - 4)
+        : Math.min(clippingBottom - menuHeight, buttonRect.bottom + 4);
 
-      setMenuPlacement(spaceBelow < menuHeight && spaceAbove > spaceBelow ? "top" : "bottom");
+      setMenuPlacement(placement);
+      setMenuPosition({ left, top });
     }
 
     updateMenuPlacement();
@@ -412,13 +430,17 @@ function JournalEntryActionsMenu({
         <MoreVertical className="h-4 w-4" />
       </Button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
-          className={cn(
-            "absolute right-0 z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]",
-            menuPlacement === "top" ? "bottom-full mb-1" : "top-full mt-1",
-          )}
+          className="fixed z-[2147483647] w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
+          data-placement={menuPlacement}
+          style={{
+            left: menuPosition?.left ?? 0,
+            top: menuPosition?.top ?? 0,
+            visibility: menuPosition ? "visible" : "hidden",
+          }}
+          onClick={(event) => event.stopPropagation()}
         >
           {canReply && onReply && (
             <button
@@ -428,6 +450,16 @@ function JournalEntryActionsMenu({
             >
               <StickyNotePlus className="h-4 w-4" />
               Add Note
+            </button>
+          )}
+          {canAttach && isManualEntry(entry) && onAttach && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => runAction(() => onAttach(entry))}
+            >
+              <StickyNotes className="h-4 w-4" />
+              Attach
             </button>
           )}
           {canLink && isManualEntry(entry) && onLink && (
@@ -480,7 +512,8 @@ function JournalEntryActionsMenu({
               Delete
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -494,10 +527,12 @@ function TimelineTopActions({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
+  allowAttach = true,
 }: {
   entry: ManualJournalTimelineEntry;
   busy: boolean;
@@ -506,10 +541,12 @@ function TimelineTopActions({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply?: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
+  allowAttach?: boolean;
 }) {
   const saved = isSavedEntry(entry);
 
@@ -537,10 +574,12 @@ function TimelineTopActions({
         isHidden={isHidden}
         onReply={onReply}
         onLink={onLink}
+        onAttach={onAttach}
         onUnattach={onUnattach}
         onToggleHidden={onToggleHidden}
         onEdit={onEdit}
         onDelete={onDelete}
+        allowAttach={allowAttach}
       />
     </div>
   );
@@ -563,11 +602,13 @@ function JournalNoteEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
   allowReply,
+  allowAttach = true,
   linkedEntryCount,
   hideSaveButton = false,
 }: {
@@ -577,11 +618,13 @@ function JournalNoteEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
+  allowAttach?: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
 }) {
@@ -612,10 +655,12 @@ function JournalNoteEntry({
           onToggleSaved={onToggleSaved}
           onReply={allowReply ? onReply : undefined}
           onLink={onLink}
+          onAttach={onAttach}
           onUnattach={onUnattach}
           onToggleHidden={onToggleHidden}
           onEdit={onEdit}
           onDelete={onDelete}
+          allowAttach={allowAttach}
         />
         {displayEntryTitle(entry) && (
           <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
@@ -635,11 +680,13 @@ function JournalPassageEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
   allowReply,
+  allowAttach = true,
   linkedEntryCount,
   hideSaveButton = false,
 }: {
@@ -649,11 +696,13 @@ function JournalPassageEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
+  allowAttach?: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
 }) {
@@ -685,10 +734,12 @@ function JournalPassageEntry({
           onToggleSaved={onToggleSaved}
           onReply={allowReply ? onReply : undefined}
           onLink={onLink}
+          onAttach={onAttach}
           onUnattach={onUnattach}
           onToggleHidden={onToggleHidden}
           onEdit={onEdit}
           onDelete={onDelete}
+          allowAttach={allowAttach}
         />
         <QuoteBlock
           attribution={
@@ -713,11 +764,13 @@ function JournalReviewEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
   allowReply,
+  allowAttach = true,
   linkedEntryCount,
   hideSaveButton = false,
 }: {
@@ -727,11 +780,13 @@ function JournalReviewEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
+  allowAttach?: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
 }) {
@@ -758,10 +813,12 @@ function JournalReviewEntry({
           onToggleSaved={onToggleSaved}
           onReply={allowReply ? onReply : undefined}
           onLink={onLink}
+          onAttach={onAttach}
           onUnattach={onUnattach}
           onToggleHidden={onToggleHidden}
           onEdit={onEdit}
           onDelete={onDelete}
+          allowAttach={allowAttach}
         />
         {displayEntryTitle(entry) && (
           <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
@@ -989,12 +1046,14 @@ function JournalTimelineItem({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
   onDelete,
   hideSaveButton = false,
   allowReply = true,
+  allowAttach = true,
   linkedEntryCount = 0,
 }: {
   entry: JournalTimelineEntry;
@@ -1003,23 +1062,25 @@ function JournalTimelineItem({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
   hideSaveButton?: boolean;
   allowReply?: boolean;
+  allowAttach?: boolean;
   linkedEntryCount?: number;
 }) {
   if (isGeneratedBookEntry(entry)) return <GeneratedBookEventEntry entry={entry} busy={busy} isHidden={isHidden} onReply={onReply} onToggleHidden={onToggleHidden} allowReply={allowReply} />;
   if (entry.type === "passage" && (isBookJournalEntryRecordEntry(entry) || isSeriesJournalEntryRecordEntry(entry) || isAuthorJournalEntryRecordEntry(entry))) {
-    return <JournalPassageEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+    return <JournalPassageEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onAttach={onAttach} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} allowAttach={allowAttach} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   }
-  if (isSeriesJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
-  if (isAuthorJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isSeriesJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onAttach={onAttach} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} allowAttach={allowAttach} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isAuthorJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onAttach={onAttach} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} allowAttach={allowAttach} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   if (!isBookJournalEntryRecordEntry(entry)) return null;
-  if (entry.type === "review") return <JournalReviewEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
-  if (isThoughtJournalEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (entry.type === "review") return <JournalReviewEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onAttach={onAttach} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} allowAttach={allowAttach} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isThoughtJournalEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} isHidden={isHidden} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onAttach={onAttach} onUnattach={onUnattach} onToggleHidden={onToggleHidden} onEdit={onEdit} onDelete={onDelete} allowReply={allowReply} allowAttach={allowAttach} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   return null;
 }
 
@@ -1033,6 +1094,7 @@ function TimelineRow({
   onToggleSaved,
   onReply,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
@@ -1040,6 +1102,7 @@ function TimelineRow({
   parentContextLabel,
   linkedEntryCount = 0,
   hideSaveButton = false,
+  allowAttach = true,
   showConnector = true,
 }: {
   entry: JournalTimelineEntry;
@@ -1051,6 +1114,7 @@ function TimelineRow({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
@@ -1058,6 +1122,7 @@ function TimelineRow({
   parentContextLabel?: string | null;
   linkedEntryCount?: number;
   hideSaveButton?: boolean;
+  allowAttach?: boolean;
   showConnector?: boolean;
 }) {
   const MarkerIcon = getTimelineMarkerIcon(entry);
@@ -1101,11 +1166,13 @@ function TimelineRow({
           onToggleSaved={onToggleSaved}
           onReply={onReply}
           onLink={onLink}
+          onAttach={onAttach}
           onUnattach={onUnattach}
           onToggleHidden={onToggleHidden}
           onEdit={onEdit}
           onDelete={onDelete}
           hideSaveButton={hideSaveButton}
+          allowAttach={allowAttach}
           linkedEntryCount={linkedEntryCount}
         />
       </div>
@@ -1121,6 +1188,7 @@ function TimelineReplyRow({
   linkedEntryCount = 0,
   onToggleSaved,
   onLink,
+  onAttach,
   onUnattach,
   onToggleHidden,
   onEdit,
@@ -1134,6 +1202,7 @@ function TimelineReplyRow({
   linkedEntryCount?: number;
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
@@ -1164,6 +1233,7 @@ function TimelineReplyRow({
           onToggleSaved={onToggleSaved}
           onReply={() => undefined}
           onLink={onLink}
+          onAttach={onAttach}
           onUnattach={onUnattach}
           onToggleHidden={onToggleHidden}
           onEdit={onEdit}
@@ -1338,6 +1408,7 @@ function JournalPanelReplyPreview({
   relatedBusyEntryId,
   onToggleSaved,
   onLink,
+  onAttach,
   onEdit,
   onUnattach,
   onToggleHidden,
@@ -1353,6 +1424,7 @@ function JournalPanelReplyPreview({
   relatedBusyEntryId: string | null;
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onToggleHidden: (entry: JournalTimelineEntry) => void;
@@ -1388,6 +1460,7 @@ function JournalPanelReplyPreview({
             busy={busy}
             isHidden={isHidden}
             onLink={onLink}
+            onAttach={onAttach}
             onUnattach={onUnattach}
             onToggleHidden={onToggleHidden}
             onEdit={onEdit}
@@ -1909,6 +1982,9 @@ export default function JournalTimeline({
   const [linkingEntry, setLinkingEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [linkingError, setLinkingError] = useState<string | null>(null);
   const [linkingBusyEntryId, setLinkingBusyEntryId] = useState<string | null>(null);
+  const [attachingEntry, setAttachingEntry] = useState<ManualJournalTimelineEntry | null>(null);
+  const [attachingError, setAttachingError] = useState<string | null>(null);
+  const [attachingBusyEntryId, setAttachingBusyEntryId] = useState<string | null>(null);
   const [unlinkingEntryId, setUnlinkingEntryId] = useState<string | null>(null);
   const [relatedEntries, setRelatedEntries] = useState<ManualJournalTimelineEntry[]>([]);
   const [relatedEntriesLoading, setRelatedEntriesLoading] = useState(false);
@@ -2080,6 +2156,32 @@ export default function JournalTimeline({
       .filter((entry) => entry.id !== linkingEntry.id && sameManualLinkTable(linkingEntry, entry))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
   }, [displayEntries, linkingEntry, timelineRepliesByParentId]);
+  const availableAttachTargets = useMemo(() => {
+    if (!attachingEntry) return [];
+
+    const entriesById = new Map<string, ManualJournalTimelineEntry>();
+    displayEntries.forEach((entry) => {
+      if (isManualEntry(entry)) entriesById.set(entry.id, entry);
+    });
+    Object.values(timelineRepliesByParentId).flat().forEach((entry) => {
+      entriesById.set(entry.id, entry);
+    });
+
+    const currentParentId = getManualNote(attachingEntry).parent_entry_id;
+
+    return [...entriesById.values()]
+      .filter((entry) => {
+        const note = getManualNote(entry);
+        return (
+          entry.id !== attachingEntry.id &&
+          entry.sourceId !== currentParentId &&
+          sameManualLinkTable(attachingEntry, entry) &&
+          !note.parent_entry_id &&
+          getAttachedGeneratedNoteTags(entry).length === 0
+        );
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+  }, [attachingEntry, displayEntries, timelineRepliesByParentId]);
   const timelineLinkedCountEntries = useMemo(() => {
     const entriesById = new Map<string, ManualJournalTimelineEntry>();
     displayEntries.forEach((entry) => {
@@ -2334,6 +2436,66 @@ export default function JournalTimeline({
     setLinkingError(null);
   }
 
+  function startAttaching(entry: ManualJournalTimelineEntry) {
+    setAttachingEntry(entry);
+    setAttachingError(null);
+  }
+
+  async function updateManualEntryParent(
+    entry: ManualJournalTimelineEntry,
+    parentEntryId: string | null,
+  ): Promise<BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord> {
+    const note = getManualNote(entry);
+    const tags = normalizeJournalTags(note.tags).filter(
+      (tag) => parentEntryId
+        ? !tag.startsWith(GENERATED_EVENT_NOTE_TAG_PREFIX) && !tag.startsWith(READING_LOG_NOTE_TAG_PREFIX)
+        : true,
+    );
+
+    if (isBookJournalEntryRecordEntry(entry)) {
+      return updateBookJournalEntryRecord({
+        noteId: entry.bookJournalEntry.id,
+        label: entry.bookJournalEntry.label,
+        title: entry.bookJournalEntry.title ?? undefined,
+        quoteSpeaker: entry.bookJournalEntry.quote_speaker ?? undefined,
+        content: entry.bookJournalEntry.content,
+        tags,
+        pageStart: entry.bookJournalEntry.page_start ?? undefined,
+        noteDate: entry.bookJournalEntry.entry_date,
+        isFavorite: entry.bookJournalEntry.is_favorite,
+        parentEntryId,
+      });
+    }
+
+    if (isSeriesJournalEntryRecordEntry(entry)) {
+      return updateSeriesJournalEntryRecord({
+        noteId: entry.seriesJournalEntry.id,
+        label: entry.seriesJournalEntry.label,
+        title: entry.seriesJournalEntry.title ?? undefined,
+        quoteSpeaker: entry.seriesJournalEntry.quote_speaker ?? undefined,
+        content: entry.seriesJournalEntry.content,
+        tags,
+        pageStart: entry.seriesJournalEntry.page_start ?? undefined,
+        noteDate: entry.seriesJournalEntry.entry_date,
+        isFavorite: entry.seriesJournalEntry.is_favorite,
+        parentEntryId,
+      });
+    }
+
+    return updateAuthorJournalEntryRecord({
+      noteId: entry.authorJournalEntry.id,
+      label: entry.authorJournalEntry.label,
+      title: entry.authorJournalEntry.title ?? undefined,
+      quoteSpeaker: entry.authorJournalEntry.quote_speaker ?? undefined,
+      content: entry.authorJournalEntry.content,
+      tags,
+      pageStart: entry.authorJournalEntry.page_start ?? undefined,
+      noteDate: entry.authorJournalEntry.entry_date,
+      isFavorite: entry.authorJournalEntry.is_favorite,
+      parentEntryId,
+    });
+  }
+
   async function handleLinkTarget(target: ManualJournalTimelineEntry) {
     if (!linkingEntry) return;
 
@@ -2347,6 +2509,47 @@ export default function JournalTimeline({
       setLinkingError(error instanceof Error ? error.message : "Could not link these entries.");
     } finally {
       setLinkingBusyEntryId(null);
+    }
+  }
+
+  async function handleAttachTarget(target: ManualJournalTimelineEntry) {
+    if (!attachingEntry) return;
+
+    setBusyEntryId(attachingEntry.id);
+    setAttachingBusyEntryId(target.id);
+    setAttachingError(null);
+    try {
+      const previousParentEntryId = getManualNote(attachingEntry).parent_entry_id;
+      const updatedNote = await updateManualEntryParent(attachingEntry, target.sourceId);
+      const updatedEntry = replaceManualEntryRecord(attachingEntry, updatedNote) as ManualJournalTimelineEntry;
+
+      setSelectedEntry((current) => (current?.id === attachingEntry.id ? updatedEntry : current));
+      setReplyEntries((current) => {
+        const withoutEntry = current.filter((item) => item.id !== attachingEntry.id);
+        return selectedEntry?.id === target.id ? [...withoutEntry, updatedEntry] : withoutEntry;
+      });
+      setTimelineRepliesByParentId((current) => {
+        const next = { ...current };
+        if (previousParentEntryId) {
+          next[previousParentEntryId] = (next[previousParentEntryId] ?? []).filter((item) => item.id !== attachingEntry.id);
+        }
+        next[target.sourceId] = [
+          ...(next[target.sourceId] ?? []).filter((item) => item.id !== attachingEntry.id),
+          updatedEntry,
+        ];
+        return next;
+      });
+      if (isAttachedGeneratedNote(attachingEntry)) {
+        updateOptimisticReadingSessionSplitsAfterUnattach(attachingEntry);
+      }
+      setEditingReplyEntry((current) => (current?.id === attachingEntry.id ? null : current));
+      setAttachingEntry(null);
+      onEntryUpdated?.(updatedEntry);
+    } catch (error) {
+      setAttachingError(error instanceof Error ? error.message : "Could not attach this entry.");
+    } finally {
+      setBusyEntryId(null);
+      setAttachingBusyEntryId(null);
     }
   }
 
@@ -2749,12 +2952,14 @@ export default function JournalTimeline({
                   onToggleSaved={(item) => void handleToggleSaved(item)}
                   onReply={startReply}
                   onLink={startLinking}
+                  onAttach={startAttaching}
                   onUnattach={requestUnattachNote}
                   onToggleHidden={toggleEntryHidden}
                   onEdit={startEditing}
                   onDelete={requestEntryDelete}
                   parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
                   linkedEntryCount={linkedEntryCountsById[entry.id] ?? 0}
+                  allowAttach={!(isManualEntry(entry) && (timelineRepliesByParentId[entry.sourceId]?.length ?? 0) > 0)}
                   showConnector={false}
                 />
                 {isManualEntry(entry) && (
@@ -2783,6 +2988,7 @@ export default function JournalTimeline({
                     linkedEntryCount={linkedEntryCountsById[reply.id] ?? 0}
                     onToggleSaved={(item) => void handleToggleSaved(item)}
                     onLink={startLinking}
+                    onAttach={startAttaching}
                     onUnattach={requestUnattachNote}
                     onToggleHidden={toggleEntryHidden}
                     onEdit={startEditing}
@@ -2800,6 +3006,7 @@ export default function JournalTimeline({
                     linkedEntryCount={linkedEntryCountsById[note.id] ?? 0}
                     onToggleSaved={(item) => void handleToggleSaved(item)}
                     onLink={startLinking}
+                    onAttach={startAttaching}
                     onUnattach={requestUnattachNote}
                     onToggleHidden={toggleEntryHidden}
                     onEdit={startEditing}
@@ -2836,12 +3043,14 @@ export default function JournalTimeline({
                   onToggleSaved={(item) => void handleToggleSaved(item)}
                   onReply={startReply}
                   onLink={startLinking}
+                  onAttach={startAttaching}
                   onUnattach={requestUnattachNote}
                   onToggleHidden={toggleEntryHidden}
                   onEdit={startEditing}
                   onDelete={requestEntryDelete}
                   parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
                   linkedEntryCount={linkedEntryCountsById[entry.id] ?? 0}
+                  allowAttach={!(isManualEntry(entry) && (timelineRepliesByParentId[entry.sourceId]?.length ?? 0) > 0)}
                   hideSaveButton
                 />
               ))}
@@ -2963,6 +3172,7 @@ export default function JournalTimeline({
                                     relatedBusyEntryId={unlinkingEntryId}
                                     onToggleSaved={(item) => void handleToggleSaved(item)}
                                     onLink={startLinking}
+                                    onAttach={startAttaching}
                                     onEdit={(reply) => {
                                       setComposerParentEntry(null);
                                       setEditingReplyEntry(reply);
@@ -3004,6 +3214,7 @@ export default function JournalTimeline({
                               relatedBusyEntryId={unlinkingEntryId}
                               onToggleSaved={(item) => void handleToggleSaved(item)}
                               onLink={startLinking}
+                              onAttach={startAttaching}
                               onEdit={(note) => {
                                 setGeneratedComposerTarget(null);
                                 setEditingReplyEntry(note);
@@ -3051,6 +3262,18 @@ export default function JournalTimeline({
                             >
                               <StickyNotePlus className="mr-2 h-4 w-4" />
                               Add Note
+                            </Button>
+                          )}
+                          {isManualEntry(selectedEntry) && !isAttachedNote(selectedEntry) && selectedManualReplyEntries.length === 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start"
+                              onClick={() => startAttaching(selectedEntry)}
+                            >
+                              <StickyNotes className="mr-2 h-4 w-4" />
+                              Attach
                             </Button>
                           )}
                           {isManualEntry(selectedEntry) && (
@@ -3208,6 +3431,52 @@ export default function JournalTimeline({
           {linkingError && <p className="text-sm text-destructive">{linkingError}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setLinkingEntry(null)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(attachingEntry)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAttachingEntry(null);
+            setAttachingError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogTitle>Attach to entry</DialogTitle>
+          <DialogDescription>
+            Choose the entry this should become attached to.
+          </DialogDescription>
+          <div className="max-h-[22rem] space-y-2 overflow-y-auto pr-1">
+            {availableAttachTargets.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No compatible parent entries are available.
+              </p>
+            ) : (
+              availableAttachTargets.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className="w-full rounded-lg border bg-background p-3 text-left transition-colors hover:border-primary/35 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={attachingBusyEntryId === entry.id}
+                  onClick={() => void handleAttachTarget(entry)}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-medium">{entryTitle(entry)}</p>
+                    <p className="shrink-0 text-xs text-muted-foreground">{formatJournalDate(entryDate(entry))}</p>
+                  </div>
+                  <FormattedNoteContent markdown={getManualNote(entry).content} className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground" />
+                </button>
+              ))
+            )}
+          </div>
+          {attachingError && <p className="text-sm text-destructive">{attachingError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAttachingEntry(null)}>
               Cancel
             </Button>
           </DialogFooter>
