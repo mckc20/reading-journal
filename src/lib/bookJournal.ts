@@ -23,6 +23,7 @@ export interface BookJournalEntryRecordFieldsInput {
   pageStart?: string | number | null;
   noteDate?: string | null;
   isFavorite?: boolean;
+  parentEntryId?: string | null;
 }
 
 export interface NormalizedBookJournalEntryRecordInput {
@@ -48,6 +49,7 @@ export interface NormalizedBookJournalEntryRecordFields {
   page_start: number | null;
   is_favorite: boolean;
   entry_date: string;
+  parent_entry_id?: string | null;
 }
 
 export interface UpdateBookJournalEntryRecordInput extends BookJournalEntryRecordFieldsInput {
@@ -159,6 +161,10 @@ export function normalizeBookJournalEntryRecordFields(
 
   if (Object.prototype.hasOwnProperty.call(input, "tags")) {
     fields.tags = normalizedTags;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "parentEntryId")) {
+    fields.parent_entry_id = input.parentEntryId ?? null;
   }
 
   return fields;
