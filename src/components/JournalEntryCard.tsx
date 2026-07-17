@@ -84,6 +84,10 @@ function isAttachedGeneratedNote(entry: JournalTimelineEntry): boolean {
   );
 }
 
+function linkedEntryCountLabel(count: number): string {
+  return `Linked to ${count} ${count === 1 ? "entry" : "entries"}`;
+}
+
 export default function JournalEntryCard({ entry, busy = false, linkedEntryCount = 0, onToggleSaved, onReply, onLink }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
@@ -103,7 +107,7 @@ export default function JournalEntryCard({ entry, busy = false, linkedEntryCount
       {((isManual(entry) && onToggleSaved) || linkWithSave) && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
           {linkWithSave && linkedEntryCount > 0 && (
-            <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
+            <span className="text-xs text-muted-foreground">{linkedEntryCountLabel(linkedEntryCount)}</span>
           )}
           {linkWithSave && (
             <Button
@@ -167,7 +171,7 @@ export default function JournalEntryCard({ entry, busy = false, linkedEntryCount
       {(showReply || linkWithReply) && (
         <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1">
           {linkWithReply && linkedEntryCount > 0 && (
-            <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
+            <span className="text-xs text-muted-foreground">{linkedEntryCountLabel(linkedEntryCount)}</span>
           )}
           {linkWithReply && (
             <Button
