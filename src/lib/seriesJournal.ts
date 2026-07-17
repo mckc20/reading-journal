@@ -24,6 +24,7 @@ export interface UpdateSeriesJournalEntryRecordInput {
   pageStart?: string | number | null;
   isFavorite?: boolean;
   noteDate?: string | null;
+  parentEntryId?: string | null;
 }
 
 export interface NormalizedSeriesJournalEntryRecordFields {
@@ -95,7 +96,9 @@ export function seriesJournalEntryErrorToError(error: unknown): Error {
 }
 
 export function normalizeSeriesJournalEntryRecordFields(
-  input: Pick<CreateSeriesJournalEntryRecordInput, "label" | "title" | "quoteSpeaker" | "content" | "tags" | "pageStart" | "isFavorite" | "noteDate">,
+  input: Pick<CreateSeriesJournalEntryRecordInput, "label" | "title" | "quoteSpeaker" | "content" | "tags" | "pageStart" | "isFavorite" | "noteDate"> & {
+    parentEntryId?: string | null;
+  },
 ): NormalizedSeriesJournalEntryRecordFields {
   const content = input.content.trim();
   if (!content) throw new Error("Note content is required");
@@ -113,6 +116,10 @@ export function normalizeSeriesJournalEntryRecordFields(
 
   if (Object.prototype.hasOwnProperty.call(input, "tags")) {
     fields.tags = normalizeTags(input.tags);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "parentEntryId")) {
+    fields.parent_entry_id = input.parentEntryId ?? null;
   }
 
   return fields;

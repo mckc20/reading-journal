@@ -15,6 +15,7 @@ import {
   Reply,
   Star,
   StickyNote,
+  StickyNoteOff,
   StickyNotePlus,
   TrendingUp,
   Trash2,
@@ -106,6 +107,9 @@ type GeneratedNoteTarget = {
 type PendingDeleteTarget =
   | { type: "entry"; entry: ManualJournalTimelineEntry }
   | { type: "note"; entry: ManualJournalTimelineEntry };
+type PendingRelationshipAction =
+  | { type: "unlink"; source: ManualJournalTimelineEntry; target: ManualJournalTimelineEntry }
+  | { type: "unattach"; entry: ManualJournalTimelineEntry };
 
 function formatJournalDate(value: string): string {
   const dateValue = value.includes("T") ? value : `${value}T00:00:00`;
@@ -205,6 +209,10 @@ function getAttachedGeneratedNoteTags(entry: ManualJournalTimelineEntry): string
 
 function isAttachedGeneratedNote(entry: JournalTimelineEntry): entry is ManualJournalTimelineEntry {
   return isManualEntry(entry) && getAttachedGeneratedNoteTags(entry).length > 0;
+}
+
+function isAttachedNote(entry: JournalTimelineEntry): entry is ManualJournalTimelineEntry {
+  return isManualEntry(entry) && (isReplyEntry(entry) || isAttachedGeneratedNote(entry));
 }
 
 function sameManualLinkTable(left: ManualJournalTimelineEntry, right: ManualJournalTimelineEntry): boolean {
@@ -351,6 +359,7 @@ function TimelineBottomActions({
   entry,
   onReply,
   onLink,
+  onUnattach,
   showLink = false,
   allowReply = true,
   linkedEntryCount = 0,
@@ -358,6 +367,7 @@ function TimelineBottomActions({
   entry: JournalTimelineEntry;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink?: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach?: (entry: ManualJournalTimelineEntry) => void;
   showLink?: boolean;
   allowReply?: boolean;
   linkedEntryCount?: number;
@@ -367,7 +377,9 @@ function TimelineBottomActions({
     (isManualEntry(entry) && !isReplyEntry(entry) && !isAttachedGeneratedNote(entry))
   );
 
-  if (!showReply && !showLink) return null;
+  const showUnattach = isAttachedNote(entry) && Boolean(onUnattach);
+
+  if (!showReply && !showLink && !showUnattach) return null;
 
   return (
     <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1">
@@ -388,6 +400,22 @@ function TimelineBottomActions({
           }}
         >
           <LinkIcon className="h-4 w-4" />
+        </Button>
+      )}
+      {showUnattach && isManualEntry(entry) && onUnattach && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="h-7 w-7 text-muted-foreground hover:text-primary"
+          aria-label="Unattach note"
+          title="Unattach note"
+          onClick={(event) => {
+            event.stopPropagation();
+            onUnattach(entry);
+          }}
+        >
+          <StickyNoteOff className="h-4 w-4" />
         </Button>
       )}
       {showReply && (
@@ -453,6 +481,7 @@ function JournalNoteEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onUnattach,
   allowReply,
   linkedEntryCount,
   hideSaveButton = false,
@@ -462,6 +491,7 @@ function JournalNoteEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
@@ -499,7 +529,7 @@ function JournalNoteEntry({
         )}
         <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
-        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
+        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} onUnattach={onUnattach} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
       </div>
     </article>
   );
@@ -511,6 +541,7 @@ function JournalPassageEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onUnattach,
   allowReply,
   linkedEntryCount,
   hideSaveButton = false,
@@ -520,6 +551,7 @@ function JournalPassageEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
@@ -563,7 +595,7 @@ function JournalPassageEntry({
           <FormattedNoteContent markdown={note.content} className="text-base leading-7 text-foreground [&_em]:not-italic" />
         </QuoteBlock>
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
-        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
+        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} onUnattach={onUnattach} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
       </div>
     </article>
   );
@@ -575,6 +607,7 @@ function JournalReviewEntry({
   onToggleSaved,
   onReply,
   onLink,
+  onUnattach,
   allowReply,
   linkedEntryCount,
   hideSaveButton = false,
@@ -584,6 +617,7 @@ function JournalReviewEntry({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   allowReply: boolean;
   linkedEntryCount: number;
   hideSaveButton?: boolean;
@@ -617,7 +651,7 @@ function JournalReviewEntry({
         )}
         <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
-        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
+        <TimelineBottomActions entry={entry} onReply={onReply} onLink={onLink} onUnattach={onUnattach} showLink={!linkWithSave} allowReply={allowReply} linkedEntryCount={linkedEntryCount} />
       </div>
     </article>
   );
@@ -823,6 +857,7 @@ function JournalTimelineItem({
   onToggleSaved,
   onReply,
   onLink,
+  onUnattach,
   hideSaveButton = false,
   allowReply = true,
   linkedEntryCount = 0,
@@ -832,19 +867,20 @@ function JournalTimelineItem({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   hideSaveButton?: boolean;
   allowReply?: boolean;
   linkedEntryCount?: number;
 }) {
   if (isGeneratedBookEntry(entry)) return <GeneratedBookEventEntry entry={entry} onReply={onReply} allowReply={allowReply} />;
   if (entry.type === "passage" && (isBookJournalEntryRecordEntry(entry) || isSeriesJournalEntryRecordEntry(entry) || isAuthorJournalEntryRecordEntry(entry))) {
-    return <JournalPassageEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+    return <JournalPassageEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   }
-  if (isSeriesJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
-  if (isAuthorJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isSeriesJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isAuthorJournalEntryRecordEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   if (!isBookJournalEntryRecordEntry(entry)) return null;
-  if (entry.type === "review") return <JournalReviewEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
-  if (isThoughtJournalEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (entry.type === "review") return <JournalReviewEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
+  if (isThoughtJournalEntry(entry)) return <JournalNoteEntry entry={entry} busy={busy} onToggleSaved={onToggleSaved} onReply={onReply} onLink={onLink} onUnattach={onUnattach} allowReply={allowReply} linkedEntryCount={linkedEntryCount} hideSaveButton={hideSaveButton} />;
   return null;
 }
 
@@ -857,6 +893,7 @@ function TimelineRow({
   onToggleSaved,
   onReply,
   onLink,
+  onUnattach,
   parentContextLabel,
   linkedEntryCount = 0,
   restoreButton,
@@ -871,6 +908,7 @@ function TimelineRow({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   parentContextLabel?: string | null;
   linkedEntryCount?: number;
   restoreButton?: ReactNode;
@@ -918,6 +956,7 @@ function TimelineRow({
           onToggleSaved={onToggleSaved}
           onReply={onReply}
           onLink={onLink}
+          onUnattach={onUnattach}
           hideSaveButton={hideSaveButton}
           linkedEntryCount={linkedEntryCount}
         />
@@ -933,6 +972,7 @@ function TimelineReplyRow({
   linkedEntryCount = 0,
   onToggleSaved,
   onLink,
+  onUnattach,
   onOpenParent,
 }: {
   entry: ManualJournalTimelineEntry;
@@ -941,6 +981,7 @@ function TimelineReplyRow({
   linkedEntryCount?: number;
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onOpenParent: (entry: JournalTimelineEntry) => void;
 }) {
   return (
@@ -966,6 +1007,7 @@ function TimelineReplyRow({
           onToggleSaved={onToggleSaved}
           onReply={() => undefined}
           onLink={onLink}
+          onUnattach={onUnattach}
           allowReply={false}
           linkedEntryCount={linkedEntryCount}
         />
@@ -1139,6 +1181,7 @@ function JournalPanelReplyPreview({
   onToggleSaved,
   onLink,
   onEdit,
+  onUnattach,
   onOpenRelated,
   onUnlinkRelated,
 }: {
@@ -1149,6 +1192,7 @@ function JournalPanelReplyPreview({
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
   onOpenRelated: (entry: JournalTimelineEntry) => void;
   onUnlinkRelated: (source: ManualJournalTimelineEntry, target: ManualJournalTimelineEntry) => void;
 }) {
@@ -1184,17 +1228,31 @@ function JournalPanelReplyPreview({
             <LinkIcon className="h-4 w-4" />
           </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute bottom-2 right-2 h-7 w-7 opacity-0 transition-opacity group-hover/reply:opacity-100 focus-visible:opacity-100"
-          aria-label="Edit note"
-          title="Edit note"
-          onClick={() => onEdit(entry)}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover/reply:opacity-100 focus-within:opacity-100">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7 text-muted-foreground hover:text-primary"
+            aria-label="Unattach note"
+            title="Unattach note"
+            disabled={busy}
+            onClick={() => onUnattach(entry)}
+          >
+            <StickyNoteOff className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7 text-muted-foreground hover:text-primary"
+            aria-label="Edit note"
+            title="Edit note"
+            onClick={() => onEdit(entry)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
         <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
         {relatedEntries.length > 0 && (
@@ -1704,6 +1762,7 @@ export default function JournalTimeline({
   const [optimisticUncompressedReadingLogIds, setOptimisticUncompressedReadingLogIds] = useState<Set<string>>(new Set());
   const [editingReplyEntry, setEditingReplyEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDeleteTarget | null>(null);
+  const [pendingRelationshipAction, setPendingRelationshipAction] = useState<PendingRelationshipAction | null>(null);
   const [linkingEntry, setLinkingEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [linkingError, setLinkingError] = useState<string | null>(null);
   const [linkingBusyEntryId, setLinkingBusyEntryId] = useState<string | null>(null);
@@ -2117,14 +2176,123 @@ export default function JournalTimeline({
     }
   }
 
-  async function handleUnlinkRelatedEntry(source: ManualJournalTimelineEntry, target: ManualJournalTimelineEntry) {
+  function requestUnlinkRelatedEntry(source: ManualJournalTimelineEntry, target: ManualJournalTimelineEntry) {
+    setPendingRelationshipAction({ type: "unlink", source, target });
+  }
+
+  function requestUnattachNote(entry: ManualJournalTimelineEntry) {
+    setPendingRelationshipAction({ type: "unattach", entry });
+  }
+
+  async function performUnlinkRelatedEntry(source: ManualJournalTimelineEntry, target: ManualJournalTimelineEntry) {
     setUnlinkingEntryId(target.id);
     try {
       await unlinkManualJournalEntries(source, target);
       setRelatedEntriesRefreshKey((current) => current + 1);
+      setPendingRelationshipAction(null);
     } finally {
       setUnlinkingEntryId(null);
     }
+  }
+
+  function updateOptimisticReadingSessionSplitsAfterUnattach(entry: ManualJournalTimelineEntry) {
+    getAttachedGeneratedNoteTags(entry)
+      .filter((tag) => tag.startsWith(READING_LOG_NOTE_TAG_PREFIX))
+      .forEach((tag) => {
+        const hasAnotherNoteForSession = visibleEntries.some((item) => (
+          item.id !== entry.id && isAttachedGeneratedNote(item) && getAttachedGeneratedNoteTags(item).includes(tag)
+        ));
+        if (!hasAnotherNoteForSession) {
+          setOptimisticUncompressedReadingLogIds((current) => {
+            const next = new Set(current);
+            next.delete(tag.slice(READING_LOG_NOTE_TAG_PREFIX.length));
+            return next;
+          });
+        }
+      });
+  }
+
+  async function performUnattachNote(entry: ManualJournalTimelineEntry) {
+    setBusyEntryId(entry.id);
+    try {
+      const note = getManualNote(entry);
+      const tags = normalizeJournalTags(note.tags).filter(
+        (tag) => !tag.startsWith(GENERATED_EVENT_NOTE_TAG_PREFIX) && !tag.startsWith(READING_LOG_NOTE_TAG_PREFIX),
+      );
+      let updatedNote: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
+
+      if (isBookJournalEntryRecordEntry(entry)) {
+        updatedNote = await updateBookJournalEntryRecord({
+          noteId: entry.bookJournalEntry.id,
+          label: entry.bookJournalEntry.label,
+          title: entry.bookJournalEntry.title ?? undefined,
+          quoteSpeaker: entry.bookJournalEntry.quote_speaker ?? undefined,
+          content: entry.bookJournalEntry.content,
+          tags,
+          pageStart: entry.bookJournalEntry.page_start ?? undefined,
+          noteDate: entry.bookJournalEntry.entry_date,
+          isFavorite: entry.bookJournalEntry.is_favorite,
+          parentEntryId: null,
+        });
+      } else if (isSeriesJournalEntryRecordEntry(entry)) {
+        updatedNote = await updateSeriesJournalEntryRecord({
+          noteId: entry.seriesJournalEntry.id,
+          label: entry.seriesJournalEntry.label,
+          title: entry.seriesJournalEntry.title ?? undefined,
+          quoteSpeaker: entry.seriesJournalEntry.quote_speaker ?? undefined,
+          content: entry.seriesJournalEntry.content,
+          tags,
+          pageStart: entry.seriesJournalEntry.page_start ?? undefined,
+          noteDate: entry.seriesJournalEntry.entry_date,
+          isFavorite: entry.seriesJournalEntry.is_favorite,
+          parentEntryId: null,
+        });
+      } else {
+        updatedNote = await updateAuthorJournalEntryRecord({
+          noteId: entry.authorJournalEntry.id,
+          label: entry.authorJournalEntry.label,
+          title: entry.authorJournalEntry.title ?? undefined,
+          quoteSpeaker: entry.authorJournalEntry.quote_speaker ?? undefined,
+          content: entry.authorJournalEntry.content,
+          tags,
+          pageStart: entry.authorJournalEntry.page_start ?? undefined,
+          noteDate: entry.authorJournalEntry.entry_date,
+          isFavorite: entry.authorJournalEntry.is_favorite,
+          parentEntryId: null,
+        });
+      }
+
+      const updatedEntry = replaceManualEntryRecord(entry, updatedNote) as ManualJournalTimelineEntry;
+      const parentEntryId = note.parent_entry_id;
+      setReplyEntries((current) => current.filter((item) => item.id !== entry.id));
+      if (parentEntryId) {
+        setTimelineRepliesByParentId((current) => ({
+          ...current,
+          [parentEntryId]: (current[parentEntryId] ?? []).filter((item) => item.id !== entry.id),
+        }));
+      }
+      setAttachedRelatedEntriesById((current) => {
+        const { [entry.id]: _removed, ...next } = current;
+        return next;
+      });
+      updateOptimisticReadingSessionSplitsAfterUnattach(entry);
+      setEditingReplyEntry(null);
+      setPendingRelationshipAction(null);
+      onEntryUpdated?.(updatedEntry);
+    } finally {
+      setBusyEntryId(null);
+    }
+  }
+
+  async function confirmPendingRelationshipAction() {
+    if (!pendingRelationshipAction) return;
+
+    if (pendingRelationshipAction.type === "unlink") {
+      await performUnlinkRelatedEntry(pendingRelationshipAction.source, pendingRelationshipAction.target);
+      return;
+    }
+
+    await performUnattachNote(pendingRelationshipAction.entry);
   }
 
   async function handleToggleSaved(entry: JournalTimelineEntry) {
@@ -2408,6 +2576,7 @@ export default function JournalTimeline({
                   onToggleSaved={(item) => void handleToggleSaved(item)}
                   onReply={startReply}
                   onLink={startLinking}
+                  onUnattach={requestUnattachNote}
                   parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
                   linkedEntryCount={linkedEntryCountsById[entry.id] ?? 0}
                   showConnector={false}
@@ -2437,6 +2606,7 @@ export default function JournalTimeline({
                     linkedEntryCount={linkedEntryCountsById[reply.id] ?? 0}
                     onToggleSaved={(item) => void handleToggleSaved(item)}
                     onLink={startLinking}
+                    onUnattach={requestUnattachNote}
                     onOpenParent={openEntry}
                   />
                 ))}
@@ -2449,6 +2619,7 @@ export default function JournalTimeline({
                     linkedEntryCount={linkedEntryCountsById[note.id] ?? 0}
                     onToggleSaved={(item) => void handleToggleSaved(item)}
                     onLink={startLinking}
+                    onUnattach={requestUnattachNote}
                     onOpenParent={openEntry}
                   />
                 ))}
@@ -2480,6 +2651,7 @@ export default function JournalTimeline({
                   onToggleSaved={(item) => void handleToggleSaved(item)}
                   onReply={startReply}
                   onLink={startLinking}
+                  onUnattach={requestUnattachNote}
                   parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
                   linkedEntryCount={linkedEntryCountsById[entry.id] ?? 0}
                   hideSaveButton
@@ -2642,8 +2814,9 @@ export default function JournalTimeline({
                                       setComposerParentEntry(null);
                                       setEditingReplyEntry(reply);
                                     }}
+                                    onUnattach={requestUnattachNote}
                                     onOpenRelated={openEntry}
-                                    onUnlinkRelated={(source, target) => void handleUnlinkRelatedEntry(source, target)}
+                                    onUnlinkRelated={requestUnlinkRelatedEntry}
                                   />
                                 )
                               ))}
@@ -2678,8 +2851,9 @@ export default function JournalTimeline({
                                 setGeneratedComposerTarget(null);
                                 setEditingReplyEntry(note);
                               }}
+                              onUnattach={requestUnattachNote}
                               onOpenRelated={openEntry}
-                              onUnlinkRelated={(source, target) => void handleUnlinkRelatedEntry(source, target)}
+                              onUnlinkRelated={requestUnlinkRelatedEntry}
                             />
                           )
                         ))}
@@ -2696,7 +2870,7 @@ export default function JournalTimeline({
                               entry={entry}
                               busy={unlinkingEntryId === entry.id}
                               onOpen={openEntry}
-                              onUnlink={(source, target) => void handleUnlinkRelatedEntry(source, target)}
+                              onUnlink={requestUnlinkRelatedEntry}
                             />
                           ))}
                         </div>
@@ -2849,6 +3023,37 @@ export default function JournalTimeline({
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setLinkingEntry(null)}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(pendingRelationshipAction)} onOpenChange={(open) => !open && setPendingRelationshipAction(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>
+            {pendingRelationshipAction?.type === "unlink" ? "Unlink these entries?" : "Unattach this note?"}
+          </DialogTitle>
+          <DialogDescription>
+            {pendingRelationshipAction?.type === "unlink"
+              ? "This will remove the relationship between these entries. The entries themselves will stay in your journal."
+              : "This will remove the note from its parent entry and turn it into a normal journal entry."}
+          </DialogDescription>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingRelationshipAction(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                pendingRelationshipAction?.type === "unlink"
+                  ? unlinkingEntryId === pendingRelationshipAction.target.id
+                  : pendingRelationshipAction?.type === "unattach"
+                    ? busyEntryId === pendingRelationshipAction.entry.id
+                    : false
+              }
+              onClick={() => void confirmPendingRelationshipAction()}
+            >
+              {pendingRelationshipAction?.type === "unlink" ? "Unlink" : "Unattach"}
             </Button>
           </DialogFooter>
         </DialogContent>
