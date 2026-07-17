@@ -48,19 +48,18 @@ function linkedEntryCountLabel(count: number): string {
 export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
+  const hasLinkedEntries = linkedEntryCount > 0;
 
   return (
     <article
       className={cn(
         "relative h-full rounded-lg border bg-background p-4",
-        actions ? (linkedEntryCount > 0 ? "pr-56" : "pr-24") : "pr-4",
+        actions ? (hasLinkedEntries ? "pr-56" : "pr-24") : "pr-4",
+        hasLinkedEntries && "pb-9",
       )}
     >
       {actions && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
-          {linkedEntryCount > 0 && (
-            <span className="text-xs text-muted-foreground">{linkedEntryCountLabel(linkedEntryCount)}</span>
-          )}
           {actions}
         </div>
       )}
@@ -86,6 +85,12 @@ export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions 
             </Badge>
           ))}
         </div>
+      )}
+
+      {hasLinkedEntries && (
+        <span className="absolute bottom-3 right-3 z-10 text-xs text-muted-foreground">
+          {linkedEntryCountLabel(linkedEntryCount)}
+        </span>
       )}
     </article>
   );

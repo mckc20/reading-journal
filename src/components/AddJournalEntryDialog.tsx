@@ -277,10 +277,17 @@ export function JournalEntryForm({
       tagDraft: "",
       tags: visibleJournalTags(initialEntry?.tags),
     };
-    const draft = readJournalEntryDraft(draftKey);
+    const savedDraft = readJournalEntryDraft(draftKey);
+    const draft = initialEntry && savedDraft?.content.trim() === "" && initialEntry.content.trim() !== ""
+      ? null
+      : savedDraft;
 
+    draftSaveReadyRef.current = false;
     reset(draft ? { ...initialValues, ...draft } : initialValues);
-    draftSaveReadyRef.current = true;
+    const timeoutId = window.setTimeout(() => {
+      draftSaveReadyRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [active, draftKey, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, preferInitialPageAndDate, reset]);
 
   useEffect(() => {
