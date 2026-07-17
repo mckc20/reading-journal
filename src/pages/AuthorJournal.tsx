@@ -17,7 +17,6 @@ import {
   buildGeneratedAuthorJournalEntries,
   sortJournalEntries,
 } from "@/lib/journal";
-import { suggestAuthorJournalTags } from "@/lib/journalTags";
 import { fetchAuthorJournalEntryRecords, sortAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord } from "@/types";
 
@@ -173,10 +172,6 @@ export default function AuthorJournal() {
       ]),
     [automaticEntries, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries],
   );
-  const tagSuggestions = useMemo(
-    () => suggestAuthorJournalTags(authorBooks, allBookJournalEntryRecords),
-    [allBookJournalEntryRecords, authorBooks],
-  );
 
   if (authorsLoading || booksLoading || loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-muted" />;
@@ -204,7 +199,6 @@ export default function AuthorJournal() {
         open={composerOpen}
         onOpenChange={setComposerOpen}
         entity={{ type: "Author", id: author.id }}
-        tagSuggestions={tagSuggestions}
         onSaved={(note) => {
           if ("author_id" in note) setJournalEntries((current) => sortAuthorJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
         }}
