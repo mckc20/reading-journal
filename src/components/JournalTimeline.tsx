@@ -2846,7 +2846,7 @@ export default function JournalTimeline({
                   )}
                 >
                   <div className="relative overflow-y-auto p-6 pb-20 pr-20 sm:p-8 sm:pb-20 sm:pr-24">
-                    <div className="sticky top-3 z-20 ml-auto flex h-0 w-fit items-start gap-2">
+                    <div className="sticky top-7 z-20 float-right -mr-16 mb-2 ml-4 flex w-fit items-start gap-2 sm:-mr-20">
                       {isManualEntry(selectedEntry) && !selectedEntryHidden && (
                         <Button
                           type="button"
