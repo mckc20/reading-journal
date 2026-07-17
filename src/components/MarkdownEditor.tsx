@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState, type ComponentType, type KeyboardEvent, type SVGProps } from "react";
 import {
   Bold,
   CircleAlert,
@@ -15,8 +15,6 @@ import {
   Quote,
   Eye,
   Star,
-  StickyNote,
-  type LucideIcon,
 } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import { Button } from "@/components/ui/button";
@@ -38,8 +36,23 @@ type SelectionRange = {
   end: number;
 };
 
-const CALLOUT_OPTIONS: Array<{ type: NoteCalloutType; label: string; Icon: LucideIcon }> = [
-  { type: "note", label: "Note", Icon: StickyNote },
+type CalloutIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+
+function NoteCalloutIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="15" x2="21" y1="3" y2="9" />
+      <line x1="15" x2="15" y1="3" y2="9" />
+      <line x1="15" x2="21" y1="9" y2="9" />
+      <line x1="8" x2="16" y1="13" y2="13" />
+      <line x1="8" x2="13" y1="17" y2="17" />
+    </svg>
+  );
+}
+
+const CALLOUT_OPTIONS: Array<{ type: NoteCalloutType; label: string; Icon: CalloutIconComponent }> = [
+  { type: "note", label: "Note", Icon: NoteCalloutIcon },
   { type: "idea", label: "Idea", Icon: Lightbulb },
   { type: "question", label: "Question", Icon: CircleQuestionMark },
   { type: "favorite", label: "Favorite", Icon: Star },
