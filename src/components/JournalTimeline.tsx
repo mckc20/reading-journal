@@ -2846,7 +2846,7 @@ export default function JournalTimeline({
                   )}
                 >
                   <div className="relative overflow-y-auto p-6 pb-20 pr-20 sm:p-8 sm:pb-20 sm:pr-24">
-                    <div className="sticky top-7 z-20 float-right -mr-16 mb-2 ml-4 flex w-fit items-start gap-2 sm:-mr-20">
+                    <div className="sticky top-2 z-20 float-right -mr-16 mb-2 ml-4 flex w-fit items-start gap-2 sm:-mr-20">
                       {isManualEntry(selectedEntry) && !selectedEntryHidden && (
                         <Button
                           type="button"
@@ -3110,7 +3110,7 @@ export default function JournalTimeline({
                       </div>
                       {((isManualEntry(selectedEntry) && !isReplyEntry(selectedEntry)) || isGeneratedBookEntry(selectedEntry)) && (
                         <div>
-                          <p className="text-xs font-medium uppercase text-muted-foreground">Notes</p>
+                          <p className="text-xs font-medium uppercase text-muted-foreground">Attached Note</p>
                           <p className="text-sm">
                             {isGeneratedBookEntry(selectedEntry) ? selectedGeneratedPanelNotes.length : selectedManualReplyEntries.length}
                           </p>

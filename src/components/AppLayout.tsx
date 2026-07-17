@@ -45,7 +45,7 @@ const addActions: Array<{
   { key: "book", label: "Book", icon: BookOpen },
   { key: "author", label: "Author", icon: UserRound },
   { key: "series", label: "Series", icon: LibraryBig },
-  { key: "note", label: "Note", icon: StickyNote },
+  { key: "note", label: "Entry", icon: StickyNote },
   { key: "chat", label: "Chat", icon: MessageCircle },
   { key: "genre", label: "Genre", icon: SwatchBook },
 ];
