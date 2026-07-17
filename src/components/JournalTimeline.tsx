@@ -1072,15 +1072,19 @@ function JournalPanelInlineActions({ children }: { children: ReactNode }) {
 function JournalPanelReplyPreview({
   entry,
   busy,
+  relatedEntries,
   onToggleSaved,
   onLink,
   onEdit,
+  onOpenRelated,
 }: {
   entry: ManualJournalTimelineEntry;
   busy: boolean;
+  relatedEntries: ManualJournalTimelineEntry[];
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onLink: (entry: ManualJournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
+  onOpenRelated: (entry: JournalTimelineEntry) => void;
 }) {
   const note = getManualNote(entry);
   const saved = isSavedEntry(entry);
@@ -1127,6 +1131,16 @@ function JournalPanelReplyPreview({
         </Button>
         <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
+        {relatedEntries.length > 0 && (
+          <section className="mt-4 space-y-2 border-t pt-3">
+            <h4 className="text-xs font-medium uppercase text-muted-foreground">Related entries</h4>
+            <div className="space-y-2">
+              {relatedEntries.map((relatedEntry) => (
+                <JournalPanelRelatedEntryPreview key={relatedEntry.id} entry={relatedEntry} onOpen={onOpenRelated} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </article>
   );
@@ -1575,6 +1589,7 @@ export default function JournalTimeline({
   const [relatedEntries, setRelatedEntries] = useState<ManualJournalTimelineEntry[]>([]);
   const [relatedEntriesLoading, setRelatedEntriesLoading] = useState(false);
   const [relatedEntriesRefreshKey, setRelatedEntriesRefreshKey] = useState(0);
+  const [attachedRelatedEntriesById, setAttachedRelatedEntriesById] = useState<Record<string, ManualJournalTimelineEntry[]>>({});
   const [replyEntries, setReplyEntries] = useState<ManualJournalTimelineEntry[]>([]);
   const [timelineRepliesByParentId, setTimelineRepliesByParentId] = useState<Record<string, ManualJournalTimelineEntry[]>>({});
   const [repliesLoading, setRepliesLoading] = useState(false);
@@ -1697,6 +1712,12 @@ export default function JournalTimeline({
   const selectedGeneratedSessionTime = selectedEntry && isGeneratedBookEntry(selectedEntry)
     ? formatGeneratedSessionTime(selectedEntry)
     : null;
+  const panelAttachedNoteEntries = selectedEntry && isGeneratedBookEntry(selectedEntry)
+    ? selectedGeneratedAttachedNotes
+    : selectedEntry && isManualEntry(selectedEntry)
+      ? replyEntries
+      : [];
+  const panelAttachedNoteEntryKey = panelAttachedNoteEntries.map((entry) => entry.id).join("|");
   const availableLinkTargets = useMemo(() => {
     if (!linkingEntry) return [];
 
@@ -1760,6 +1781,34 @@ export default function JournalTimeline({
       cancelled = true;
     };
   }, [relatedEntriesRefreshKey, selectedEntry?.id]);
+
+  useEffect(() => {
+    if (panelAttachedNoteEntries.length === 0) {
+      setAttachedRelatedEntriesById({});
+      return;
+    }
+
+    let cancelled = false;
+    const entriesToLoad = panelAttachedNoteEntries;
+
+    Promise.all(
+      entriesToLoad.map((entry) => (
+        fetchRelatedManualJournalEntries(entry)
+          .then((entries) => [entry.id, entries] as const)
+          .catch(() => [entry.id, []] as const)
+      )),
+    ).then((pairs) => {
+      if (cancelled) return;
+
+      setAttachedRelatedEntriesById(
+        Object.fromEntries(pairs.filter(([, entries]) => entries.length > 0)),
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [panelAttachedNoteEntryKey, relatedEntriesRefreshKey]);
 
   useEffect(() => {
     if (!selectedEntry || !isManualEntry(selectedEntry)) {
@@ -2411,12 +2460,14 @@ export default function JournalTimeline({
                                     key={entry.id}
                                     entry={entry}
                                     busy={busyEntryId === entry.id}
+                                    relatedEntries={attachedRelatedEntriesById[entry.id] ?? []}
                                     onToggleSaved={(item) => void handleToggleSaved(item)}
                                     onLink={startLinking}
                                     onEdit={(reply) => {
                                       setComposerParentEntry(null);
                                       setEditingReplyEntry(reply);
                                     }}
+                                    onOpenRelated={openEntry}
                                   />
                                 )
                               ))}
@@ -2443,12 +2494,14 @@ export default function JournalTimeline({
                               key={entry.id}
                               entry={entry}
                               busy={busyEntryId === entry.id}
+                              relatedEntries={attachedRelatedEntriesById[entry.id] ?? []}
                               onToggleSaved={(item) => void handleToggleSaved(item)}
                               onLink={startLinking}
                               onEdit={(note) => {
                                 setGeneratedComposerTarget(null);
                                 setEditingReplyEntry(note);
                               }}
+                              onOpenRelated={openEntry}
                             />
                           )
                         ))}
