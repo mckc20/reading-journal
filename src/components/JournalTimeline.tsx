@@ -338,8 +338,25 @@ function JournalEntryActionsMenu({
       const buttonRect = button.getBoundingClientRect();
       const menuHeight = menuRef.current?.offsetHeight ?? 280;
       const viewportPadding = 12;
-      const spaceBelow = window.innerHeight - buttonRect.bottom - viewportPadding;
-      const spaceAbove = buttonRect.top - viewportPadding;
+      let clippingTop = viewportPadding;
+      let clippingBottom = window.innerHeight - viewportPadding;
+      let ancestor = button.parentElement;
+
+      while (ancestor) {
+        const styles = window.getComputedStyle(ancestor);
+        const clipsOverflow = /(auto|scroll|hidden)/.test(`${styles.overflow}${styles.overflowY}${styles.overflowX}`);
+
+        if (clipsOverflow) {
+          const ancestorRect = ancestor.getBoundingClientRect();
+          clippingTop = Math.max(clippingTop, ancestorRect.top + viewportPadding);
+          clippingBottom = Math.min(clippingBottom, ancestorRect.bottom - viewportPadding);
+        }
+
+        ancestor = ancestor.parentElement;
+      }
+
+      const spaceBelow = clippingBottom - buttonRect.bottom;
+      const spaceAbove = buttonRect.top - clippingTop;
 
       setMenuPlacement(spaceBelow < menuHeight && spaceAbove > spaceBelow ? "top" : "bottom");
     }
