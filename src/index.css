@@ -252,9 +252,8 @@
     @apply mb-1.5 flex items-center gap-2 text-sm font-semibold;
   }
 
-  .journal-markdown .journal-callout-title::before {
-    @apply flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold;
-    content: "i";
+  .journal-markdown .journal-callout-icon {
+    @apply h-4 w-4 shrink-0;
   }
 
   .journal-markdown .journal-callout-body {
@@ -265,21 +264,19 @@
     @apply border-border bg-muted/55;
   }
 
-  .journal-markdown .journal-callout-note .journal-callout-title::before {
-    @apply bg-muted text-muted-foreground;
-    content: "i";
+  .journal-markdown .journal-callout-note .journal-callout-icon {
+    @apply text-muted-foreground;
   }
 
   .journal-markdown .journal-callout-idea {
     @apply border-blue-500/25 bg-blue-500/10;
   }
 
-  .journal-markdown .journal-callout-idea .journal-callout-title::before {
-    @apply bg-blue-500/15 text-blue-700;
-    content: "*";
+  .journal-markdown .journal-callout-idea .journal-callout-icon {
+    @apply text-blue-700;
   }
 
-  .dark .journal-markdown .journal-callout-idea .journal-callout-title::before {
+  .dark .journal-markdown .journal-callout-idea .journal-callout-icon {
     @apply text-blue-300;
   }
 
@@ -287,12 +284,11 @@
     @apply border-purple-500/25 bg-purple-500/10;
   }
 
-  .journal-markdown .journal-callout-question .journal-callout-title::before {
-    @apply bg-purple-500/15 text-purple-700;
-    content: "?";
+  .journal-markdown .journal-callout-question .journal-callout-icon {
+    @apply text-purple-700;
   }
 
-  .dark .journal-markdown .journal-callout-question .journal-callout-title::before {
+  .dark .journal-markdown .journal-callout-question .journal-callout-icon {
     @apply text-purple-300;
   }
 
@@ -300,12 +296,11 @@
     @apply border-amber-500/30 bg-amber-500/12;
   }
 
-  .journal-markdown .journal-callout-favorite .journal-callout-title::before {
-    @apply bg-amber-500/20 text-amber-700;
-    content: "!";
+  .journal-markdown .journal-callout-favorite .journal-callout-icon {
+    @apply text-amber-700;
   }
 
-  .dark .journal-markdown .journal-callout-favorite .journal-callout-title::before {
+  .dark .journal-markdown .journal-callout-favorite .journal-callout-icon {
     @apply text-amber-300;
   }
 
@@ -313,12 +308,11 @@
     @apply border-red-500/25 bg-red-500/10;
   }
 
-  .journal-markdown .journal-callout-spoiler .journal-callout-title::before {
-    @apply bg-red-500/15 text-red-700;
-    content: "!";
+  .journal-markdown .journal-callout-spoiler .journal-callout-icon {
+    @apply text-red-700;
   }
 
-  .dark .journal-markdown .journal-callout-spoiler .journal-callout-title::before {
+  .dark .journal-markdown .journal-callout-spoiler .journal-callout-icon {
     @apply text-red-300;
   }
 
