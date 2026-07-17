@@ -243,7 +243,7 @@ export default function ReadingProgressPanel({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-auto px-0 text-primary hover:bg-transparent hover:text-primary/85"
+                className="border border-note/60 bg-transparent text-note hover:border-note hover:bg-transparent hover:text-note"
                 onClick={() => {
                   setShowNoteEditor(true);
                   onEntryComposerOpenChange?.(true);
