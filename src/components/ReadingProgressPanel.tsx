@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
-import { getProgressNoteDate } from "@/lib/bookJournal";
+import { getProgressNoteDate, updateBookJournalEntryRecord } from "@/lib/bookJournal";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
-import type { Book, ReadingLog } from "@/types";
+import { READING_LOG_NOTE_TAG_PREFIX, normalizeJournalTags } from "@/lib/journalTags";
+import type { Book, BookJournalEntryRecord, ReadingLog } from "@/types";
 
 interface ReadingProgressPanelProps {
   book: Book;
@@ -42,6 +43,23 @@ const MINUTE_ITEMS = Array.from({ length: 12 }, (_, i) => ({
   label: `${(i * 5).toString().padStart(2, "0")}m`,
 }));
 
+async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: ReadingLog): Promise<BookJournalEntryRecord> {
+  const readingLogTag = `${READING_LOG_NOTE_TAG_PREFIX}${readingLog.id}`;
+  const tags = normalizeJournalTags([...(note.tags ?? []), readingLogTag]);
+
+  return updateBookJournalEntryRecord({
+    noteId: note.id,
+    label: note.label,
+    title: note.title ?? undefined,
+    quoteSpeaker: note.quote_speaker ?? undefined,
+    content: note.content,
+    tags,
+    pageStart: note.page_start ?? undefined,
+    noteDate: note.entry_date,
+    isFavorite: note.is_favorite,
+  });
+}
+
 export default function ReadingProgressPanel({
   book,
   onProgressSaved,
@@ -71,6 +89,7 @@ export default function ReadingProgressPanel({
     toDateTimeLocalValue(new Date())
   );
   const [showNoteEditor, setShowNoteEditor] = useState(false);
+  const [savedProgressNote, setSavedProgressNote] = useState<BookJournalEntryRecord | null>(null);
 
   // Fetch last reading log on mount
   useEffect(() => {
@@ -99,6 +118,7 @@ export default function ReadingProgressPanel({
       setShowLoggedAtEditor(false);
       setSelectedLoggedAt(toDateTimeLocalValue(new Date()));
       setShowNoteEditor(false);
+      setSavedProgressNote(null);
       onEntryComposerOpenChange?.(false);
       setErrorMsg(null);
     }
@@ -125,7 +145,7 @@ export default function ReadingProgressPanel({
         loggedAtIso = parsedDate.toISOString();
       }
 
-      await createReadingLog(
+      const readingLog = await createReadingLog(
         book.id,
         user.id,
         selectedPage,
@@ -133,15 +153,14 @@ export default function ReadingProgressPanel({
         loggedAtIso
       );
 
+      if (savedProgressNote) {
+        await attachNoteToReadingLog(savedProgressNote, readingLog);
+      }
+
       await onProgressSaved(selectedPage);
       // Update lastLog locally so the min page updates
-      setLastLog({
-        id: "",
-        book_id: book.id,
-        user_id: user.id,
-        current_page: selectedPage,
-        logged_at: loggedAtIso ?? new Date().toISOString(),
-      });
+      setLastLog(readingLog);
+      setSavedProgressNote(null);
       setShowNoteEditor(false);
       onEntryComposerOpenChange?.(false);
       setExpanded(false);
@@ -271,7 +290,8 @@ export default function ReadingProgressPanel({
                     setShowNoteEditor(false);
                     onEntryComposerOpenChange?.(false);
                   }}
-                  onSaved={() => {
+                  onSaved={(note) => {
+                    if ("book_id" in note) setSavedProgressNote(note);
                     setShowNoteEditor(false);
                     onEntryComposerOpenChange?.(false);
                   }}
