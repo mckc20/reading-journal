@@ -5,11 +5,11 @@ export type NoteCalloutType = "note" | "idea" | "question" | "favorite" | "spoil
 
 const CALLOUT_TYPES = new Set<NoteCalloutType>(["note", "idea", "question", "favorite", "spoiler"]);
 
-const CALLOUT_ICON_PATHS: Record<NoteCalloutType, string> = {
-  note: '<path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v5h5"/><path d="M8 13h8"/><path d="M8 17h5"/>',
-  idea: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
-  question: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 5.8 1c-.6 1-1.7 1.5-2.4 2.2-.5.5-.5 1.1-.5 1.8"/><path d="M12 17h.01"/>',
-  favorite: '<path d="M11.5 2.6a.5.5 0 0 1 .9 0l2.6 5.3a1 1 0 0 0 .7.5l5.8.8a.5.5 0 0 1 .3.9l-4.2 4.1a1 1 0 0 0-.3.9l1 5.7a.5.5 0 0 1-.7.5l-5.2-2.7a1 1 0 0 0-.9 0l-5.2 2.7a.5.5 0 0 1-.7-.5l1-5.7a1 1 0 0 0-.3-.9L2.2 10a.5.5 0 0 1 .3-.9l5.8-.8a1 1 0 0 0 .7-.5z"/>',
+const CALLOUT_ICON_MARKUP: Record<NoteCalloutType, string> = {
+  note: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" x2="21" y1="3" y2="9"/><line x1="15" x2="15" y1="3" y2="9"/><line x1="15" x2="21" y1="9" y2="9"/><line x1="8" x2="16" y1="13" y2="13"/><line x1="8" x2="13" y1="17" y2="17"/>',
+  idea: '<circle cx="12" cy="9" r="5"/><line x1="12" x2="12" y1="14" y2="16"/><line x1="9" x2="15" y1="18" y2="18"/><line x1="10" x2="14" y1="22" y2="22"/>',
+  question: '<circle cx="12" cy="12" r="10"/><text x="12" y="13" dominant-baseline="middle" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor" stroke="none">?</text>',
+  favorite: '<polygon points="12 3 14.8 8.7 21 9.6 16.5 14 17.6 20.2 12 17.3 6.4 20.2 7.5 14 3 9.6 9.2 8.7 12 3"/>',
   spoiler: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
 };
 
@@ -50,7 +50,7 @@ function titleForCallout(type: NoteCalloutType): string {
 }
 
 function iconForCallout(type: NoteCalloutType): string {
-  return `<svg class="journal-callout-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CALLOUT_ICON_PATHS[type]}</svg>`;
+  return `<svg class="journal-callout-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CALLOUT_ICON_MARKUP[type]}</svg>`;
 }
 
 function getCalloutFromBlockquote(raw: string): { type: NoteCalloutType; markdown: string } | null {
@@ -140,10 +140,12 @@ function sanitizeRenderedHtml(html: string): string {
       "p",
       "span",
       "svg",
-      "path",
       "circle",
       "line",
+      "polygon",
+      "rect",
       "strong",
+      "text",
       "ul",
     ],
     ALLOWED_ATTR: [
@@ -154,19 +156,29 @@ function sanitizeRenderedHtml(html: string): string {
       "d",
       "data-callout",
       "data-callout-title",
+      "dominant-baseline",
       "fill",
+      "font-size",
+      "font-weight",
       "href",
+      "height",
+      "points",
       "r",
       "rel",
+      "rx",
       "stroke",
       "stroke-linecap",
       "stroke-linejoin",
       "stroke-width",
       "target",
+      "text-anchor",
       "title",
       "viewBox",
+      "width",
+      "x",
       "x1",
       "x2",
+      "y",
       "y1",
       "y2",
     ],

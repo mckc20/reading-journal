@@ -29,8 +29,25 @@ test("renders custom reading journal callouts", () => {
 
   assert.match(html, /journal-callout journal-callout-favorite/);
   assert.match(html, /data-callout="favorite"/);
+  assert.match(html, /journal-callout-icon/);
   assert.match(html, /Favorite/);
   assert.match(html, /This mattered\./);
+});
+
+test("renders callout icons without svg path elements", () => {
+  const html = renderNoteMarkdownToHtml([
+    "> [!note]\n> Hi",
+    "> [!idea]\n> Hi",
+    "> [!question]\n> Hi",
+    "> [!favorite]\n> Hi",
+    "> [!spoiler]\n> Hi",
+  ].join("\n\n"));
+
+  assert.equal(html.match(/journal-callout-icon/g)?.length, 5);
+  assert.doesNotMatch(html, /<path\b/);
+  assert.match(html, /<rect\b/);
+  assert.match(html, /<polygon\b/);
+  assert.match(html, /<text\b[^>]*>\?<\/text>/);
 });
 
 test("keeps plain text entries backwards compatible", () => {
