@@ -47,6 +47,12 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   reading_streak_goal_days: 7,
   auto_finish_books: true,
   estimated_completion_dates: true,
+  journal_filter_defaults: {
+    show_quotes: true,
+    show_thoughts: true,
+    show_automatic: true,
+    show_from_books: true,
+  },
 };
 
 export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
@@ -116,6 +122,16 @@ function mergeSection<TSection extends object>(
   } as TSection;
 }
 
+function normalizeReadingSettings(settings: ReadingSettings): ReadingSettings {
+  return {
+    ...settings,
+    journal_filter_defaults: {
+      ...DEFAULT_READING_SETTINGS.journal_filter_defaults,
+      ...(isRecord(settings.journal_filter_defaults) ? settings.journal_filter_defaults : {}),
+    },
+  };
+}
+
 function normalizeLibrarySettings(settings: LibrarySettings): LibrarySettings {
   const storedDefaultView = String(settings.default_view);
 
@@ -145,7 +161,7 @@ function normalizeSettings(row: UserSettingsRow): UserSettings {
   return {
     user_id: row.user_id,
     appearance: mergeSection(DEFAULT_APPEARANCE_SETTINGS, row.appearance),
-    reading: mergeSection(DEFAULT_READING_SETTINGS, row.reading),
+    reading: normalizeReadingSettings(mergeSection(DEFAULT_READING_SETTINGS, row.reading)),
     library: normalizeLibrarySettings(mergeSection(DEFAULT_LIBRARY_SETTINGS, row.library)),
     collections: mergeSection(DEFAULT_COLLECTION_SETTINGS, row.collections),
     notifications: mergeSection(DEFAULT_NOTIFICATION_SETTINGS, row.notifications),
@@ -177,7 +193,7 @@ export function mergeUserSettings(
   return {
     ...settings,
     appearance: mergeSection(DEFAULT_APPEARANCE_SETTINGS, settings.appearance, update.appearance),
-    reading: mergeSection(DEFAULT_READING_SETTINGS, settings.reading, update.reading),
+    reading: normalizeReadingSettings(mergeSection(DEFAULT_READING_SETTINGS, settings.reading, update.reading)),
     library: normalizeLibrarySettings(
       mergeSection(DEFAULT_LIBRARY_SETTINGS, settings.library, update.library),
     ),

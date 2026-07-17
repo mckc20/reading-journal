@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import AddJournalEntryDialog from "@/components/AddJournalEntryDialog";
@@ -8,6 +8,7 @@ import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
+import { useUserSettings } from "@/context/UserSettingsContext";
 import { fetchAllBookJournalEntryRecords, fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import {
@@ -51,6 +52,7 @@ export default function BookAnnotations() {
   const { bookId } = useParams<{ bookId: string }>();
   const [searchParams] = useSearchParams();
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
+  const { settings } = useUserSettings();
   const [journalEntryRecords, setJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [allJournalEntries, setAllJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
@@ -63,8 +65,24 @@ export default function BookAnnotations() {
   const [showThoughts, setShowThoughts] = useState(true);
   const [showAutomatic, setShowAutomatic] = useState(true);
   const [timelineSort, setTimelineSort] = useState<JournalTimelineSortMode>("entry-date");
+  const filterDefaultsAppliedRef = useRef(false);
+  const filterDefaultsTouchedRef = useRef(false);
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+
+  useEffect(() => {
+    if (!settings || filterDefaultsAppliedRef.current || filterDefaultsTouchedRef.current) return;
+    const defaults = settings.reading.journal_filter_defaults;
+    setShowQuotes(defaults.show_quotes);
+    setShowThoughts(defaults.show_thoughts);
+    setShowAutomatic(defaults.show_automatic);
+    filterDefaultsAppliedRef.current = true;
+  }, [settings]);
+
+  function setFilterFromUser(setter: (checked: boolean) => void, checked: boolean) {
+    filterDefaultsTouchedRef.current = true;
+    setter(checked);
+  }
 
   useEffect(() => {
     if (!bookId) return;
@@ -345,19 +363,19 @@ export default function BookAnnotations() {
             checked={showQuotes}
             label="Quotes"
             count={entryCounts.quote}
-            onCheckedChange={setShowQuotes}
+            onCheckedChange={(checked) => setFilterFromUser(setShowQuotes, checked)}
           />
           <JournalFilterSwitch
             checked={showThoughts}
             label="Thoughts"
             count={entryCounts.thought}
-            onCheckedChange={setShowThoughts}
+            onCheckedChange={(checked) => setFilterFromUser(setShowThoughts, checked)}
           />
           <JournalFilterSwitch
             checked={showAutomatic}
             label="Automatic"
             count={entryCounts.automatic}
-            onCheckedChange={setShowAutomatic}
+            onCheckedChange={(checked) => setFilterFromUser(setShowAutomatic, checked)}
           />
         </div>
         <Select value={timelineSort} onValueChange={(value) => setTimelineSort(value as JournalTimelineSortMode)}>

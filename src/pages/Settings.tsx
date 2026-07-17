@@ -664,6 +664,15 @@ function ReadingSettings() {
     saveSettingsSection("library", update);
   const saveCollections = (update: Partial<CollectionSettingsValues>) =>
     saveSettingsSection("collections", update);
+  const saveJournalFilterDefault = (
+    key: keyof ReadingSettingsValues["journal_filter_defaults"],
+    checked: boolean,
+  ) => saveReading({
+    journal_filter_defaults: {
+      ...reading.journal_filter_defaults,
+      [key]: checked,
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -733,6 +742,45 @@ function ReadingSettings() {
                 void saveReading({ estimated_completion_dates })
               }
             />
+          </SettingRow>
+          <SettingRow
+            title="Journal filter defaults"
+            description="Choose which journal filters start turned on when you open a journal."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">Quotes</span>
+                <ToggleSetting
+                  checked={reading.journal_filter_defaults.show_quotes}
+                  disabled={disabled}
+                  onChange={(checked) => void saveJournalFilterDefault("show_quotes", checked)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">Thoughts</span>
+                <ToggleSetting
+                  checked={reading.journal_filter_defaults.show_thoughts}
+                  disabled={disabled}
+                  onChange={(checked) => void saveJournalFilterDefault("show_thoughts", checked)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">Automatic</span>
+                <ToggleSetting
+                  checked={reading.journal_filter_defaults.show_automatic}
+                  disabled={disabled}
+                  onChange={(checked) => void saveJournalFilterDefault("show_automatic", checked)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">From books</span>
+                <ToggleSetting
+                  checked={reading.journal_filter_defaults.show_from_books}
+                  disabled={disabled}
+                  onChange={(checked) => void saveJournalFilterDefault("show_from_books", checked)}
+                />
+              </div>
+            </div>
           </SettingRow>
         </SettingsRows>
       </SettingsSection>

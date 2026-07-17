@@ -258,6 +258,13 @@ export type ReadingPaceCalculation = "recent_logs" | "all_logs" | "manual";
 
 export type ProgressDisplay = "percentage" | "pages" | "both";
 
+export interface JournalFilterDefaults {
+  show_quotes: boolean;
+  show_thoughts: boolean;
+  show_automatic: boolean;
+  show_from_books: boolean;
+}
+
 export interface ReadingSettings {
   default_reading_status: BookStatus;
   reading_pace_calculation: ReadingPaceCalculation;
@@ -266,6 +273,7 @@ export interface ReadingSettings {
   reading_streak_goal_days: number;
   auto_finish_books: boolean;
   estimated_completion_dates: boolean;
+  journal_filter_defaults: JournalFilterDefaults;
 }
 
 export type LibrarySorting = "recently_added" | "title" | "author" | "rating" | "status";

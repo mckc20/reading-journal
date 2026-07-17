@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookOpen, NotebookPen } from "lucide-react";
 import AddJournalEntryDialog from "@/components/AddJournalEntryDialog";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
+import { useUserSettings } from "@/context/UserSettingsContext";
 import { fetchAllBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import {
   authorJournalToJournalEntries,
@@ -39,6 +40,7 @@ export default function AuthorJournal() {
   const { user } = useAuth();
   const { authors, loading: authorsLoading } = useAuthorsContext();
   const { books, loading: booksLoading } = useBooksContext();
+  const { settings } = useUserSettings();
   const [journalEntries, setJournalEntries] = useState<AuthorJournalEntryRecord[]>([]);
   const [allBookJournalEntryRecords, setAllBookJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,8 @@ export default function AuthorJournal() {
   const [showThoughts, setShowThoughts] = useState(true);
   const [showAutomatic, setShowAutomatic] = useState(true);
   const [showBookEntries, setShowBookEntries] = useState(true);
+  const filterDefaultsAppliedRef = useRef(false);
+  const filterDefaultsTouchedRef = useRef(false);
 
   const author = authors.find((item) => item.id === authorId) ?? null;
   const authorBooks = useMemo(
@@ -59,6 +63,21 @@ export default function AuthorJournal() {
     () => allBookJournalEntryRecords.filter((note) => authorBookById.has(note.book_id)),
     [allBookJournalEntryRecords, authorBookById],
   );
+
+  useEffect(() => {
+    if (!settings || filterDefaultsAppliedRef.current || filterDefaultsTouchedRef.current) return;
+    const defaults = settings.reading.journal_filter_defaults;
+    setShowQuotes(defaults.show_quotes);
+    setShowThoughts(defaults.show_thoughts);
+    setShowAutomatic(defaults.show_automatic);
+    setShowBookEntries(defaults.show_from_books);
+    filterDefaultsAppliedRef.current = true;
+  }, [settings]);
+
+  function setFilterFromUser(setter: (checked: boolean) => void, checked: boolean) {
+    filterDefaultsTouchedRef.current = true;
+    setter(checked);
+  }
 
   useEffect(() => {
     if (!authorId) return;
@@ -200,14 +219,14 @@ export default function AuthorJournal() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <JournalFilterSwitch checked={showQuotes} label="Quotes" count={quoteEntries.length} onCheckedChange={setShowQuotes} />
-        <JournalFilterSwitch checked={showThoughts} label="Thoughts" count={thoughtEntries.length} onCheckedChange={setShowThoughts} />
-        <JournalFilterSwitch checked={showAutomatic} label="Automatic" count={automaticEntries.length} onCheckedChange={setShowAutomatic} />
+        <JournalFilterSwitch checked={showQuotes} label="Quotes" count={quoteEntries.length} onCheckedChange={(checked) => setFilterFromUser(setShowQuotes, checked)} />
+        <JournalFilterSwitch checked={showThoughts} label="Thoughts" count={thoughtEntries.length} onCheckedChange={(checked) => setFilterFromUser(setShowThoughts, checked)} />
+        <JournalFilterSwitch checked={showAutomatic} label="Automatic" count={automaticEntries.length} onCheckedChange={(checked) => setFilterFromUser(setShowAutomatic, checked)} />
         <JournalFilterSwitch
           checked={showBookEntries}
           label="From books"
           count={bookQuoteEntries.length + bookThoughtEntries.length}
-          onCheckedChange={setShowBookEntries}
+          onCheckedChange={(checked) => setFilterFromUser(setShowBookEntries, checked)}
         />
       </div>
 
