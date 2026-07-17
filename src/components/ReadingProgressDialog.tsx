@@ -26,10 +26,12 @@ export default function ReadingProgressDialog({
   onOpenChange,
 }: ReadingProgressDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [entryComposerOpen, setEntryComposerOpen] = useState(false);
   const isControlled = typeof open === "boolean";
   const resolvedOpen = isControlled ? open : internalOpen;
 
   function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) setEntryComposerOpen(false);
     if (!isControlled) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   }
@@ -38,7 +40,7 @@ export default function ReadingProgressDialog({
     <Dialog open={resolvedOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent
-        className="sm:max-w-md"
+        className={entryComposerOpen ? "sm:max-w-2xl" : "sm:max-w-md"}
         onClick={(event) => event.stopPropagation()}
       >
         <DialogHeader>
@@ -48,6 +50,7 @@ export default function ReadingProgressDialog({
           book={book}
           defaultExpanded
           hideTrigger
+          onEntryComposerOpenChange={setEntryComposerOpen}
           onCancel={() => handleOpenChange(false)}
           onProgressSaved={async (newPage) => {
             const totalPages = book.total_pages ?? 0;

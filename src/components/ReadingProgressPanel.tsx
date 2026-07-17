@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { BookOpen, NotebookPen } from "lucide-react";
+import { BookOpen, History, NotebookPen } from "lucide-react";
 import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ interface ReadingProgressPanelProps {
   defaultExpanded?: boolean;
   hideTrigger?: boolean;
   onCancel?: () => void;
+  onEntryComposerOpenChange?: (open: boolean) => void;
 }
 
 function buildPageItems(min: number, max: number) {
@@ -47,6 +48,7 @@ export default function ReadingProgressPanel({
   defaultExpanded = false,
   hideTrigger = false,
   onCancel,
+  onEntryComposerOpenChange,
 }: ReadingProgressPanelProps) {
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -97,9 +99,10 @@ export default function ReadingProgressPanel({
       setShowLoggedAtEditor(false);
       setSelectedLoggedAt(toDateTimeLocalValue(new Date()));
       setShowNoteEditor(false);
+      onEntryComposerOpenChange?.(false);
       setErrorMsg(null);
     }
-  }, [expanded, lastLog, book.current_page, totalPages]);
+  }, [expanded, lastLog, book.current_page, totalPages, onEntryComposerOpenChange]);
 
   const pageItems = useMemo(
     () => buildPageItems(minPage + 1, totalPages),
@@ -140,6 +143,7 @@ export default function ReadingProgressPanel({
         logged_at: loggedAtIso ?? new Date().toISOString(),
       });
       setShowNoteEditor(false);
+      onEntryComposerOpenChange?.(false);
       setExpanded(false);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save progress");
@@ -208,10 +212,12 @@ export default function ReadingProgressPanel({
             {!showLoggedAtEditor && (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
+                className="h-auto px-0 text-primary hover:bg-transparent hover:text-primary/85"
                 onClick={() => setShowLoggedAtEditor(true)}
               >
+                <History className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Change Finished Time
               </Button>
             )}
@@ -238,7 +244,10 @@ export default function ReadingProgressPanel({
                 variant="ghost"
                 size="sm"
                 className="h-auto px-0 text-primary hover:bg-transparent hover:text-primary/85"
-                onClick={() => setShowNoteEditor(true)}
+                onClick={() => {
+                  setShowNoteEditor(true);
+                  onEntryComposerOpenChange?.(true);
+                }}
               >
                 <NotebookPen className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Add Entry
@@ -258,8 +267,14 @@ export default function ReadingProgressPanel({
                   variant="inline"
                   heading="Add entry"
                   hideEntitySelector
-                  onCancel={() => setShowNoteEditor(false)}
-                  onSaved={() => setShowNoteEditor(false)}
+                  onCancel={() => {
+                    setShowNoteEditor(false);
+                    onEntryComposerOpenChange?.(false);
+                  }}
+                  onSaved={() => {
+                    setShowNoteEditor(false);
+                    onEntryComposerOpenChange?.(false);
+                  }}
                 />
               </div>
             )}
@@ -277,9 +292,11 @@ export default function ReadingProgressPanel({
               disabled={saving}
               onClick={() => {
                 if (onCancel) {
+                  onEntryComposerOpenChange?.(false);
                   onCancel();
                   return;
                 }
+                onEntryComposerOpenChange?.(false);
                 setExpanded(false);
               }}
             >
