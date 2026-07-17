@@ -286,6 +286,10 @@ function isCompactManualEntry(entry: ManualJournalTimelineEntry): boolean {
   return estimatedLineCount <= 3;
 }
 
+function linkedEntryCountLabel(count: number): string {
+  return `Linked to ${count} ${count === 1 ? "entry" : "entries"}`;
+}
+
 function TimelineTopActions({
   entry,
   busy,
@@ -306,7 +310,7 @@ function TimelineTopActions({
   return (
     <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
       {showLink && linkedEntryCount > 0 && (
-        <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
+        <span className="text-xs text-muted-foreground">{linkedEntryCountLabel(linkedEntryCount)}</span>
       )}
       {showLink && (
         <Button
@@ -368,7 +372,7 @@ function TimelineBottomActions({
   return (
     <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1">
       {showLink && linkedEntryCount > 0 && (
-        <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
+        <span className="text-xs text-muted-foreground">{linkedEntryCountLabel(linkedEntryCount)}</span>
       )}
       {showLink && isManualEntry(entry) && onLink && (
         <Button
@@ -1124,7 +1128,7 @@ function JournalPanelEntryContent({ entry, actions }: { entry: JournalTimelineEn
 }
 
 function JournalPanelInlineActions({ children }: { children: ReactNode }) {
-  return <div className="flex shrink-0 items-center justify-end gap-1">{children}</div>;
+  return <div className="flex shrink-0 translate-x-12 items-center justify-end gap-1 sm:translate-x-14">{children}</div>;
 }
 
 function JournalPanelReplyPreview({
