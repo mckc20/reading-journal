@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 interface JournalEntryCardProps {
   entry: JournalTimelineEntry;
   busy?: boolean;
+  linkedEntryCount?: number;
   onToggleSaved?: (entry: JournalTimelineEntry) => void;
   onReply?: (entry: JournalTimelineEntry) => void;
   onLink?: (entry: JournalTimelineEntry) => void;
@@ -83,7 +84,7 @@ function isAttachedGeneratedNote(entry: JournalTimelineEntry): boolean {
   );
 }
 
-export default function JournalEntryCard({ entry, busy = false, onToggleSaved, onReply, onLink }: JournalEntryCardProps) {
+export default function JournalEntryCard({ entry, busy = false, linkedEntryCount = 0, onToggleSaved, onReply, onLink }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
   const saved = isSaved(entry);
@@ -96,26 +97,13 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved, o
     <article
       className={cn(
         "relative h-full rounded-lg border bg-background p-4",
-        linkWithSave ? "pr-20" : isManual(entry) && onToggleSaved ? "pr-12" : "pr-4",
+        linkWithSave ? (linkedEntryCount > 0 ? "pr-52" : "pr-20") : isManual(entry) && onToggleSaved ? "pr-12" : "pr-4",
       )}
     >
       {((isManual(entry) && onToggleSaved) || linkWithSave) && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
-          {isManual(entry) && onToggleSaved && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="h-7 w-7 text-muted-foreground hover:text-primary"
-              aria-label={saved ? "Unsave entry" : "Save entry"}
-              disabled={busy}
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleSaved(entry);
-              }}
-            >
-              <Bookmark className={cn("h-4 w-4", saved && "fill-primary text-primary")} />
-            </Button>
+          {linkWithSave && linkedEntryCount > 0 && (
+            <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
           )}
           {linkWithSave && (
             <Button
@@ -132,6 +120,22 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved, o
               }}
             >
               <LinkIcon className="h-4 w-4" />
+            </Button>
+          )}
+          {isManual(entry) && onToggleSaved && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              aria-label={saved ? "Unsave entry" : "Save entry"}
+              disabled={busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSaved(entry);
+              }}
+            >
+              <Bookmark className={cn("h-4 w-4", saved && "fill-primary text-primary")} />
             </Button>
           )}
         </div>
@@ -162,6 +166,9 @@ export default function JournalEntryCard({ entry, busy = false, onToggleSaved, o
 
       {(showReply || linkWithReply) && (
         <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1">
+          {linkWithReply && linkedEntryCount > 0 && (
+            <span className="text-xs text-muted-foreground">Linked to {linkedEntryCount} entries.</span>
+          )}
           {linkWithReply && (
             <Button
               type="button"
