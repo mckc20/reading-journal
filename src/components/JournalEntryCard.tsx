@@ -71,7 +71,7 @@ export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions 
           className={cn(actions && "pr-8")}
           attribution={quoteSpeakerForEntry(entry) ? `- ${quoteSpeakerForEntry(entry)}` : null}
         >
-          <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6 [&_em]:not-italic" />
+          <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
         </QuoteBlock>
       ) : (
         <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />

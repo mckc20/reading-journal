@@ -697,7 +697,7 @@ function JournalPassageEntry({
             ) : null
           }
         >
-          <FormattedNoteContent markdown={note.content} className="text-base leading-7 text-foreground [&_em]:not-italic" />
+          <FormattedNoteContent markdown={note.content} className="text-base leading-7 text-foreground" />
         </QuoteBlock>
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
         <LinkedEntryCountText count={linkedEntryCount} />
@@ -1254,7 +1254,7 @@ function JournalPanelEntryContent({ entry, actions }: { entry: JournalTimelineEn
       <article className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-2">
-            <h3 className="font-heading text-xl font-medium leading-snug">{entry.label}</h3>
+            <h3 className="font-heading text-2xl font-medium leading-snug">{entry.label}</h3>
             {typeof rating === "number" && <RatingStars rating={rating} />}
             {details && <p className="text-sm text-muted-foreground">{details}</p>}
           </div>
@@ -1300,7 +1300,7 @@ function JournalPanelEntryContent({ entry, actions }: { entry: JournalTimelineEn
           }
           actions={actions}
         >
-          <FormattedNoteContent markdown={note.content} className="text-lg leading-8 text-foreground [&_em]:not-italic" />
+          <FormattedNoteContent markdown={note.content} className="text-lg leading-8 text-foreground" />
         </QuoteBlock>
       </article>
     );
@@ -1319,7 +1319,7 @@ function JournalPanelEntryContent({ entry, actions }: { entry: JournalTimelineEn
   return (
     <article className="space-y-4">
       {displayEntryTitle(entry) && (
-        <h3 className="font-heading text-xl font-medium leading-snug">{displayEntryTitle(entry)}</h3>
+        <h3 className="font-heading text-2xl font-medium leading-snug">{displayEntryTitle(entry)}</h3>
       )}
       <div className="flex items-end justify-between gap-3">
         <FormattedNoteContent markdown={note.content} className="min-w-0 flex-1 text-base leading-7 text-foreground" />
@@ -1362,6 +1362,7 @@ function JournalPanelReplyPreview({
 }) {
   const note = getManualNote(entry);
   const saved = isSavedEntry(entry);
+  const title = displayEntryTitle(entry);
 
   return (
     <article className="group/reply relative pl-8">
@@ -1393,6 +1394,7 @@ function JournalPanelReplyPreview({
             onDelete={onDelete}
           />
         </div>
+        {title && <h4 className="mb-2 pr-4 font-heading text-base font-medium leading-snug">{title}</h4>}
         <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
         <LinkedEntryCountText count={linkedEntryCount} />
