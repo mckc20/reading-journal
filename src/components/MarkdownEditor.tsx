@@ -1,17 +1,22 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import {
   Bold,
+  CircleAlert,
+  CircleQuestionMark,
   Heading,
   Italic,
   Link,
   List,
   ListOrdered,
+  Lightbulb,
   MessageSquarePlus,
   Minus,
   Pencil,
   Quote,
-  Sparkles,
   Eye,
+  Star,
+  StickyNote,
+  type LucideIcon,
 } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import { Button } from "@/components/ui/button";
@@ -33,12 +38,12 @@ type SelectionRange = {
   end: number;
 };
 
-const CALLOUT_OPTIONS: Array<{ type: NoteCalloutType; label: string }> = [
-  { type: "note", label: "Note" },
-  { type: "idea", label: "Idea" },
-  { type: "question", label: "Question" },
-  { type: "favorite", label: "Favorite" },
-  { type: "spoiler", label: "Spoiler" },
+const CALLOUT_OPTIONS: Array<{ type: NoteCalloutType; label: string; Icon: LucideIcon }> = [
+  { type: "note", label: "Note", Icon: StickyNote },
+  { type: "idea", label: "Idea", Icon: Lightbulb },
+  { type: "question", label: "Question", Icon: CircleQuestionMark },
+  { type: "favorite", label: "Favorite", Icon: Star },
+  { type: "spoiler", label: "Spoiler", Icon: CircleAlert },
 ];
 
 function selectedLines(value: string, selection: SelectionRange) {
@@ -256,7 +261,7 @@ export default function MarkdownEditor({
             </Button>
             {calloutMenuOpen && (
               <div className="absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
-                {CALLOUT_OPTIONS.map((option) => (
+                {CALLOUT_OPTIONS.map(({ Icon, ...option }) => (
                   <button
                     key={option.type}
                     type="button"
@@ -264,7 +269,7 @@ export default function MarkdownEditor({
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => insertCallout(option.type)}
                   >
-                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                     {option.label}
                   </button>
                 ))}

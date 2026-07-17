@@ -1994,13 +1994,32 @@ export default function JournalTimeline({
   const selectedGeneratedAttachedNotes = selectedEntry && isGeneratedBookEntry(selectedEntry)
     ? getGeneratedEntryNoteTags(selectedEntry).flatMap((tag) => generatedAttachedNotesByTag.get(tag) ?? [])
     : [];
+  const selectedGeneratedAttachedNoteTags = selectedEntry && isGeneratedBookEntry(selectedEntry)
+    ? getGeneratedEntryNoteTags(selectedEntry)
+    : [];
+  const selectedManualReplyEntries = selectedEntry && isManualEntry(selectedEntry)
+    ? editingReplyEntry &&
+      isReplyEntry(editingReplyEntry) &&
+      getManualNote(editingReplyEntry).parent_entry_id === selectedEntry.sourceId &&
+      !replyEntries.some((entry) => entry.id === editingReplyEntry.id)
+      ? [editingReplyEntry, ...replyEntries]
+      : replyEntries
+    : [];
+  const selectedGeneratedPanelNotes = selectedEntry && isGeneratedBookEntry(selectedEntry)
+    ? editingReplyEntry &&
+      isAttachedGeneratedNote(editingReplyEntry) &&
+      getAttachedGeneratedNoteTags(editingReplyEntry).some((tag) => selectedGeneratedAttachedNoteTags.includes(tag)) &&
+      !selectedGeneratedAttachedNotes.some((entry) => entry.id === editingReplyEntry.id)
+      ? [editingReplyEntry, ...selectedGeneratedAttachedNotes]
+      : selectedGeneratedAttachedNotes
+    : [];
   const selectedGeneratedSessionTime = selectedEntry && isGeneratedBookEntry(selectedEntry)
     ? formatGeneratedSessionTime(selectedEntry)
     : null;
   const panelAttachedNoteEntries = selectedEntry && isGeneratedBookEntry(selectedEntry)
-    ? selectedGeneratedAttachedNotes
+    ? selectedGeneratedPanelNotes
     : selectedEntry && isManualEntry(selectedEntry)
-      ? replyEntries
+      ? selectedManualReplyEntries
       : [];
   const panelAttachedNoteEntryKey = panelAttachedNoteEntries.map((entry) => entry.id).join("|");
   const availableLinkTargets = useMemo(() => {
@@ -2874,12 +2893,12 @@ export default function JournalTimeline({
                     )}
                     {isManualEntry(selectedEntry) && (
                       <div className="mt-8 space-y-6">
-                        {repliesLoading ? (
+                        {repliesLoading && selectedManualReplyEntries.length === 0 ? (
                           <p className="text-sm text-muted-foreground">Loading notes...</p>
                         ) : (
-                          replyEntries.length > 0 && (
+                          selectedManualReplyEntries.length > 0 && (
                             <div className="space-y-3">
-                              {replyEntries.map((entry) => (
+                              {selectedManualReplyEntries.map((entry) => (
                                 editingReplyEntry?.id === entry.id ? (
                                   <InlineEditReplyComposer
                                     key={entry.id}
@@ -2918,9 +2937,9 @@ export default function JournalTimeline({
                         )}
                       </div>
                     )}
-                    {isGeneratedBookEntry(selectedEntry) && selectedGeneratedAttachedNotes.length > 0 && (
+                    {isGeneratedBookEntry(selectedEntry) && selectedGeneratedPanelNotes.length > 0 && (
                       <div className="mt-8 space-y-3">
-                        {selectedGeneratedAttachedNotes.map((entry) => (
+                        {selectedGeneratedPanelNotes.map((entry) => (
                           editingReplyEntry?.id === entry.id ? (
                             <InlineEditReplyComposer
                               key={entry.id}
@@ -3093,7 +3112,7 @@ export default function JournalTimeline({
                         <div>
                           <p className="text-xs font-medium uppercase text-muted-foreground">Notes</p>
                           <p className="text-sm">
-                            {isGeneratedBookEntry(selectedEntry) ? selectedGeneratedAttachedNotes.length : replyEntries.length}
+                            {isGeneratedBookEntry(selectedEntry) ? selectedGeneratedPanelNotes.length : selectedManualReplyEntries.length}
                           </p>
                         </div>
                       )}
