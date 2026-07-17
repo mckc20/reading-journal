@@ -35,7 +35,7 @@ export default function QuoteBlock({
       <div className="min-w-0">
         <blockquote
           className={cn(
-            "font-heading text-base italic leading-7 text-foreground",
+            "font-heading text-base leading-7 text-foreground",
             contentClassName,
           )}
         >

@@ -213,15 +213,15 @@
   }
 
   .journal-markdown h1 {
-    @apply text-2xl font-heading font-semibold leading-tight;
-  }
-
-  .journal-markdown h2 {
     @apply text-xl font-heading font-semibold leading-tight;
   }
 
+  .journal-markdown h2 {
+    @apply text-lg font-heading font-semibold leading-tight;
+  }
+
   .journal-markdown h3 {
-    @apply text-lg font-heading font-semibold leading-snug;
+    @apply text-base font-heading font-semibold leading-snug;
   }
 
   .journal-markdown ul {
