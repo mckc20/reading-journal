@@ -90,6 +90,8 @@ type LegacyJournalEntryDraft = Partial<JournalEntryDraft> & {
 
 const JOURNAL_ENTRY_DRAFT_PREFIX = "reading-journal:journal-entry-draft:v1";
 const JOURNAL_ENTRY_DRAFT_PREFIX_V2 = "reading-journal:journal-entry-draft:v2";
+const EMPTY_SYSTEM_TAGS: string[] = [];
+const EMPTY_SYSTEM_TAG_PREFIXES: string[] = [];
 
 function hasDraftContent(values: FormValues): boolean {
   return Boolean(
@@ -176,8 +178,8 @@ export function JournalEntryForm({
   initialPageStart = null,
   initialNoteDate = null,
   preferInitialPageAndDate = false,
-  systemTags = [],
-  replaceSystemTagPrefixes = [],
+  systemTags = EMPTY_SYSTEM_TAGS,
+  replaceSystemTagPrefixes = EMPTY_SYSTEM_TAG_PREFIXES,
   variant = "dialog",
   heading,
   hideEntitySelector = false,
@@ -257,16 +259,19 @@ export function JournalEntryForm({
   const [mediaError, setMediaError] = useState<string | null>(null);
   const isInline = variant === "inline";
   const paragraphCount = useMemo(() => journalParagraphCount(content), [content]);
+  const systemTagsKey = systemTags.join("\u0001");
+  const replaceSystemTagPrefixesKey = replaceSystemTagPrefixes.join("\u0001");
+  const initialEntryResetKey = initialEntry ? `${journalEntryDraftSource(initialEntry)}:${initialEntry.id}` : "new";
   const hiddenInitialTags = useMemo(
     () =>
       normalizeJournalTags(initialEntry?.tags)
         .filter(isInternalJournalTag)
         .filter((tag) => !replaceSystemTagPrefixes.some((prefix) => tag.startsWith(prefix))),
-    [initialEntry, replaceSystemTagPrefixes],
+    [initialEntry?.id, replaceSystemTagPrefixesKey],
   );
   const hiddenSystemTags = useMemo(
     () => normalizeJournalTags([...hiddenInitialTags, ...systemTags]),
-    [hiddenInitialTags, systemTags],
+    [hiddenInitialTags, systemTagsKey],
   );
   const draftKey = useMemo(() => {
     if (initialEntry) {
@@ -331,7 +336,7 @@ export function JournalEntryForm({
       autosaveReadyRef.current = true;
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [active, draftKey, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, legacyDraftKey, preferInitialPageAndDate, reset]);
+  }, [active, draftKey, entityId, initialBookId, initialEntryResetKey, initialNoteDate, initialPageStart, legacyDraftKey, preferInitialPageAndDate, reset]);
 
   useEffect(() => {
     if (!active || !draftSaveReadyRef.current || !draftKey) return;

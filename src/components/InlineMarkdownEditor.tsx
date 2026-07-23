@@ -103,7 +103,13 @@ const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdo
   useEffect(() => {
     if (!editor) return;
     if (editorMarkdown(editor) === value) return;
+    const { from, to } = editor.state.selection;
     editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
+    const docSize = editor.state.doc.content.size;
+    editor.commands.setTextSelection({
+      from: Math.min(from, docSize),
+      to: Math.min(to, docSize),
+    });
   }, [editor, value]);
 
   useEffect(() => {
