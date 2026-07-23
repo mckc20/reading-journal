@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Compass,
@@ -31,7 +31,6 @@ import type { Book } from "@/types";
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
-const AddJournalEntryDialog = lazy(() => import("./AddJournalEntryDialog"));
 const AddChatDialog = lazy(() => import("./AddChatDialog"));
 const AddGenreDialog = lazy(() => import("./AddGenreDialog"));
 
@@ -111,6 +110,7 @@ function AppLayoutContent() {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const location = useLocation();
+  const navigate = useNavigate();
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -177,6 +177,27 @@ function AppLayoutContent() {
       openAddBook();
       return;
     }
+    if (action === "note") {
+      const bookMatch = location.pathname.match(/^\/books\/([^/]+)/);
+      const seriesMatch = location.pathname.match(/^\/series\/([^/]+)/);
+      const authorMatch = location.pathname.match(/^\/authors\/([^/]+)/);
+
+      if (bookMatch) {
+        navigate(`/books/${bookMatch[1]}/journal?new=1`);
+        return;
+      }
+      if (seriesMatch) {
+        navigate(`/series/${seriesMatch[1]}/journal?new=1`);
+        return;
+      }
+      if (authorMatch) {
+        navigate(`/authors/${authorMatch[1]}/journal?new=1`);
+        return;
+      }
+
+      navigate("/library/explore?view=journalEntries");
+      return;
+    }
     setActiveAddAction(action);
   }
 
@@ -237,12 +258,6 @@ function AppLayoutContent() {
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
             openAddBook={openAddBook}
-          />
-        )}
-        {activeAddAction === "note" && (
-          <AddJournalEntryDialog
-            open
-            onOpenChange={(open) => !open && setActiveAddAction(null)}
           />
         )}
         {activeAddAction === "chat" && (

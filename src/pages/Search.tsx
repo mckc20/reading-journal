@@ -354,10 +354,10 @@ function NoteSearchResult({
       {note.label === "quote" ? (
         <QuoteBlock
           attribution={
-            note.quote_speaker || pageLabel ? (
+            note.attribution || pageLabel ? (
               <div className="flex flex-wrap items-center gap-2">
-                {note.quote_speaker && (
-                  <span className="font-serif italic">- {note.quote_speaker}</span>
+                {note.attribution && (
+                  <span className="font-serif italic">- {note.attribution}</span>
                 )}
                 {pageLabel && <span className="text-xs font-medium">{pageLabel}</span>}
               </div>
@@ -369,11 +369,6 @@ function NoteSearchResult({
         </QuoteBlock>
       ) : (
         <>
-          {note.title && (
-            <p className="mb-1 text-sm font-medium leading-snug">
-              <HighlightedText value={note.title} query={query} />
-            </p>
-          )}
           <p className="line-clamp-3 whitespace-pre-line text-sm leading-6 text-foreground">
             <HighlightedText value={match.values[0]} query={query} />
           </p>

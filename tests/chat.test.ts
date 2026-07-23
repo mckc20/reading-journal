@@ -133,7 +133,7 @@ test("builds clean book import payloads without personal reading state", () => {
 });
 
 test("maps note snapshots to a selected target book", () => {
-  const note = makeNote({ label: "quote", content: "A quote", quote_speaker: "Author" });
+  const note = makeNote({ label: "quote", content: "A quote", attribution: "Author" });
   const attachment = buildBookAttachment(makeBook(), [note]);
   const input = noteSnapshotToCreateInput({
     note: attachment.book.included_journalEntries?.[0] as NonNullable<typeof attachment.book.included_journalEntries>[number],
@@ -145,8 +145,7 @@ test("maps note snapshots to a selected target book", () => {
     bookId: "target-book",
     userId: "current-user",
     label: "quote",
-    title: undefined,
-    quoteSpeaker: "Author",
+    attribution: "Author",
     content: "A quote",
     pageStart: undefined,
     noteDate: "2026-06-20",
@@ -306,8 +305,7 @@ function makeNote(overrides: Partial<BookJournalEntryRecord> = {}): BookJournalE
     user_id: "current-user",
     book_id: "book-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "A note",
     page_start: null,
     is_favorite: false,

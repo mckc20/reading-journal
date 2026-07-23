@@ -116,8 +116,7 @@ export interface BookJournalEntryRecord {
   book_id: string;
   parent_entry_id?: string | null;
   label: JournalEntryLabel;
-  title?: string | null;
-  quote_speaker?: string | null;
+  attribution?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
@@ -133,8 +132,7 @@ export interface SeriesJournalEntryRecord {
   series_id: string;
   parent_entry_id?: string | null;
   label: JournalEntryLabel;
-  title?: string | null;
-  quote_speaker?: string | null;
+  attribution?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
@@ -150,8 +148,7 @@ export interface AuthorJournalEntryRecord {
   author_id: string;
   parent_entry_id?: string | null;
   label: JournalEntryLabel;
-  title?: string | null;
-  quote_speaker?: string | null;
+  attribution?: string | null;
   content: string;
   tags?: string[] | null;
   page_start?: number | null;
@@ -159,13 +156,6 @@ export interface AuthorJournalEntryRecord {
   entry_date: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface JournalEntryLink {
-  id: string;
-  entry_a_id: string;
-  entry_b_id: string;
-  created_at: string;
 }
 
 export type JournalEntityType = "Book" | "Series" | "Author";
@@ -436,9 +426,8 @@ export type ChatSharedNoteLabel = JournalEntryLabel;
 export interface ChatSharedNoteSnapshot {
   id?: string;
   label: ChatSharedNoteLabel;
-  title?: string | null;
   content: string;
-  quote_speaker?: string | null;
+  attribution?: string | null;
   page_start?: number | null;
   entry_date?: string | null;
   book_id?: string | null;

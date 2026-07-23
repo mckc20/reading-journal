@@ -21,8 +21,7 @@ function makeBookJournalEntryRecord(overrides: Partial<BookJournalEntryRecord> =
     user_id: "user-1",
     book_id: "book-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "A note",
     tags: null,
     page_start: null,
@@ -65,8 +64,7 @@ function makeSeriesJournalEntryRecord(overrides: Partial<SeriesJournalEntryRecor
     user_id: "user-1",
     series_id: "series-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "A series note",
     tags: null,
     page_start: null,
@@ -84,8 +82,7 @@ function makeAuthorJournalEntryRecord(overrides: Partial<AuthorJournalEntryRecor
     user_id: "user-1",
     author_id: "author-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "An author note",
     tags: null,
     page_start: null,
@@ -467,7 +464,6 @@ test("merges manual and generated journal entries in chronological order", () =>
 test("keeps note content on the source book note record", () => {
   const note = makeBookJournalEntryRecord({
     id: "note-with-content",
-    title: "  A saved thought  ",
     content: "This is still stored on book_journal.",
   });
   const entry = bookJournalEntryToJournalEntry(note);

@@ -21,9 +21,8 @@ export function buildSharedNoteSnapshot(
   return {
     id: note.id,
     label: note.label,
-    title: note.title ?? null,
     content: note.content,
-    quote_speaker: note.quote_speaker ?? null,
+    attribution: note.attribution ?? null,
     page_start: note.page_start ?? null,
     entry_date: note.entry_date ?? null,
     book_id: note.book_id,
@@ -163,8 +162,7 @@ export function noteSnapshotToCreateInput({
     bookId,
     userId,
     label: note.label,
-    title: note.title ?? undefined,
-    quoteSpeaker: note.quote_speaker ?? undefined,
+    attribution: note.attribution ?? undefined,
     content: note.content,
     pageStart: note.page_start ?? undefined,
     noteDate: note.entry_date ?? undefined,
@@ -174,7 +172,7 @@ export function noteSnapshotToCreateInput({
 
 export function attachmentTitle(attachment: ChatAttachmentPayload): string {
   if (attachment.type === "book") return attachment.book.title;
-  if (attachment.type === "note") return attachment.note.title || attachment.note.book_title || "Shared note";
+  if (attachment.type === "note") return attachment.note.book_title || "Shared note";
   if (attachment.type === "author") return attachment.author.name;
   return attachment.series.name;
 }

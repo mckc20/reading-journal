@@ -59,8 +59,8 @@ export default function AnnotationCard({ note, bookId, bookTitle, compact = fals
         </div>
         <QuoteBlock
           attribution={
-            note.quote_speaker ? (
-              <span className="font-serif italic">- {note.quote_speaker}</span>
+            note.attribution ? (
+              <span className="font-serif italic">- {note.attribution}</span>
             ) : null
           }
         >
@@ -93,9 +93,6 @@ export default function AnnotationCard({ note, bookId, bookTitle, compact = fals
           </time>
         </div>
       </div>
-      {note.title && (
-        <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{note.title}</h3>
-      )}
       <FormattedNoteContent
         markdown={note.content}
         className={cn("text-sm leading-6 text-foreground", compact && "line-clamp-5")}

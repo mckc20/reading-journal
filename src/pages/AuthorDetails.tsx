@@ -182,6 +182,9 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
           <JournalTimeline
             entries={journalEntries}
             layout="cards"
+            previewMode={{
+              getEntryHref: (entry) => `/authors/${author.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
+            }}
             emptyMessage="Author journal entries will appear here."
             onEntryUpdated={(entry) => {
               if (entry.source === "author_note") {

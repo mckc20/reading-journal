@@ -453,7 +453,7 @@ Users should be able to:
 - write thoughts
 - attach timestamps
 - create thematic notes
-- link notes to quotes
+- add comments to quotes and notes
 
 This transforms the app from tracker → personal archive.
 
@@ -575,15 +575,15 @@ Examples:
 
 ---
 
-### Cross-Linking
+### Comments and Context
 
 Clicking a quote should:
 
 - open the book
-- open related notes
+- open its comments
 - show context
 
-This creates knowledge graphs naturally.
+This keeps annotations close to the writing they belong to.
 
 ---
 
@@ -707,9 +707,9 @@ Should support:
 
 ### Notes
 
-Independent but linkable.
+Standalone, with optional comments.
 
-Can evolve into knowledge management.
+Can evolve into a cleaner personal notebook.
 
 ---
 

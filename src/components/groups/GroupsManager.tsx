@@ -369,10 +369,9 @@ function AttachmentCard({
           {mine ? (
             <div className="rounded-md bg-muted/50 px-3 py-2">
               <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
-              {attachment.note.title && <p className="mt-1 text-sm font-medium">{attachment.note.title}</p>}
               <p className="mt-1 text-sm">{attachment.note.content}</p>
-              {attachment.note.quote_speaker && (
-                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.quote_speaker}</p>
+              {attachment.note.attribution && (
+                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.attribution}</p>
               )}
               {attachment.note.book_title && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -384,13 +383,12 @@ function AttachmentCard({
             <Link
               to={href ?? "#"}
               className="block rounded-md bg-muted/50 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label={`Open ${attachment.note.book_title ?? attachment.note.title ?? "quote"}`}
+              aria-label={`Open ${attachment.note.book_title ?? "quote"}`}
             >
               <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
-              {attachment.note.title && <p className="mt-1 text-sm font-medium">{attachment.note.title}</p>}
               <p className="mt-1 text-sm">{attachment.note.content}</p>
-              {attachment.note.quote_speaker && (
-                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.quote_speaker}</p>
+              {attachment.note.attribution && (
+                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.attribution}</p>
               )}
               {attachment.note.book_title && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -714,7 +712,7 @@ export function GroupsManager() {
     if (!query) return sorted;
     return sorted.filter((note) => {
       const book = booksById.get(note.book_id);
-      return [note.title, note.content, note.quote_speaker, book?.title]
+      return [note.content, note.attribution, book?.title]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });

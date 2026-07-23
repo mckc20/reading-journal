@@ -10,14 +10,13 @@ import {
 } from "../src/lib/bookJournal";
 import type { BookJournalEntryRecord } from "../src/types";
 
-test("normalizes book note title and content before insert", () => {
+test("normalizes book quote attribution and content before insert", () => {
   assert.deepEqual(
     normalizeBookJournalEntryRecordInput({
       bookId: "book-1",
       userId: "user-1",
       label: "quote",
-      title: "  Favorite line  ",
-      quoteSpeaker: "  Mae Holland  ",
+      attribution: "  Mae Holland  ",
       content: "  This stayed with me.  ",
       noteDate: "2026-05-05",
       isFavorite: true,
@@ -26,8 +25,7 @@ test("normalizes book note title and content before insert", () => {
       book_id: "book-1",
       user_id: "user-1",
       label: "quote",
-      title: null,
-      quote_speaker: "Mae Holland",
+      attribution: "Mae Holland",
       content: "This stayed with me.",
       page_start: null,
       is_favorite: true,
@@ -36,15 +34,15 @@ test("normalizes book note title and content before insert", () => {
   );
 });
 
-test("stores blank book note title as null", () => {
+test("thought inputs do not persist attribution", () => {
   assert.equal(
     normalizeBookJournalEntryRecordInput({
       bookId: "book-1",
       userId: "user-1",
       label: "note",
-      title: "   ",
+      attribution: "Should not save",
       content: "A regular note",
-    }).title,
+    }).attribution,
     null,
   );
 });
@@ -79,15 +77,13 @@ test("normalizes editable book note fields", () => {
   assert.deepEqual(
     normalizeBookJournalEntryRecordFields({
       label: "review",
-      title: "  Final thoughts  ",
-      quoteSpeaker: "Should not save",
+      attribution: "Should not save",
       content: "  Strong ending.  ",
       noteDate: "2026-04-30",
     }),
     {
       label: "review",
-      title: "Final thoughts",
-      quote_speaker: null,
+      attribution: null,
       content: "Strong ending.",
       page_start: null,
       is_favorite: false,
@@ -106,8 +102,7 @@ test("normalizes a single source page", () => {
     }),
     {
       label: "quote",
-      title: null,
-      quote_speaker: null,
+      attribution: null,
       content: "Important line.",
       page_start: 42,
       is_favorite: false,
@@ -121,14 +116,13 @@ test("normalizes saved state for quote entries", () => {
     normalizeBookJournalEntryRecordFields({
       label: "quote",
       content: "Favorite line.",
-      quoteSpeaker: "Annie",
+      attribution: "Annie",
       isFavorite: true,
       noteDate: "2026-05-02",
     }),
     {
       label: "quote",
-      title: null,
-      quote_speaker: "Annie",
+      attribution: "Annie",
       content: "Favorite line.",
       page_start: null,
       is_favorite: true,
@@ -149,14 +143,14 @@ test("stores saved state for reviews and regular journalEntries", () => {
   );
 });
 
-test("stores quote speaker only for quote entries", () => {
+test("stores quote attribution only for quote entries", () => {
   assert.equal(
     normalizeBookJournalEntryRecordFields({
       label: "quote",
       content: "Quoted text.",
-      quoteSpeaker: "  Mae  ",
+      attribution: "  Mae  ",
       noteDate: "2026-05-04",
-    }).quote_speaker,
+    }).attribution,
     "Mae",
   );
 
@@ -164,9 +158,9 @@ test("stores quote speaker only for quote entries", () => {
     normalizeBookJournalEntryRecordFields({
       label: "note",
       content: "Regular thought.",
-      quoteSpeaker: "Mae",
+      attribution: "Mae",
       noteDate: "2026-05-04",
-    }).quote_speaker,
+    }).attribution,
     null,
   );
 });
@@ -257,8 +251,7 @@ function makeBookJournalEntryRecord(overrides: Partial<BookJournalEntryRecord>):
     user_id: "user-1",
     book_id: "book-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "Note",
     page_start: null,
     is_favorite: false,

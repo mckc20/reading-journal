@@ -1,11 +1,10 @@
-import type { BookJournalEntryRecord, JournalEntryLabel, JournalEntryLink } from "@/types";
+import type { BookJournalEntryRecord, JournalEntryLabel } from "@/types";
 
 export interface CreateBookJournalEntryRecordInput {
   bookId: string;
   userId: string;
   label: JournalEntryLabel;
-  title?: string;
-  quoteSpeaker?: string;
+  attribution?: string;
   content: string;
   tags?: string[] | null;
   pageStart?: string | number | null;
@@ -16,8 +15,7 @@ export interface CreateBookJournalEntryRecordInput {
 
 export interface BookJournalEntryRecordFieldsInput {
   label: JournalEntryLabel;
-  title?: string;
-  quoteSpeaker?: string;
+  attribution?: string;
   content: string;
   tags?: string[] | null;
   pageStart?: string | number | null;
@@ -30,8 +28,7 @@ export interface NormalizedBookJournalEntryRecordInput {
   book_id: string;
   user_id: string;
   label: JournalEntryLabel;
-  title: string | null;
-  quote_speaker: string | null;
+  attribution: string | null;
   content: string;
   tags?: string[];
   page_start: number | null;
@@ -42,8 +39,7 @@ export interface NormalizedBookJournalEntryRecordInput {
 
 export interface NormalizedBookJournalEntryRecordFields {
   label: JournalEntryLabel;
-  title: string | null;
-  quote_speaker: string | null;
+  attribution: string | null;
   content: string;
   tags?: string[] | null;
   page_start: number | null;
@@ -150,9 +146,8 @@ export function normalizeBookJournalEntryRecordFields(
 
   const fields: NormalizedBookJournalEntryRecordFields = {
     label: input.label,
-    title: input.label === "quote" ? null : input.title?.trim() || null,
-    quote_speaker:
-      input.label === "quote" ? input.quoteSpeaker?.trim() || null : null,
+    attribution:
+      input.label === "quote" ? input.attribution?.trim() || null : null,
     content,
     page_start: pageStart,
     is_favorite: Boolean(input.isFavorite),
@@ -364,81 +359,4 @@ export async function updateBookJournalReply(
 
 export async function deleteBookJournalReply(entryId: string): Promise<void> {
   return deleteBookJournalEntryRecord(entryId);
-}
-
-function orderedEntryPair(entryA: string, entryB: string): { entry_a_id: string; entry_b_id: string } {
-  if (entryA === entryB) throw new Error("An entry cannot be linked to itself");
-  return entryA.localeCompare(entryB) < 0
-    ? { entry_a_id: entryA, entry_b_id: entryB }
-    : { entry_a_id: entryB, entry_b_id: entryA };
-}
-
-function isDuplicateLinkError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
-  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
-  return code === "23505" || message.toLocaleLowerCase().includes("duplicate");
-}
-
-export async function linkBookJournalEntries(
-  entryA: string,
-  entryB: string,
-): Promise<JournalEntryLink> {
-  const { supabase } = await import("./supabase");
-  const payload = orderedEntryPair(entryA, entryB);
-  const { data, error } = await supabase
-    .from("book_journal_entry_links")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error && isDuplicateLinkError(error)) {
-    const existing = await supabase
-      .from("book_journal_entry_links")
-      .select("*")
-      .eq("entry_a_id", payload.entry_a_id)
-      .eq("entry_b_id", payload.entry_b_id)
-      .single();
-    if (existing.error) throw bookJournalEntryErrorToError(existing.error);
-    return existing.data as JournalEntryLink;
-  }
-
-  if (error) throw bookJournalEntryErrorToError(error);
-  return data as JournalEntryLink;
-}
-
-export async function unlinkBookJournalEntries(entryA: string, entryB: string): Promise<void> {
-  const { supabase } = await import("./supabase");
-  const pair = orderedEntryPair(entryA, entryB);
-  const { error } = await supabase
-    .from("book_journal_entry_links")
-    .delete()
-    .eq("entry_a_id", pair.entry_a_id)
-    .eq("entry_b_id", pair.entry_b_id);
-
-  if (error) throw bookJournalEntryErrorToError(error);
-}
-
-export async function getRelatedBookJournalEntries(entryId: string): Promise<BookJournalEntryRecord[]> {
-  const { supabase } = await import("./supabase");
-  const { data: links, error: linksError } = await supabase
-    .from("book_journal_entry_links")
-    .select("*")
-    .or(`entry_a_id.eq.${entryId},entry_b_id.eq.${entryId}`)
-    .order("created_at", { ascending: false });
-
-  if (linksError) throw bookJournalEntryErrorToError(linksError);
-
-  const relatedIds = ((links ?? []) as JournalEntryLink[])
-    .map((link) => (link.entry_a_id === entryId ? link.entry_b_id : link.entry_a_id));
-  if (relatedIds.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from("book_journal")
-    .select("*")
-    .in("id", relatedIds);
-
-  if (error) throw bookJournalEntryErrorToError(error);
-  const entriesById = new Map(((data ?? []) as BookJournalEntryRecord[]).map((entry) => [entry.id, entry]));
-  return relatedIds.map((id) => entriesById.get(id)).filter((entry): entry is BookJournalEntryRecord => Boolean(entry));
 }

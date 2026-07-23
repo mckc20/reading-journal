@@ -14,8 +14,7 @@ function makeAuthorJournalEntryRecord(overrides: Partial<AuthorJournalEntryRecor
     user_id: "user-1",
     author_id: "author-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "An author note",
     page_start: null,
     is_favorite: false,
@@ -31,7 +30,6 @@ test("normalizes author note fields", () => {
     normalizeAuthorJournalEntryRecordInput({
       authorId: "author-1",
       userId: "user-1",
-      title: "  Background  ",
       content: "  This belongs to the author.  ",
       noteDate: "2026-07-02",
     }),
@@ -39,8 +37,7 @@ test("normalizes author note fields", () => {
       author_id: "author-1",
       user_id: "user-1",
       label: "note",
-      title: "Background",
-      quote_speaker: null,
+      attribution: null,
       content: "This belongs to the author.",
       page_start: null,
       is_favorite: false,
@@ -61,14 +58,13 @@ test("includes parent entry id for author journal replies", () => {
   );
 });
 
-test("normalizes author quotes with speaker and page", () => {
+test("normalizes author quotes with attribution and page", () => {
   assert.deepEqual(
     normalizeAuthorJournalEntryRecordInput({
       authorId: "author-1",
       userId: "user-1",
       label: "quote",
-      title: "Ignored title",
-      quoteSpeaker: "  Narrator  ",
+      attribution: "  Narrator  ",
       content: "  A quote about the author.  ",
       pageStart: "42",
       noteDate: "2026-07-02",
@@ -77,8 +73,7 @@ test("normalizes author quotes with speaker and page", () => {
       author_id: "author-1",
       user_id: "user-1",
       label: "quote",
-      title: null,
-      quote_speaker: "Narrator",
+      attribution: "Narrator",
       content: "A quote about the author.",
       page_start: 42,
       is_favorite: false,
@@ -87,13 +82,13 @@ test("normalizes author quotes with speaker and page", () => {
   );
 });
 
-test("stores blank author note title as null", () => {
+test("author thoughts do not persist attribution", () => {
   assert.equal(
     normalizeAuthorJournalEntryRecordFields({
-      title: "   ",
+      attribution: "Should not save",
       content: "A note",
       noteDate: "2026-07-02",
-    }).title,
+    }).attribution,
     null,
   );
 });
@@ -102,7 +97,6 @@ test("rejects blank author note content", () => {
   assert.throws(
     () =>
       normalizeAuthorJournalEntryRecordFields({
-        title: "Optional",
         content: "   ",
         noteDate: "2026-07-02",
       }),

@@ -1,11 +1,10 @@
-import type { JournalEntryLabel, JournalEntryLink, SeriesJournalEntryRecord } from "@/types";
+import type { JournalEntryLabel, SeriesJournalEntryRecord } from "@/types";
 
 export interface CreateSeriesJournalEntryRecordInput {
   seriesId: string;
   userId: string;
   label?: JournalEntryLabel;
-  title?: string;
-  quoteSpeaker?: string;
+  attribution?: string;
   content: string;
   tags?: string[] | null;
   pageStart?: string | number | null;
@@ -17,8 +16,7 @@ export interface CreateSeriesJournalEntryRecordInput {
 export interface UpdateSeriesJournalEntryRecordInput {
   noteId: string;
   label?: JournalEntryLabel;
-  title?: string;
-  quoteSpeaker?: string;
+  attribution?: string;
   content: string;
   tags?: string[] | null;
   pageStart?: string | number | null;
@@ -29,8 +27,7 @@ export interface UpdateSeriesJournalEntryRecordInput {
 
 export interface NormalizedSeriesJournalEntryRecordFields {
   label: JournalEntryLabel;
-  title: string | null;
-  quote_speaker: string | null;
+  attribution: string | null;
   content: string;
   tags?: string[] | null;
   page_start: number | null;
@@ -96,7 +93,7 @@ export function seriesJournalEntryErrorToError(error: unknown): Error {
 }
 
 export function normalizeSeriesJournalEntryRecordFields(
-  input: Pick<CreateSeriesJournalEntryRecordInput, "label" | "title" | "quoteSpeaker" | "content" | "tags" | "pageStart" | "isFavorite" | "noteDate"> & {
+  input: Pick<CreateSeriesJournalEntryRecordInput, "label" | "attribution" | "content" | "tags" | "pageStart" | "isFavorite" | "noteDate"> & {
     parentEntryId?: string | null;
   },
 ): NormalizedSeriesJournalEntryRecordFields {
@@ -106,8 +103,7 @@ export function normalizeSeriesJournalEntryRecordFields(
 
   const fields: NormalizedSeriesJournalEntryRecordFields = {
     label,
-    title: label === "quote" ? null : input.title?.trim() || null,
-    quote_speaker: label === "quote" ? input.quoteSpeaker?.trim() || null : null,
+    attribution: label === "quote" ? input.attribution?.trim() || null : null,
     content,
     page_start: normalizePageValue(input.pageStart),
     is_favorite: Boolean("isFavorite" in input ? input.isFavorite : false),
@@ -248,73 +244,4 @@ export async function updateSeriesJournalReply(
 
 export async function deleteSeriesJournalReply(entryId: string): Promise<void> {
   return deleteSeriesJournalEntryRecord(entryId);
-}
-
-function orderedEntryPair(entryA: string, entryB: string): { entry_a_id: string; entry_b_id: string } {
-  if (entryA === entryB) throw new Error("An entry cannot be linked to itself");
-  return entryA.localeCompare(entryB) < 0
-    ? { entry_a_id: entryA, entry_b_id: entryB }
-    : { entry_a_id: entryB, entry_b_id: entryA };
-}
-
-function isDuplicateLinkError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
-  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
-  return code === "23505" || message.toLocaleLowerCase().includes("duplicate");
-}
-
-export async function linkSeriesJournalEntries(entryA: string, entryB: string): Promise<JournalEntryLink> {
-  const { supabase } = await import("./supabase");
-  const payload = orderedEntryPair(entryA, entryB);
-  const { data, error } = await supabase
-    .from("series_journal_entry_links")
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error && isDuplicateLinkError(error)) {
-    const existing = await supabase
-      .from("series_journal_entry_links")
-      .select("*")
-      .eq("entry_a_id", payload.entry_a_id)
-      .eq("entry_b_id", payload.entry_b_id)
-      .single();
-    if (existing.error) throw seriesJournalEntryErrorToError(existing.error);
-    return existing.data as JournalEntryLink;
-  }
-
-  if (error) throw seriesJournalEntryErrorToError(error);
-  return data as JournalEntryLink;
-}
-
-export async function unlinkSeriesJournalEntries(entryA: string, entryB: string): Promise<void> {
-  const { supabase } = await import("./supabase");
-  const pair = orderedEntryPair(entryA, entryB);
-  const { error } = await supabase
-    .from("series_journal_entry_links")
-    .delete()
-    .eq("entry_a_id", pair.entry_a_id)
-    .eq("entry_b_id", pair.entry_b_id);
-
-  if (error) throw seriesJournalEntryErrorToError(error);
-}
-
-export async function getRelatedSeriesJournalEntries(entryId: string): Promise<SeriesJournalEntryRecord[]> {
-  const { supabase } = await import("./supabase");
-  const { data: links, error: linksError } = await supabase
-    .from("series_journal_entry_links")
-    .select("*")
-    .or(`entry_a_id.eq.${entryId},entry_b_id.eq.${entryId}`)
-    .order("created_at", { ascending: false });
-
-  if (linksError) throw seriesJournalEntryErrorToError(linksError);
-  const relatedIds = ((links ?? []) as JournalEntryLink[])
-    .map((link) => (link.entry_a_id === entryId ? link.entry_b_id : link.entry_a_id));
-  if (relatedIds.length === 0) return [];
-
-  const { data, error } = await supabase.from("series_journal").select("*").in("id", relatedIds);
-  if (error) throw seriesJournalEntryErrorToError(error);
-  const entriesById = new Map(((data ?? []) as SeriesJournalEntryRecord[]).map((entry) => [entry.id, entry]));
-  return relatedIds.map((id) => entriesById.get(id)).filter((entry): entry is SeriesJournalEntryRecord => Boolean(entry));
 }
