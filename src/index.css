@@ -213,6 +213,33 @@
     overflow-wrap: anywhere;
   }
 
+  [data-journal-media-figure] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    text-align: left;
+  }
+
+  [data-journal-media-figure] > figure {
+    align-self: flex-start;
+    width: auto;
+    max-width: 100%;
+    margin-inline: 0 !important;
+  }
+
+  [data-journal-media-image] {
+    display: block;
+    max-width: 100%;
+    margin-inline: 0 !important;
+    object-fit: contain;
+  }
+
+  [data-journal-media-image]:not([data-journal-media-thumbnail]) {
+    width: auto;
+    height: auto;
+  }
+
   .journal-markdown h1 {
     @apply text-xl font-heading font-semibold leading-tight;
   }

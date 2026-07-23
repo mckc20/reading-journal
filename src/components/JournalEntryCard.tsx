@@ -1,4 +1,5 @@
 import FormattedNoteContent from "@/components/FormattedNoteContent";
+import { JournalMediaFigure } from "@/components/JournalEntryMediaContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntryTags, type JournalTimelineEntry } from "@/lib/journal";
@@ -42,9 +43,17 @@ function attributionForEntry(entry: JournalTimelineEntry): string | null {
   return null;
 }
 
+function mediaForEntry(entry: JournalTimelineEntry) {
+  if (entry.source === "book_note") return entry.bookJournalEntry.media ?? [];
+  if (entry.source === "series_note") return entry.seriesJournalEntry.media ?? [];
+  if (entry.source === "author_note") return entry.authorJournalEntry.media ?? [];
+  return [];
+}
+
 export default function JournalEntryCard({ entry, actions, showTags = true }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
+  const media = mediaForEntry(entry);
 
   return (
     <article
@@ -70,6 +79,16 @@ export default function JournalEntryCard({ entry, actions, showTags = true }: Jo
         </QuoteBlock>
       ) : (
         <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
+      )}
+
+      {media.length > 0 && (
+        <JournalMediaFigure
+          item={media[0]}
+          thumbnail
+          className="mb-0 mt-3"
+          imageClassName="h-24 rounded object-cover"
+          captionClassName="line-clamp-1"
+        />
       )}
 
       {showTags && tags.length > 0 && (

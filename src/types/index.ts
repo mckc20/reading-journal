@@ -124,6 +124,7 @@ export interface BookJournalEntryRecord {
   entry_date: string;
   created_at: string;
   updated_at: string;
+  media?: JournalEntryMediaItem[];
 }
 
 export interface SeriesJournalEntryRecord {
@@ -140,6 +141,7 @@ export interface SeriesJournalEntryRecord {
   entry_date: string;
   created_at: string;
   updated_at: string;
+  media?: JournalEntryMediaItem[];
 }
 
 export interface AuthorJournalEntryRecord {
@@ -156,6 +158,7 @@ export interface AuthorJournalEntryRecord {
   entry_date: string;
   created_at: string;
   updated_at: string;
+  media?: JournalEntryMediaItem[];
 }
 
 export type JournalEntityType = "Book" | "Series" | "Author";
@@ -176,6 +179,38 @@ export type JournalEntrySource =
   | "series_note"
   | "author_note"
   | "generated_book_event";
+
+export type ManualJournalEntrySource = Exclude<JournalEntrySource, "generated_book_event">;
+
+export interface MediaAttachment {
+  id: string;
+  user_id: string;
+  file_path: string;
+  thumbnail_path?: string | null;
+  file_name: string;
+  file_type: "image/jpeg" | "image/png" | "image/webp";
+  file_size: number;
+  width?: number | null;
+  height?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JournalEntryMedia {
+  id: string;
+  journal_entry_source: ManualJournalEntrySource;
+  journal_entry_id: string;
+  media_attachment_id: string;
+  position: number;
+  caption?: string | null;
+  created_at: string;
+}
+
+export interface JournalEntryMediaItem extends JournalEntryMedia {
+  media_attachment: MediaAttachment;
+  url: string;
+  thumbnailUrl?: string | null;
+}
 
 export interface JournalEntry {
   id: string;

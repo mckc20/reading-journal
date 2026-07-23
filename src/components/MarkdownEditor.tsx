@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentType, type KeyboardEvent, type SVGProps } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, type ComponentType, type KeyboardEvent, type SVGProps } from "react";
 import {
   Bold,
   CircleAlert,
@@ -17,18 +17,25 @@ import {
   Star,
 } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
+import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { NoteCalloutType } from "@/lib/noteFormatting";
+import type { JournalEntryMediaItem } from "@/types";
 
 interface MarkdownEditorProps {
   id?: string;
   value: string;
   placeholder?: string;
   minHeightClassName?: string;
+  media?: JournalEntryMediaItem[];
   onChange: (value: string) => void;
   onBlur?: () => void;
+}
+
+export interface MarkdownEditorHandle {
+  insertTextAtCursor: (text: string) => void;
 }
 
 type SelectionRange = {
@@ -75,14 +82,15 @@ function stripListMarker(line: string): string {
   return line.replace(/^(\s*)(?:[-*]\s+|\d+\.\s+)/, "$1");
 }
 
-export default function MarkdownEditor({
+const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
   id,
   value,
   placeholder,
   minHeightClassName = "min-h-56",
+  media = [],
   onChange,
   onBlur,
-}: MarkdownEditorProps) {
+}, ref) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSelectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
   const [mode, setMode] = useState<"edit" | "preview">("edit");
@@ -115,6 +123,32 @@ export default function MarkdownEditor({
     setMode("edit");
     focusSelection(nextSelection.start, nextSelection.end);
   }
+
+  function blockInsertionText(text: string, selection: SelectionRange) {
+    const before = value.slice(0, selection.start);
+    const after = value.slice(selection.end);
+    const prefix = before && !before.endsWith("\n\n") ? before.endsWith("\n") ? "\n" : "\n\n" : "";
+    const suffix = after && !after.startsWith("\n\n") ? after.startsWith("\n") ? "\n" : "\n\n" : "";
+
+    return {
+      text: `${prefix}${text}${suffix}`,
+      before,
+      after,
+    };
+  }
+
+  function insertTextAtCursor(text: string) {
+    const selection = currentSelection();
+    const insertion = blockInsertionText(text, selection);
+    const nextValue = insertion.before + insertion.text + insertion.after;
+    const cursor = insertion.before.length + insertion.text.length;
+
+    replaceSelection(nextValue, { start: cursor, end: cursor });
+  }
+
+  useImperativeHandle(ref, () => ({
+    insertTextAtCursor,
+  }));
 
   function wrapSelection(prefix: string, suffix: string, fallback: string) {
     const selection = currentSelection();
@@ -305,7 +339,11 @@ export default function MarkdownEditor({
       {mode === "preview" ? (
         <div className={cn("px-3 py-3 text-sm leading-6", minHeightClassName)}>
           {value.trim() ? (
-            <FormattedNoteContent markdown={value} />
+            media.length > 0 ? (
+              <JournalEntryMediaContent markdown={value} media={media} />
+            ) : (
+              <FormattedNoteContent markdown={value} />
+            )
           ) : (
             <p className="text-muted-foreground">{placeholder}</p>
           )}
@@ -327,4 +365,6 @@ export default function MarkdownEditor({
       )}
     </div>
   );
-}
+});
+
+export default MarkdownEditor;

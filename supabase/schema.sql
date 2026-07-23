@@ -257,6 +257,33 @@ CREATE TABLE IF NOT EXISTS journal_entry_visibility (
   UNIQUE (user_id, entity_type, entity_id, source, source_id)
 );
 
+-- ── JOURNAL MEDIA ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS media_attachments (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  file_path      text NOT NULL,
+  thumbnail_path text,
+  file_name      text NOT NULL,
+  file_type      text NOT NULL CHECK (file_type IN ('image/jpeg', 'image/png', 'image/webp')),
+  file_size      integer NOT NULL CHECK (file_size > 0),
+  width          integer CHECK (width IS NULL OR width > 0),
+  height         integer CHECK (height IS NULL OR height > 0),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, file_path)
+);
+
+CREATE TABLE IF NOT EXISTS journal_entry_media (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  journal_entry_source text NOT NULL CHECK (journal_entry_source IN ('book_note', 'series_note', 'author_note')),
+  journal_entry_id    uuid NOT NULL,
+  media_attachment_id uuid NOT NULL REFERENCES media_attachments(id) ON DELETE CASCADE,
+  position            integer NOT NULL DEFAULT 1 CHECK (position >= 0),
+  caption             text,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (journal_entry_source, journal_entry_id, media_attachment_id)
+);
+
 -- ── PROFILES ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -417,6 +444,50 @@ CREATE TRIGGER authors_set_updated_at
   BEFORE UPDATE ON authors
   FOR EACH ROW
   EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS media_attachments_set_updated_at ON media_attachments;
+
+CREATE TRIGGER media_attachments_set_updated_at
+  BEFORE UPDATE ON media_attachments
+  FOR EACH ROW
+  EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION delete_journal_entry_media_links()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  source_name text;
+BEGIN
+  source_name := TG_ARGV[0];
+  DELETE FROM journal_entry_media
+  WHERE journal_entry_source = source_name
+    AND journal_entry_id = OLD.id;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS book_journal_delete_media_links ON book_journal;
+
+CREATE TRIGGER book_journal_delete_media_links
+  BEFORE DELETE ON book_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_journal_entry_media_links('book_note');
+
+DROP TRIGGER IF EXISTS series_journal_delete_media_links ON series_journal;
+
+CREATE TRIGGER series_journal_delete_media_links
+  BEFORE DELETE ON series_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_journal_entry_media_links('series_note');
+
+DROP TRIGGER IF EXISTS author_journal_delete_media_links ON author_journal;
+
+CREATE TRIGGER author_journal_delete_media_links
+  BEFORE DELETE ON author_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION delete_journal_entry_media_links('author_note');
 
 CREATE OR REPLACE FUNCTION inherit_book_journal_reply_fields()
 RETURNS trigger
@@ -612,6 +683,12 @@ CREATE INDEX IF NOT EXISTS author_journal_parent_entry_id_idx ON author_journal(
 CREATE INDEX IF NOT EXISTS author_journal_author_entry_date_idx ON author_journal(author_id, entry_date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS journal_entry_visibility_entity_idx
   ON journal_entry_visibility(user_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS media_attachments_user_id_idx
+  ON media_attachments(user_id);
+CREATE INDEX IF NOT EXISTS journal_entry_media_entry_idx
+  ON journal_entry_media(journal_entry_source, journal_entry_id, position, created_at);
+CREATE INDEX IF NOT EXISTS journal_entry_media_media_attachment_id_idx
+  ON journal_entry_media(media_attachment_id);
 CREATE INDEX IF NOT EXISTS profiles_created_at_idx ON profiles(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_unique_idx ON profiles (lower(username)) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS groups_created_by_idx ON groups(created_by);
@@ -654,6 +731,8 @@ ALTER TABLE book_journal ENABLE ROW LEVEL SECURITY;
 ALTER TABLE series_journal ENABLE ROW LEVEL SECURITY;
 ALTER TABLE author_journal ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entry_visibility ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media_attachments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entry_media ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
@@ -1465,6 +1544,107 @@ CREATE POLICY "journal_entry_visibility: owner delete"
   ON journal_entry_visibility FOR DELETE
   USING (auth.uid() = user_id);
 
+CREATE OR REPLACE FUNCTION user_owns_journal_entry(
+  entry_source text,
+  entry_id uuid,
+  owner_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+  SELECT CASE entry_source
+    WHEN 'book_note' THEN EXISTS (
+      SELECT 1 FROM book_journal
+      WHERE id = entry_id AND user_id = owner_id
+    )
+    WHEN 'series_note' THEN EXISTS (
+      SELECT 1 FROM series_journal
+      WHERE id = entry_id AND user_id = owner_id
+    )
+    WHEN 'author_note' THEN EXISTS (
+      SELECT 1 FROM author_journal
+      WHERE id = entry_id AND user_id = owner_id
+    )
+    ELSE false
+  END
+$$;
+
+CREATE POLICY "media_attachments: owner select"
+  ON media_attachments FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "media_attachments: owner insert"
+  ON media_attachments FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "media_attachments: owner update"
+  ON media_attachments FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "media_attachments: owner delete"
+  ON media_attachments FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "journal_entry_media: owner select"
+  ON journal_entry_media FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM media_attachments
+      WHERE media_attachments.id = journal_entry_media.media_attachment_id
+        AND media_attachments.user_id = auth.uid()
+    )
+    AND user_owns_journal_entry(journal_entry_source, journal_entry_id, auth.uid())
+  );
+
+CREATE POLICY "journal_entry_media: owner insert"
+  ON journal_entry_media FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM media_attachments
+      WHERE media_attachments.id = journal_entry_media.media_attachment_id
+        AND media_attachments.user_id = auth.uid()
+    )
+    AND user_owns_journal_entry(journal_entry_source, journal_entry_id, auth.uid())
+  );
+
+CREATE POLICY "journal_entry_media: owner update"
+  ON journal_entry_media FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM media_attachments
+      WHERE media_attachments.id = journal_entry_media.media_attachment_id
+        AND media_attachments.user_id = auth.uid()
+    )
+    AND user_owns_journal_entry(journal_entry_source, journal_entry_id, auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM media_attachments
+      WHERE media_attachments.id = journal_entry_media.media_attachment_id
+        AND media_attachments.user_id = auth.uid()
+    )
+    AND user_owns_journal_entry(journal_entry_source, journal_entry_id, auth.uid())
+  );
+
+CREATE POLICY "journal_entry_media: owner delete"
+  ON journal_entry_media FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM media_attachments
+      WHERE media_attachments.id = journal_entry_media.media_attachment_id
+        AND media_attachments.user_id = auth.uid()
+    )
+    AND user_owns_journal_entry(journal_entry_source, journal_entry_id, auth.uid())
+  );
+
 -- profiles
 CREATE POLICY "profiles: owner select" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "profiles: owner insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
@@ -1631,6 +1811,57 @@ CREATE POLICY "group_message_reactions: member delete own"
   );
 
 -- ── STORAGE ────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('journal-media', 'journal-media', false)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS journal_media_select_own ON storage.objects;
+CREATE POLICY journal_media_select_own
+  ON storage.objects
+  FOR SELECT
+  USING (
+    bucket_id = 'journal-media'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS journal_media_insert_own ON storage.objects;
+CREATE POLICY journal_media_insert_own
+  ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'journal-media'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS journal_media_update_own ON storage.objects;
+CREATE POLICY journal_media_update_own
+  ON storage.objects
+  FOR UPDATE
+  USING (
+    bucket_id = 'journal-media'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = 'journal-media'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
+DROP POLICY IF EXISTS journal_media_delete_own ON storage.objects;
+CREATE POLICY journal_media_delete_own
+  ON storage.objects
+  FOR DELETE
+  USING (
+    bucket_id = 'journal-media'
+    AND auth.uid() IS NOT NULL
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );
+
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('author-photos', 'author-photos', true)
 ON CONFLICT (id) DO UPDATE

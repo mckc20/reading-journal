@@ -1,4 +1,5 @@
 import type { JournalEntryLabel, SeriesJournalEntryRecord } from "@/types";
+import { withJournalMedia } from "@/lib/journalMedia";
 
 export interface CreateSeriesJournalEntryRecordInput {
   seriesId: string;
@@ -156,7 +157,7 @@ export async function fetchSeriesJournalEntryRecords(seriesId: string): Promise<
     .order("created_at", { ascending: false });
 
   if (error) throw seriesJournalEntryErrorToError(error);
-  return sortSeriesJournalEntryRecords((data ?? []) as SeriesJournalEntryRecord[]);
+  return sortSeriesJournalEntryRecords(await withJournalMedia("series_note", (data ?? []) as SeriesJournalEntryRecord[]));
 }
 
 export async function createSeriesJournalEntryRecord(input: CreateSeriesJournalEntryRecordInput): Promise<SeriesJournalEntryRecord> {
@@ -169,7 +170,7 @@ export async function createSeriesJournalEntryRecord(input: CreateSeriesJournalE
     .single();
 
   if (error) throw seriesJournalEntryErrorToError(error);
-  return data as SeriesJournalEntryRecord;
+  return (await withJournalMedia("series_note", [data as SeriesJournalEntryRecord]))[0];
 }
 
 export async function updateSeriesJournalEntryRecord(input: UpdateSeriesJournalEntryRecordInput): Promise<SeriesJournalEntryRecord> {
@@ -186,7 +187,7 @@ export async function updateSeriesJournalEntryRecord(input: UpdateSeriesJournalE
     .single();
 
   if (error) throw seriesJournalEntryErrorToError(error);
-  return data as SeriesJournalEntryRecord;
+  return (await withJournalMedia("series_note", [data as SeriesJournalEntryRecord]))[0];
 }
 
 export async function deleteSeriesJournalEntryRecord(noteId: string): Promise<void> {
@@ -204,7 +205,7 @@ export async function fetchSeriesJournalEntryRecord(entryId: string): Promise<Se
     .single();
 
   if (error) throw seriesJournalEntryErrorToError(error);
-  return data as SeriesJournalEntryRecord;
+  return (await withJournalMedia("series_note", [data as SeriesJournalEntryRecord]))[0];
 }
 
 export async function createSeriesJournalReply(
@@ -233,7 +234,7 @@ export async function getSeriesJournalReplies(entryId: string): Promise<SeriesJo
     .order("created_at", { ascending: true });
 
   if (error) throw seriesJournalEntryErrorToError(error);
-  return (data ?? []) as SeriesJournalEntryRecord[];
+  return withJournalMedia("series_note", (data ?? []) as SeriesJournalEntryRecord[]);
 }
 
 export async function updateSeriesJournalReply(
