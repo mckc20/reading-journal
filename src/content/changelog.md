@@ -2,6 +2,19 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-07-23 - Journal pages for books, series, and authors
+Version: `2026-07-23-journal-pages`
+Summary: Books, series, and authors now have dedicated journal pages for writing, reviewing, and organizing reading notes in one focused place.
+
+- Dedicated journal pages
+  Open a full journal view from book, series, and author pages instead of working only from smaller preview sections.
+- List and Book View modes
+  Switch between a scannable timeline list and a paginated Book View that makes entries feel more like a collected reading journal.
+- Faster entry writing
+  Add new entries directly from the journal page, with deep links that can open the composer when you start from a book, series, or author.
+- Richer journal organization
+  Journal entries support editing, replies, favorites, hidden items, tags, and attached images so notes, quotes, and reviews are easier to keep organized.
+
 ## 2026-07-05 - Series detail and analytics redesign
 Version: `2026-07-05-series-detail-analytics`
 Summary: Series pages now feel more complete, with a redesigned detail page, dedicated subpages, richer analytics, and better recommendations.

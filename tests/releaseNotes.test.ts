@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-07-05-series-detail-analytics");
-  assert.equal(entries[0].title, "Series detail and analytics redesign");
-  assert.equal(entries[0].summary, "Series pages now feel more complete, with a redesigned detail page, dedicated subpages, richer analytics, and better recommendations.");
+  assert.equal(entries[0].version, "2026-07-23-journal-pages");
+  assert.equal(entries[0].title, "Journal pages for books, series, and authors");
+  assert.equal(entries[0].summary, "Books, series, and authors now have dedicated journal pages for writing, reviewing, and organizing reading notes in one focused place.");
   assert.equal(entries[0].highlights.length, 4);
-  assert.equal(entries[0].highlights[0].title, "Redesigned series detail page");
-  assert.equal(entries[0].highlights[0].description, "Series pages now have a stronger hero, editable banner support, polished progress cards, focused book and quote sections, and a cleaner More to Explore area.");
+  assert.equal(entries[0].highlights[0].title, "Dedicated journal pages");
+  assert.equal(entries[0].highlights[0].description, "Open a full journal view from book, series, and author pages instead of working only from smaller preview sections.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 
