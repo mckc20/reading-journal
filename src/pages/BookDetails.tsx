@@ -1292,6 +1292,9 @@ export default function BookDetails() {
                 <JournalTimeline
                   entries={previewJournalEntries}
                   layout="cards"
+                  previewMode={{
+                    getEntryHref: (entry) => `/books/${book.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
+                  }}
                   emptyMessage="No journal entries yet."
                   onEntryUpdated={(entry) => {
                     if (entry.source !== "book_note") return;

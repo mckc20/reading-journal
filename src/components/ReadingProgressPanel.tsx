@@ -50,8 +50,7 @@ async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: 
   return updateBookJournalEntryRecord({
     noteId: note.id,
     label: note.label,
-    title: note.title ?? undefined,
-    quoteSpeaker: note.quote_speaker ?? undefined,
+    attribution: note.attribution ?? undefined,
     content: note.content,
     tags,
     pageStart: note.page_start ?? undefined,

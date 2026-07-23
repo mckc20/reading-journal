@@ -616,7 +616,7 @@ export function getSeriesQuoteEntries(
     .filter((note) => {
       if (!normalizedSearch) return true;
       const book = bookById.get(note.book_id);
-      return [note.content, note.quote_speaker ?? "", book?.title ?? ""].some((value) =>
+      return [note.content, note.attribution ?? "", book?.title ?? ""].some((value) =>
         value.toLowerCase().includes(normalizedSearch),
       );
     })

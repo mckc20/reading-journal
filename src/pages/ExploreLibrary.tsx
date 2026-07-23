@@ -1758,10 +1758,10 @@ function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: B
       {note.label === "quote" ? (
         <QuoteBlock
           attribution={
-            note.quote_speaker || pageLabel ? (
+            note.attribution || pageLabel ? (
               <div className="flex flex-wrap items-center gap-2">
-                {note.quote_speaker && (
-                  <span className="font-serif italic">- {note.quote_speaker}</span>
+                {note.attribution && (
+                  <span className="font-serif italic">- {note.attribution}</span>
                 )}
                 {pageLabel && <span className="text-xs font-medium">{pageLabel}</span>}
               </div>
@@ -1772,9 +1772,6 @@ function LibraryNoteCard({ note, onBook }: { note: LibraryNote; onBook: (book: B
         </QuoteBlock>
       ) : (
         <>
-          {note.title && (
-            <p className="mb-1 text-sm font-medium leading-snug text-foreground">{note.title}</p>
-          )}
           <FormattedNoteContent
             markdown={note.content}
             className="line-clamp-4 text-sm leading-6 text-foreground"

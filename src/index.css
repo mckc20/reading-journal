@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/google-sans-flex";
 @import "@fontsource-variable/lora";
 @import "@fontsource-variable/lora/wght-italic.css";
 
@@ -67,7 +67,7 @@
 
 :root {
     --font-display: 'Lora Variable', Georgia, serif;
-    --font-body: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Google Sans Flex Variable', ui-sans-serif, system-ui, sans-serif;
 
     --background: #fafafa;
     --surface: #ffffff;
@@ -190,6 +190,7 @@
     }
   body {
     @apply bg-background text-foreground antialiased;
+    font-weight: 400;
     }
   html {
     @apply font-sans;
@@ -258,6 +259,26 @@
 
   .journal-markdown .journal-callout-body {
     @apply space-y-2 text-sm leading-6;
+  }
+
+  .inline-journal-editor {
+    min-height: 8rem;
+  }
+
+  .inline-journal-editor.ProseMirror {
+    padding: 0;
+  }
+
+  .inline-journal-editor.ProseMirror:focus {
+    outline: none;
+  }
+
+  .inline-journal-editor p.is-editor-empty:first-child::before {
+    color: var(--muted-foreground);
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
   }
 
   .journal-markdown .journal-callout-note {

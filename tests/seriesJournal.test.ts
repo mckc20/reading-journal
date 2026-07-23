@@ -14,8 +14,7 @@ function makeSeriesJournalEntryRecord(overrides: Partial<SeriesJournalEntryRecor
     user_id: "user-1",
     series_id: "series-1",
     label: "note",
-    title: null,
-    quote_speaker: null,
+    attribution: null,
     content: "A series note",
     page_start: null,
     is_favorite: false,
@@ -31,7 +30,6 @@ test("normalizes series note fields", () => {
     normalizeSeriesJournalEntryRecordInput({
       seriesId: "series-1",
       userId: "user-1",
-      title: "  Big thought  ",
       content: "  This belongs to the whole series.  ",
       noteDate: "2026-07-02",
     }),
@@ -39,8 +37,7 @@ test("normalizes series note fields", () => {
       series_id: "series-1",
       user_id: "user-1",
       label: "note",
-      title: "Big thought",
-      quote_speaker: null,
+      attribution: null,
       content: "This belongs to the whole series.",
       page_start: null,
       is_favorite: false,
@@ -61,14 +58,13 @@ test("includes parent entry id for series journal replies", () => {
   );
 });
 
-test("normalizes series quotes with speaker and page", () => {
+test("normalizes series quotes with attribution and page", () => {
   assert.deepEqual(
     normalizeSeriesJournalEntryRecordInput({
       seriesId: "series-1",
       userId: "user-1",
       label: "quote",
-      title: "Ignored title",
-      quoteSpeaker: "  Narrator  ",
+      attribution: "  Narrator  ",
       content: "  A quote for the whole series.  ",
       pageStart: "42",
       noteDate: "2026-07-02",
@@ -77,8 +73,7 @@ test("normalizes series quotes with speaker and page", () => {
       series_id: "series-1",
       user_id: "user-1",
       label: "quote",
-      title: null,
-      quote_speaker: "Narrator",
+      attribution: "Narrator",
       content: "A quote for the whole series.",
       page_start: 42,
       is_favorite: false,
@@ -87,13 +82,13 @@ test("normalizes series quotes with speaker and page", () => {
   );
 });
 
-test("stores blank series note title as null", () => {
+test("series thoughts do not persist attribution", () => {
   assert.equal(
     normalizeSeriesJournalEntryRecordFields({
-      title: "   ",
+      attribution: "Should not save",
       content: "A note",
       noteDate: "2026-07-02",
-    }).title,
+    }).attribution,
     null,
   );
 });
@@ -102,7 +97,6 @@ test("rejects blank series note content", () => {
   assert.throws(
     () =>
       normalizeSeriesJournalEntryRecordFields({
-        title: "Optional",
         content: "   ",
         noteDate: "2026-07-02",
       }),

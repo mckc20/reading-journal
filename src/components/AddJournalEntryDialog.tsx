@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { PlusCircle, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import InlineMarkdownEditor from "@/components/InlineMarkdownEditor";
 import MarkdownEditor from "@/components/MarkdownEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
@@ -48,6 +49,9 @@ interface JournalEntryFormProps {
   heading?: ReactNode;
   hideEntitySelector?: boolean;
   footerStart?: ReactNode;
+  autoFocus?: boolean;
+  autoSave?: boolean;
+  onEditorBlur?: (note?: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null) => void;
   onCancel: () => void;
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
@@ -58,7 +62,7 @@ interface FormValues {
   bookId: string;
   entityId: string;
   entryType: ManualJournalEntryType;
-  title: string;
+  attribution: string;
   content: string;
   pageStart: string;
   noteDate: string;
@@ -70,12 +74,17 @@ type JournalEntryDraft = FormValues & {
   savedAt: string;
 };
 
+type LegacyJournalEntryDraft = Partial<JournalEntryDraft> & {
+  title?: string;
+};
+
 const JOURNAL_ENTRY_DRAFT_PREFIX = "reading-journal:journal-entry-draft:v1";
+const JOURNAL_ENTRY_DRAFT_PREFIX_V2 = "reading-journal:journal-entry-draft:v2";
 
 function hasDraftContent(values: FormValues): boolean {
   return Boolean(
     values.content.trim() ||
-      values.title.trim() ||
+      values.attribution.trim() ||
       values.pageStart.trim() ||
       values.tagDraft.trim() ||
       values.tags.length > 0,
@@ -89,14 +98,19 @@ function readJournalEntryDraft(key: string | null): FormValues | null {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
 
-    const draft = JSON.parse(raw) as Partial<JournalEntryDraft>;
+    const draft = JSON.parse(raw) as LegacyJournalEntryDraft;
     if (!draft || typeof draft !== "object") return null;
 
     return {
       bookId: typeof draft.bookId === "string" ? draft.bookId : "",
       entityId: typeof draft.entityId === "string" ? draft.entityId : "",
       entryType: draft.entryType === "quote" ? "quote" : "thought",
-      title: typeof draft.title === "string" ? draft.title : "",
+      attribution:
+        typeof draft.attribution === "string"
+          ? draft.attribution
+          : draft.entryType === "quote" && typeof draft.title === "string"
+            ? draft.title
+            : "",
       content: typeof draft.content === "string" ? draft.content : "",
       pageStart: typeof draft.pageStart === "string" ? draft.pageStart : "",
       noteDate: typeof draft.noteDate === "string" ? draft.noteDate : getTodayLocalDate(),
@@ -158,6 +172,9 @@ export function JournalEntryForm({
   heading,
   hideEntitySelector = false,
   footerStart,
+  autoFocus = false,
+  autoSave = false,
+  onEditorBlur,
   onCancel,
   onSaved,
 }: JournalEntryFormProps) {
@@ -202,7 +219,7 @@ export function JournalEntryForm({
       bookId: initialBookId,
       entityId: entityId ?? "",
       entryType: "thought",
-      title: "",
+      attribution: "",
       content: "",
       pageStart: initialPageStart ? String(initialPageStart) : "",
       noteDate: initialNoteDate ?? getTodayLocalDate(),
@@ -216,7 +233,13 @@ export function JournalEntryForm({
   const tags = watch("tags");
   const tagDraft = watch("tagDraft");
   const formValues = watch();
+  const formRef = useRef<HTMLFormElement>(null);
   const draftSaveReadyRef = useRef(false);
+  const autosaveReadyRef = useRef(false);
+  const autosaveSignatureRef = useRef("");
+  const [autosaveEntry, setAutosaveEntry] = useState<BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null>(initialEntry);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const isInline = variant === "inline";
   const hiddenInitialTags = useMemo(
     () =>
@@ -232,7 +255,7 @@ export function JournalEntryForm({
   const draftKey = useMemo(() => {
     if (initialEntry) {
       return [
-        JOURNAL_ENTRY_DRAFT_PREFIX,
+        JOURNAL_ENTRY_DRAFT_PREFIX_V2,
         user?.id ?? "anonymous",
         "edit",
         journalEntryDraftSource(initialEntry),
@@ -241,7 +264,7 @@ export function JournalEntryForm({
     }
 
     return [
-      JOURNAL_ENTRY_DRAFT_PREFIX,
+      JOURNAL_ENTRY_DRAFT_PREFIX_V2,
       user?.id ?? "anonymous",
       "create",
       entityType,
@@ -250,6 +273,10 @@ export function JournalEntryForm({
       hiddenSystemTags.join(",") || "manual",
     ].join(":");
   }, [entityId, entityType, hiddenSystemTags, initialBookId, initialEntry, parentEntryId, user?.id]);
+  const legacyDraftKey = useMemo(
+    () => draftKey.replace(JOURNAL_ENTRY_DRAFT_PREFIX_V2, JOURNAL_ENTRY_DRAFT_PREFIX),
+    [draftKey],
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -259,7 +286,7 @@ export function JournalEntryForm({
       bookId: isBookEntry ? initialEntry.book_id : initialBookId,
       entityId,
       entryType: isQuote ? "quote" : "thought",
-      title: isQuote && "quote_speaker" in initialEntry ? initialEntry.quote_speaker ?? "" : initialEntry?.title ?? "",
+      attribution: isQuote && initialEntry ? initialEntry.attribution ?? "" : "",
       content: initialEntry?.content ?? "",
       pageStart: preferInitialPageAndDate
         ? initialPageStart ? String(initialPageStart) : ""
@@ -270,18 +297,23 @@ export function JournalEntryForm({
       tagDraft: "",
       tags: visibleJournalTags(initialEntry?.tags),
     };
-    const savedDraft = readJournalEntryDraft(draftKey);
+    const savedDraft = readJournalEntryDraft(draftKey) ?? readJournalEntryDraft(legacyDraftKey);
     const draft = initialEntry && savedDraft?.content.trim() === "" && initialEntry.content.trim() !== ""
       ? null
       : savedDraft;
 
     draftSaveReadyRef.current = false;
+    autosaveReadyRef.current = false;
+    setAutosaveEntry(initialEntry);
+    setAutosaveStatus(initialEntry ? "saved" : "idle");
+    setAutosaveError(null);
     reset(draft ? { ...initialValues, ...draft } : initialValues);
     const timeoutId = window.setTimeout(() => {
       draftSaveReadyRef.current = true;
+      autosaveReadyRef.current = true;
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [active, draftKey, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, preferInitialPageAndDate, reset]);
+  }, [active, draftKey, entityId, initialBookId, initialEntry, initialNoteDate, initialPageStart, legacyDraftKey, preferInitialPageAndDate, reset]);
 
   useEffect(() => {
     if (!active || !draftSaveReadyRef.current || !draftKey) return;
@@ -294,7 +326,7 @@ export function JournalEntryForm({
       bookId: initialBookId,
       entityId,
       entryType: "thought",
-      title: "",
+      attribution: "",
       content: "",
       pageStart: initialPageStart ? String(initialPageStart) : "",
       noteDate: initialNoteDate ?? getTodayLocalDate(),
@@ -327,83 +359,86 @@ export function JournalEntryForm({
     );
   }
 
-  async function onSubmit(values: FormValues) {
+  async function saveJournalEntry(values: FormValues, entryOverride: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null) {
     if (!user) {
       setError("root", { message: "You must be signed in." });
-      return;
+      throw new Error("You must be signed in.");
     }
 
+    const normalizedTags = normalizeJournalTags([...values.tags, values.tagDraft, ...hiddenSystemTags]);
+    let note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
+
+    if (entityType === "Series") {
+      const selectedSeriesId = values.entityId || entityId;
+      const fields = {
+        label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
+        attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
+        content: values.content,
+        tags: normalizedTags,
+        pageStart: values.pageStart,
+        noteDate: values.noteDate,
+      };
+      note =
+        entryOverride && "series_id" in entryOverride
+          ? await updateSeriesJournalEntryRecord({
+              noteId: entryOverride.id,
+              ...fields,
+            })
+          : await createSeriesJournalEntryRecord({
+              seriesId: selectedSeriesId,
+              userId: user.id,
+              parentEntryId,
+              ...fields,
+            });
+    } else if (entityType === "Author") {
+      const selectedAuthorId = values.entityId || entityId;
+      const fields = {
+        label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
+        attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
+        content: values.content,
+        tags: normalizedTags,
+        pageStart: values.pageStart,
+        noteDate: values.noteDate,
+      };
+      note =
+        entryOverride && "author_id" in entryOverride
+          ? await updateAuthorJournalEntryRecord({
+              noteId: entryOverride.id,
+              ...fields,
+            })
+          : await createAuthorJournalEntryRecord({
+              authorId: selectedAuthorId,
+              userId: user.id,
+              parentEntryId,
+              ...fields,
+            });
+    } else {
+      const fields = {
+        label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
+        content: values.content,
+        attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
+        tags: normalizedTags,
+        pageStart: values.pageStart,
+        noteDate: values.noteDate,
+      };
+      note =
+        entryOverride && "book_id" in entryOverride
+          ? await updateBookJournalEntryRecord({ noteId: entryOverride.id, ...fields })
+          : await createBookJournalEntryRecord({
+              bookId: values.bookId,
+              userId: user.id,
+              parentEntryId,
+              ...fields,
+            });
+    }
+
+    setAutosaveEntry(note);
+    return note;
+  }
+
+  async function onSubmit(values: FormValues) {
     try {
-      const normalizedTags = normalizeJournalTags([...values.tags, values.tagDraft, ...hiddenSystemTags]);
-      let note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
-
-      if (entityType === "Series") {
-        const selectedSeriesId = values.entityId || entityId;
-        const fields = {
-          label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
-          title: values.entryType === "thought" ? values.title || undefined : undefined,
-          quoteSpeaker: values.entryType === "quote" ? values.title || undefined : undefined,
-          content: values.content,
-          tags: normalizedTags,
-          pageStart: values.pageStart,
-          noteDate: values.noteDate,
-        };
-        note =
-          initialEntry && "series_id" in initialEntry
-            ? await updateSeriesJournalEntryRecord({
-                noteId: initialEntry.id,
-                ...fields,
-              })
-            : await createSeriesJournalEntryRecord({
-                seriesId: selectedSeriesId,
-                userId: user.id,
-                parentEntryId,
-                ...fields,
-              });
-      } else if (entityType === "Author") {
-        const selectedAuthorId = values.entityId || entityId;
-        const fields = {
-          label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
-          title: values.entryType === "thought" ? values.title || undefined : undefined,
-          quoteSpeaker: values.entryType === "quote" ? values.title || undefined : undefined,
-          content: values.content,
-          tags: normalizedTags,
-          pageStart: values.pageStart,
-          noteDate: values.noteDate,
-        };
-        note =
-          initialEntry && "author_id" in initialEntry
-            ? await updateAuthorJournalEntryRecord({
-                noteId: initialEntry.id,
-                ...fields,
-              })
-            : await createAuthorJournalEntryRecord({
-                authorId: selectedAuthorId,
-                userId: user.id,
-                parentEntryId,
-                ...fields,
-              });
-      } else {
-        const fields = {
-          label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
-          content: values.content,
-          title: values.entryType === "thought" ? values.title || undefined : undefined,
-          quoteSpeaker: values.entryType === "quote" ? values.title || undefined : undefined,
-          tags: normalizedTags,
-          pageStart: values.pageStart,
-          noteDate: values.noteDate,
-        };
-        note =
-          initialEntry && "book_id" in initialEntry
-            ? await updateBookJournalEntryRecord({ noteId: initialEntry.id, ...fields })
-            : await createBookJournalEntryRecord({
-                bookId: values.bookId,
-                userId: user.id,
-                parentEntryId,
-                ...fields,
-              });
-      }
-
+      const note = await saveJournalEntry(values, autosaveEntry ?? initialEntry);
       onSaved?.(note);
       resetForm();
     } catch (submitError) {
@@ -413,224 +448,370 @@ export function JournalEntryForm({
     }
   }
 
+  useEffect(() => {
+    if (!autoSave || !active || !autosaveReadyRef.current) return;
+    if (!content.trim()) {
+      setAutosaveStatus("idle");
+      return;
+    }
+    if (entityType === "Book" && !(formValues.bookId || entityId || initialBookId)) return;
+    if ((entityType === "Series" || entityType === "Author") && !(formValues.entityId || entityId)) return;
+
+    const signature = JSON.stringify({
+      ...formValues,
+      tags: normalizeJournalTags([...formValues.tags, formValues.tagDraft, ...hiddenSystemTags]),
+      entityType,
+      entityId,
+      autosaveEntryId: autosaveEntry?.id ?? initialEntry?.id ?? null,
+    });
+    if (signature === autosaveSignatureRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setAutosaveStatus("saving");
+      setAutosaveError(null);
+      saveJournalEntry(formValues, autosaveEntry ?? initialEntry)
+        .then((note) => {
+          autosaveSignatureRef.current = JSON.stringify({
+            ...formValues,
+            tags: normalizeJournalTags([...formValues.tags, formValues.tagDraft, ...hiddenSystemTags]),
+            entityType,
+            entityId,
+            autosaveEntryId: note.id,
+          });
+          setAutosaveStatus("saved");
+          removeJournalEntryDraft(draftKey);
+          onSaved?.(note);
+        })
+        .catch((saveError) => {
+          setAutosaveStatus("error");
+          setAutosaveError(saveError instanceof Error ? saveError.message : "Could not save this entry.");
+        });
+    }, 850);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [active, autoSave, autosaveEntry, content, draftKey, entityId, entityType, formValues, hiddenSystemTags, initialBookId, initialEntry, onSaved]);
+
+  function handleInlineEditorBlur() {
+    if (autoSave && formRef.current?.contains(document.activeElement)) {
+      return;
+    }
+
+    if (!autoSave) {
+      onEditorBlur?.(autosaveEntry ?? initialEntry);
+      return;
+    }
+
+    if (!content.trim()) {
+      onEditorBlur?.(autosaveEntry ?? initialEntry);
+      return;
+    }
+
+    setAutosaveStatus("saving");
+    setAutosaveError(null);
+    saveJournalEntry(formValues, autosaveEntry ?? initialEntry)
+      .then((note) => {
+        setAutosaveStatus("saved");
+        removeJournalEntryDraft(draftKey);
+        onSaved?.(note);
+        onEditorBlur?.(note);
+      })
+      .catch((saveError) => {
+        setAutosaveStatus("error");
+        setAutosaveError(saveError instanceof Error ? saveError.message : "Could not save this entry.");
+      });
+  }
+
+  function handleManualInlineSave() {
+    if (!autoSave || !content.trim()) return;
+
+    setAutosaveStatus("saving");
+    setAutosaveError(null);
+    saveJournalEntry(formValues, autosaveEntry ?? initialEntry)
+      .then((note) => {
+        autosaveSignatureRef.current = JSON.stringify({
+          ...formValues,
+          tags: normalizeJournalTags([...formValues.tags, formValues.tagDraft, ...hiddenSystemTags]),
+          entityType,
+          entityId,
+          autosaveEntryId: note.id,
+        });
+        setAutosaveStatus("saved");
+        removeJournalEntryDraft(draftKey);
+        onSaved?.(note);
+      })
+      .catch((saveError) => {
+        setAutosaveStatus("error");
+        setAutosaveError(saveError instanceof Error ? saveError.message : "Could not save this entry.");
+      });
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div className={cn("rounded-lg", isInline ? "border bg-background shadow-sm" : "border-0")}>
+    <form ref={formRef} onSubmit={handleSubmit(onSubmit)}>
+      <div className={cn(isInline ? "border-y border-border/60 bg-background" : "rounded-lg border-0")}>
             {heading && (
-              <div className="border-b px-4 py-3">
+              <div className="border-b border-border/60 px-4 py-3">
                 <h3 className="text-sm font-medium">{heading}</h3>
               </div>
             )}
-            <div className={cn("border-b px-4 py-4", isInline && "py-3")}>
-              {entityType === "Book" && !hideEntitySelector && (
-                <>
-                  <Label htmlFor="note-book">Related book *</Label>
-                  <Controller
-                    name="bookId"
-                    control={control}
-                    rules={{ required: "Choose a book." }}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-                      >
-                        <SelectTrigger id="note-book" className="mt-2">
-                          <SelectValue placeholder="Choose a book" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Choose a book</SelectItem>
-                          {sortedBooks.map((book) => (
-                            <SelectItem key={book.id} value={book.id}>
-                              {book.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.bookId && <p className="mt-1 text-xs text-destructive">{errors.bookId.message}</p>}
-                </>
-              )}
-              {entityType === "Series" && !hideEntitySelector && (
-                <>
-                  <Label htmlFor="note-series">Related series *</Label>
-                  <Controller
-                    name="entityId"
-                    control={control}
-                    rules={{ required: "Choose a series." }}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-                      >
-                        <SelectTrigger id="note-series" className="mt-2">
-                          <SelectValue placeholder="Choose a series" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Choose a series</SelectItem>
-                          {sortedSeries.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
-                </>
-              )}
-              {entityType === "Author" && !hideEntitySelector && (
-                <>
-                  <Label htmlFor="note-author">Related author *</Label>
-                  <Controller
-                    name="entityId"
-                    control={control}
-                    rules={{ required: "Choose an author." }}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-                      >
-                        <SelectTrigger id="note-author" className="mt-2">
-                          <SelectValue placeholder="Choose an author" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Choose an author</SelectItem>
-                          {sortedAuthors.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
-                </>
-              )}
-              <div className={cn("flex flex-wrap gap-2", !hideEntitySelector && "mt-4")}>
-                {supportsQuotes && (
-                  <button
-                    type="button"
-                    onClick={() => setEntryType("quote")}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                      entryType === "quote"
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
-                    )}
-                  >
-                    Quote
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setEntryType("thought")}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    entryType === "thought"
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
-                  )}
-                >
-                  Thought
-                </button>
-              </div>
-            </div>
-
-            <div className={cn("border-b p-3", isInline && "py-2")}>
-              <Label htmlFor="note-title" className="sr-only">
-                {entryType === "quote" ? "Speaker" : "Title"}
-              </Label>
-              <Input
-                id="note-title"
-                {...register("title")}
-                placeholder={entryType === "quote" ? "Speaker" : "Title"}
-                className="border-0 bg-transparent px-0 text-base font-medium shadow-none focus-visible:ring-0"
-              />
-            </div>
-
             <div className={cn("p-4", isInline && "p-3")}>
-              <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                {supportsQuotes && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="note-page-start" className="text-xs">
-                      Page
-                    </Label>
-                    <Input
-                      id="note-page-start"
-                      type="number"
-                      min={1}
-                      step={1}
-                      inputMode="numeric"
-                      {...register("pageStart")}
-                      placeholder="42"
-                    />
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <Label htmlFor="note-date" className="text-xs">
-                    Date
-                  </Label>
-                  <Input id="note-date" type="date" {...register("noteDate")} />
-                </div>
-              </div>
-
-              <div className="mb-4 space-y-2">
-                <Label className="text-xs">Tags</Label>
-                <div className="flex flex-wrap items-center gap-2">
-                  {tags.map((tag) => (
-                    <span key={tag} className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-1 text-xs font-medium">
-                      {tag}
-                      <button type="button" aria-label={`Remove ${tag}`} onClick={() => removeTag(tag)}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  <div className="flex items-center gap-1 rounded-full border bg-background px-2 py-1">
-                    <PlusCircle className="h-4 w-4 text-primary" aria-hidden />
-                    <Input
-                      {...register("tagDraft")}
-                      placeholder="Add tag"
-                      className="h-6 w-24 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addTag(tagDraft);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
               <Label htmlFor="note-content" className="sr-only">
                 Note content
               </Label>
-              <MarkdownEditor
-                id="note-content"
-                value={content}
-                placeholder={entryType === "quote" ? "Write the quote..." : "Write your thought..."}
-                minHeightClassName={isInline ? "min-h-32" : "min-h-56"}
-                onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
-              />
+              {isInline ? (
+                <InlineMarkdownEditor
+                  id="note-content"
+                  value={content}
+                  placeholder={entryType === "quote" ? "Write the quote..." : "Start writing..."}
+                  minHeightClassName="min-h-32"
+                  autoFocus={autoFocus}
+                  onBlur={handleInlineEditorBlur}
+                  onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
+                />
+              ) : (
+                <MarkdownEditor
+                  id="note-content"
+                  value={content}
+                  placeholder={entryType === "quote" ? "Write the quote..." : "Start writing..."}
+                  minHeightClassName="min-h-56"
+                  onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
+                />
+              )}
               {errors.content && <p className="mt-1 text-xs text-destructive">{errors.content.message}</p>}
+
+              <details className="group mt-5 border-t border-border/60 pt-4" open={isInline || (!hideEntitySelector && !entityId)}>
+                <summary
+                  className={cn(
+                    "list-none text-sm font-medium text-muted-foreground transition-colors",
+                    isInline ? "pointer-events-none cursor-default" : "cursor-pointer hover:text-foreground",
+                  )}
+                  onClick={(event) => {
+                    if (isInline) event.preventDefault();
+                  }}
+                >
+                  Details
+                </summary>
+
+                <div className="mt-4 space-y-4">
+                  {entityType === "Book" && !hideEntitySelector && (
+                    <div>
+                      <Label htmlFor="note-book">Book *</Label>
+                      <Controller
+                        name="bookId"
+                        control={control}
+                        rules={{ required: "Choose a book." }}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value || "__none__"}
+                            onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
+                          >
+                            <SelectTrigger id="note-book" className="mt-2">
+                              <SelectValue placeholder="Choose a book" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Choose a book</SelectItem>
+                              {sortedBooks.map((book) => (
+                                <SelectItem key={book.id} value={book.id}>
+                                  {book.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.bookId && <p className="mt-1 text-xs text-destructive">{errors.bookId.message}</p>}
+                    </div>
+                  )}
+                  {entityType === "Series" && !hideEntitySelector && (
+                    <div>
+                      <Label htmlFor="note-series">Series *</Label>
+                      <Controller
+                        name="entityId"
+                        control={control}
+                        rules={{ required: "Choose a series." }}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value || "__none__"}
+                            onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
+                          >
+                            <SelectTrigger id="note-series" className="mt-2">
+                              <SelectValue placeholder="Choose a series" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Choose a series</SelectItem>
+                              {sortedSeries.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
+                    </div>
+                  )}
+                  {entityType === "Author" && !hideEntitySelector && (
+                    <div>
+                      <Label htmlFor="note-author">Author *</Label>
+                      <Controller
+                        name="entityId"
+                        control={control}
+                        rules={{ required: "Choose an author." }}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value || "__none__"}
+                            onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
+                          >
+                            <SelectTrigger id="note-author" className="mt-2">
+                              <SelectValue placeholder="Choose an author" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Choose an author</SelectItem>
+                              {sortedAuthors.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.entityId && <p className="mt-1 text-xs text-destructive">{errors.entityId.message}</p>}
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="text-xs">Entry type</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {supportsQuotes && (
+                        <button
+                          type="button"
+                          onClick={() => setEntryType("quote")}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                            entryType === "quote"
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
+                          )}
+                        >
+                          Quote
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEntryType("thought")}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                          entryType === "thought"
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
+                        )}
+                      >
+                        Thought
+                      </button>
+                    </div>
+                  </div>
+
+                  {entryType === "quote" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="note-attribution" className="text-xs">
+                        Attribution
+                      </Label>
+                      <Input id="note-attribution" {...register("attribution")} placeholder="Speaker, character, or source" />
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="note-page-start" className="text-xs">
+                        Page
+                      </Label>
+                      <Input
+                        id="note-page-start"
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        {...register("pageStart")}
+                        placeholder="42"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="note-date" className="text-xs">
+                        Date
+                      </Label>
+                      <Input id="note-date" type="date" {...register("noteDate")} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Tags</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {tags.map((tag) => (
+                        <span key={tag} className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-1 text-xs font-medium">
+                          {tag}
+                          <button type="button" aria-label={`Remove ${tag}`} onClick={() => removeTag(tag)}>
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <div className="flex items-center gap-1 rounded-full border bg-background px-2 py-1">
+                        <PlusCircle className="h-4 w-4 text-primary" aria-hidden />
+                        <Input
+                          {...register("tagDraft")}
+                          placeholder="Add tag"
+                          className="h-6 w-24 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addTag(tagDraft);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
 
             {errors.root && <p className="px-4 pb-3 text-sm text-destructive">{errors.root.message}</p>}
+            {isInline && autosaveError && <p className="px-4 pb-3 text-sm text-destructive">{autosaveError}</p>}
 
-            <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>{footerStart}</div>
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" onClick={handleCancel}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting || !content.trim()}>
-                  {isSubmitting ? "Saving..." : "Save"}
-                </Button>
+            {isInline && autoSave ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-background px-4 py-3 text-xs text-muted-foreground">
+                <div>{footerStart}</div>
+                <div className="flex items-center gap-3">
+                  <span aria-live="polite">
+                    {autosaveStatus === "saving" ? "Saving..." : autosaveStatus === "saved" ? "Saved" : autosaveStatus === "error" ? "Not saved" : ""}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 px-4 shadow-sm"
+                    disabled={!content.trim() || autosaveStatus === "saving"}
+                    onClick={handleManualInlineSave}
+                  >
+                    {autosaveStatus === "saving" ? "Saving..." : "Save"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground" onClick={handleCancel}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>{footerStart}</div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={handleCancel}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting || !content.trim()}>
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
     </form>
   );

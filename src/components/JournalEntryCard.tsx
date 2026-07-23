@@ -8,23 +8,24 @@ import type { ReactNode } from "react";
 
 interface JournalEntryCardProps {
   entry: JournalTimelineEntry;
-  linkedEntryCount?: number;
   actions?: ReactNode;
+  showTags?: boolean;
 }
 
 function titleForEntry(entry: JournalTimelineEntry): ReactNode {
   if (entry.source === "generated_book_event") return entry.label;
-  const tags = visibleJournalTags(getJournalEntryTags(entry));
-  if (entry.source === "book_note" && tags.some((tag) => tag.toLocaleLowerCase() === "review") && entry.relatedBookTitle) {
+  const isReviewEntry =
+    entry.source === "book_note" &&
+    (entry.bookJournalEntry.label === "review" ||
+      getJournalEntryTags(entry).some((tag) => tag.toLocaleLowerCase() === "review"));
+  if (entry.source === "book_note" && isReviewEntry && entry.relatedBookTitle) {
     return (
       <>
         Review of <span className="font-serif italic">{entry.relatedBookTitle}</span>
       </>
     );
   }
-  if (entry.source === "book_note") return entry.bookJournalEntry.label === "quote" ? "" : entry.bookJournalEntry.title || "";
-  if (entry.source === "series_note") return entry.seriesJournalEntry.label === "quote" ? "" : entry.seriesJournalEntry.title || "";
-  return entry.authorJournalEntry.label === "quote" ? "" : entry.authorJournalEntry.title || "";
+  return "";
 }
 
 function contentForEntry(entry: JournalTimelineEntry): string {
@@ -34,28 +35,22 @@ function contentForEntry(entry: JournalTimelineEntry): string {
   return entry.authorJournalEntry.content;
 }
 
-function quoteSpeakerForEntry(entry: JournalTimelineEntry): string | null {
-  if (entry.source === "book_note") return entry.bookJournalEntry.quote_speaker ?? null;
-  if (entry.source === "series_note") return entry.seriesJournalEntry.quote_speaker ?? null;
-  if (entry.source === "author_note") return entry.authorJournalEntry.quote_speaker ?? null;
+function attributionForEntry(entry: JournalTimelineEntry): string | null {
+  if (entry.source === "book_note") return entry.bookJournalEntry.attribution ?? null;
+  if (entry.source === "series_note") return entry.seriesJournalEntry.attribution ?? null;
+  if (entry.source === "author_note") return entry.authorJournalEntry.attribution ?? null;
   return null;
 }
 
-function linkedEntryCountLabel(count: number): string {
-  return `Linked to ${count} ${count === 1 ? "entry" : "entries"}`;
-}
-
-export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions }: JournalEntryCardProps) {
+export default function JournalEntryCard({ entry, actions, showTags = true }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
-  const hasLinkedEntries = linkedEntryCount > 0;
 
   return (
     <article
       className={cn(
         "relative h-full rounded-lg border bg-background p-4",
-        actions ? (hasLinkedEntries ? "pr-56" : "pr-24") : "pr-4",
-        hasLinkedEntries && "pb-9",
+        actions ? "pr-24" : "pr-4",
       )}
     >
       {actions && (
@@ -69,7 +64,7 @@ export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions 
       {entry.type === "passage" ? (
         <QuoteBlock
           className={cn(actions && "pr-8")}
-          attribution={quoteSpeakerForEntry(entry) ? `- ${quoteSpeakerForEntry(entry)}` : null}
+          attribution={attributionForEntry(entry) ? `- ${attributionForEntry(entry)}` : null}
         >
           <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
         </QuoteBlock>
@@ -77,7 +72,7 @@ export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions 
         <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
       )}
 
-      {tags.length > 0 && (
+      {showTags && tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
           {tags.map((tag) => (
             <Badge key={tag} variant="outline" className="text-[0.7rem]">
@@ -87,11 +82,6 @@ export default function JournalEntryCard({ entry, linkedEntryCount = 0, actions 
         </div>
       )}
 
-      {hasLinkedEntries && (
-        <span className="absolute bottom-3 right-3 z-10 text-xs text-muted-foreground">
-          {linkedEntryCountLabel(linkedEntryCount)}
-        </span>
-      )}
     </article>
   );
 }

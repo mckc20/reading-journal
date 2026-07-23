@@ -1,42 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { BookOpen, RefreshCw } from "lucide-react";
-import AddJournalEntryDialog from "@/components/AddJournalEntryDialog";
+import { BookOpen, NotebookPen, RefreshCw } from "lucide-react";
 import BackButton from "@/components/BackButton";
-import JournalFilterSwitch from "@/components/JournalFilterSwitch";
 import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { useUserSettings } from "@/context/UserSettingsContext";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
-import { fetchReadingLogsForBook } from "@/lib/books";
-import {
-  bookJournalToJournalEntries,
-  buildGeneratedBookJournalEntries,
-  getJournalEntryTags,
-  isThoughtJournalEntry,
-  sortJournalEntries,
-  type JournalTimelineEntry,
-} from "@/lib/journal";
-import { READING_LOG_NOTE_TAG_PREFIX, isInternalJournalTag, normalizeJournalTags } from "@/lib/journalTags";
-import type { BookJournalEntryRecord, ReadingLog } from "@/types";
+import { bookJournalToJournalEntries, sortJournalEntries, type JournalTimelineEntry } from "@/lib/journal";
+import type { BookJournalEntryRecord } from "@/types";
 
-type JournalTimelineSortMode = "entry-date" | "date-added" | "book-progress";
-
-function getEntryDateAddedValue(entry: JournalTimelineEntry): string {
-  if (entry.source === "book_note") return entry.bookJournalEntry.created_at;
-  if (entry.source === "series_note") return entry.seriesJournalEntry.created_at;
-  if (entry.source === "author_note") return entry.authorJournalEntry.created_at;
-  return entry.createdAt;
-}
-
-function getEntryPageStart(entry: JournalTimelineEntry): number | null {
-  if (entry.source === "book_note") return entry.bookJournalEntry.page_start ?? null;
-  if (entry.source === "series_note") return entry.seriesJournalEntry.page_start ?? null;
-  if (entry.source === "author_note") return entry.authorJournalEntry.page_start ?? null;
-  return null;
-}
+type JournalViewMode = "list" | "book";
 
 function compareStableEntryTie(left: JournalTimelineEntry, right: JournalTimelineEntry): number {
   return right.id.localeCompare(left.id);
@@ -52,36 +27,19 @@ export default function BookAnnotations() {
   const { bookId } = useParams<{ bookId: string }>();
   const [searchParams] = useSearchParams();
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
-  const { settings } = useUserSettings();
   const [journalEntryRecords, setJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
-  const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(true);
-  const [logsError, setLogsError] = useState<string | null>(null);
-  const [showEditor, setShowEditor] = useState(searchParams.get("new") === "1");
-  const [showQuotes, setShowQuotes] = useState(true);
-  const [showThoughts, setShowThoughts] = useState(true);
-  const [showAutomatic, setShowAutomatic] = useState(true);
-  const [timelineSort, setTimelineSort] = useState<JournalTimelineSortMode>("entry-date");
-  const filterDefaultsAppliedRef = useRef(false);
-  const filterDefaultsTouchedRef = useRef(false);
+  const [composerOpen, setComposerOpen] = useState(searchParams.get("new") === "1");
+  const [viewMode, setViewMode] = useState<JournalViewMode>("list");
+  const { user } = useAuth();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+  const selectedEntryId = searchParams.get("entry");
 
   useEffect(() => {
-    if (!settings || filterDefaultsAppliedRef.current || filterDefaultsTouchedRef.current) return;
-    const defaults = settings.reading.journal_filter_defaults;
-    setShowQuotes(defaults.show_quotes);
-    setShowThoughts(defaults.show_thoughts);
-    setShowAutomatic(defaults.show_automatic);
-    filterDefaultsAppliedRef.current = true;
-  }, [settings]);
-
-  function setFilterFromUser(setter: (checked: boolean) => void, checked: boolean) {
-    filterDefaultsTouchedRef.current = true;
-    setter(checked);
-  }
+    if (searchParams.get("new") === "1") setComposerOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -111,164 +69,16 @@ export default function BookAnnotations() {
     };
   }, [bookId]);
 
-  useEffect(() => {
-    if (!bookId) return;
-    const currentBookId = bookId;
-    let cancelled = false;
-
-    async function run() {
-      try {
-        setLogsLoading(true);
-        setLogsError(null);
-        const data = await fetchReadingLogsForBook(currentBookId);
-        if (!cancelled) setReadingLogs(data);
-      } catch (err) {
-        if (!cancelled) {
-          setReadingLogs([]);
-          setLogsError(err instanceof Error ? err.message : "Failed to load reading history");
-        }
-      } finally {
-        if (!cancelled) setLogsLoading(false);
-      }
-    }
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [bookId]);
-
-  const journalEntriesByLabel = useMemo(
-    () => ({
-      quote: journalEntryRecords.filter((note) => note.label === "quote"),
-      note: journalEntryRecords.filter((note) => note.label === "note"),
-      review: journalEntryRecords.filter((note) => note.label === "review"),
-    }),
-    [journalEntryRecords],
-  );
-
-  const quoteEntries = useMemo(
+  const timelineEntries = useMemo(
     () =>
       sortJournalEntries(
-        bookJournalToJournalEntries(journalEntriesByLabel.quote).map((entry) => ({
+        bookJournalToJournalEntries(journalEntryRecords).map((entry) => ({
           ...entry,
           relatedBookTitle: book?.title,
         })),
-      ),
-    [book?.title, journalEntriesByLabel.quote],
+      ).sort(compareEntryDateStable),
+    [book?.title, journalEntryRecords],
   );
-
-  const thoughtEntries = useMemo(
-    () =>
-      sortJournalEntries(
-        bookJournalToJournalEntries([...journalEntriesByLabel.note, ...journalEntriesByLabel.review])
-          .map((entry) => ({ ...entry, relatedBookTitle: book?.title }))
-          .filter(isThoughtJournalEntry),
-      ),
-    [book?.title, journalEntriesByLabel.note, journalEntriesByLabel.review],
-  );
-
-  const uncompressedReadingLogIds = useMemo(() => {
-    const ids = new Set<string>();
-    journalEntryRecords.forEach((note) => {
-      normalizeJournalTags(note.tags).forEach((tag) => {
-        if (tag.startsWith(READING_LOG_NOTE_TAG_PREFIX)) {
-          ids.add(tag.slice(READING_LOG_NOTE_TAG_PREFIX.length));
-        }
-      });
-    });
-    return ids;
-  }, [journalEntryRecords]);
-
-  const sessionBarrierEntries = useMemo(
-    () => journalEntryRecords.filter((note) => !normalizeJournalTags(note.tags).some(isInternalJournalTag)),
-    [journalEntryRecords],
-  );
-  const sessionBarrierPages = useMemo(
-    () => new Set(
-      sessionBarrierEntries
-        .map((note) => note.page_start)
-        .filter((page): page is number => typeof page === "number" && page > 0),
-    ),
-    [sessionBarrierEntries],
-  );
-  const sessionBarrierDateKeys = useMemo(
-    () => new Set(
-      sessionBarrierEntries
-        .filter((note) => !note.page_start)
-        .map((note) => note.entry_date.slice(0, 10)),
-    ),
-    [sessionBarrierEntries],
-  );
-
-  const generatedJournalEntries = useMemo(
-    () => (book ? buildGeneratedBookJournalEntries(book, readingLogs, { uncompressedReadingLogIds, sessionBarrierDateKeys, sessionBarrierPages }) : []),
-    [book, readingLogs, sessionBarrierDateKeys, sessionBarrierPages, uncompressedReadingLogIds],
-  );
-
-  const readingLogProgressById = useMemo(
-    () => new Map(readingLogs.map((log) => [log.id, log.current_page])),
-    [readingLogs],
-  );
-
-  const getBookProgressSortValue = useMemo(
-    () => (entry: JournalTimelineEntry): number | null => {
-      const pageStart = getEntryPageStart(entry);
-      if (typeof pageStart === "number" && pageStart > 0) return pageStart;
-
-      const linkedReadingLogTag = normalizeJournalTags(getJournalEntryTags(entry)).find((tag) => tag.startsWith(READING_LOG_NOTE_TAG_PREFIX));
-      if (linkedReadingLogTag) {
-        const linkedPage = readingLogProgressById.get(linkedReadingLogTag.slice(READING_LOG_NOTE_TAG_PREFIX.length));
-        if (typeof linkedPage === "number") return linkedPage;
-      }
-
-      if (entry.source === "generated_book_event" && entry.type === "reading_session" && typeof entry.metadata?.currentPage === "number") {
-        return entry.metadata.currentPage;
-      }
-
-      return null;
-    },
-    [readingLogProgressById],
-  );
-
-  const timelineEntries = useMemo(
-    () => {
-      const entries = [
-        ...(showAutomatic ? generatedJournalEntries : []),
-        ...(showQuotes ? quoteEntries : []),
-        ...(showThoughts ? thoughtEntries : []),
-      ];
-
-      if (timelineSort === "date-added") {
-        return [...entries].sort((a, b) => {
-          const addedCompare = getEntryDateAddedValue(b).localeCompare(getEntryDateAddedValue(a));
-          if (addedCompare !== 0) return addedCompare;
-          return compareStableEntryTie(a, b);
-        });
-      }
-
-      if (timelineSort === "book-progress") {
-        return [...entries].sort((a, b) => {
-          const aProgress = getBookProgressSortValue(a);
-          const bProgress = getBookProgressSortValue(b);
-
-          if (aProgress !== null && bProgress !== null && aProgress !== bProgress) return bProgress - aProgress;
-          if (aProgress !== null && bProgress === null) return -1;
-          if (aProgress === null && bProgress !== null) return 1;
-          return compareEntryDateStable(a, b);
-        });
-      }
-
-      return [...entries].sort(compareEntryDateStable);
-    },
-    [generatedJournalEntries, getBookProgressSortValue, quoteEntries, showAutomatic, showQuotes, showThoughts, thoughtEntries, timelineSort],
-  );
-
-  const entryCounts = {
-    quote: journalEntriesByLabel.quote.length,
-    thought: journalEntriesByLabel.note.length + journalEntriesByLabel.review.length,
-    automatic: generatedJournalEntries.length,
-  };
   if (booksLoading) {
     return (
       <div className="space-y-4">
@@ -309,66 +119,32 @@ export default function BookAnnotations() {
           <p className="text-sm text-muted-foreground">{book.title}</p>
           <h1 className="text-2xl font-heading leading-snug font-medium">Journal</h1>
         </div>
+        <Button type="button" size="sm" onClick={() => setComposerOpen(true)} disabled={!user}>
+          <NotebookPen className="mr-1.5 h-4 w-4" />
+          Add entry
+        </Button>
       </div>
-
-      <AddJournalEntryDialog
-        open={showEditor}
-        onOpenChange={setShowEditor}
-        initialBookId={book.id}
-        entity={{ type: "Book", id: book.id }}
-        onSaved={(note) => {
-          if ("book_id" in note) {
-            setJournalEntryRecords((current) => sortBookJournalEntryRecords([note, ...current.filter((item) => item.id !== note.id)]));
-          }
-        }}
-      />
 
       {journalEntriesError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {journalEntriesError}
         </div>
       )}
-      {logsError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          Reading history could not be added to the journal: {logsError}
-        </div>
-      )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <JournalFilterSwitch
-            checked={showQuotes}
-            label="Quotes"
-            count={entryCounts.quote}
-            onCheckedChange={(checked) => setFilterFromUser(setShowQuotes, checked)}
-          />
-          <JournalFilterSwitch
-            checked={showThoughts}
-            label="Thoughts"
-            count={entryCounts.thought}
-            onCheckedChange={(checked) => setFilterFromUser(setShowThoughts, checked)}
-          />
-          <JournalFilterSwitch
-            checked={showAutomatic}
-            label="Automatic"
-            count={entryCounts.automatic}
-            onCheckedChange={(checked) => setFilterFromUser(setShowAutomatic, checked)}
-          />
-        </div>
-        <Select value={timelineSort} onValueChange={(value) => setTimelineSort(value as JournalTimelineSortMode)}>
-          <SelectTrigger className="w-[13.5rem] justify-between gap-1.5" aria-label="Sort journal timeline">
-            <span className="text-muted-foreground">Sort by:</span>
+      <div className="flex justify-end">
+        <Select value={viewMode} onValueChange={(value) => setViewMode(value as JournalViewMode)}>
+          <SelectTrigger className="w-[11rem] justify-between gap-1.5" aria-label="Journal view">
+            <span className="text-muted-foreground">View:</span>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="entry-date">Entry Date</SelectItem>
-            <SelectItem value="date-added">Date Added</SelectItem>
-            <SelectItem value="book-progress">Book Progress</SelectItem>
+            <SelectItem value="list">List</SelectItem>
+            <SelectItem value="book" disabled>Book</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {journalEntriesLoading || logsLoading ? (
+      {journalEntriesLoading ? (
         <div className="grid gap-3 md:grid-cols-2">
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
@@ -376,8 +152,14 @@ export default function BookAnnotations() {
       ) : (
         <JournalTimeline
           entries={timelineEntries}
-          generatedReferenceEntries={generatedJournalEntries}
-          sortMode={timelineSort}
+          layout="pages"
+          selectedEntryId={selectedEntryId}
+          inlineComposer={{
+            open: composerOpen,
+            entity: { type: "Book", id: book.id },
+            initialBookId: book.id,
+            onOpenChange: setComposerOpen,
+          }}
           emptyMessage="No journal entries yet."
           onEntryUpdated={(entry) => {
             if (entry.source !== "book_note") return;

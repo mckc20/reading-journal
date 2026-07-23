@@ -245,7 +245,7 @@ export function searchBookJournalEntryRecords(
       const book = booksById.get(note.book_id);
       if (!book) return null;
 
-      const values = unique([note.content].filter(Boolean));
+      const values = unique([note.content, note.attribution ?? ""].filter(Boolean));
       const matchedValues = values.filter((value) => matchesQuery(value, normalizedQuery));
       if (matchedValues.length === 0) return null;
 
