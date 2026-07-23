@@ -1357,13 +1357,62 @@ function isInsideMarkdownBlockquote(markdown: string, offset: number): boolean {
 }
 
 function getBookViewSegmentMarkdown(entry: BookViewPaginatedTimelineEntry): string {
-  if (!entry.isContinuation || /^\s*>/.test(entry.content)) return entry.content;
+  const repairedContent = repairSplitInlineMarkdown(entry);
+  if (!entry.isContinuation || /^\s*>/.test(repairedContent)) return repairedContent;
 
   const originalContent = getManualNote(entry).content;
   const sourceStart = entry.sourceStart ?? 0;
-  if (!isInsideMarkdownBlockquote(originalContent, sourceStart)) return entry.content;
+  if (!isInsideMarkdownBlockquote(originalContent, sourceStart)) return repairedContent;
 
-  return `> ${entry.content}`;
+  return `> ${repairedContent}`;
+}
+
+function isEscapedMarkdownCharacter(markdown: string, index: number): boolean {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && markdown[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
+function hasOpenInlineDelimiterBefore(markdown: string, offset: number, delimiter: "*" | "_" | "**" | "__"): boolean {
+  const delimiterCharacter = delimiter[0];
+  const delimiterLength = delimiter.length;
+  let count = 0;
+
+  for (let index = 0; index < offset;) {
+    if (markdown[index] !== delimiterCharacter || isEscapedMarkdownCharacter(markdown, index)) {
+      index += 1;
+      continue;
+    }
+
+    let runLength = 0;
+    while (index + runLength < offset && markdown[index + runLength] === delimiterCharacter) {
+      runLength += 1;
+    }
+
+    count += delimiterLength === 1 ? runLength % 2 : Math.floor(runLength / delimiterLength);
+    index += runLength;
+  }
+
+  return count % 2 === 1;
+}
+
+function repairSplitInlineMarkdown(entry: BookViewPaginatedTimelineEntry): string {
+  const originalContent = getManualNote(entry).content;
+  const sourceStart = entry.sourceStart ?? 0;
+  const sourceEnd = entry.sourceEnd ?? sourceStart + entry.content.length;
+  let content = entry.content;
+
+  (["**", "__", "*", "_"] as const).forEach((delimiter) => {
+    const startsInsideDelimiter = sourceStart > 0 && hasOpenInlineDelimiterBefore(originalContent, sourceStart, delimiter);
+    const endsInsideDelimiter = sourceEnd < originalContent.length && hasOpenInlineDelimiterBefore(originalContent, sourceEnd, delimiter);
+
+    if (startsInsideDelimiter) content = `${delimiter}${content}`;
+    if (endsInsideDelimiter) content = `${content}${delimiter}`;
+  });
+
+  return content;
 }
 
 function BookViewEntryMeta({ entry, parentContextLabel }: { entry: BookViewPaginatedTimelineEntry; parentContextLabel?: string | null }) {
@@ -2430,11 +2479,9 @@ export default function JournalTimeline({
     if (!isManualEntry(entry)) return;
     setComposerParentEntry(null);
     setGeneratedComposerTarget(null);
-    const editableId = "sourceId" in entry && typeof entry.sourceId === "string"
-      ? entry.sourceId
-      : "originalId" in entry && typeof entry.originalId === "string"
-        ? entry.originalId
-        : entry.id;
+    const editableId = "originalId" in entry && typeof entry.originalId === "string"
+      ? entry.originalId
+      : entry.id;
     const editableEntry: ManualJournalTimelineEntry = { ...entry, id: editableId } as ManualJournalTimelineEntry;
 
     if (isAttachedNote(editableEntry)) {
@@ -3007,6 +3054,16 @@ export default function JournalTimeline({
                   />
                 </div>
               )}
+              {editingReplyEntry && (
+                <div className="mx-auto w-full max-w-5xl">
+                  <InlineEditReplyComposer
+                    entry={editingReplyEntry}
+                    generatedParentEntry={null}
+                    onCancel={() => setEditingReplyEntry(null)}
+                    onSaved={handleReplyEditSaved}
+                  />
+                </div>
+              )}
               {inlineComposer && (
                 <InlineJournalEntryComposer
                   open={inlineComposer.open}
@@ -3056,30 +3113,20 @@ export default function JournalTimeline({
                   />
                 )}
                 {isFinalEntrySegment && timelineReplies.map((reply) => (
-                  editingReplyEntry?.id === reply.id ? (
-                    <InlineEditReplyComposer
-                      key={reply.id}
-                      entry={reply}
-                      generatedParentEntry={null}
-                      onCancel={() => setEditingReplyEntry(null)}
-                      onSaved={handleReplyEditSaved}
-                    />
-                  ) : (
-                    <BookViewJournalEntry
-                      key={reply.id}
-                      entry={manualEntryToSingleBookViewSegment(reply)}
-                      busy={busyEntryId === reply.id}
-                      isHidden={isEntryHidden(reply)}
-                      onToggleSaved={(item) => void handleToggleSaved(item)}
-                      onAttach={startAttaching}
-                      onUnattach={requestUnattachNote}
-                      onToggleHidden={toggleEntryHidden}
-                      onEdit={startEditing}
-                      onDelete={requestNoteDelete}
-                      allowAttach
-                      indented
-                    />
-                  )
+                  <BookViewJournalEntry
+                    key={reply.id}
+                    entry={manualEntryToSingleBookViewSegment(reply)}
+                    busy={busyEntryId === reply.id}
+                    isHidden={isEntryHidden(reply)}
+                    onToggleSaved={(item) => void handleToggleSaved(item)}
+                    onAttach={startAttaching}
+                    onUnattach={requestUnattachNote}
+                    onToggleHidden={toggleEntryHidden}
+                    onEdit={startEditing}
+                    onDelete={requestNoteDelete}
+                    allowAttach
+                    indented
+                  />
                 ))}
               </div>
             );
