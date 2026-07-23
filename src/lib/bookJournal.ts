@@ -1,4 +1,5 @@
 import type { BookJournalEntryRecord, JournalEntryLabel } from "@/types";
+import { withJournalMedia } from "@/lib/journalMedia";
 
 export interface CreateBookJournalEntryRecordInput {
   bookId: string;
@@ -207,7 +208,7 @@ export async function fetchBookJournalEntryRecords(bookId: string): Promise<Book
     .order("created_at", { ascending: false });
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return sortBookJournalEntryRecords((data ?? []) as BookJournalEntryRecord[]);
+  return sortBookJournalEntryRecords(await withJournalMedia("book_note", (data ?? []) as BookJournalEntryRecord[]));
 }
 
 export async function fetchAllBookJournalEntryRecords(): Promise<BookJournalEntryRecord[]> {
@@ -220,7 +221,7 @@ export async function fetchAllBookJournalEntryRecords(): Promise<BookJournalEntr
     .order("created_at", { ascending: false });
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return sortBookJournalEntryRecords((data ?? []) as BookJournalEntryRecord[]);
+  return sortBookJournalEntryRecords(await withJournalMedia("book_note", (data ?? []) as BookJournalEntryRecord[]));
 }
 
 export async function createBookJournalEntryRecord(
@@ -246,7 +247,7 @@ export async function createBookJournalEntryRecord(
   }
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return data as BookJournalEntryRecord;
+  return (await withJournalMedia("book_note", [data as BookJournalEntryRecord]))[0];
 }
 
 export async function updateBookJournalEntryRecord(
@@ -280,7 +281,7 @@ export async function updateBookJournalEntryRecord(
   }
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return data as BookJournalEntryRecord;
+  return (await withJournalMedia("book_note", [data as BookJournalEntryRecord]))[0];
 }
 
 export async function updateBookJournalEntryRecordFavorite(
@@ -300,7 +301,7 @@ export async function updateBookJournalEntryRecordFavorite(
     .single();
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return data as BookJournalEntryRecord;
+  return (await withJournalMedia("book_note", [data as BookJournalEntryRecord]))[0];
 }
 
 export async function deleteBookJournalEntryRecord(noteId: string): Promise<void> {
@@ -335,7 +336,7 @@ export async function fetchBookJournalEntryRecord(entryId: string): Promise<Book
     .single();
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return data as BookJournalEntryRecord;
+  return (await withJournalMedia("book_note", [data as BookJournalEntryRecord]))[0];
 }
 
 export async function getBookJournalReplies(entryId: string): Promise<BookJournalEntryRecord[]> {
@@ -348,7 +349,7 @@ export async function getBookJournalReplies(entryId: string): Promise<BookJourna
     .order("created_at", { ascending: true });
 
   if (error) throw bookJournalEntryErrorToError(error);
-  return (data ?? []) as BookJournalEntryRecord[];
+  return withJournalMedia("book_note", (data ?? []) as BookJournalEntryRecord[]);
 }
 
 export async function updateBookJournalReply(

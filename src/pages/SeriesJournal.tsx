@@ -4,11 +4,14 @@ import { NotebookPen } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { useSeries } from "@/hooks/useSeries";
 import { seriesJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { fetchSeriesJournalEntryRecords, sortSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import type { SeriesJournalEntryRecord } from "@/types";
+
+type JournalViewMode = "list" | "book";
 
 export default function SeriesJournal() {
   const { seriesId } = useParams<{ seriesId: string }>();
@@ -19,6 +22,7 @@ export default function SeriesJournal() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<JournalViewMode>("list");
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const selectedEntryId = searchParams.get("entry");
@@ -75,9 +79,24 @@ export default function SeriesJournal() {
 
       {error && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
 
+      <div className="flex justify-end">
+        <Select value={viewMode} onValueChange={(value) => setViewMode(value as JournalViewMode)}>
+          <SelectTrigger className="w-[11rem] justify-between gap-1.5" aria-label="Journal view">
+            <span className="text-muted-foreground">View:</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="list">List</SelectItem>
+            <SelectItem value="book">Book View</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <JournalTimeline
         entries={entries}
-        layout="pages"
+        layout={viewMode === "book" ? "pages" : "list"}
+        bookViewTitle={seriesRecord.name}
+        bookViewSubtitle="Series Reading Journal"
         selectedEntryId={selectedEntryId}
         inlineComposer={{
           open: composerOpen,

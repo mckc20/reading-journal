@@ -25,7 +25,9 @@ import {
 } from "lucide-react";
 import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
+import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import JournalEntryCard from "@/components/JournalEntryCard";
+import BookView, { type BookViewEntry } from "@/components/journal-book/BookView";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +70,7 @@ import {
   type JournalTimelineEntry,
   type SeriesJournalEntryRecordJournalEntry,
 } from "@/lib/journal";
+import type { JournalBookPaginatedItem } from "@/lib/journalBookPagination";
 import {
   deleteSeriesJournalEntryRecord,
   getSeriesJournalReplies,
@@ -84,7 +87,9 @@ interface JournalTimelineProps {
   generatedReferenceEntries?: GeneratedBookJournalEntry[];
   emptyMessage?: string;
   className?: string;
-  layout?: "timeline" | "cards" | "pages";
+  layout?: "timeline" | "cards" | "pages" | "list";
+  bookViewTitle?: string;
+  bookViewSubtitle?: string;
   sortMode?: "entry-date" | "date-added" | "book-progress";
   selectedEntryId?: string | null;
   previewMode?: {
@@ -103,6 +108,10 @@ interface JournalTimelineProps {
 }
 
 type ManualJournalTimelineEntry = BookJournalEntryRecordJournalEntry | SeriesJournalEntryRecordJournalEntry | AuthorJournalEntryRecordJournalEntry;
+type BookViewTimelineEntry = ManualJournalTimelineEntry & BookViewEntry & {
+  startsDateGroup?: boolean;
+};
+type BookViewPaginatedTimelineEntry = JournalBookPaginatedItem<BookViewTimelineEntry>;
 type GeneratedSession = NonNullable<NonNullable<GeneratedBookJournalEntry["metadata"]>["sessions"]>[number];
 type GeneratedNoteTarget = {
   entry: GeneratedBookJournalEntry;
@@ -164,6 +173,12 @@ function getManualNote(
   if (isBookJournalEntryRecordEntry(entry)) return entry.bookJournalEntry;
   if (isSeriesJournalEntryRecordEntry(entry)) return entry.seriesJournalEntry;
   return entry.authorJournalEntry;
+}
+
+function getManualNoteMedia(
+  entry: BookJournalEntryRecordJournalEntry | SeriesJournalEntryRecordJournalEntry | AuthorJournalEntryRecordJournalEntry,
+) {
+  return getManualNote(entry).media ?? [];
 }
 
 function isManualEntry(
@@ -762,7 +777,13 @@ function JournalNoteEntry({
         {displayEntryTitle(entry) && (
           <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
         )}
-        <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
+        <JournalEntryMediaContent
+          markdown={note.content}
+          media={getManualNoteMedia(entry)}
+          className="text-sm leading-6 text-foreground"
+          imageClassName="h-32 max-h-32"
+          thumbnail
+        />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
       </div>
     </article>
@@ -835,7 +856,13 @@ function JournalPassageEntry({
             ) : null
           }
         >
-          <FormattedNoteContent markdown={note.content} className="text-base leading-7 text-foreground" />
+          <JournalEntryMediaContent
+            markdown={note.content}
+            media={getManualNoteMedia(entry)}
+            className="text-base leading-7 text-foreground"
+            imageClassName="h-32 max-h-32"
+            thumbnail
+          />
         </QuoteBlock>
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
       </div>
@@ -900,7 +927,13 @@ function JournalReviewEntry({
         {displayEntryTitle(entry) && (
           <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
         )}
-        <FormattedNoteContent markdown={note.content} className="text-sm leading-6 text-foreground" />
+        <JournalEntryMediaContent
+          markdown={note.content}
+          media={getManualNoteMedia(entry)}
+          className="text-sm leading-6 text-foreground"
+          imageClassName="h-32 max-h-32"
+          thumbnail
+        />
         <TimelineTags tags={normalizeJournalTags(note.tags)} />
       </div>
     </article>
@@ -1269,64 +1302,160 @@ function TimelineReplyRow({
   );
 }
 
-function NotebookTags({ tags }: { tags: string[] }) {
-  const visibleTags = visibleJournalTags(tags);
-  if (visibleTags.length === 0) return null;
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {visibleTags.map((tag) => (
-        <span key={tag}>#{tag}</span>
-      ))}
-    </div>
-  );
-}
-
-function NotebookEntryMeta({ entry, parentContextLabel }: { entry: JournalTimelineEntry; parentContextLabel?: string | null }) {
-  const details = [
-    entryPage(entry),
-    parentContextLabel ? `with ${parentContextLabel}` : null,
-    isBookJournalEntryRecordEntry(entry) && entry.relatedBookTitle && entry.relatedContext ? entry.relatedBookTitle : null,
-  ].filter(Boolean);
-
-  if (details.length === 0) return null;
-
-  return (
-    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-      {details.join(" · ")}
-    </p>
-  );
-}
-
-function NotebookEntryContent({ entry }: { entry: ManualJournalTimelineEntry }) {
+function BookViewEntryContent({ entry }: { entry: BookViewPaginatedTimelineEntry }) {
   const note = getManualNote(entry);
   const title = displayEntryTitle(entry);
+  const isFinalSegment = entry.segmentIndex === entry.segmentCount - 1;
+  const displayContent = getBookViewSegmentMarkdown(entry);
 
   if (entry.type === "passage") {
     return (
       <QuoteBlock
         attribution={
-          note.attribution ? (
+          note.attribution && isFinalSegment ? (
             <span className="font-serif italic">- {note.attribution}</span>
           ) : null
         }
         className="gap-x-2"
         markClassName="text-muted-foreground/40"
       >
-        <FormattedNoteContent markdown={note.content} className="text-base leading-8 text-foreground" />
+        <JournalEntryMediaContent
+          markdown={displayContent}
+          media={isFinalSegment ? getManualNoteMedia(entry) : []}
+          className="text-base leading-8 text-foreground"
+          imageClassName="max-h-72"
+        />
       </QuoteBlock>
     );
   }
 
   return (
     <div className="space-y-3">
-      {title && <h3 className="font-heading text-xl font-medium leading-snug">{title}</h3>}
-      <FormattedNoteContent markdown={note.content} className="text-base leading-8 text-foreground" />
+      {title && !entry.isContinuation && <h3 className="font-heading text-xl font-medium leading-snug">{title}</h3>}
+      <JournalEntryMediaContent
+        markdown={displayContent}
+        media={isFinalSegment ? getManualNoteMedia(entry) : []}
+        className="text-base leading-8 text-foreground"
+        imageClassName="max-h-72"
+      />
     </div>
   );
 }
 
-function NotebookJournalEntry({
+function isInsideMarkdownBlockquote(markdown: string, offset: number): boolean {
+  if (offset <= 0) return false;
+
+  const beforeSegment = markdown.slice(0, offset);
+  const blockStart = beforeSegment.lastIndexOf("\n\n") + 2;
+  const lineStart = beforeSegment.lastIndexOf("\n") + 1;
+  const currentLinePrefix = markdown.slice(lineStart, offset);
+
+  if (/^\s*>\s?/.test(currentLinePrefix)) return true;
+
+  const previousLinesInBlock = markdown.slice(blockStart, offset).split("\n").filter((line) => line.trim().length > 0);
+  return previousLinesInBlock.some((line) => /^\s*>\s?/.test(line));
+}
+
+function getBookViewSegmentMarkdown(entry: BookViewPaginatedTimelineEntry): string {
+  if (!entry.isContinuation || /^\s*>/.test(entry.content)) return entry.content;
+
+  const originalContent = getManualNote(entry).content;
+  const sourceStart = entry.sourceStart ?? 0;
+  if (!isInsideMarkdownBlockquote(originalContent, sourceStart)) return entry.content;
+
+  return `> ${entry.content}`;
+}
+
+function BookViewEntryMeta({ entry, parentContextLabel }: { entry: BookViewPaginatedTimelineEntry; parentContextLabel?: string | null }) {
+  if (entry.segmentIndex !== entry.segmentCount - 1) return null;
+
+  const note = getManualNote(entry);
+  const details = [
+    entryPage(entry),
+    parentContextLabel ? `with ${parentContextLabel}` : null,
+    isBookJournalEntryRecordEntry(entry) && entry.relatedBookTitle && entry.relatedContext ? entry.relatedBookTitle : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  const tags = visibleJournalTags(normalizeJournalTags(note.tags));
+
+  if (details.length === 0 && tags.length === 0) return null;
+
+  return (
+    <EntryMetadataLine details={details} tags={tags} />
+  );
+}
+
+function BookViewJournalEntry({
+  entry,
+  busy,
+  isHidden,
+  attachedCount = 0,
+  onToggleSaved,
+  onReply,
+  onAttach,
+  onUnattach,
+  onToggleHidden,
+  onEdit,
+  onDelete,
+  parentContextLabel,
+  allowAttach = true,
+  indented = false,
+}: {
+  entry: BookViewPaginatedTimelineEntry;
+  busy: boolean;
+  isHidden: boolean;
+  attachedCount?: number;
+  onToggleSaved: (entry: JournalTimelineEntry) => void;
+  onReply?: (entry: JournalTimelineEntry) => void;
+  onAttach: (entry: ManualJournalTimelineEntry) => void;
+  onUnattach: (entry: ManualJournalTimelineEntry) => void;
+  onToggleHidden: (entry: JournalTimelineEntry) => void;
+  onEdit: (entry: ManualJournalTimelineEntry) => void;
+  onDelete: (entry: ManualJournalTimelineEntry) => void;
+  parentContextLabel?: string | null;
+  allowAttach?: boolean;
+  indented?: boolean;
+}) {
+  return (
+    <>
+      {entry.startsDateGroup && !entry.isContinuation && (
+        <header className="border-b border-border/70 pb-3 pt-1">
+          <h2 className="font-heading text-2xl font-medium leading-tight">
+            {formatJournalDate(entry.date)}
+          </h2>
+        </header>
+      )}
+      <article
+        className={cn(
+          "group/notebook relative border-b border-border/60 py-6 last:border-b-0",
+          indented && "ml-6 border-l border-border/60 pl-5",
+        )}
+      >
+        <div className="absolute right-0 top-5 z-10 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/notebook:opacity-100 sm:group-focus-within/notebook:opacity-100">
+          <TimelineTopActions
+            entry={entry}
+            busy={busy}
+            isHidden={isHidden}
+            attachedCount={attachedCount}
+            onToggleSaved={onToggleSaved}
+            onReply={onReply}
+            onAttach={onAttach}
+            onUnattach={onUnattach}
+            onToggleHidden={onToggleHidden}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            allowAttach={allowAttach}
+          />
+        </div>
+        <div className="pr-16">
+          <BookViewEntryContent entry={entry} />
+          <BookViewEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
+        </div>
+      </article>
+    </>
+  );
+}
+
+function ListJournalEntry({
   entry,
   busy,
   isHidden,
@@ -1357,8 +1486,6 @@ function NotebookJournalEntry({
   allowAttach?: boolean;
   indented?: boolean;
 }) {
-  const note = getManualNote(entry);
-
   return (
     <article
       className={cn(
@@ -1385,9 +1512,71 @@ function NotebookJournalEntry({
       <div className="pr-16">
         <NotebookEntryContent entry={entry} />
         <NotebookEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
-        <NotebookTags tags={normalizeJournalTags(note.tags)} />
       </div>
     </article>
+  );
+}
+
+function NotebookEntryContent({ entry }: { entry: ManualJournalTimelineEntry }) {
+  const note = getManualNote(entry);
+  const title = displayEntryTitle(entry);
+
+  if (entry.type === "passage") {
+    return (
+      <QuoteBlock
+        attribution={
+          note.attribution ? (
+            <span className="font-serif italic">- {note.attribution}</span>
+          ) : null
+        }
+        className="gap-x-2"
+        markClassName="text-muted-foreground/40"
+      >
+        <JournalEntryMediaContent
+          markdown={note.content}
+          media={getManualNoteMedia(entry)}
+          className="text-base leading-8 text-foreground"
+          imageClassName="max-h-96"
+        />
+      </QuoteBlock>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {title && <h3 className="font-heading text-xl font-medium leading-snug">{title}</h3>}
+      <JournalEntryMediaContent
+        markdown={note.content}
+        media={getManualNoteMedia(entry)}
+        className="text-base leading-8 text-foreground"
+        imageClassName="max-h-96"
+      />
+    </div>
+  );
+}
+
+function NotebookEntryMeta({ entry, parentContextLabel }: { entry: JournalTimelineEntry; parentContextLabel?: string | null }) {
+  const note = isManualEntry(entry) ? getManualNote(entry) : null;
+  const details = [
+    entryPage(entry),
+    parentContextLabel ? `with ${parentContextLabel}` : null,
+    isBookJournalEntryRecordEntry(entry) && entry.relatedBookTitle && entry.relatedContext ? entry.relatedBookTitle : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  const tags = note ? visibleJournalTags(normalizeJournalTags(note.tags)) : [];
+
+  if (details.length === 0 && tags.length === 0) return null;
+
+  return <EntryMetadataLine details={details} tags={tags} />;
+}
+
+function EntryMetadataLine({ details, tags }: { details: string[]; tags: string[] }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-foreground">
+      {details.length > 0 && <span>{details.join(" · ")}</span>}
+      {tags.map((tag) => (
+        <span key={tag}>#{tag}</span>
+      ))}
+    </div>
   );
 }
 
@@ -1809,6 +1998,13 @@ function InlineJournalEntryComposer({
           initialEntry={null}
           hideEntitySelector
           onCancel={onCancel}
+          onSaved={(note) => {
+            onSaved(note);
+          }}
+          onSubmitSaved={(note) => {
+            onSaved(note);
+            onCancel();
+          }}
           onEditorBlur={(note) => {
             if (note) onSaved(note);
             onCancel();
@@ -1826,7 +2022,11 @@ function InlineEditEntryComposer({
 }: {
   entry: ManualJournalTimelineEntry;
   onCancel: () => void;
-  onSaved: (entry: ManualJournalTimelineEntry, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
+  onSaved: (
+    entry: ManualJournalTimelineEntry,
+    note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord,
+    options?: { close?: boolean },
+  ) => void;
 }) {
   const entity = getManualEntryDialogEntity(entry);
   const initialBookId = isBookJournalEntryRecordEntry(entry) ? entry.bookJournalEntry.book_id : "";
@@ -1842,9 +2042,14 @@ function InlineEditEntryComposer({
       initialEntry={getManualNote(entry)}
       hideEntitySelector
       onCancel={onCancel}
+      onSaved={(note) => {
+        onSaved(entry, note, { close: false });
+      }}
+      onSubmitSaved={(note) => {
+        onSaved(entry, note, { close: true });
+      }}
       onEditorBlur={(note) => {
-        if (note) onSaved(entry, note);
-        onCancel();
+        if (note) onSaved(entry, note, { close: false });
       }}
     />
   );
@@ -1947,12 +2152,43 @@ async function fetchRepliesForEntry(entry: ManualJournalTimelineEntry): Promise<
   return getAuthorJournalReplies(entry.authorJournalEntry.id).then((items) => items.map(authorJournalEntryToJournalEntry));
 }
 
+function manualEntryToBookViewEntry(
+  entry: ManualJournalTimelineEntry,
+  options: { childCount?: number } = {},
+): BookViewTimelineEntry {
+  const note = getManualNote(entry);
+  const tags = visibleJournalTags(normalizeJournalTags(note.tags));
+
+  return {
+    ...entry,
+    content: note.content,
+    date: entryDate(entry),
+    label: entryTypeLabel(entry),
+    tags,
+    tagCount: tags.length,
+    hasAttribution: Boolean(note.attribution),
+    childCount: options.childCount ?? 0,
+  };
+}
+
+function manualEntryToSingleBookViewSegment(entry: ManualJournalTimelineEntry): BookViewPaginatedTimelineEntry {
+  return {
+    ...manualEntryToBookViewEntry(entry),
+    originalId: entry.id,
+    segmentIndex: 0,
+    segmentCount: 1,
+    isContinuation: false,
+  };
+}
+
 export default function JournalTimeline({
   entries,
   generatedReferenceEntries = [],
   emptyMessage = "No journal entries yet.",
   className,
   layout = "timeline",
+  bookViewTitle = "Journal",
+  bookViewSubtitle = "Reading Journal",
   sortMode = "entry-date",
   selectedEntryId = null,
   previewMode,
@@ -2194,14 +2430,20 @@ export default function JournalTimeline({
     if (!isManualEntry(entry)) return;
     setComposerParentEntry(null);
     setGeneratedComposerTarget(null);
+    const editableId = "sourceId" in entry && typeof entry.sourceId === "string"
+      ? entry.sourceId
+      : "originalId" in entry && typeof entry.originalId === "string"
+        ? entry.originalId
+        : entry.id;
+    const editableEntry: ManualJournalTimelineEntry = { ...entry, id: editableId } as ManualJournalTimelineEntry;
 
-    if (isAttachedNote(entry)) {
+    if (isAttachedNote(editableEntry)) {
       setEditingEntry(null);
-      setEditingReplyEntry(entry);
+      setEditingReplyEntry(editableEntry);
       return;
     }
 
-    setEditingEntry(entry);
+    setEditingEntry(editableEntry);
     setEditingReplyEntry(null);
   }
 
@@ -2470,10 +2712,15 @@ export default function JournalTimeline({
     }
   }
 
-  function handleEditingEntrySaved(note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) {
+  function handleEditingEntrySaved(
+    note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord,
+    options: { close?: boolean } = { close: true },
+  ) {
     if (!editingEntry) return;
     const updatedEntry = replaceManualEntryRecord(editingEntry, note);
-    setEditingEntry(null);
+    if (options.close) {
+      setEditingEntry(null);
+    }
     onEntryUpdated?.(updatedEntry);
     onEntryEdit?.(updatedEntry);
   }
@@ -2601,7 +2848,19 @@ export default function JournalTimeline({
     );
   }
 
-  const journalPageGroups = layout === "pages" ? groupJournalEntriesByDate(splitEntries.visible) : [];
+  if (entries.length === 0 && inlineComposer?.open) {
+    return (
+      <div className={cn("mr-auto max-w-5xl", className)}>
+        <InlineJournalEntryComposer
+          open={inlineComposer.open}
+          entity={inlineComposer.entity}
+          initialBookId={inlineComposer.initialBookId}
+          onCancel={() => inlineComposer.onOpenChange(false)}
+          onSaved={handleInlineComposerSaved}
+        />
+      </div>
+    );
+  }
 
   function attachedCountForEntry(entry: JournalTimelineEntry): number {
     if (isGeneratedBookEntry(entry)) {
@@ -2613,9 +2872,24 @@ export default function JournalTimeline({
     return 0;
   }
 
+  const bookViewEntries: BookViewTimelineEntry[] = layout === "pages"
+    ? splitEntries.visible.filter(isManualEntry).map((entry, index, manualEntries) => {
+      const previousEntry = manualEntries[index - 1];
+      const startsDateGroup = !previousEntry || entryDate(previousEntry).slice(0, 10) !== entryDate(entry).slice(0, 10);
+
+      return {
+        ...manualEntryToBookViewEntry(entry, { childCount: attachedCountForEntry(entry) }),
+        startsDateGroup,
+        headingWeight: startsDateGroup ? 3 : 0,
+        forceNewPage: startsDateGroup,
+      };
+    })
+    : [];
+  const journalListGroups = layout === "list" ? groupJournalEntriesByDate(splitEntries.visible) : [];
+
   return (
     <>
-      {layout === "pages" && splitEntries.visible.length > 0 ? (
+      {layout === "list" && splitEntries.visible.length > 0 ? (
         <div className={cn("mr-auto max-w-5xl space-y-12", className)}>
           {inlineComposer && (
             <InlineJournalEntryComposer
@@ -2626,7 +2900,7 @@ export default function JournalTimeline({
               onSaved={handleInlineComposerSaved}
             />
           )}
-          {journalPageGroups.map((group) => (
+          {journalListGroups.map((group) => (
             <section key={group.dateKey} className="space-y-2">
               <header className="border-b border-border/70 pb-3">
                 <h2 className="font-heading text-3xl font-medium leading-tight">
@@ -2650,17 +2924,16 @@ export default function JournalTimeline({
                         selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
                       )}
                     >
-                      {editingEntry?.id === entry.id ? (
+                      {editingEntry?.sourceId === entry.sourceId ? (
                         <InlineEditEntryComposer
                           entry={entry}
                           onCancel={() => setEditingEntry(null)}
-                          onSaved={(editedEntry, note) => {
-                            handleEditingEntrySaved(note);
-                            setEditingEntry((current) => (current?.id === editedEntry.id ? null : current));
+                          onSaved={(_editedEntry, note, options) => {
+                            handleEditingEntrySaved(note, options);
                           }}
                         />
                       ) : (
-                        <NotebookJournalEntry
+                        <ListJournalEntry
                           entry={entry}
                           busy={busyEntryId === entry.id}
                           isHidden={isEntryHidden(entry)}
@@ -2692,7 +2965,7 @@ export default function JournalTimeline({
                             onSaved={handleReplyEditSaved}
                           />
                         ) : (
-                          <NotebookJournalEntry
+                          <ListJournalEntry
                             key={reply.id}
                             entry={reply}
                             busy={busyEntryId === reply.id}
@@ -2715,6 +2988,103 @@ export default function JournalTimeline({
             </section>
           ))}
         </div>
+      ) : layout === "pages" && bookViewEntries.length > 0 ? (
+        <BookView
+          title={bookViewTitle}
+          subtitle={bookViewSubtitle}
+          entries={bookViewEntries}
+          className={className}
+          renderComposer={() => (
+            <>
+              {editingEntry && (
+                <div className="mx-auto w-full max-w-5xl">
+                  <InlineEditEntryComposer
+                    entry={editingEntry}
+                    onCancel={() => setEditingEntry(null)}
+                    onSaved={(_editedEntry, note, options) => {
+                      handleEditingEntrySaved(note, options);
+                    }}
+                  />
+                </div>
+              )}
+              {inlineComposer && (
+                <InlineJournalEntryComposer
+                  open={inlineComposer.open}
+                  entity={inlineComposer.entity}
+                  initialBookId={inlineComposer.initialBookId}
+                  onCancel={() => inlineComposer.onOpenChange(false)}
+                  onSaved={handleInlineComposerSaved}
+                />
+              )}
+            </>
+          )}
+          renderEntry={(entry) => {
+            const timelineReplies = timelineRepliesByParentId[entry.sourceId] ?? [];
+            const isFinalEntrySegment = entry.segmentIndex === entry.segmentCount - 1;
+            const composerOpen = isFinalEntrySegment && composerParentEntry?.sourceId === entry.sourceId;
+
+            return (
+              <div
+                id={entry.isContinuation ? `${journalEntryElementId(entry.sourceId)}-part-${entry.segmentIndex + 1}` : journalEntryElementId(entry.sourceId)}
+                tabIndex={-1}
+                className={cn(
+                  "scroll-mt-24 space-y-4 rounded-sm outline-none",
+                  selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
+                )}
+              >
+                <BookViewJournalEntry
+                  entry={entry}
+                  busy={busyEntryId === entry.id}
+                  isHidden={isEntryHidden(entry)}
+                  attachedCount={attachedCountForEntry(entry)}
+                  onToggleSaved={(item) => void handleToggleSaved(item)}
+                  onReply={startReply}
+                  onAttach={startAttaching}
+                  onUnattach={requestUnattachNote}
+                  onToggleHidden={toggleEntryHidden}
+                  onEdit={startEditing}
+                  onDelete={requestTimelineDelete}
+                  parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
+                  allowAttach={(timelineRepliesByParentId[entry.sourceId]?.length ?? 0) === 0}
+                />
+                {isFinalEntrySegment && (
+                  <InlineAddEntryComposer
+                    parentEntry={entry}
+                    open={composerOpen}
+                    onCancel={() => setComposerParentEntry(null)}
+                    onSaved={handleComposerEntrySaved}
+                  />
+                )}
+                {isFinalEntrySegment && timelineReplies.map((reply) => (
+                  editingReplyEntry?.id === reply.id ? (
+                    <InlineEditReplyComposer
+                      key={reply.id}
+                      entry={reply}
+                      generatedParentEntry={null}
+                      onCancel={() => setEditingReplyEntry(null)}
+                      onSaved={handleReplyEditSaved}
+                    />
+                  ) : (
+                    <BookViewJournalEntry
+                      key={reply.id}
+                      entry={manualEntryToSingleBookViewSegment(reply)}
+                      busy={busyEntryId === reply.id}
+                      isHidden={isEntryHidden(reply)}
+                      onToggleSaved={(item) => void handleToggleSaved(item)}
+                      onAttach={startAttaching}
+                      onUnattach={requestUnattachNote}
+                      onToggleHidden={toggleEntryHidden}
+                      onEdit={startEditing}
+                      onDelete={requestNoteDelete}
+                      allowAttach
+                      indented
+                    />
+                  )
+                ))}
+              </div>
+            );
+          }}
+        />
       ) : splitEntries.visible.length > 0 ? (
         <div className={cn(layout === "cards" ? "grid gap-3 md:grid-cols-2" : "space-y-4", className)}>
           {inlineComposer && layout !== "cards" && (
@@ -2747,13 +3117,12 @@ export default function JournalTimeline({
                 {parentContextLabelsByEntryId.has(entry.id) && (
                   <p className="text-xs text-muted-foreground">with {parentContextLabelsByEntryId.get(entry.id)}</p>
                 )}
-                {isManualEntry(entry) && editingEntry?.id === entry.id ? (
+                {isManualEntry(entry) && editingEntry?.sourceId === entry.sourceId ? (
                   <InlineEditEntryComposer
                     entry={entry}
                     onCancel={() => setEditingEntry(null)}
-                    onSaved={(editedEntry, note) => {
-                      handleEditingEntrySaved(note);
-                      setEditingEntry((current) => (current?.id === editedEntry.id ? null : current));
+                    onSaved={(_editedEntry, note, options) => {
+                      handleEditingEntrySaved(note, options);
                     }}
                   />
                 ) : previewMode ? (
@@ -2816,14 +3185,14 @@ export default function JournalTimeline({
                     "before:absolute before:left-3 before:top-6 before:-bottom-4 before:w-px before:bg-border",
                 )}
               >
-                {isManualEntry(entry) && editingEntry?.id === entry.id ? (
+                {isManualEntry(entry) && editingEntry?.sourceId === entry.sourceId ? (
                   <TimelineInlineEditReplyComposerRow
                     entry={entry}
                     generatedParentEntry={null}
                     onCancel={() => setEditingEntry(null)}
                     onSaved={(editedEntry, note) => {
                       handleEditingEntrySaved(note);
-                      setEditingEntry((current) => (current?.id === editedEntry.id ? null : current));
+                      setEditingEntry((current) => (current?.sourceId === editedEntry.sourceId ? null : current));
                     }}
                   />
                 ) : (

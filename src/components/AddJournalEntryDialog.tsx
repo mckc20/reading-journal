@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { PlusCircle, X } from "lucide-react";
+import { ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +14,19 @@ import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { createBookJournalEntryRecord, updateBookJournalEntryRecord } from "@/lib/bookJournal";
 import { createAuthorJournalEntryRecord, updateAuthorJournalEntryRecord } from "@/lib/authorJournal";
+import {
+  detachJournalEntryMediaItem,
+  journalParagraphCount,
+  nextJournalMediaPosition,
+  removeLegacyJournalMediaReferences,
+  sourceForJournalEntryRecord,
+  updateJournalEntryMediaItem,
+  uploadJournalImage,
+} from "@/lib/journalMedia";
 import { isInternalJournalTag, normalizeJournalTags, visibleJournalTags } from "@/lib/journalTags";
 import { createSeriesJournalEntryRecord, updateSeriesJournalEntryRecord } from "@/lib/seriesJournal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
-import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
+import type { AuthorJournalEntryRecord, BookJournalEntryRecord, JournalEntryMediaItem, SeriesJournalEntryRecord } from "@/types";
 
 interface AddJournalEntryDialogProps {
   open: boolean;
@@ -54,6 +63,7 @@ interface JournalEntryFormProps {
   onEditorBlur?: (note?: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null) => void;
   onCancel: () => void;
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
+  onSubmitSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
 
 type ManualJournalEntryType = "quote" | "thought";
@@ -177,6 +187,7 @@ export function JournalEntryForm({
   onEditorBlur,
   onCancel,
   onSaved,
+  onSubmitSaved,
 }: JournalEntryFormProps) {
   const { user } = useAuth();
   const { books } = useBooksContext();
@@ -234,13 +245,18 @@ export function JournalEntryForm({
   const tagDraft = watch("tagDraft");
   const formValues = watch();
   const formRef = useRef<HTMLFormElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const draftSaveReadyRef = useRef(false);
   const autosaveReadyRef = useRef(false);
   const autosaveSignatureRef = useRef("");
   const [autosaveEntry, setAutosaveEntry] = useState<BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null>(initialEntry);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const [mediaItems, setMediaItems] = useState<JournalEntryMediaItem[]>(initialEntry?.media ?? []);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const isInline = variant === "inline";
+  const paragraphCount = useMemo(() => journalParagraphCount(content), [content]);
   const hiddenInitialTags = useMemo(
     () =>
       normalizeJournalTags(initialEntry?.tags)
@@ -287,7 +303,7 @@ export function JournalEntryForm({
       entityId,
       entryType: isQuote ? "quote" : "thought",
       attribution: isQuote && initialEntry ? initialEntry.attribution ?? "" : "",
-      content: initialEntry?.content ?? "",
+      content: removeLegacyJournalMediaReferences(initialEntry?.content ?? ""),
       pageStart: preferInitialPageAndDate
         ? initialPageStart ? String(initialPageStart) : ""
         : "page_start" in (initialEntry ?? {}) && initialEntry?.page_start ? String(initialEntry.page_start) : initialPageStart ? String(initialPageStart) : "",
@@ -307,6 +323,8 @@ export function JournalEntryForm({
     setAutosaveEntry(initialEntry);
     setAutosaveStatus(initialEntry ? "saved" : "idle");
     setAutosaveError(null);
+    setMediaItems(initialEntry?.media ?? []);
+    setMediaError(null);
     reset(draft ? { ...initialValues, ...draft } : initialValues);
     const timeoutId = window.setTimeout(() => {
       draftSaveReadyRef.current = true;
@@ -322,6 +340,8 @@ export function JournalEntryForm({
 
   function resetForm() {
     removeJournalEntryDraft(draftKey);
+    setMediaItems([]);
+    setMediaError(null);
     reset({
       bookId: initialBookId,
       entityId,
@@ -373,7 +393,7 @@ export function JournalEntryForm({
       const fields = {
         label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
         attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
-        content: values.content,
+        content: removeLegacyJournalMediaReferences(values.content),
         tags: normalizedTags,
         pageStart: values.pageStart,
         noteDate: values.noteDate,
@@ -395,7 +415,7 @@ export function JournalEntryForm({
       const fields = {
         label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
         attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
-        content: values.content,
+        content: removeLegacyJournalMediaReferences(values.content),
         tags: normalizedTags,
         pageStart: values.pageStart,
         noteDate: values.noteDate,
@@ -415,7 +435,7 @@ export function JournalEntryForm({
     } else {
       const fields = {
         label: values.entryType === "quote" ? ("quote" as const) : ("note" as const),
-        content: values.content,
+        content: removeLegacyJournalMediaReferences(values.content),
         attribution: values.entryType === "quote" ? values.attribution || undefined : undefined,
         tags: normalizedTags,
         pageStart: values.pageStart,
@@ -439,7 +459,9 @@ export function JournalEntryForm({
   async function onSubmit(values: FormValues) {
     try {
       const note = await saveJournalEntry(values, autosaveEntry ?? initialEntry);
-      onSaved?.(note);
+      const noteWithMedia = { ...note, media: mediaItems };
+      onSaved?.(noteWithMedia);
+      onSubmitSaved?.(noteWithMedia);
       resetForm();
     } catch (submitError) {
       setError("root", {
@@ -480,7 +502,7 @@ export function JournalEntryForm({
           });
           setAutosaveStatus("saved");
           removeJournalEntryDraft(draftKey);
-          onSaved?.(note);
+          onSaved?.({ ...note, media: mediaItems });
         })
         .catch((saveError) => {
           setAutosaveStatus("error");
@@ -512,8 +534,8 @@ export function JournalEntryForm({
       .then((note) => {
         setAutosaveStatus("saved");
         removeJournalEntryDraft(draftKey);
-        onSaved?.(note);
-        onEditorBlur?.(note);
+        onSaved?.({ ...note, media: mediaItems });
+        onEditorBlur?.({ ...note, media: mediaItems });
       })
       .catch((saveError) => {
         setAutosaveStatus("error");
@@ -537,12 +559,105 @@ export function JournalEntryForm({
         });
         setAutosaveStatus("saved");
         removeJournalEntryDraft(draftKey);
-        onSaved?.(note);
+        onSaved?.({ ...note, media: mediaItems });
+        onSubmitSaved?.({ ...note, media: mediaItems });
       })
       .catch((saveError) => {
         setAutosaveStatus("error");
         setAutosaveError(saveError instanceof Error ? saveError.message : "Could not save this entry.");
       });
+  }
+
+  function updateSavedEntryMedia(
+    nextMedia: JournalEntryMediaItem[],
+    entryOverride?: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord | null,
+  ) {
+    const currentEntry = entryOverride ?? autosaveEntry ?? initialEntry;
+    if (!currentEntry) return;
+    const nextEntry = { ...currentEntry, media: nextMedia };
+    setAutosaveEntry(nextEntry);
+    onSaved?.(nextEntry);
+  }
+
+  async function handleImageSelected(file: File | undefined) {
+    if (!file) return;
+
+    if (!user) {
+      setMediaError("You must be signed in.");
+      return;
+    }
+
+    if (!content.trim()) {
+      setMediaError("Write the journal entry text before adding an image.");
+      return;
+    }
+
+    setUploadingImage(true);
+    setMediaError(null);
+
+    try {
+      const note = await saveJournalEntry(formValues, autosaveEntry ?? initialEntry);
+      setAutosaveEntry(note);
+      onSaved?.(note);
+
+      const uploaded = await uploadJournalImage({
+        userId: user.id,
+        journalEntrySource: sourceForJournalEntryRecord(note),
+        journalEntryId: note.id,
+        file,
+        position: nextJournalMediaPosition(content),
+      });
+      const nextMedia = [...(note.media ?? mediaItems), uploaded].sort((a, b) => {
+        const positionCompare = a.position - b.position;
+        if (positionCompare !== 0) return positionCompare;
+        return a.created_at.localeCompare(b.created_at);
+      });
+      setMediaItems(nextMedia);
+      updateSavedEntryMedia(nextMedia, note);
+      removeJournalEntryDraft(draftKey);
+    } catch (uploadError) {
+      setMediaError(uploadError instanceof Error ? uploadError.message : "Could not add this image.");
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    }
+  }
+
+  async function updateMediaItem(
+    item: JournalEntryMediaItem,
+    changes: Partial<Pick<JournalEntryMediaItem, "caption" | "position">>,
+  ) {
+    const nextItem = {
+      ...item,
+      ...changes,
+    };
+    const nextMedia = mediaItems
+      .map((mediaItem) => (mediaItem.id === item.id ? nextItem : mediaItem))
+      .sort((a, b) => {
+        const positionCompare = a.position - b.position;
+        if (positionCompare !== 0) return positionCompare;
+        return a.created_at.localeCompare(b.created_at);
+      });
+    setMediaItems(nextMedia);
+    updateSavedEntryMedia(nextMedia);
+    try {
+      await updateJournalEntryMediaItem(nextItem);
+    } catch (updateError) {
+      setMediaError(updateError instanceof Error ? updateError.message : "Could not update this image.");
+    }
+  }
+
+  async function removeMediaItem(item: JournalEntryMediaItem) {
+    const nextMedia = mediaItems.filter((mediaItem) => mediaItem.id !== item.id);
+    setMediaItems(nextMedia);
+    updateSavedEntryMedia(nextMedia);
+    try {
+      await detachJournalEntryMediaItem(item);
+    } catch (deleteError) {
+      setMediaItems(mediaItems);
+      updateSavedEntryMedia(mediaItems);
+      setMediaError(deleteError instanceof Error ? deleteError.message : "Could not remove this image.");
+    }
   }
 
   return (
@@ -573,10 +688,92 @@ export function JournalEntryForm({
                   value={content}
                   placeholder={entryType === "quote" ? "Write the quote..." : "Start writing..."}
                   minHeightClassName="min-h-56"
+                  media={mediaItems}
                   onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
                 />
               )}
               {errors.content && <p className="mt-1 text-xs text-destructive">{errors.content.message}</p>}
+
+              <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Label className="text-xs">Images</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(event) => void handleImageSelected(event.target.files?.[0])}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-2"
+                      disabled={uploadingImage || !content.trim()}
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                      {uploadingImage ? "Adding..." : "Add image"}
+                    </Button>
+                  </div>
+                </div>
+
+                {mediaItems.length > 0 && (
+                  <div className="space-y-3">
+                    {mediaItems.map((item) => (
+                      <div key={item.id} className="grid gap-3 border-l-2 border-primary/30 pl-3 sm:grid-cols-[7rem_1fr]">
+                        <img
+                          src={item.thumbnailUrl ?? item.url}
+                          alt={item.caption?.trim() || item.media_attachment.file_name}
+                          className="h-28 w-full rounded-md object-cover"
+                        />
+                        <div className="min-w-0 space-y-2">
+                          <Input
+                            value={item.caption ?? ""}
+                            placeholder="Caption"
+                            className="h-9"
+                            onChange={(event) => {
+                              const caption = event.target.value;
+                              setMediaItems((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, caption } : mediaItem));
+                            }}
+                            onBlur={(event) => void updateMediaItem(item, { caption: event.target.value })}
+                          />
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>Placement</span>
+                            <Select
+                              value={String(Math.min(Math.max(1, item.position), Math.max(1, paragraphCount)))}
+                              onValueChange={(value) => void updateMediaItem(item, { position: Number(value) })}
+                            >
+                              <SelectTrigger className="h-8 w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: Math.max(1, paragraphCount) }, (_, index) => (
+                                  <SelectItem key={index + 1} value={String(index + 1)}>
+                                    {paragraphCount === 0 ? "After text" : `After paragraph ${index + 1}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              aria-label="Remove image"
+                              onClick={() => void removeMediaItem(item)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
+              </div>
 
               <details className="group mt-5 border-t border-border/60 pt-4" open={isInline || (!hideEntitySelector && !entityId)}>
                 <summary
@@ -855,6 +1052,9 @@ export default function AddJournalEntryDialog({
           replaceSystemTagPrefixes={replaceSystemTagPrefixes}
           onCancel={() => onOpenChange(false)}
           onSaved={(note) => {
+            onSaved?.(note);
+          }}
+          onSubmitSaved={(note) => {
             onSaved?.(note);
             onOpenChange(false);
           }}

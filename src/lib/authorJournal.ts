@@ -1,4 +1,5 @@
 import type { AuthorJournalEntryRecord, JournalEntryLabel } from "@/types";
+import { withJournalMedia } from "@/lib/journalMedia";
 
 export interface CreateAuthorJournalEntryRecordInput {
   authorId: string;
@@ -156,7 +157,7 @@ export async function fetchAuthorJournalEntryRecords(authorId: string): Promise<
     .order("created_at", { ascending: false });
 
   if (error) throw authorJournalEntryErrorToError(error);
-  return sortAuthorJournalEntryRecords((data ?? []) as AuthorJournalEntryRecord[]);
+  return sortAuthorJournalEntryRecords(await withJournalMedia("author_note", (data ?? []) as AuthorJournalEntryRecord[]));
 }
 
 export async function createAuthorJournalEntryRecord(input: CreateAuthorJournalEntryRecordInput): Promise<AuthorJournalEntryRecord> {
@@ -169,7 +170,7 @@ export async function createAuthorJournalEntryRecord(input: CreateAuthorJournalE
     .single();
 
   if (error) throw authorJournalEntryErrorToError(error);
-  return data as AuthorJournalEntryRecord;
+  return (await withJournalMedia("author_note", [data as AuthorJournalEntryRecord]))[0];
 }
 
 export async function updateAuthorJournalEntryRecord(input: UpdateAuthorJournalEntryRecordInput): Promise<AuthorJournalEntryRecord> {
@@ -186,7 +187,7 @@ export async function updateAuthorJournalEntryRecord(input: UpdateAuthorJournalE
     .single();
 
   if (error) throw authorJournalEntryErrorToError(error);
-  return data as AuthorJournalEntryRecord;
+  return (await withJournalMedia("author_note", [data as AuthorJournalEntryRecord]))[0];
 }
 
 export async function deleteAuthorJournalEntryRecord(noteId: string): Promise<void> {
@@ -204,7 +205,7 @@ export async function fetchAuthorJournalEntryRecord(entryId: string): Promise<Au
     .single();
 
   if (error) throw authorJournalEntryErrorToError(error);
-  return data as AuthorJournalEntryRecord;
+  return (await withJournalMedia("author_note", [data as AuthorJournalEntryRecord]))[0];
 }
 
 export async function createAuthorJournalReply(
@@ -233,7 +234,7 @@ export async function getAuthorJournalReplies(entryId: string): Promise<AuthorJo
     .order("created_at", { ascending: true });
 
   if (error) throw authorJournalEntryErrorToError(error);
-  return (data ?? []) as AuthorJournalEntryRecord[];
+  return withJournalMedia("author_note", (data ?? []) as AuthorJournalEntryRecord[]);
 }
 
 export async function updateAuthorJournalReply(

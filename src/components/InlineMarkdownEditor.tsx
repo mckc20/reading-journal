@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import LinkExtension from "@tiptap/extension-link";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -19,6 +19,10 @@ interface InlineMarkdownEditorProps {
   onBlur?: () => void;
 }
 
+export interface InlineMarkdownEditorHandle {
+  insertTextAtCursor: (text: string) => void;
+}
+
 type SlashCommand = {
   label: string;
   Icon: typeof Heading;
@@ -30,7 +34,7 @@ function editorMarkdown(editor: NonNullable<ReturnType<typeof useEditor>>): stri
   return maybeMarkdownEditor.getMarkdown?.() ?? editor.getText();
 }
 
-export default function InlineMarkdownEditor({
+const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdownEditorProps>(function InlineMarkdownEditor({
   id,
   value,
   placeholder = "Start writing...",
@@ -39,7 +43,7 @@ export default function InlineMarkdownEditor({
   autoFocus = false,
   onChange,
   onBlur,
-}: InlineMarkdownEditorProps) {
+}, ref) {
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const extensions = useMemo(
     () => [
@@ -106,6 +110,14 @@ export default function InlineMarkdownEditor({
     if (!editor || !autoFocus) return;
     window.requestAnimationFrame(() => editor.commands.focus("end"));
   }, [autoFocus, editor]);
+
+  useImperativeHandle(ref, () => ({
+    insertTextAtCursor: (text: string) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent(`\n\n${text}\n\n`).run();
+      onChange(editorMarkdown(editor));
+    },
+  }), [editor, onChange]);
 
   if (!editor) return null;
   const activeEditor = editor;
@@ -237,4 +249,6 @@ export default function InlineMarkdownEditor({
       )}
     </div>
   );
-}
+});
+
+export default InlineMarkdownEditor;

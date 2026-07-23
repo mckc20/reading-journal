@@ -138,8 +138,8 @@ export default function BookAnnotations() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="book">Book View</SelectItem>
             <SelectItem value="list">List</SelectItem>
-            <SelectItem value="book" disabled>Book</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -152,7 +152,9 @@ export default function BookAnnotations() {
       ) : (
         <JournalTimeline
           entries={timelineEntries}
-          layout="pages"
+          layout={viewMode === "book" ? "pages" : "list"}
+          bookViewTitle={book.title}
+          bookViewSubtitle="Reading Journal"
           selectedEntryId={selectedEntryId}
           inlineComposer={{
             open: composerOpen,
