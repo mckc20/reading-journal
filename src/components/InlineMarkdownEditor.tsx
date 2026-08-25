@@ -2,10 +2,11 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "r
 import LinkExtension from "@tiptap/extension-link";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Heading, Italic, Link, List, ListOrdered, Quote } from "lucide-react";
+import JournalEntryLinkPicker from "@/components/JournalEntryLinkPicker";
 import { Button } from "@/components/ui/button";
+import type { JournalLinkTarget } from "@/lib/journalLinks";
 import { cn } from "@/lib/utils";
 
 interface InlineMarkdownEditorProps {
@@ -15,6 +16,7 @@ interface InlineMarkdownEditorProps {
   minHeightClassName?: string;
   className?: string;
   autoFocus?: boolean;
+  entryLinkTargets?: JournalLinkTarget[];
   onChange: (value: string) => void;
   onBlur?: () => void;
 }
@@ -23,15 +25,19 @@ export interface InlineMarkdownEditorHandle {
   insertTextAtCursor: (text: string) => void;
 }
 
-type SlashCommand = {
-  label: string;
-  Icon: typeof Heading;
-  run: () => void;
-};
-
 function editorMarkdown(editor: NonNullable<ReturnType<typeof useEditor>>): string {
   const maybeMarkdownEditor = editor as typeof editor & { getMarkdown?: () => string };
   return maybeMarkdownEditor.getMarkdown?.() ?? editor.getText();
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    if (char === "&") return "&amp;";
+    if (char === "<") return "&lt;";
+    if (char === ">") return "&gt;";
+    if (char === '"') return "&quot;";
+    return "&#39;";
+  });
 }
 
 const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdownEditorProps>(function InlineMarkdownEditor({
@@ -41,10 +47,11 @@ const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdo
   minHeightClassName = "min-h-32",
   className,
   autoFocus = false,
+  entryLinkTargets = [],
   onChange,
   onBlur,
 }, ref) {
-  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [entryLinkPickerOpen, setEntryLinkPickerOpen] = useState(false);
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -88,15 +95,6 @@ const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdo
     onUpdate: ({ editor: currentEditor }) => {
       const nextMarkdown = editorMarkdown(currentEditor);
       onChange(nextMarkdown);
-
-      const { from } = currentEditor.state.selection;
-      const previousCharacter = currentEditor.state.doc.textBetween(Math.max(0, from - 1), from);
-      setSlashMenuOpen(previousCharacter === "/");
-    },
-    onSelectionUpdate: ({ editor: currentEditor }) => {
-      const { from } = currentEditor.state.selection;
-      const previousCharacter = currentEditor.state.doc.textBetween(Math.max(0, from - 1), from);
-      setSlashMenuOpen(previousCharacter === "/");
     },
   });
 
@@ -128,131 +126,75 @@ const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdo
   if (!editor) return null;
   const activeEditor = editor;
 
-  function removeSlashTrigger() {
-    const { from } = activeEditor.state.selection;
-    const previousCharacter = activeEditor.state.doc.textBetween(Math.max(0, from - 1), from);
-    if (previousCharacter === "/") {
-      activeEditor.chain().focus().deleteRange({ from: from - 1, to: from }).run();
-    } else {
-      activeEditor.chain().focus().run();
-    }
-    setSlashMenuOpen(false);
+  function openLinkPicker() {
+    setEntryLinkPickerOpen((current) => !current);
   }
 
-  function applyLink() {
-    const existing = activeEditor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("Link URL", existing ?? "https://");
-    if (url === null) return;
-    if (!url.trim()) {
-      activeEditor.chain().focus().unsetLink().run();
+  function removeActiveLink() {
+    activeEditor.chain().focus().extendMarkRange("link").unsetLink().run();
+  }
+
+  function applyEntryLink(target: JournalLinkTarget) {
+    const { empty } = activeEditor.state.selection;
+    setEntryLinkPickerOpen(false);
+
+    if (empty) {
+      activeEditor
+        .chain()
+        .focus()
+        .insertContent(`<a href="${escapeHtmlAttribute(target.href)}">${escapeHtmlAttribute(target.label)}</a>`)
+        .run();
       return;
     }
-    activeEditor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+
+    activeEditor.chain().focus().extendMarkRange("link").setLink({ href: target.href }).run();
   }
 
-  const slashCommands: SlashCommand[] = [
-    {
-      label: "Heading",
-      Icon: Heading,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleHeading({ level: 1 }).run();
-      },
-    },
-    {
-      label: "Bold",
-      Icon: Bold,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleBold().run();
-      },
-    },
-    {
-      label: "Italic",
-      Icon: Italic,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleItalic().run();
-      },
-    },
-    {
-      label: "Quote",
-      Icon: Quote,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleBlockquote().run();
-      },
-    },
-    {
-      label: "Bullet list",
-      Icon: List,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleBulletList().run();
-      },
-    },
-    {
-      label: "Numbered list",
-      Icon: ListOrdered,
-      run: () => {
-        removeSlashTrigger();
-        activeEditor.chain().focus().toggleOrderedList().run();
-      },
-    },
-    {
-      label: "Link",
-      Icon: Link,
-      run: () => {
-        removeSlashTrigger();
-        applyLink();
-      },
-    },
-  ];
-
   return (
-    <div className={cn("relative", className)}>
-      <EditorContent editor={activeEditor} />
-      {!value.trim() && (
-        <p className="pointer-events-none absolute left-0 top-0 text-base leading-8 text-muted-foreground">
-          {placeholder}
-        </p>
-      )}
-
-      <BubbleMenu
-        editor={activeEditor}
-        className="flex items-center gap-0.5 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
-        shouldShow={({ editor: currentEditor }: { editor: typeof activeEditor }) => !currentEditor.state.selection.empty}
-      >
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Bold" onClick={() => activeEditor.chain().focus().toggleBold().run()}>
+    <div className={cn("relative rounded-md border bg-surface", className)}>
+      <div className="flex flex-wrap items-center gap-1 border-b p-2">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Heading" title="Heading" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleHeading({ level: 1 }).run()}>
+          <Heading className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Bold" title="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleBold().run()}>
           <Bold className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Italic" onClick={() => activeEditor.chain().focus().toggleItalic().run()}>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Italic" title="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleItalic().run()}>
           <Italic className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Quote" onClick={() => activeEditor.chain().focus().toggleBlockquote().run()}>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Quote" title="Quote" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleBlockquote().run()}>
           <Quote className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Link" onClick={applyLink}>
-          <Link className="h-4 w-4" />
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Bullet list" title="Bullet list" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleBulletList().run()}>
+          <List className="h-4 w-4" />
         </Button>
-      </BubbleMenu>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Numbered list" title="Numbered list" onMouseDown={(event) => event.preventDefault()} onClick={() => activeEditor.chain().focus().toggleOrderedList().run()}>
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        <JournalEntryLinkPicker
+          open={entryLinkPickerOpen}
+          targets={entryLinkTargets}
+          canRemoveLink={activeEditor.isActive("link")}
+          onOpenChange={setEntryLinkPickerOpen}
+          onRemoveLink={removeActiveLink}
+          onSelect={applyEntryLink}
+          trigger={(
+            <Button type="button" variant="ghost" size="icon-sm" aria-label="Link" title="Link" onMouseDown={(event) => event.preventDefault()} onClick={openLinkPicker}>
+              <Link className="h-4 w-4" />
+            </Button>
+          )}
+        />
+      </div>
 
-      {slashMenuOpen && (
-        <div className="absolute left-0 top-9 z-30 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
-          {slashCommands.map(({ Icon, label, run }) => (
-            <button
-              key={label}
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-hover"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={run}
-            >
-              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="relative px-3 py-3">
+        <EditorContent editor={activeEditor} />
+        {!value.trim() && (
+          <p className="pointer-events-none absolute left-3 top-3 text-base leading-8 text-muted-foreground">
+            {placeholder}
+          </p>
+        )}
+      </div>
+
     </div>
   );
 });

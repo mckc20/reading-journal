@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   JOURNAL_MEDIA_MAX_FILE_SIZE_BYTES,
-  journalParagraphCount,
   normalizeJournalMediaCaption,
-  nextJournalMediaPosition,
   removeLegacyJournalMediaReferences,
   sourceForJournalEntryRecord,
-  splitMarkdownIntoJournalBlocks,
+  sortJournalMedia,
   validateJournalImageFile,
 } from "../src/lib/journalMedia";
 
@@ -43,13 +41,6 @@ test("normalizeJournalMediaCaption trims empty captions to null", () => {
   assert.equal(normalizeJournalMediaCaption(null), null);
 });
 
-test("journal paragraph helpers count paragraphs and choose the last paragraph for new media", () => {
-  assert.equal(journalParagraphCount("One\n\nTwo\n\n\nThree"), 3);
-  assert.equal(journalParagraphCount("   "), 0);
-  assert.equal(nextJournalMediaPosition("One\n\nTwo"), 2);
-  assert.equal(nextJournalMediaPosition("   "), 1);
-});
-
 test("removeLegacyJournalMediaReferences strips old internal markdown image tokens", () => {
   assert.equal(
     removeLegacyJournalMediaReferences("Before\n\n![One](journal-media:media-1)\n\nAfter\n\n\\![Two]( journal-media:media-2 )"),
@@ -57,23 +48,14 @@ test("removeLegacyJournalMediaReferences strips old internal markdown image toke
   );
 });
 
-test("splitMarkdownIntoJournalBlocks places media after their assigned paragraph", () => {
+test("sortJournalMedia orders media by saved attachment order", () => {
   const media = [
     { id: "media-2", position: 2, created_at: "2026-01-02T00:00:00Z" },
     { id: "media-1", position: 1, created_at: "2026-01-01T00:00:00Z" },
+    { id: "media-3", position: 2, created_at: "2026-01-01T00:00:00Z" },
   ];
-  const blocks = splitMarkdownIntoJournalBlocks(
-    "First paragraph.\n\nSecond paragraph.",
-    media as never,
-  );
 
-  assert.deepEqual(blocks.map((block) => ({
-    markdown: block.markdown,
-    mediaIds: block.media.map((item) => item.id),
-  })), [
-    { markdown: "First paragraph.", mediaIds: ["media-1"] },
-    { markdown: "Second paragraph.", mediaIds: ["media-2"] },
-  ]);
+  assert.deepEqual(sortJournalMedia(media as never).map((item) => item.id), ["media-1", "media-3", "media-2"]);
 });
 
 test("sourceForJournalEntryRecord maps journal records to media sources", () => {

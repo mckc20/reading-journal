@@ -27,7 +27,6 @@ import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import JournalEntryCard from "@/components/JournalEntryCard";
-import BookView, { type BookViewEntry } from "@/components/journal-book/BookView";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,7 +69,7 @@ import {
   type JournalTimelineEntry,
   type SeriesJournalEntryRecordJournalEntry,
 } from "@/lib/journal";
-import type { JournalBookPaginatedItem } from "@/lib/journalBookPagination";
+import type { JournalLinkTarget } from "@/lib/journalLinks";
 import {
   deleteSeriesJournalEntryRecord,
   getSeriesJournalReplies,
@@ -80,16 +79,14 @@ import { cn } from "@/lib/utils";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 interface JournalTimelineProps {
   entries: JournalTimelineEntry[];
   generatedReferenceEntries?: GeneratedBookJournalEntry[];
   emptyMessage?: string;
   className?: string;
-  layout?: "timeline" | "cards" | "pages" | "list";
-  bookViewTitle?: string;
-  bookViewSubtitle?: string;
+  layout?: "timeline" | "cards" | "list";
   sortMode?: "entry-date" | "date-added" | "book-progress";
   selectedEntryId?: string | null;
   previewMode?: {
@@ -108,10 +105,6 @@ interface JournalTimelineProps {
 }
 
 type ManualJournalTimelineEntry = BookJournalEntryRecordJournalEntry | SeriesJournalEntryRecordJournalEntry | AuthorJournalEntryRecordJournalEntry;
-type BookViewTimelineEntry = ManualJournalTimelineEntry & BookViewEntry & {
-  startsDateGroup?: boolean;
-};
-type BookViewPaginatedTimelineEntry = JournalBookPaginatedItem<BookViewTimelineEntry>;
 type GeneratedSession = NonNullable<NonNullable<GeneratedBookJournalEntry["metadata"]>["sessions"]>[number];
 type GeneratedNoteTarget = {
   entry: GeneratedBookJournalEntry;
@@ -1302,208 +1295,6 @@ function TimelineReplyRow({
   );
 }
 
-function BookViewEntryContent({ entry }: { entry: BookViewPaginatedTimelineEntry }) {
-  const note = getManualNote(entry);
-  const title = displayEntryTitle(entry);
-  const isFinalSegment = entry.segmentIndex === entry.segmentCount - 1;
-  const displayContent = getBookViewSegmentMarkdown(entry);
-
-  if (entry.type === "passage") {
-    return (
-      <QuoteBlock
-        attribution={
-          note.attribution && isFinalSegment ? (
-            <span className="font-serif italic">- {note.attribution}</span>
-          ) : null
-        }
-        className="gap-x-2"
-        markClassName="text-muted-foreground/40"
-      >
-        <JournalEntryMediaContent
-          markdown={displayContent}
-          media={isFinalSegment ? getManualNoteMedia(entry) : []}
-          className="text-base leading-8 text-foreground"
-          imageClassName="max-h-72"
-        />
-      </QuoteBlock>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {title && !entry.isContinuation && <h3 className="font-heading text-xl font-medium leading-snug">{title}</h3>}
-      <JournalEntryMediaContent
-        markdown={displayContent}
-        media={isFinalSegment ? getManualNoteMedia(entry) : []}
-        className="text-base leading-8 text-foreground"
-        imageClassName="max-h-72"
-      />
-    </div>
-  );
-}
-
-function isInsideMarkdownBlockquote(markdown: string, offset: number): boolean {
-  if (offset <= 0) return false;
-
-  const beforeSegment = markdown.slice(0, offset);
-  const blockStart = beforeSegment.lastIndexOf("\n\n") + 2;
-  const lineStart = beforeSegment.lastIndexOf("\n") + 1;
-  const currentLinePrefix = markdown.slice(lineStart, offset);
-
-  if (/^\s*>\s?/.test(currentLinePrefix)) return true;
-
-  const previousLinesInBlock = markdown.slice(blockStart, offset).split("\n").filter((line) => line.trim().length > 0);
-  return previousLinesInBlock.some((line) => /^\s*>\s?/.test(line));
-}
-
-function getBookViewSegmentMarkdown(entry: BookViewPaginatedTimelineEntry): string {
-  const repairedContent = repairSplitInlineMarkdown(entry);
-  if (!entry.isContinuation || /^\s*>/.test(repairedContent)) return repairedContent;
-
-  const originalContent = getManualNote(entry).content;
-  const sourceStart = entry.sourceStart ?? 0;
-  if (!isInsideMarkdownBlockquote(originalContent, sourceStart)) return repairedContent;
-
-  return `> ${repairedContent}`;
-}
-
-function isEscapedMarkdownCharacter(markdown: string, index: number): boolean {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && markdown[cursor] === "\\"; cursor -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
-}
-
-function hasOpenInlineDelimiterBefore(markdown: string, offset: number, delimiter: "*" | "_" | "**" | "__"): boolean {
-  const delimiterCharacter = delimiter[0];
-  const delimiterLength = delimiter.length;
-  let count = 0;
-
-  for (let index = 0; index < offset;) {
-    if (markdown[index] !== delimiterCharacter || isEscapedMarkdownCharacter(markdown, index)) {
-      index += 1;
-      continue;
-    }
-
-    let runLength = 0;
-    while (index + runLength < offset && markdown[index + runLength] === delimiterCharacter) {
-      runLength += 1;
-    }
-
-    count += delimiterLength === 1 ? runLength % 2 : Math.floor(runLength / delimiterLength);
-    index += runLength;
-  }
-
-  return count % 2 === 1;
-}
-
-function repairSplitInlineMarkdown(entry: BookViewPaginatedTimelineEntry): string {
-  const originalContent = getManualNote(entry).content;
-  const sourceStart = entry.sourceStart ?? 0;
-  const sourceEnd = entry.sourceEnd ?? sourceStart + entry.content.length;
-  let content = entry.content;
-
-  (["**", "__", "*", "_"] as const).forEach((delimiter) => {
-    const startsInsideDelimiter = sourceStart > 0 && hasOpenInlineDelimiterBefore(originalContent, sourceStart, delimiter);
-    const endsInsideDelimiter = sourceEnd < originalContent.length && hasOpenInlineDelimiterBefore(originalContent, sourceEnd, delimiter);
-
-    if (startsInsideDelimiter) content = `${delimiter}${content}`;
-    if (endsInsideDelimiter) content = `${content}${delimiter}`;
-  });
-
-  return content;
-}
-
-function BookViewEntryMeta({ entry, parentContextLabel }: { entry: BookViewPaginatedTimelineEntry; parentContextLabel?: string | null }) {
-  if (entry.segmentIndex !== entry.segmentCount - 1) return null;
-
-  const note = getManualNote(entry);
-  const details = [
-    entryPage(entry),
-    parentContextLabel ? `with ${parentContextLabel}` : null,
-    isBookJournalEntryRecordEntry(entry) && entry.relatedBookTitle && entry.relatedContext ? entry.relatedBookTitle : null,
-  ].filter((detail): detail is string => Boolean(detail));
-  const tags = visibleJournalTags(normalizeJournalTags(note.tags));
-
-  if (details.length === 0 && tags.length === 0) return null;
-
-  return (
-    <EntryMetadataLine details={details} tags={tags} />
-  );
-}
-
-function BookViewJournalEntry({
-  entry,
-  busy,
-  isHidden,
-  attachedCount = 0,
-  onToggleSaved,
-  onReply,
-  onAttach,
-  onUnattach,
-  onToggleHidden,
-  onEdit,
-  onDelete,
-  parentContextLabel,
-  allowAttach = true,
-  indented = false,
-}: {
-  entry: BookViewPaginatedTimelineEntry;
-  busy: boolean;
-  isHidden: boolean;
-  attachedCount?: number;
-  onToggleSaved: (entry: JournalTimelineEntry) => void;
-  onReply?: (entry: JournalTimelineEntry) => void;
-  onAttach: (entry: ManualJournalTimelineEntry) => void;
-  onUnattach: (entry: ManualJournalTimelineEntry) => void;
-  onToggleHidden: (entry: JournalTimelineEntry) => void;
-  onEdit: (entry: ManualJournalTimelineEntry) => void;
-  onDelete: (entry: ManualJournalTimelineEntry) => void;
-  parentContextLabel?: string | null;
-  allowAttach?: boolean;
-  indented?: boolean;
-}) {
-  return (
-    <>
-      {entry.startsDateGroup && !entry.isContinuation && (
-        <header className="border-b border-border/70 pb-3 pt-1">
-          <h2 className="font-heading text-2xl font-medium leading-tight">
-            {formatJournalDate(entry.date)}
-          </h2>
-        </header>
-      )}
-      <article
-        className={cn(
-          "group/notebook relative border-b border-border/60 py-6 last:border-b-0",
-          indented && "ml-6 border-l border-border/60 pl-5",
-        )}
-      >
-        <div className="absolute right-0 top-5 z-10 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/notebook:opacity-100 sm:group-focus-within/notebook:opacity-100">
-          <TimelineTopActions
-            entry={entry}
-            busy={busy}
-            isHidden={isHidden}
-            attachedCount={attachedCount}
-            onToggleSaved={onToggleSaved}
-            onReply={onReply}
-            onAttach={onAttach}
-            onUnattach={onUnattach}
-            onToggleHidden={onToggleHidden}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            allowAttach={allowAttach}
-          />
-        </div>
-        <div className="pr-16">
-          <BookViewEntryContent entry={entry} />
-          <BookViewEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
-        </div>
-      </article>
-    </>
-  );
-}
-
 function ListJournalEntry({
   entry,
   busy,
@@ -1713,6 +1504,40 @@ function journalEntryElementId(entryId: string): string {
   return `journal-entry-${entryId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
+function journalEntryHref(entry: ManualJournalTimelineEntry): string {
+  if (isBookJournalEntryRecordEntry(entry)) {
+    return `/books/${encodeURIComponent(entry.bookJournalEntry.book_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
+  }
+  if (isSeriesJournalEntryRecordEntry(entry)) {
+    return `/series/${encodeURIComponent(entry.seriesJournalEntry.series_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
+  }
+  return `/authors/${encodeURIComponent(entry.authorJournalEntry.author_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
+}
+
+function journalEntryLinkPreview(entry: ManualJournalTimelineEntry): string {
+  const content = entryContentText(entry)
+    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
+    .replace(/[#*_>`~\-\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return content.length > 90 ? `${content.slice(0, 87).trim()}...` : content;
+}
+
+function journalEntryLinkTarget(entry: ManualJournalTimelineEntry): JournalLinkTarget {
+  const page = entryPage(entry);
+  const formattedDate = formatJournalDate(entryDate(entry));
+  const descriptionParts = [page, journalEntryLinkPreview(entry)].filter(Boolean);
+
+  return {
+    id: entry.id,
+    label: `${entryTitle(entry)} · ${formattedDate}`,
+    description: descriptionParts.join(" · "),
+    href: journalEntryHref(entry),
+  };
+}
+
 function getEntryVisibilityInput(entry: JournalTimelineEntry) {
   return {
     entityType: entry.entityType,
@@ -1742,11 +1567,13 @@ function manualRecordToJournalEntry(
 function InlineAddEntryComposer({
   parentEntry,
   open,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   parentEntry: ManualJournalTimelineEntry;
   open: boolean;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (parentEntry: ManualJournalTimelineEntry, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -1786,6 +1613,7 @@ function InlineAddEntryComposer({
             entity={entity}
             initialEntry={null}
             parentEntryId={parentEntry.sourceId}
+            entryLinkTargets={entryLinkTargets}
             hideEntitySelector
             onCancel={onCancel}
             onEditorBlur={(note) => {
@@ -1851,11 +1679,13 @@ function SessionTargetSelector({
 function InlineGeneratedNoteComposer({
   target,
   open,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   target: GeneratedNoteTarget;
   open: boolean;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (target: GeneratedNoteTarget, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -1918,6 +1748,7 @@ function InlineGeneratedNoteComposer({
             initialPageStart={getGeneratedTargetPage(selectedTarget)}
             initialNoteDate={getGeneratedTargetDate(selectedTarget)}
             systemTags={getGeneratedTargetTags(selectedTarget)}
+            entryLinkTargets={entryLinkTargets}
             hideEntitySelector
             onCancel={onCancel}
             onEditorBlur={(note) => {
@@ -1934,11 +1765,13 @@ function InlineGeneratedNoteComposer({
 function InlineEditReplyComposer({
   entry,
   generatedParentEntry,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   entry: ManualJournalTimelineEntry;
   generatedParentEntry?: GeneratedBookJournalEntry | null;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (entry: ManualJournalTimelineEntry, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -1991,6 +1824,7 @@ function InlineEditReplyComposer({
         preferInitialPageAndDate={Boolean(selectedTarget)}
         systemTags={selectedTarget ? getGeneratedTargetTags(selectedTarget) : undefined}
         replaceSystemTagPrefixes={selectedTarget ? [READING_LOG_NOTE_TAG_PREFIX] : undefined}
+        entryLinkTargets={entryLinkTargets}
         hideEntitySelector
         onCancel={onCancel}
         onEditorBlur={(note) => {
@@ -2006,12 +1840,14 @@ function InlineJournalEntryComposer({
   open,
   entity,
   initialBookId = "",
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   open: boolean;
   entity: { type: "Book"; id: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
   initialBookId?: string;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -2045,6 +1881,7 @@ function InlineJournalEntryComposer({
           initialBookId={initialBookId}
           entity={entity}
           initialEntry={null}
+          entryLinkTargets={entryLinkTargets}
           hideEntitySelector
           onCancel={onCancel}
           onSaved={(note) => {
@@ -2066,10 +1903,12 @@ function InlineJournalEntryComposer({
 
 function InlineEditEntryComposer({
   entry,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   entry: ManualJournalTimelineEntry;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (
     entry: ManualJournalTimelineEntry,
@@ -2089,6 +1928,7 @@ function InlineEditEntryComposer({
       initialBookId={initialBookId}
       entity={entity}
       initialEntry={getManualNote(entry)}
+      entryLinkTargets={entryLinkTargets}
       hideEntitySelector
       onCancel={onCancel}
       onSaved={(note) => {
@@ -2107,11 +1947,13 @@ function InlineEditEntryComposer({
 function TimelineInlineAddEntryComposerRow({
   parentEntry,
   open,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   parentEntry: ManualJournalTimelineEntry;
   open: boolean;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (parentEntry: ManualJournalTimelineEntry, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -2123,6 +1965,7 @@ function TimelineInlineAddEntryComposerRow({
         <InlineAddEntryComposer
           parentEntry={parentEntry}
           open={open}
+          entryLinkTargets={entryLinkTargets}
           onCancel={onCancel}
           onSaved={onSaved}
         />
@@ -2134,11 +1977,13 @@ function TimelineInlineAddEntryComposerRow({
 function TimelineInlineGeneratedNoteComposerRow({
   target,
   open,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   target: GeneratedNoteTarget;
   open: boolean;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (target: GeneratedNoteTarget, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -2150,6 +1995,7 @@ function TimelineInlineGeneratedNoteComposerRow({
         <InlineGeneratedNoteComposer
           target={target}
           open={open}
+          entryLinkTargets={entryLinkTargets}
           onCancel={onCancel}
           onSaved={onSaved}
         />
@@ -2161,11 +2007,13 @@ function TimelineInlineGeneratedNoteComposerRow({
 function TimelineInlineEditReplyComposerRow({
   entry,
   generatedParentEntry,
+  entryLinkTargets,
   onCancel,
   onSaved,
 }: {
   entry: ManualJournalTimelineEntry;
   generatedParentEntry?: GeneratedBookJournalEntry | null;
+  entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (entry: ManualJournalTimelineEntry, note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }) {
@@ -2177,6 +2025,7 @@ function TimelineInlineEditReplyComposerRow({
         <InlineEditReplyComposer
           entry={entry}
           generatedParentEntry={generatedParentEntry}
+          entryLinkTargets={entryLinkTargets}
           onCancel={onCancel}
           onSaved={onSaved}
         />
@@ -2201,43 +2050,12 @@ async function fetchRepliesForEntry(entry: ManualJournalTimelineEntry): Promise<
   return getAuthorJournalReplies(entry.authorJournalEntry.id).then((items) => items.map(authorJournalEntryToJournalEntry));
 }
 
-function manualEntryToBookViewEntry(
-  entry: ManualJournalTimelineEntry,
-  options: { childCount?: number } = {},
-): BookViewTimelineEntry {
-  const note = getManualNote(entry);
-  const tags = visibleJournalTags(normalizeJournalTags(note.tags));
-
-  return {
-    ...entry,
-    content: note.content,
-    date: entryDate(entry),
-    label: entryTypeLabel(entry),
-    tags,
-    tagCount: tags.length,
-    hasAttribution: Boolean(note.attribution),
-    childCount: options.childCount ?? 0,
-  };
-}
-
-function manualEntryToSingleBookViewSegment(entry: ManualJournalTimelineEntry): BookViewPaginatedTimelineEntry {
-  return {
-    ...manualEntryToBookViewEntry(entry),
-    originalId: entry.id,
-    segmentIndex: 0,
-    segmentCount: 1,
-    isContinuation: false,
-  };
-}
-
 export default function JournalTimeline({
   entries,
   generatedReferenceEntries = [],
   emptyMessage = "No journal entries yet.",
   className,
   layout = "timeline",
-  bookViewTitle = "Journal",
-  bookViewSubtitle = "Reading Journal",
   sortMode = "entry-date",
   selectedEntryId = null,
   previewMode,
@@ -2248,6 +2066,7 @@ export default function JournalTimeline({
   onEntryDeleted,
 }: JournalTimelineProps) {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editingEntry, setEditingEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [composerParentEntry, setComposerParentEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [generatedComposerTarget, setGeneratedComposerTarget] = useState<GeneratedNoteTarget | null>(null);
@@ -2262,6 +2081,9 @@ export default function JournalTimeline({
   const [hiddenEntries, setHiddenEntries] = useState<Set<string>>(new Set());
   const [hiddenSectionOpen, setHiddenSectionOpen] = useState(false);
   const [busyEntryId, setBusyEntryId] = useState<string | null>(null);
+  const [highlightedEntryId, setHighlightedEntryId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const consumedSelectedEntryIdRef = useRef<string | null>(null);
   const visibleEntries = useMemo(() => entries, [entries]);
   const generatedPanelReferenceEntries = useMemo(() => {
     const generatedEntries = new Map<string, GeneratedBookJournalEntry>();
@@ -2370,6 +2192,20 @@ export default function JournalTimeline({
 
     return groups;
   }, [visibleEntries]);
+  const journalLinkTargets = useMemo(() => {
+    const targetsById = new Map<string, JournalLinkTarget>();
+    splitEntries.visible.filter(isManualEntry).forEach((entry) => {
+      targetsById.set(entry.id, journalEntryLinkTarget(entry));
+    });
+    Object.values(timelineRepliesByParentId).flat().forEach((entry) => {
+      if (!isEntryHidden(entry)) targetsById.set(entry.id, journalEntryLinkTarget(entry));
+    });
+
+    return [...targetsById.values()];
+  }, [splitEntries.visible, timelineRepliesByParentId, hiddenEntries]);
+  const journalLinkTargetsExcept = (entry: ManualJournalTimelineEntry): JournalLinkTarget[] =>
+    journalLinkTargets.filter((target) => target.id !== entry.id);
+
   const availableAttachTargets = useMemo(() => {
     if (!attachingEntry) return [];
 
@@ -2421,15 +2257,50 @@ export default function JournalTimeline({
   }, [displayEntries, generatedPanelReferenceEntries, sortMode]);
 
   useEffect(() => {
-    if (!selectedEntryId) return;
+    return () => {
+      if (highlightTimeoutRef.current !== null) window.clearTimeout(highlightTimeoutRef.current);
+    };
+  }, []);
+
+  function showEntryHighlight(entryId: string) {
+    setHighlightedEntryId(entryId);
+    if (highlightTimeoutRef.current !== null) window.clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedEntryId((current) => (current === entryId ? null : current));
+      highlightTimeoutRef.current = null;
+    }, 3000);
+  }
+
+  function entryHighlightClassName(entryId: string): string | false {
+    return highlightedEntryId === entryId &&
+      "ring-2 ring-primary/25 ring-offset-4 ring-offset-background transition-shadow duration-500";
+  }
+
+  useEffect(() => {
+    if (!selectedEntryId) {
+      consumedSelectedEntryIdRef.current = null;
+      return;
+    }
+    if (consumedSelectedEntryIdRef.current === selectedEntryId) return;
+
     const timeoutId = window.setTimeout(() => {
       const target = document.getElementById(journalEntryElementId(selectedEntryId));
-      target?.scrollIntoView({ block: "center", behavior: "smooth" });
-      target?.focus({ preventScroll: true });
+      if (!target) return;
+
+      consumedSelectedEntryIdRef.current = selectedEntryId;
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      target.focus({ preventScroll: true });
+      showEntryHighlight(selectedEntryId);
+
+      if (searchParams.get("entry") === selectedEntryId) {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.delete("entry");
+        setSearchParams(nextSearchParams, { replace: true });
+      }
     }, 100);
 
     return () => window.clearTimeout(timeoutId);
-  }, [selectedEntryId, splitEntries.visible]);
+  }, [searchParams, selectedEntryId, setSearchParams, splitEntries.visible]);
 
   async function handleHide(entry: JournalTimelineEntry) {
     if (!user) return;
@@ -2902,6 +2773,7 @@ export default function JournalTimeline({
           open={inlineComposer.open}
           entity={inlineComposer.entity}
           initialBookId={inlineComposer.initialBookId}
+          entryLinkTargets={journalLinkTargets}
           onCancel={() => inlineComposer.onOpenChange(false)}
           onSaved={handleInlineComposerSaved}
         />
@@ -2919,19 +2791,6 @@ export default function JournalTimeline({
     return 0;
   }
 
-  const bookViewEntries: BookViewTimelineEntry[] = layout === "pages"
-    ? splitEntries.visible.filter(isManualEntry).map((entry, index, manualEntries) => {
-      const previousEntry = manualEntries[index - 1];
-      const startsDateGroup = !previousEntry || entryDate(previousEntry).slice(0, 10) !== entryDate(entry).slice(0, 10);
-
-      return {
-        ...manualEntryToBookViewEntry(entry, { childCount: attachedCountForEntry(entry) }),
-        startsDateGroup,
-        headingWeight: startsDateGroup ? 3 : 0,
-        forceNewPage: startsDateGroup,
-      };
-    })
-    : [];
   const journalListGroups = layout === "list" ? groupJournalEntriesByDate(splitEntries.visible) : [];
 
   return (
@@ -2943,6 +2802,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}
             />
@@ -2967,13 +2827,14 @@ export default function JournalTimeline({
                       id={journalEntryElementId(entry.sourceId)}
                       tabIndex={-1}
                       className={cn(
-                        "scroll-mt-24 rounded-sm outline-none",
-                        selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
+                        "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                        entryHighlightClassName(entry.sourceId),
                       )}
                     >
                       {editingEntry?.sourceId === entry.sourceId ? (
                         <InlineEditEntryComposer
                           entry={entry}
+                          entryLinkTargets={journalLinkTargetsExcept(entry)}
                           onCancel={() => setEditingEntry(null)}
                           onSaved={(_editedEntry, note, options) => {
                             handleEditingEntrySaved(note, options);
@@ -2999,34 +2860,44 @@ export default function JournalTimeline({
                       <InlineAddEntryComposer
                         parentEntry={entry}
                         open={composerOpen}
+                        entryLinkTargets={journalLinkTargets}
                         onCancel={() => setComposerParentEntry(null)}
                         onSaved={handleComposerEntrySaved}
                       />
                       {timelineReplies.map((reply) => (
-                        editingReplyEntry?.id === reply.id ? (
-                          <InlineEditReplyComposer
-                            key={reply.id}
-                            entry={reply}
-                            generatedParentEntry={null}
-                            onCancel={() => setEditingReplyEntry(null)}
-                            onSaved={handleReplyEditSaved}
-                          />
-                        ) : (
-                          <ListJournalEntry
-                            key={reply.id}
-                            entry={reply}
-                            busy={busyEntryId === reply.id}
-                            isHidden={isEntryHidden(reply)}
-                            onToggleSaved={(item) => void handleToggleSaved(item)}
-                            onAttach={startAttaching}
-                            onUnattach={requestUnattachNote}
-                            onToggleHidden={toggleEntryHidden}
-                            onEdit={startEditing}
-                            onDelete={requestNoteDelete}
-                            allowAttach
-                            indented
-                          />
-                        )
+                        <div
+                          key={reply.id}
+                          id={journalEntryElementId(reply.sourceId)}
+                          tabIndex={-1}
+                          className={cn(
+                            "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                            entryHighlightClassName(reply.sourceId),
+                          )}
+                        >
+                          {editingReplyEntry?.id === reply.id ? (
+                            <InlineEditReplyComposer
+                              entry={reply}
+                              generatedParentEntry={null}
+                              entryLinkTargets={journalLinkTargetsExcept(reply)}
+                              onCancel={() => setEditingReplyEntry(null)}
+                              onSaved={handleReplyEditSaved}
+                            />
+                          ) : (
+                            <ListJournalEntry
+                              entry={reply}
+                              busy={busyEntryId === reply.id}
+                              isHidden={isEntryHidden(reply)}
+                              onToggleSaved={(item) => void handleToggleSaved(item)}
+                              onAttach={startAttaching}
+                              onUnattach={requestUnattachNote}
+                              onToggleHidden={toggleEntryHidden}
+                              onEdit={startEditing}
+                              onDelete={requestNoteDelete}
+                              allowAttach
+                              indented
+                            />
+                          )}
+                        </div>
                       ))}
                     </div>
                   );
@@ -3035,103 +2906,6 @@ export default function JournalTimeline({
             </section>
           ))}
         </div>
-      ) : layout === "pages" && bookViewEntries.length > 0 ? (
-        <BookView
-          title={bookViewTitle}
-          subtitle={bookViewSubtitle}
-          entries={bookViewEntries}
-          className={className}
-          renderComposer={() => (
-            <>
-              {editingEntry && (
-                <div className="mx-auto w-full max-w-5xl">
-                  <InlineEditEntryComposer
-                    entry={editingEntry}
-                    onCancel={() => setEditingEntry(null)}
-                    onSaved={(_editedEntry, note, options) => {
-                      handleEditingEntrySaved(note, options);
-                    }}
-                  />
-                </div>
-              )}
-              {editingReplyEntry && (
-                <div className="mx-auto w-full max-w-5xl">
-                  <InlineEditReplyComposer
-                    entry={editingReplyEntry}
-                    generatedParentEntry={null}
-                    onCancel={() => setEditingReplyEntry(null)}
-                    onSaved={handleReplyEditSaved}
-                  />
-                </div>
-              )}
-              {inlineComposer && (
-                <InlineJournalEntryComposer
-                  open={inlineComposer.open}
-                  entity={inlineComposer.entity}
-                  initialBookId={inlineComposer.initialBookId}
-                  onCancel={() => inlineComposer.onOpenChange(false)}
-                  onSaved={handleInlineComposerSaved}
-                />
-              )}
-            </>
-          )}
-          renderEntry={(entry) => {
-            const timelineReplies = timelineRepliesByParentId[entry.sourceId] ?? [];
-            const isFinalEntrySegment = entry.segmentIndex === entry.segmentCount - 1;
-            const composerOpen = isFinalEntrySegment && composerParentEntry?.sourceId === entry.sourceId;
-
-            return (
-              <div
-                id={entry.isContinuation ? `${journalEntryElementId(entry.sourceId)}-part-${entry.segmentIndex + 1}` : journalEntryElementId(entry.sourceId)}
-                tabIndex={-1}
-                className={cn(
-                  "scroll-mt-24 space-y-4 rounded-sm outline-none",
-                  selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
-                )}
-              >
-                <BookViewJournalEntry
-                  entry={entry}
-                  busy={busyEntryId === entry.id}
-                  isHidden={isEntryHidden(entry)}
-                  attachedCount={attachedCountForEntry(entry)}
-                  onToggleSaved={(item) => void handleToggleSaved(item)}
-                  onReply={startReply}
-                  onAttach={startAttaching}
-                  onUnattach={requestUnattachNote}
-                  onToggleHidden={toggleEntryHidden}
-                  onEdit={startEditing}
-                  onDelete={requestTimelineDelete}
-                  parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
-                  allowAttach={(timelineRepliesByParentId[entry.sourceId]?.length ?? 0) === 0}
-                />
-                {isFinalEntrySegment && (
-                  <InlineAddEntryComposer
-                    parentEntry={entry}
-                    open={composerOpen}
-                    onCancel={() => setComposerParentEntry(null)}
-                    onSaved={handleComposerEntrySaved}
-                  />
-                )}
-                {isFinalEntrySegment && timelineReplies.map((reply) => (
-                  <BookViewJournalEntry
-                    key={reply.id}
-                    entry={manualEntryToSingleBookViewSegment(reply)}
-                    busy={busyEntryId === reply.id}
-                    isHidden={isEntryHidden(reply)}
-                    onToggleSaved={(item) => void handleToggleSaved(item)}
-                    onAttach={startAttaching}
-                    onUnattach={requestUnattachNote}
-                    onToggleHidden={toggleEntryHidden}
-                    onEdit={startEditing}
-                    onDelete={requestNoteDelete}
-                    allowAttach
-                    indented
-                  />
-                ))}
-              </div>
-            );
-          }}
-        />
       ) : splitEntries.visible.length > 0 ? (
         <div className={cn(layout === "cards" ? "grid gap-3 md:grid-cols-2" : "space-y-4", className)}>
           {inlineComposer && layout !== "cards" && (
@@ -3139,6 +2913,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}
             />
@@ -3157,8 +2932,8 @@ export default function JournalTimeline({
                 id={journalEntryElementId(entry.sourceId)}
                 tabIndex={-1}
                 className={cn(
-                  "space-y-3 scroll-mt-24 rounded-sm outline-none",
-                  selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
+                  "space-y-3 scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                  entryHighlightClassName(entry.sourceId),
                 )}
               >
                 {parentContextLabelsByEntryId.has(entry.id) && (
@@ -3167,6 +2942,7 @@ export default function JournalTimeline({
                 {isManualEntry(entry) && editingEntry?.sourceId === entry.sourceId ? (
                   <InlineEditEntryComposer
                     entry={entry}
+                    entryLinkTargets={journalLinkTargetsExcept(entry)}
                     onCancel={() => setEditingEntry(null)}
                     onSaved={(_editedEntry, note, options) => {
                       handleEditingEntrySaved(note, options);
@@ -3207,6 +2983,7 @@ export default function JournalTimeline({
                   <InlineAddEntryComposer
                     parentEntry={entry}
                     open={composerOpen}
+                    entryLinkTargets={journalLinkTargets}
                     onCancel={() => setComposerParentEntry(null)}
                     onSaved={handleComposerEntrySaved}
                   />
@@ -3215,6 +2992,7 @@ export default function JournalTimeline({
                   <InlineGeneratedNoteComposer
                     target={generatedComposerTarget}
                     open={generatedComposerOpen}
+                    entryLinkTargets={journalLinkTargets}
                     onCancel={() => setGeneratedComposerTarget(null)}
                     onSaved={handleGeneratedNoteSaved}
                   />
@@ -3226,8 +3004,8 @@ export default function JournalTimeline({
                 id={journalEntryElementId(entry.sourceId)}
                 tabIndex={-1}
                 className={cn(
-                  "relative space-y-3 scroll-mt-24 rounded-sm outline-none",
-                  selectedEntryId === entry.sourceId && "ring-2 ring-primary/25 ring-offset-4 ring-offset-background",
+                  "relative space-y-3 scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                  entryHighlightClassName(entry.sourceId),
                   index < splitEntries.visible.length - 1 &&
                     "before:absolute before:left-3 before:top-6 before:-bottom-4 before:w-px before:bg-border",
                 )}
@@ -3236,6 +3014,7 @@ export default function JournalTimeline({
                   <TimelineInlineEditReplyComposerRow
                     entry={entry}
                     generatedParentEntry={null}
+                    entryLinkTargets={journalLinkTargetsExcept(entry)}
                     onCancel={() => setEditingEntry(null)}
                     onSaved={(editedEntry, note) => {
                       handleEditingEntrySaved(note);
@@ -3266,6 +3045,7 @@ export default function JournalTimeline({
                   <TimelineInlineAddEntryComposerRow
                     parentEntry={entry}
                     open={composerOpen}
+                    entryLinkTargets={journalLinkTargets}
                     onCancel={() => setComposerParentEntry(null)}
                     onSaved={handleComposerEntrySaved}
                   />
@@ -3274,57 +3054,76 @@ export default function JournalTimeline({
                   <TimelineInlineGeneratedNoteComposerRow
                     target={generatedComposerTarget}
                     open={generatedComposerOpen}
+                    entryLinkTargets={journalLinkTargets}
                     onCancel={() => setGeneratedComposerTarget(null)}
                     onSaved={handleGeneratedNoteSaved}
                   />
                 )}
                 {parentManualEntry && timelineReplies.map((reply) => (
-                  editingReplyEntry?.id === reply.id ? (
-                    <TimelineInlineEditReplyComposerRow
-                      key={reply.id}
-                      entry={reply}
-                      generatedParentEntry={null}
-                      onCancel={() => setEditingReplyEntry(null)}
-                      onSaved={handleReplyEditSaved}
-                    />
-                  ) : (
-                    <TimelineReplyRow
-                      key={reply.id}
-                      entry={reply}
-                      busy={busyEntryId === reply.id}
-                      isHidden={isEntryHidden(reply)}
-                      onToggleSaved={(item) => void handleToggleSaved(item)}
-                      onAttach={startAttaching}
-                      onUnattach={requestUnattachNote}
-                      onToggleHidden={toggleEntryHidden}
-                      onEdit={startEditing}
-                      onDelete={requestNoteDelete}
-                    />
-                  )
+                  <div
+                    key={reply.id}
+                    id={journalEntryElementId(reply.sourceId)}
+                    tabIndex={-1}
+                    className={cn(
+                      "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                      entryHighlightClassName(reply.sourceId),
+                    )}
+                  >
+                    {editingReplyEntry?.id === reply.id ? (
+                      <TimelineInlineEditReplyComposerRow
+                        entry={reply}
+                        generatedParentEntry={null}
+                        entryLinkTargets={journalLinkTargetsExcept(reply)}
+                        onCancel={() => setEditingReplyEntry(null)}
+                        onSaved={handleReplyEditSaved}
+                      />
+                    ) : (
+                      <TimelineReplyRow
+                        entry={reply}
+                        busy={busyEntryId === reply.id}
+                        isHidden={isEntryHidden(reply)}
+                        onToggleSaved={(item) => void handleToggleSaved(item)}
+                        onAttach={startAttaching}
+                        onUnattach={requestUnattachNote}
+                        onToggleHidden={toggleEntryHidden}
+                        onEdit={startEditing}
+                        onDelete={requestNoteDelete}
+                      />
+                    )}
+                  </div>
                 ))}
                 {isGeneratedBookEntry(entry) && generatedAttachedNotes.map((note) => (
-                  editingReplyEntry?.id === note.id ? (
-                    <TimelineInlineEditReplyComposerRow
-                      key={note.id}
-                      entry={note}
-                      generatedParentEntry={entry}
-                      onCancel={() => setEditingReplyEntry(null)}
-                      onSaved={handleReplyEditSaved}
-                    />
-                  ) : (
-                    <TimelineReplyRow
-                      key={note.id}
-                      entry={note}
-                      busy={busyEntryId === note.id}
-                      isHidden={isEntryHidden(note)}
-                      onToggleSaved={(item) => void handleToggleSaved(item)}
-                      onAttach={startAttaching}
-                      onUnattach={requestUnattachNote}
-                      onToggleHidden={toggleEntryHidden}
-                      onEdit={startEditing}
-                      onDelete={requestNoteDelete}
-                    />
-                  )
+                  <div
+                    key={note.id}
+                    id={journalEntryElementId(note.sourceId)}
+                    tabIndex={-1}
+                    className={cn(
+                      "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
+                      entryHighlightClassName(note.sourceId),
+                    )}
+                  >
+                    {editingReplyEntry?.id === note.id ? (
+                      <TimelineInlineEditReplyComposerRow
+                        entry={note}
+                        generatedParentEntry={entry}
+                        entryLinkTargets={journalLinkTargetsExcept(note)}
+                        onCancel={() => setEditingReplyEntry(null)}
+                        onSaved={handleReplyEditSaved}
+                      />
+                    ) : (
+                      <TimelineReplyRow
+                        entry={note}
+                        busy={busyEntryId === note.id}
+                        isHidden={isEntryHidden(note)}
+                        onToggleSaved={(item) => void handleToggleSaved(item)}
+                        onAttach={startAttaching}
+                        onUnattach={requestUnattachNote}
+                        onToggleHidden={toggleEntryHidden}
+                        onEdit={startEditing}
+                        onDelete={requestNoteDelete}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             );
@@ -3337,6 +3136,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}
             />

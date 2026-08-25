@@ -1,5 +1,5 @@
 import FormattedNoteContent from "@/components/FormattedNoteContent";
-import { JournalMediaFigure } from "@/components/JournalEntryMediaContent";
+import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntryTags, type JournalTimelineEntry } from "@/lib/journal";
@@ -82,10 +82,12 @@ export default function JournalEntryCard({ entry, actions, showTags = true }: Jo
       )}
 
       {media.length > 0 && (
-        <JournalMediaFigure
-          item={media[0]}
+        <JournalEntryMediaContent
+          markdown=""
+          media={media}
           thumbnail
-          className="mb-0 mt-3"
+          visibleMediaLimit={1}
+          mediaClassName="mb-0 mt-3"
           imageClassName="h-24 rounded object-cover"
           captionClassName="line-clamp-1"
         />
