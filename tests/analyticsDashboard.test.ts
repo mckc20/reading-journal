@@ -70,7 +70,7 @@ test("builds overview and monthly trend metrics from books and reading logs", ()
   assert.equal(data.overview.booksFinished, 1);
   assert.equal(data.overview.pagesRead, 300);
   assert.equal(data.overview.readingMinutes, 115);
-  assert.equal(data.overview.averagePace, 80);
+  assert.equal(data.overview.averageSpeed?.toFixed(1), "125.2");
   assert.deepEqual(data.trends.pagesReadByMonth.map((bucket) => [bucket.key, bucket.value]), [
     ["2026-01", 160],
     ["2026-02", 80],
@@ -81,7 +81,7 @@ test("builds overview and monthly trend metrics from books and reading logs", ()
   ]);
 });
 
-test("builds average pace over time as cumulative overall pace", () => {
+test("builds average speed over time as cumulative pages per hour", () => {
   const data = buildAnalyticsDashboardData(
     [makeBook({ id: "book-1", total_pages: 400, date_finished: "2026-02-10" })],
     [
@@ -91,9 +91,9 @@ test("builds average pace over time as cumulative overall pace", () => {
     ],
   );
 
-  assert.equal(data.overview.averagePace, 80);
+  assert.equal(data.overview.averageSpeed, 80);
   assert.deepEqual(
-    data.trends.averagePaceByMonth.map((bucket) => [bucket.key, bucket.value]),
+    data.trends.averageSpeedByMonth.map((bucket) => [bucket.key, bucket.value]),
     [
       ["2026-01", 80],
       ["2026-02", 80],

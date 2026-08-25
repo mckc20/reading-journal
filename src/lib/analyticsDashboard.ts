@@ -39,7 +39,7 @@ export interface AnalyticsDashboardData {
     booksFinished: number;
     pagesRead: number;
     readingMinutes: number;
-    averagePace: number | null;
+    averageSpeed: number | null;
   };
   trends: {
     booksFinishedByMonth: TimeBucket[];
@@ -47,7 +47,7 @@ export interface AnalyticsDashboardData {
     pagesReadByMonth: TimeBucket[];
     readingMinutesByMonth: TimeBucket[];
     yearComparison: YearComparisonBucket[];
-    averagePaceByMonth: TimeBucket[];
+    averageSpeedByMonth: TimeBucket[];
     pagesPerDayDistribution: TimeBucket[];
   };
   habits: {
@@ -116,6 +116,12 @@ interface PageDelta {
   monthKey: string;
   year: string;
   pages: number;
+}
+
+interface ReadingSpeedSample {
+  monthKey: string;
+  pages: number;
+  minutes: number;
 }
 
 function isValidDate(date: Date): boolean {
@@ -253,6 +259,49 @@ function buildPageDeltas(logs: ReadingLog[]): PageDelta[] {
   }
 
   return deltas.sort((left, right) => left.loggedAt.getTime() - right.loggedAt.getTime());
+}
+
+function buildReadingSpeedSamples(logs: ReadingLog[]): ReadingSpeedSample[] {
+  const logsByBook = new Map<string, ReadingLog[]>();
+
+  for (const log of logs) {
+    const list = logsByBook.get(log.book_id) ?? [];
+    list.push(log);
+    logsByBook.set(log.book_id, list);
+  }
+
+  const samples: ReadingSpeedSample[] = [];
+
+  for (const bookLogs of logsByBook.values()) {
+    const sortedLogs = [...bookLogs].sort(
+      (left, right) => new Date(left.logged_at).getTime() - new Date(right.logged_at).getTime()
+    );
+    let previousPage = 0;
+
+    for (const log of sortedLogs) {
+      const loggedAt = parseDate(log.logged_at);
+      if (!loggedAt) continue;
+
+      const minutes = Math.max(0, log.reading_time_minutes ?? 0);
+      if (minutes <= 0) {
+        previousPage = Math.max(previousPage, log.current_page);
+        continue;
+      }
+
+      const currentPage = Math.max(0, log.current_page);
+      const pages = Math.max(0, currentPage - previousPage);
+      previousPage = Math.max(previousPage, currentPage);
+      if (pages <= 0) continue;
+
+      samples.push({
+        monthKey: toMonthKey(loggedAt),
+        pages,
+        minutes,
+      });
+    }
+  }
+
+  return samples;
 }
 
 function sumByMonth<T>(items: T[], getMonthKey: (item: T) => string | null, getValue: (item: T) => number): TimeBucket[] {
@@ -637,15 +686,9 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     books.filter((book) => book.status === "Finished" || book.status === "Reading" || book.status === "Paused").map((book) => book.id)
   );
   const pageDeltas = buildPageDeltas(logs);
-  const totalPageDeltas = pageDeltas.reduce((sum, delta) => sum + delta.pages, 0);
-  const activePageDays = new Set(pageDeltas.map((delta) => delta.dayKey)).size;
-  const monthlyPageDays = new Map<string, Set<string>>();
-
-  for (const delta of pageDeltas) {
-    const days = monthlyPageDays.get(delta.monthKey) ?? new Set<string>();
-    days.add(delta.dayKey);
-    monthlyPageDays.set(delta.monthKey, days);
-  }
+  const readingSpeedSamples = buildReadingSpeedSamples(logs);
+  const timedSpeedPages = readingSpeedSamples.reduce((sum, sample) => sum + sample.pages, 0);
+  const timedSpeedMinutes = readingSpeedSamples.reduce((sum, sample) => sum + sample.minutes, 0);
 
   const finishedDates = finishedBooks
     .map((book) => parseDate(book.date_finished))
@@ -693,18 +736,22 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     label: formatMonthLabel(monthKey),
     value: readingMinutesByMonthMap.get(monthKey) ?? 0,
   }));
-  let cumulativePages = 0;
-  const cumulativeActiveDays = new Set<string>();
-  const averagePaceByMonth = allTrendMonths.map((monthKey) => {
-    cumulativePages += pagesReadByMonthMap.get(monthKey) ?? 0;
-    for (const dayKey of monthlyPageDays.get(monthKey) ?? []) {
-      cumulativeActiveDays.add(dayKey);
-    }
+  const speedPagesByMonth = new Map<string, number>();
+  const speedMinutesByMonth = new Map<string, number>();
+  for (const sample of readingSpeedSamples) {
+    speedPagesByMonth.set(sample.monthKey, (speedPagesByMonth.get(sample.monthKey) ?? 0) + sample.pages);
+    speedMinutesByMonth.set(sample.monthKey, (speedMinutesByMonth.get(sample.monthKey) ?? 0) + sample.minutes);
+  }
+  let cumulativeSpeedPages = 0;
+  let cumulativeSpeedMinutes = 0;
+  const averageSpeedByMonth = allTrendMonths.map((monthKey) => {
+    cumulativeSpeedPages += speedPagesByMonth.get(monthKey) ?? 0;
+    cumulativeSpeedMinutes += speedMinutesByMonth.get(monthKey) ?? 0;
 
     return {
       key: monthKey,
       label: formatMonthLabel(monthKey),
-      value: cumulativeActiveDays.size > 0 ? cumulativePages / cumulativeActiveDays.size : 0,
+      value: cumulativeSpeedMinutes > 0 ? cumulativeSpeedPages / (cumulativeSpeedMinutes / 60) : 0,
     };
   });
 
@@ -812,7 +859,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
       readingMinutes: logs
         .filter((log) => activeBookIds.has(log.book_id))
         .reduce((sum, log) => sum + Math.max(0, log.reading_time_minutes ?? 0), 0),
-      averagePace: activePageDays > 0 ? totalPageDeltas / activePageDays : null,
+      averageSpeed: timedSpeedMinutes > 0 ? timedSpeedPages / (timedSpeedMinutes / 60) : null,
     },
     trends: {
       booksFinishedByMonth,
@@ -820,7 +867,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
       pagesReadByMonth,
       readingMinutesByMonth,
       yearComparison: [...yearComparisonMap.values()].sort((left, right) => left.year.localeCompare(right.year)),
-      averagePaceByMonth,
+      averageSpeedByMonth,
       pagesPerDayDistribution: [...pagesPerDayBuckets.entries()].map(([key, value]) => ({ key, label: key, value })),
     },
     habits: {

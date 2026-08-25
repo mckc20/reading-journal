@@ -166,7 +166,7 @@ const statusOptions = [
   { value: "DNF", label: "DNF" },
 ] satisfies Array<SelectOption<BookStatus>>;
 
-const paceOptions = [
+const speedCalculationOptions = [
   { value: "recent_logs", label: "Recent logs" },
   { value: "all_logs", label: "All logs" },
   { value: "manual", label: "Manual" },
@@ -691,10 +691,10 @@ function ReadingSettings() {
               onChange={(default_reading_status) => void saveReading({ default_reading_status })}
             />
           </SettingRow>
-          <SettingRow title="Reading pace calculation">
+          <SettingRow title="Reading speed calculation">
             <SelectSetting
               value={reading.reading_pace_calculation}
-              options={paceOptions}
+              options={speedCalculationOptions}
               disabled={disabled}
               onChange={(reading_pace_calculation) =>
                 void saveReading({ reading_pace_calculation })

@@ -404,7 +404,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
                 <p className="mt-2 text-xs text-muted-foreground">
                   {formatEstimateConfidence(estimatedFinish.confidence)} · Based on{" "}
                   {estimatedFinish.readingSessionCount} reading session
-                  {estimatedFinish.readingSessionCount === 1 ? "" : "s"} and your average pace for
+                  {estimatedFinish.readingSessionCount === 1 ? "" : "s"} and your average speed for
                   this book.
                 </p>
               </>

@@ -218,9 +218,20 @@ export function getCalendarPagesPerDay(params: {
   return pages / elapsedDays;
 }
 
-export function formatPagesPerDay(value: number | null): string {
+export function getPagesPerHour(params: {
+  pages?: number;
+  readingMinutes?: number;
+}): number | null {
+  const pages = params.pages ?? 0;
+  const readingMinutes = params.readingMinutes ?? 0;
+  if (pages <= 0 || readingMinutes <= 0) return null;
+
+  return pages / (readingMinutes / 60);
+}
+
+export function formatPagesPerHour(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "Not available";
-  return `${value.toFixed(1)} pages/day`;
+  return `${value.toFixed(1)} pages/hour`;
 }
 
 export function buildProgressTimeline(

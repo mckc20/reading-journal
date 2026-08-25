@@ -311,7 +311,7 @@ test("calculates timing series stats from eligible books only", () => {
   assert.equal(stats.averageDaysPerBook, 15);
 });
 
-test("selects pace and length winners with ties while excluding missing inputs", () => {
+test("selects speed and length winners with ties while excluding missing inputs", () => {
   const stats = getSeriesStats(
     [
       makeBook({
@@ -341,7 +341,11 @@ test("selects pace and length winners with ties while excluding missing inputs",
       makeBook({ id: "c", volume_number: 4, status: "Finished", total_pages: 300 }),
       makeBook({ id: "missing-pages", volume_number: 5, status: "Finished", date_started: "2026-04-01", date_finished: "2026-04-02" }),
     ],
-    [],
+    [
+      makeLog({ id: "a-time", book_id: "a", current_page: 100, reading_time_minutes: 300 }),
+      makeLog({ id: "b-time", book_id: "b", current_page: 200, reading_time_minutes: 300 }),
+      makeLog({ id: "d-time", book_id: "d", current_page: 200, reading_time_minutes: 600 }),
+    ],
     [],
   );
 
@@ -459,7 +463,7 @@ test("builds local series recommendations by author and genre", () => {
   assert.deepEqual(recommendations.youMightAlsoLike.map((book) => book.id), ["genre-match"]);
 });
 
-test("builds duration and pace chart rows in series order and excludes unusable pace data", () => {
+test("builds duration and speed chart rows in series order and excludes unusable speed data", () => {
   const stats = getSeriesStats(
     [
       makeBook({
@@ -487,7 +491,10 @@ test("builds duration and pace chart rows in series order and excludes unusable 
         date_started: "2026-03-01",
       }),
     ],
-    [],
+    [
+      makeLog({ id: "volume-1-time", book_id: "volume-1", current_page: 80, reading_time_minutes: 240 }),
+      makeLog({ id: "reading-time", book_id: "reading", current_page: 45, reading_time_minutes: 540 }),
+    ],
     [],
     new Date("2026-03-10T09:00:00"),
   );
@@ -495,7 +502,7 @@ test("builds duration and pace chart rows in series order and excludes unusable 
   assert.deepEqual(stats.durationChart.map((row) => row.book.id), ["volume-1", "volume-2", "reading"]);
   assert.deepEqual(stats.durationChart.map((row) => row.days), [4, 2, 9]);
   assert.deepEqual(stats.paceChart.map((row) => row.book.id), ["volume-1", "reading"]);
-  assert.deepEqual(stats.paceChart.map((row) => row.pagesPerDay), [20, 5]);
+  assert.deepEqual(stats.paceChart.map((row) => row.pagesPerHour), [20, 5]);
 });
 
 test("keeps series stats neutral when required data is absent", () => {

@@ -56,10 +56,10 @@ import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatCalendarSpan,
-  formatPagesPerDay,
+  formatPagesPerHour,
   formatTotalReadingTime,
-  getCalendarPagesPerDay,
   getEstimatedFinish,
+  getPagesPerHour,
   getReadingDuration,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
@@ -759,29 +759,28 @@ export default function BookDetails() {
           },
           {
             icon: TrendingUp,
-            label: "Current Pace",
-              value: formatPagesPerDay(
-                getCalendarPagesPerDay({
-                  pages: currentPage,
-                  dateStarted: book.date_started,
-                  pausePeriods: book.pause_periods,
-                }),
-              ),
-            },
-            {
-              icon: Clock,
-              label: "Time Reading",
-              value: formatTotalReadingTime(totalReadingMinutes),
-            },
-            {
-              icon: CalendarClock,
-              label: "Estimated Finish",
-              value:
-                estimatedFinish.isAvailable && estimatedFinish.finishDate
-                  ? formatDateObjectForDisplay(estimatedFinish.finishDate)
-                  : "Not available",
-            },
-          ]
+            label: "Current Speed",
+            value: formatPagesPerHour(
+              getPagesPerHour({
+                pages: currentPage,
+                readingMinutes: totalReadingMinutes,
+              }),
+            ),
+          },
+          {
+            icon: Clock,
+            label: "Time Reading",
+            value: formatTotalReadingTime(totalReadingMinutes),
+          },
+          {
+            icon: CalendarClock,
+            label: "Estimated Finish",
+            value:
+              estimatedFinish.isAvailable && estimatedFinish.finishDate
+                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
+                : "Not available",
+          },
+        ]
       : book.status === "Finished"
         ? [
             {
@@ -801,13 +800,11 @@ export default function BookDetails() {
             },
             {
               icon: TrendingUp,
-              label: "Average Pace",
-              value: formatPagesPerDay(
-                getCalendarPagesPerDay({
+              label: "Average Speed",
+              value: formatPagesPerHour(
+                getPagesPerHour({
                   pages: totalPages,
-                  dateStarted: book.date_started,
-                  dateEnded: book.date_finished,
-                  pausePeriods: book.pause_periods,
+                  readingMinutes: totalReadingMinutes,
                 }),
               ),
             },

@@ -106,22 +106,31 @@ function formatPagesRead(readPages: number | null, totalPages: number | null): s
   return `${readPages.toLocaleString()} / ~${totalPages.toLocaleString()}`;
 }
 
-function formatReadingPace(books: Book[], logs: ReadingLog[]): string {
+function formatReadingSpeed(books: Book[], logs: ReadingLog[]): string {
   const activeBook = getCurrentSeriesBook(books);
   if (!activeBook) return "--";
   const activeLogs = logs
-    .filter((log) => log.book_id === activeBook.id && log.current_page > 0)
+    .filter((log) => log.book_id === activeBook.id)
     .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
-  if (activeLogs.length < 2) return "--";
-  const first = activeLogs[0];
-  const last = activeLogs[activeLogs.length - 1];
-  const days = Math.max(
-    1,
-    Math.round((new Date(last.logged_at).getTime() - new Date(first.logged_at).getTime()) / (24 * 60 * 60 * 1000)),
-  );
-  const pageDelta = last.current_page - first.current_page;
-  if (pageDelta <= 0) return "--";
-  return `~${Math.round(pageDelta / days)} pages / day`;
+
+  let previousPage = 0;
+  let pagesRead = 0;
+  let readingMinutes = 0;
+
+  for (const log of activeLogs) {
+    const minutes = Math.max(0, log.reading_time_minutes ?? 0);
+    const currentPage = Math.max(0, log.current_page);
+    const pageDelta = Math.max(0, currentPage - previousPage);
+    previousPage = Math.max(previousPage, currentPage);
+
+    if (minutes > 0) {
+      pagesRead += pageDelta;
+      readingMinutes += minutes;
+    }
+  }
+
+  if (pagesRead <= 0 || readingMinutes <= 0) return "--";
+  return `~${(pagesRead / (readingMinutes / 60)).toFixed(1)} pages / hour`;
 }
 
 function BookThumbnail({ book }: { book: Book }) {
@@ -329,7 +338,7 @@ type SeriesProgressDetail =
       kind: "active";
       book: Book | null;
       estimatedCompletion: string | null;
-      readingPace: string;
+      readingSpeed: string;
     }
   | {
       kind: "not-started";
@@ -406,10 +415,10 @@ function SeriesProgressCard({
               </p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Reading Pace</p>
+              <p className="text-sm font-semibold">Reading Speed</p>
               <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
                 <Gauge className="h-4 w-4 text-primary" />
-                {detail.readingPace}
+                {detail.readingSpeed}
               </p>
             </div>
           </div>
@@ -914,8 +923,8 @@ export default function SeriesDetails() {
     () => estimateSeriesCompletionDate(seriesBooks, seriesLogs),
     [seriesBooks, seriesLogs],
   );
-  const readingPace = useMemo(
-    () => (logsLoading || logsError ? "--" : formatReadingPace(seriesBooks, seriesLogs)),
+  const readingSpeed = useMemo(
+    () => (logsLoading || logsError ? "--" : formatReadingSpeed(seriesBooks, seriesLogs)),
     [logsError, logsLoading, seriesBooks, seriesLogs],
   );
   const primaryAuthor = authors[0] ?? "this author";
@@ -975,7 +984,7 @@ export default function SeriesDetails() {
         kind: "active",
         book: currentBook,
         estimatedCompletion,
-        readingPace,
+        readingSpeed,
       };
     }
 
@@ -988,7 +997,7 @@ export default function SeriesDetails() {
     estimatedCompletion,
     firstVolume,
     journeyRecap.favoriteBook,
-    readingPace,
+    readingSpeed,
     seriesStats.overview.journeySpan,
     startingBookId,
   ]);

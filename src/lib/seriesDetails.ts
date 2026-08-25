@@ -68,7 +68,7 @@ export type SeriesDurationChartRow = {
 
 export type SeriesPaceChartRow = {
   book: Book;
-  pagesPerDay: number;
+  pagesPerHour: number;
 };
 
 export type SeriesRankedBook = {
@@ -508,16 +508,19 @@ export function getSeriesStats(
     const days = getJourneyDurationDays(book, seriesLogs, now);
     return days === null ? [] : [{ book, value: days }];
   });
-  const completedPaces = completedDurations.flatMap(({ book, value }) =>
-    value > 0 && typeof book.total_pages === "number" && book.total_pages > 0
-      ? [{ book, value: book.total_pages / value }]
-      : [],
-  );
-  const chartPaces = chartDurations.flatMap(({ book, value }) =>
-    value > 0
-      ? [{ book, value: (book.status === "Finished" ? book.total_pages ?? 0 : book.current_page ?? 0) / value }]
-      : [],
-  ).filter((row) => Number.isFinite(row.value) && row.value > 0);
+  const completedSpeeds = finishedBooks.flatMap((book) => {
+    const readingMinutes = getBookReadingMinutes(book, seriesLogs);
+    return readingMinutes > 0 && typeof book.total_pages === "number" && book.total_pages > 0
+      ? [{ book, value: book.total_pages / (readingMinutes / 60) }]
+      : [];
+  });
+  const chartSpeeds = timingBooks.flatMap((book) => {
+    const readingMinutes = getBookReadingMinutes(book, seriesLogs);
+    const pagesRead = book.status === "Finished" ? book.total_pages ?? 0 : book.current_page ?? 0;
+    return readingMinutes > 0 && pagesRead > 0
+      ? [{ book, value: pagesRead / (readingMinutes / 60) }]
+      : [];
+  });
   const lengths = sortedBooks.flatMap((book) =>
     typeof book.total_pages === "number" && book.total_pages > 0
       ? [{ book, value: book.total_pages }]
@@ -579,12 +582,12 @@ export function getSeriesStats(
       completedDurations.length > 0
         ? completedDurations.reduce((sum, duration) => sum + duration.value, 0) / completedDurations.length
         : null,
-    fastestRead: getWinnerBooks(completedPaces, (values) => Math.max(...values)),
-    slowestRead: getWinnerBooks(completedPaces, (values) => Math.min(...values)),
+    fastestRead: getWinnerBooks(completedSpeeds, (values) => Math.max(...values)),
+    slowestRead: getWinnerBooks(completedSpeeds, (values) => Math.min(...values)),
     longestBook: getWinnerBooks(lengths, (values) => Math.max(...values)),
     shortestBook: getWinnerBooks(lengths, (values) => Math.min(...values)),
     durationChart: chartDurations.map(({ book, value }) => ({ book, days: value })),
-    paceChart: chartPaces.map(({ book, value }) => ({ book, pagesPerDay: value })),
+    paceChart: chartSpeeds.map(({ book, value }) => ({ book, pagesPerHour: value })),
     rankings: {
       rating: ratingRanking,
       length: lengthRanking,

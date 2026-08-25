@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 import type { SeriesStats } from "@/lib/seriesDetails";
 
-type PaceChartMode = "duration" | "pace";
+type SpeedChartMode = "duration" | "speed";
 type RankingMode = "rating" | "length" | "annotations";
 
 function formatStatsReadingTime(minutes: number): string {
@@ -359,7 +359,7 @@ export function SeriesAnalyticsOverview({
   );
 }
 
-function getPaceChartRows(stats: SeriesStats, mode: PaceChartMode) {
+function getSpeedChartRows(stats: SeriesStats, mode: SpeedChartMode) {
   if (mode === "duration") {
     return stats.durationChart.map((row) => ({
       book: row.book,
@@ -370,17 +370,17 @@ function getPaceChartRows(stats: SeriesStats, mode: PaceChartMode) {
 
   return stats.paceChart.map((row) => ({
     book: row.book,
-    value: row.pagesPerDay,
-    formattedValue: `${row.pagesPerDay.toFixed(1)} pages/day`,
+    value: row.pagesPerHour,
+    formattedValue: `${row.pagesPerHour.toFixed(1)} pages/hour`,
   }));
 }
 
 export function SeriesAnalyticsPaceChart({ stats }: { stats: SeriesStats }) {
   return (
     <StatsBarChart
-      title="Pace by Book"
-      rows={getPaceChartRows(stats, "pace")}
-      emptyLabel="Add reading dates and page progress to compare reading pace."
+      title="Speed by Book"
+      rows={getSpeedChartRows(stats, "speed")}
+      emptyLabel="Add reading time and page progress to compare reading speed."
     />
   );
 }
@@ -394,9 +394,9 @@ export function SeriesAnalyticsFull({
   logsLoading: boolean;
   logsError: string | null;
 }) {
-  const [paceMode, setPaceMode] = useState<PaceChartMode>("pace");
+  const [paceMode, setPaceMode] = useState<SpeedChartMode>("speed");
   const [rankingMode, setRankingMode] = useState<RankingMode>("rating");
-  const paceRows = useMemo(() => getPaceChartRows(stats, paceMode), [paceMode, stats]);
+  const paceRows = useMemo(() => getSpeedChartRows(stats, paceMode), [paceMode, stats]);
   const ranking = useMemo(() => {
     if (rankingMode === "length") {
       return {
@@ -439,11 +439,11 @@ export function SeriesAnalyticsFull({
               Compare how long each book took and how quickly pages moved.
             </p>
           </div>
-          <SegmentedControl<PaceChartMode>
+          <SegmentedControl<SpeedChartMode>
             value={paceMode}
             onChange={setPaceMode}
             options={[
-              { value: "pace", label: "Pace by Book" },
+              { value: "speed", label: "Speed by Book" },
               { value: "duration", label: "Duration by Book" },
             ]}
           />
@@ -453,7 +453,7 @@ export function SeriesAnalyticsFull({
           emptyLabel={
             paceMode === "duration"
               ? "No books with start dates yet."
-              : "Add reading dates and page progress to compare reading pace."
+              : "Add reading time and page progress to compare reading speed."
           }
         />
       </section>

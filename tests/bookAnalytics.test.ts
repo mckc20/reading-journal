@@ -3,10 +3,11 @@ import test from "node:test";
 import {
   buildProgressTimeline,
   formatCalendarSpan,
-  formatPagesPerDay,
+  formatPagesPerHour,
   formatTotalReadingTime,
   getCalendarPagesPerDay,
   getEstimatedFinish,
+  getPagesPerHour,
   getReadingDuration,
   sumReadingMinutes,
 } from "../src/lib/bookAnalytics";
@@ -90,10 +91,14 @@ test("returns null calendar pace when dates or pages are missing", () => {
   );
 });
 
-test("formats pages per day labels", () => {
-  assert.equal(formatPagesPerDay(12), "12.0 pages/day");
-  assert.equal(formatPagesPerDay(12.345), "12.3 pages/day");
-  assert.equal(formatPagesPerDay(null), "Not available");
+test("calculates and formats pages per hour labels", () => {
+  assert.equal(getPagesPerHour({ pages: 120, readingMinutes: 60 }), 120);
+  assert.equal(getPagesPerHour({ pages: 90, readingMinutes: 45 }), 120);
+  assert.equal(getPagesPerHour({ pages: 0, readingMinutes: 60 }), null);
+  assert.equal(getPagesPerHour({ pages: 120, readingMinutes: 0 }), null);
+  assert.equal(formatPagesPerHour(12), "12.0 pages/hour");
+  assert.equal(formatPagesPerHour(12.345), "12.3 pages/hour");
+  assert.equal(formatPagesPerHour(null), "Not available");
 });
 
 test("builds progress timeline from increasing daily progress logs", () => {
