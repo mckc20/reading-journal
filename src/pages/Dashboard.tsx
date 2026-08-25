@@ -80,7 +80,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-8">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Dashboard</h1>
+        <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
         <SkeletonGrid />
       </div>
     );
@@ -89,7 +89,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="space-y-8">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Dashboard</h1>
+        <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <p className="text-sm text-destructive">{error}</p>
           <Button variant="outline" size="sm" onClick={() => reload()}>
@@ -105,7 +105,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-heading leading-snug font-medium">Dashboard</h1>
+      <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
 
       {!hasActiveBooks && (
         <div className="flex flex-col items-center gap-3 py-16 text-center">

@@ -52,7 +52,7 @@ function AuthorAvatar({ author }: { author: AuthorSummary }) {
 function buildExplorePath(sort: "top-rated" | "latest-read" | "most-read") {
   const params = new URLSearchParams();
   params.set("sort", sort);
-  return `/authors/explore?${params.toString()}`;
+  return `/library/authors?${params.toString()}`;
 }
 
 function AuthorShelfRow({
@@ -346,7 +346,7 @@ export default function Authors() {
                 <h2 className="font-heading text-xl font-medium leading-snug">All Authors</h2>
               </div>
               <Button asChild variant="ghost" size="sm" className="text-sm text-muted-foreground">
-                <Link to="/authors/explore">
+                <Link to="/library/authors">
                   View all
                   <ChevronRight className="h-4 w-4" />
                 </Link>

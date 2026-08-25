@@ -189,7 +189,7 @@ function buildLibraryFilterPath(
   value: string,
 ): string {
   const params = new URLSearchParams({ [key]: value });
-  return `/library/explore?${params.toString()}`;
+  return `/library/books?${params.toString()}`;
 }
 
 function getPublicationYear(value?: string | null): string | null {

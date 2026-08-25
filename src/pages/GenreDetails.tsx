@@ -68,20 +68,20 @@ export default function GenreDetails() {
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <ListTree className="h-10 w-10 text-muted-foreground/40" />
         <h1 className="text-lg font-heading leading-snug font-medium">Genre not found</h1>
-        <BackButton fallbackTo="/genres" />
+        <BackButton fallbackTo="/library/genres" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-7">
-      <BackButton fallbackTo="/genres" />
+      <BackButton fallbackTo="/library/genres" />
 
       <section className={cn("overflow-hidden rounded-xl border bg-card", metadata.accentClassName)}>
         <div className={cn("bg-gradient-to-br p-5", metadata.accentClassName ?? "from-primary/10 via-accent/10 to-muted/20")}>
           <div className="space-y-5">
             <nav className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground" aria-label="Breadcrumb">
-              <Link to="/genres" className="hover:text-foreground">Genres</Link>
+              <Link to="/library/genres" className="hover:text-foreground">Genres</Link>
               {path.map((item) => {
                 const itemSlug = slugById.get(item.id) ?? item.id;
                 return (

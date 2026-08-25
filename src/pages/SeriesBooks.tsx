@@ -231,7 +231,7 @@ export default function SeriesBooks() {
   if (!seriesRecord) {
     return (
       <div className="space-y-4">
-        <BackButton fallbackTo="/series" />
+        <BackButton fallbackTo="/library/series" />
         <EmptyState message="This series was not found in your library." />
       </div>
     );

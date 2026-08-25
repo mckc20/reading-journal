@@ -913,14 +913,14 @@ export default function Analytics() {
   const routeCategory = parseAnalyticsCategory(category);
 
   if (category && routeCategory === null) {
-    return <Navigate to="/analytics" replace />;
+    return <Navigate to="/statistics" replace />;
   }
 
   if (routeCategory) {
     return (
       <div className="space-y-8">
         <div className="space-y-3">
-          <Link to="/analytics" className="text-sm font-medium text-primary hover:underline">
+          <Link to="/statistics" className="text-sm font-medium text-primary hover:underline">
             &lt;- Back to Analytics
           </Link>
           <div className="space-y-1">

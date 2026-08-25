@@ -2054,7 +2054,7 @@ export default function Library() {
 
   useEffect(() => {
     if (viewParam && !isLibraryView(viewParam)) {
-      navigate("/library/explore", { replace: true });
+      navigate("/library/books", { replace: true });
     }
   }, [navigate, viewParam]);
 

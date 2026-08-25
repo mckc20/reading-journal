@@ -707,7 +707,7 @@ function SeriesEditPage({
 
   return (
     <div className="space-y-6">
-      <BackButton fallbackTo="/series" />
+      <BackButton fallbackTo="/library/series" />
 
       <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
@@ -1026,7 +1026,7 @@ export default function SeriesDetails() {
     try {
       setActionError(null);
       await removeSeries(seriesRecord.id);
-      navigate("/series", { replace: true });
+      navigate("/library/series", { replace: true });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to delete series");
     }
@@ -1115,7 +1115,7 @@ export default function SeriesDetails() {
         <p className="text-sm text-muted-foreground">
           This series may have been deleted or you may not have access.
         </p>
-        <BackButton fallbackTo="/series" />
+        <BackButton fallbackTo="/library/series" />
       </div>
     );
   }
@@ -1159,7 +1159,7 @@ export default function SeriesDetails() {
         </div>
       )}
       <div className="flex items-start justify-between gap-3">
-        <BackButton fallbackTo="/series" />
+        <BackButton fallbackTo="/library/series" />
         <DetailActionsMenu
           kind="series"
           label={seriesRecord.name}

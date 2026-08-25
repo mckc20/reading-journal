@@ -160,6 +160,19 @@ export async function fetchSeriesJournalEntryRecords(seriesId: string): Promise<
   return sortSeriesJournalEntryRecords(await withJournalMedia("series_note", (data ?? []) as SeriesJournalEntryRecord[]));
 }
 
+export async function fetchAllSeriesJournalEntryRecords(): Promise<SeriesJournalEntryRecord[]> {
+  const { supabase } = await import("./supabase");
+  const { data, error } = await supabase
+    .from("series_journal")
+    .select("*")
+    .is("parent_entry_id", null)
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) throw seriesJournalEntryErrorToError(error);
+  return sortSeriesJournalEntryRecords(await withJournalMedia("series_note", (data ?? []) as SeriesJournalEntryRecord[]));
+}
+
 export async function createSeriesJournalEntryRecord(input: CreateSeriesJournalEntryRecordInput): Promise<SeriesJournalEntryRecord> {
   const { supabase } = await import("./supabase");
   const payload = normalizeSeriesJournalEntryRecordInput(input);

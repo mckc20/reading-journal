@@ -125,7 +125,7 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
 
       reset();
       onOpenChange(false);
-      navigate("/groups");
+      navigate("/messages");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Could not create chat.");
     } finally {
