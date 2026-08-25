@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, Grid2X2, Heart, List } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -57,11 +58,6 @@ function downloadAuthorsCsv(authors: AuthorSummary[]) {
     "Books",
     "Quotes",
     "Average Rating",
-    "Nationality",
-    "Birth Date",
-    "Birth Precision",
-    "Death Date",
-    "Death Precision",
   ];
 
   const rows = authors.map((author) => [
@@ -70,11 +66,6 @@ function downloadAuthorsCsv(authors: AuthorSummary[]) {
     author.bookCount,
     author.quoteCount,
     author.averageRating ?? "",
-    author.nationality ?? "",
-    author.birth_date ?? "",
-    author.birth_date_precision ?? "",
-    author.death_date ?? "",
-    author.death_date_precision ?? "",
   ]);
 
   const csv = [headers, ...rows]
@@ -150,7 +141,6 @@ function AuthorTable({
             <th className="px-3 py-2">Author</th>
             <th className="px-3 py-2">Books</th>
             <th className="px-3 py-2">Rating</th>
-            <th className="px-3 py-2">Nationality</th>
             <th className="px-3 py-2">Last read</th>
           </tr>
         </thead>
@@ -206,7 +196,6 @@ function AuthorTable({
               </td>
               <td className="px-3 py-2 text-muted-foreground">{author.bookCount}</td>
               <td className="px-3 py-2 text-muted-foreground">{author.averageRating ?? "-"}</td>
-              <td className="px-3 py-2 text-muted-foreground">{author.nationality ?? "-"}</td>
               <td className="px-3 py-2 text-muted-foreground">{formatDisplayDate(author.latestReadDate)}</td>
             </tr>
           ))}
@@ -242,13 +231,8 @@ function authorToUpdatePayload(author: AuthorSummary, favorite: boolean) {
   return {
     name: author.name,
     photo_url: author.photo_url,
-    birth_date: author.birth_date,
-    birth_date_precision: author.birth_date_precision,
-    death_date: author.death_date,
-    death_date_precision: author.death_date_precision,
     bio: author.bio,
     is_favorite: favorite,
-    nationality: author.nationality,
   };
 }
 
@@ -266,7 +250,6 @@ function clearAuthorFilters(searchParams: URLSearchParams): URLSearchParams {
   nextParams.delete("display");
   nextParams.delete("genre");
   nextParams.delete("language");
-  nextParams.delete("nationality");
   return nextParams;
 }
 
@@ -321,7 +304,6 @@ export default function AuthorsExplore() {
     () => ({
       genre: uniqueSortedValues(authors.flatMap((author) => author.books.flatMap((book) => book.genres ?? []))),
       language: uniqueSortedValues(authors.flatMap((author) => author.books.map((book) => book.language))),
-      nationality: uniqueSortedValues(authors.map((author) => author.nationality)),
     }),
     [authors],
   );
@@ -350,7 +332,7 @@ export default function AuthorsExplore() {
     setSearchParams(nextParams, { replace: true });
   }
 
-  function updateFilter(key: "genre" | "language" | "nationality", value: string) {
+  function updateFilter(key: "genre" | "language", value: string) {
     const nextParams = new URLSearchParams(searchParams);
     if (value === allValue) {
       nextParams.delete(key);
@@ -425,8 +407,8 @@ export default function AuthorsExplore() {
     return (
       <div className="space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-heading leading-snug font-medium">Explore Authors</h1>
-          <p className="text-sm text-muted-foreground">Loading authors...</p>
+          <AppHeading level={1} as="h1">Explore Authors</AppHeading>
+          <HeadingDescription>Loading authors...</HeadingDescription>
         </div>
         <LoadingAuthors />
       </div>
@@ -448,8 +430,8 @@ export default function AuthorsExplore() {
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <h1 className="text-2xl font-heading leading-snug font-medium">Explore Authors</h1>
-            <p className="text-sm text-muted-foreground">{authorCountLabel}</p>
+            <AppHeading level={1} as="h1">Explore Authors</AppHeading>
+            <HeadingDescription>{authorCountLabel}</HeadingDescription>
           </div>
           <Button type="button" variant={isManageMode ? "secondary" : "outline"} onClick={toggleManageMode}>
             {isManageMode ? "Exit management" : "Management mode"}
@@ -486,22 +468,6 @@ export default function AuthorsExplore() {
               <SelectContent>
                 <SelectItem value={allValue}>Language</SelectItem>
                 {filterOptions.language.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.nationality[0] ?? allValue}
-              onValueChange={(value) => updateFilter("nationality", value)}
-            >
-              <SelectTrigger className="w-[9.75rem] justify-between gap-1.5" aria-label="Filter authors by nationality">
-                <SelectValue placeholder="Nationality" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={allValue}>Nationality</SelectItem>
-                {filterOptions.nationality.map((option) => (
                   <SelectItem key={option} value={option}>
                     {option}
                   </SelectItem>
@@ -568,10 +534,10 @@ export default function AuthorsExplore() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-muted/20 p-4">
             <div>
-              <h2 className="font-heading text-lg font-medium leading-snug">Management Mode</h2>
-              <p className="text-sm text-muted-foreground">
+              <AppHeading level={4} as="h2">Management Mode</AppHeading>
+              <HeadingDescription>
                 {selectedIds.size} selected from {visibleAuthors.length} visible authors
-              </p>
+              </HeadingDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" disabled={selectedIds.size === 0 || saving} onClick={() => void applyBulkFavorite(true)}>

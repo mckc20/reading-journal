@@ -1,4 +1,4 @@
-import BookCard from "@/components/BookCard";
+import CurrentlyReadingBookCard from "@/components/CurrentlyReadingBookCard";
 import type { Book } from "@/types";
 
 interface ContinueReadingCardProps {
@@ -8,9 +8,9 @@ interface ContinueReadingCardProps {
 
 export default function ContinueReadingCard({ book, onBook }: ContinueReadingCardProps) {
   return (
-    <BookCard
+    <CurrentlyReadingBookCard
       book={book}
-      onClick={onBook}
+      onBook={onBook}
       showQuickProgress
     />
   );

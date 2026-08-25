@@ -23,16 +23,10 @@ CREATE TABLE IF NOT EXISTS authors (
   user_id       uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name          text NOT NULL CHECK (btrim(name) <> ''),
   photo_url     text,
-  birth_date    date,
-  birth_date_precision text CHECK (birth_date_precision IN ('year','month','day')),
-  death_date    date,
-  death_date_precision text CHECK (death_date_precision IN ('year','month','day')),
   bio           text,
   is_favorite   boolean NOT NULL DEFAULT false,
-  nationality   text,
   created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
-  CHECK (death_date IS NULL OR birth_date IS NULL OR death_date >= birth_date)
+  updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
 -- ── BOOKS ─────────────────────────────────────────────────

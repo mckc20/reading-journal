@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { LogOut, Pencil } from "lucide-react";
+import { AppHeading } from "@/components/design";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,7 @@ export default function Profile() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-heading leading-snug font-medium">Profile</h1>
+          <AppHeading level={1} as="h1">Profile</AppHeading>
           {loading && <p className="text-sm text-muted-foreground">Loading profile...</p>}
         </div>
         <Button asChild>

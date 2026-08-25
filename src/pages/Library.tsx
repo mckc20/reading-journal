@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronRight, RefreshCw, SwatchBook } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -271,8 +272,8 @@ function LibrarySection({
     <section className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-heading text-xl font-medium leading-snug">{title}</h2>
-          {countLabel && <p className="text-xs text-muted-foreground">{countLabel}</p>}
+          <AppHeading level={3} as="h2">{title}</AppHeading>
+          {countLabel && <HeadingDescription className="text-xs">{countLabel}</HeadingDescription>}
         </div>
         {action}
       </div>
@@ -320,8 +321,8 @@ export default function Library() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h1 className="font-heading text-4xl font-bold leading-tight">Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Your books, authors, series, genres, and journal.</p>
+          <AppHeading level={1}>Library</AppHeading>
+          <HeadingDescription>Your books, authors, series, genres, and journal.</HeadingDescription>
         </div>
       </div>
 

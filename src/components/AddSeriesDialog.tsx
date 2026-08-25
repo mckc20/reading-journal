@@ -20,6 +20,7 @@ interface AddSeriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   openAddBook: (options?: AddBookDialogLaunchOptions) => void;
+  onSaved?: (series: Series) => void;
 }
 
 function getNextVolume(rows: EditableSeriesBook[]): number {
@@ -31,7 +32,7 @@ function getNextVolume(rows: EditableSeriesBook[]): number {
   return largestVolume + 1 || visibleRows.length + 1;
 }
 
-export default function AddSeriesDialog({ open, onOpenChange, openAddBook }: AddSeriesDialogProps) {
+export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSaved }: AddSeriesDialogProps) {
   const { user } = useAuth();
   const { addSeries, editSeries } = useSeries();
   const { books, updateBookSeriesPlacement } = useBooksContext();
@@ -181,6 +182,7 @@ export default function AddSeriesDialog({ open, onOpenChange, openAddBook }: Add
 
       reset();
       onOpenChange(false);
+      onSaved?.(created);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to add series.");
     } finally {

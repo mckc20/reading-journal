@@ -4,7 +4,7 @@ const RECENTLY_READ_WINDOW_MS = 5 * 7 * 24 * 60 * 60 * 1000;
 
 export type AuthorSort = "name" | "recently-added" | "latest-read" | "top-rated" | "most-read";
 
-export type AuthorFilterKey = "genre" | "language" | "nationality";
+export type AuthorFilterKey = "genre" | "language";
 
 export type AuthorFilters = Record<AuthorFilterKey, string[]>;
 
@@ -86,12 +86,11 @@ export function getAuthorFilters(searchParams: URLSearchParams): AuthorFilters {
   return {
     genre: getValues("genre"),
     language: getValues("language"),
-    nationality: getValues("nationality"),
   };
 }
 
 export function hasActiveAuthorFilters(filters: AuthorFilters): boolean {
-  return filters.genre.length > 0 || filters.language.length > 0 || filters.nationality.length > 0;
+  return filters.genre.length > 0 || filters.language.length > 0;
 }
 
 export function matchesAuthorFilters(author: AuthorSummary, filters: AuthorFilters): boolean {
@@ -102,9 +101,6 @@ export function matchesAuthorFilters(author: AuthorSummary, filters: AuthorFilte
     return false;
   }
   if (filters.language.length > 0 && !author.books.some((book) => book.language && filters.language.includes(book.language))) {
-    return false;
-  }
-  if (filters.nationality.length > 0 && !filters.nationality.includes(author.nationality ?? "")) {
     return false;
   }
   return true;

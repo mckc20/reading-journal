@@ -13,6 +13,13 @@ import {
 } from "lucide-react";
 
 import ReadingHeatmap from "@/components/ReadingHeatmap";
+import {
+  AppHeading,
+  DesignLineChart,
+  HeadingDescription,
+  StatCard as SharedStatCard,
+  VerticalBarChart,
+} from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -23,7 +30,6 @@ import {
 } from "@/lib/analyticsDashboard";
 import { fetchReadingLogs } from "@/lib/books";
 import { calculateReadingHabits } from "@/lib/readingHabits";
-import { cn } from "@/lib/utils";
 import type { Book, ReadingLog, Series } from "@/types";
 
 type MonthlyTrendMetric = "books" | "pages" | "minutes";
@@ -106,8 +112,8 @@ function Section({
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="font-heading text-xl font-medium leading-tight">{title}</h2>
-          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+          <AppHeading level={3} as="h2">{title}</AppHeading>
+          {description ? <HeadingDescription>{description}</HeadingDescription> : null}
         </div>
         {action}
       </div>
@@ -133,44 +139,16 @@ function StatCard({
   onClick?: () => void;
   active?: boolean;
 }) {
-  const content = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <Icon className={cn("text-primary", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden="true" />
-      </div>
-      <p className={cn("font-semibold leading-tight", compact ? "mt-2 text-lg" : "mt-3 text-2xl")}>{value}</p>
-      {detail ? <p className="mt-1 text-xs text-muted-foreground">{detail}</p> : null}
-    </>
-  );
-
-  const className = cn(
-    "rounded-lg border border-border/60 bg-muted/10 transition-colors",
-    compact ? "p-3" : "p-4",
-    active ? "border-primary/70 bg-primary/5" : "",
-    onClick ? "text-left hover:border-primary/50 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" : ""
-  );
-
-  if (onClick) {
-    return (
-      <button type="button" className={className} onClick={onClick} aria-pressed={active}>
-        {content}
-      </button>
-    );
-  }
-
   return (
-    <div className={className}>
-      {content}
-    </div>
-  );
-}
-
-function EmptyPanel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-36 items-center justify-center rounded-lg bg-muted/20 px-4 text-center text-sm text-muted-foreground">
-      {children}
-    </div>
+    <SharedStatCard
+      label={label}
+      value={value}
+      detail={detail}
+      icon={Icon}
+      onClick={onClick}
+      active={active}
+      className={compact ? undefined : "p-3"}
+    />
   );
 }
 
@@ -186,8 +164,8 @@ function DetailSection({
   return (
     <section className="space-y-3">
       <div className="space-y-1">
-        <h3 className="text-base font-heading leading-snug font-medium">{title}</h3>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+        <AppHeading level={4} as="h3">{title}</AppHeading>
+        {description ? <HeadingDescription>{description}</HeadingDescription> : null}
       </div>
       {children}
     </section>
@@ -209,101 +187,21 @@ function SimpleBarChart({
   highlightKey?: string | null;
   showAllXLabels?: boolean;
 }) {
-  const chartData = data;
-  const maxValue = Math.max(...chartData.map((bucket) => bucket.value), 0);
-  const yAxisMax = unit === "books" ? Math.ceil(maxValue) : maxValue;
-  const yTicks = [yAxisMax, yAxisMax / 2, 0];
-  const labelStep = useMemo(() => {
-    if (showAllXLabels) return 1;
-    if (chartData.length <= 6) return 1;
-    if (chartData.length <= 12) return 2;
-    if (chartData.length <= 24) return 3;
-    if (chartData.length <= 36) return 4;
-    return 6;
-  }, [chartData.length, showAllXLabels]);
-  const chartGridStyle = useMemo(
-    () => ({
-      gridTemplateColumns: `repeat(${Math.max(chartData.length, 1)}, minmax(0, 1fr))`,
-    }),
-    [chartData.length]
-  );
-
   return (
-    <div className="rounded-lg bg-muted/20 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-heading leading-snug font-medium">{title}</h3>
-        {action}
-      </div>
-      {chartData.length === 0 || maxValue <= 0 ? (
-        <EmptyPanel>No data for this chart yet.</EmptyPanel>
-      ) : (
-        <div className="mt-4 space-y-2">
-          <div className="grid grid-cols-[3rem_1fr] gap-2">
-            <div className="flex h-44 flex-col justify-between text-right text-[10px] text-muted-foreground">
-              {yTicks.map((tick, index) => (
-                <span key={`${tick}-${index}`}>
-                  {unit === "minutes"
-                    ? formatChartValue(tick, "minutes")
-                    : unit === "speed"
-                      ? tick.toFixed(1)
-                      : formatNumber(Math.round(tick))}
-                </span>
-              ))}
-            </div>
-            <div className="min-w-0">
-              <div className="relative h-44 w-full">
-                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                  <div className="border-t border-border/70" />
-                  <div className="border-t border-border/50" />
-                  <div className="border-t border-border/70" />
-                </div>
-                <div className="relative grid h-full w-full items-end gap-1" style={chartGridStyle}>
-                  {chartData.map((bucket) => {
-                    const height = bucket.value > 0 ? Math.max((bucket.value / yAxisMax) * 100, 4) : 0;
-                    const highlighted = bucket.key === highlightKey;
-                    return (
-                      <button
-                        key={bucket.key}
-                        type="button"
-                        className="group flex h-full min-w-0 items-end justify-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                        aria-label={`${bucket.label}: ${formatChartValue(bucket.value, unit)}`}
-                      >
-                        <div
-                          className={cn(
-                            "w-[70%] max-w-8 rounded-t-sm transition-colors group-hover:bg-primary",
-                            highlighted ? "bg-rating" : "bg-primary/85"
-                          )}
-                          style={{ height: `${height}%` }}
-                          title={`${bucket.label}: ${formatChartValue(bucket.value, unit)}`}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-[3rem_1fr] gap-2">
-            <div />
-            <div className="grid w-full gap-1" style={chartGridStyle}>
-              {chartData.map((bucket, index) => {
-                const shouldShow =
-                  chartData.length <= 6 ||
-                  index === 0 ||
-                  index === chartData.length - 1 ||
-                  index % labelStep === 0;
-
-                return (
-                  <span key={`${bucket.key}-label`} className="min-w-0 break-words text-center text-[10px] leading-tight text-muted-foreground">
-                    {shouldShow ? bucket.label : ""}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <VerticalBarChart
+      title={title}
+      data={data}
+      formatValue={(value) =>
+        unit === "minutes"
+          ? formatChartValue(value, "minutes")
+          : unit === "speed"
+            ? value.toFixed(1)
+            : formatNumber(Math.round(value))
+      }
+      action={action}
+      highlightKey={highlightKey}
+      showAllXLabels={showAllXLabels}
+    />
   );
 }
 
@@ -318,138 +216,16 @@ function LineChart({
   unit: "pages" | "speed";
   empty: string;
 }) {
-  const chartData = data;
-  const maxValue = Math.max(...chartData.map((bucket) => bucket.value), 0);
-  const yAxisMax = maxValue > 0 ? maxValue : 1;
-  const yTicks = [yAxisMax, yAxisMax / 2, 0];
-  const chartHeight = 176;
-  const labelStep = useMemo(() => {
-    if (chartData.length <= 6) return 1;
-    if (chartData.length <= 12) return 2;
-    if (chartData.length <= 24) return 3;
-    if (chartData.length <= 36) return 4;
-    return 6;
-  }, [chartData.length]);
-  const chartGridStyle = useMemo(
-    () => ({
-      gridTemplateColumns: `repeat(${Math.max(chartData.length, 1)}, minmax(0, 1fr))`,
-    }),
-    [chartData.length]
-  );
-  const points = useMemo(() => {
-    if (chartData.length === 0) return [];
-    if (chartData.length === 1) {
-      return [
-        {
-          ...chartData[0],
-          x: 50,
-          y: chartHeight - (chartData[0].value / yAxisMax) * chartHeight,
-        },
-      ];
-    }
-
-    return chartData.map((bucket, index) => ({
-      ...bucket,
-      x: (index / (chartData.length - 1)) * 100,
-      y: chartHeight - (bucket.value / yAxisMax) * chartHeight,
-    }));
-  }, [chartData, yAxisMax]);
-  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPoints =
-    points.length > 0
-      ? `0,${chartHeight} ${points.map((point) => `${point.x},${point.y}`).join(" ")} 100,${chartHeight}`
-      : "";
-
   return (
-    <div className="rounded-lg bg-muted/20 p-4">
-      <h3 className="text-base font-heading leading-snug font-medium">{title}</h3>
-      {chartData.length === 0 || maxValue <= 0 ? (
-        <EmptyPanel>{empty}</EmptyPanel>
-      ) : (
-        <div className="mt-4 space-y-2">
-          <div className="grid grid-cols-[3rem_1fr] gap-2">
-            <div className="flex h-44 flex-col justify-between text-right text-[10px] text-muted-foreground">
-              {yTicks.map((tick, index) => (
-                <span key={`${tick}-${index}`}>
-                  {unit === "speed" ? tick.toFixed(1) : formatNumber(Math.round(tick))}
-                </span>
-              ))}
-            </div>
-            <div className="min-w-0">
-              <div className="relative h-44 w-full">
-                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                  <div className="border-t border-border/70" />
-                  <div className="border-t border-border/50" />
-                  <div className="border-t border-border/70" />
-                </div>
-
-                <svg
-                  className="absolute inset-0 overflow-visible"
-                  width="100%"
-                  height={chartHeight}
-                  viewBox={`0 0 100 ${chartHeight}`}
-                  preserveAspectRatio="none"
-                  role="img"
-                  aria-label="Line chart showing average reading speed over time"
-                >
-                  <defs>
-                    <linearGradient id="average-speed-fill" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.34" />
-                      <stop offset="70%" stopColor="var(--primary)" stopOpacity="0.1" />
-                      <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <polygon points={areaPoints} fill="url(#average-speed-fill)" />
-                  <polyline
-                    points={linePoints}
-                    fill="none"
-                    stroke="var(--primary)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-
-                {points.map((point) => (
-                  <button
-                    key={point.key}
-                    type="button"
-                    className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                    style={{
-                      left: `${point.x}%`,
-                      top: `${point.y}px`,
-                    }}
-                    aria-label={`${point.label}: ${unit === "speed" ? formatChartValue(point.value, "speed") : formatChartValue(point.value, "pages")}`}
-                    title={`${point.label}: ${unit === "speed" ? formatChartValue(point.value, "speed") : formatChartValue(point.value, "pages")}`}
-                  >
-                    <span className="block h-2.5 w-2.5 rounded-full border-2 border-background bg-primary shadow-sm" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-[3rem_1fr] gap-2">
-            <div />
-            <div className="grid w-full gap-1" style={chartGridStyle}>
-              {chartData.map((bucket, index) => {
-                const shouldShow =
-                  chartData.length <= 6 ||
-                  index === 0 ||
-                  index === chartData.length - 1 ||
-                  index % labelStep === 0;
-
-                return (
-                  <span key={`${bucket.key}-label`} className="min-w-0 break-words text-center text-[10px] leading-tight text-muted-foreground">
-                    {shouldShow ? bucket.label : ""}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <DesignLineChart
+      title={title}
+      data={data}
+      formatValue={(value) =>
+        unit === "speed" ? formatChartValue(value, "speed") : formatChartValue(value, "pages")
+      }
+      empty={empty}
+      ariaLabel="Line chart showing average reading speed over time"
+    />
   );
 }
 
@@ -474,12 +250,7 @@ function RankedList({ items, empty }: { items: Array<{ label: string; value: str
 }
 
 function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
-    </div>
-  );
+  return <SharedStatCard label={label} value={value} />;
 }
 
 function formatRating(value: number | null): string {
@@ -924,8 +695,8 @@ export default function Analytics() {
             &lt;- Back to Analytics
           </Link>
           <div className="space-y-1">
-            <h1 className="text-2xl font-heading leading-snug font-medium">{getAnalyticsCategoryTitle(routeCategory)}</h1>
-            <p className="text-sm text-muted-foreground">{getAnalyticsCategoryDescription(routeCategory)}</p>
+        <AppHeading level={1} as="h1">{getAnalyticsCategoryTitle(routeCategory)}</AppHeading>
+        <HeadingDescription>{getAnalyticsCategoryDescription(routeCategory)}</HeadingDescription>
           </div>
         </div>
 
@@ -957,8 +728,8 @@ export default function Analytics() {
   return (
     <div className="space-y-10">
       <div className="space-y-1">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Lifetime reading patterns from your books and progress logs.</p>
+        <AppHeading level={1} as="h1">Analytics</AppHeading>
+        <HeadingDescription>Lifetime reading patterns from your books and progress logs.</HeadingDescription>
       </div>
 
       {booksError ? <p className="text-sm text-destructive">{booksError}</p> : null}

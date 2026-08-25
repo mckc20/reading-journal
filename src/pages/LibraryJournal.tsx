@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NotebookPen } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
 import { fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
@@ -59,8 +60,8 @@ export default function LibraryJournal() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="font-heading text-3xl font-medium leading-tight">Journal</h1>
-        <p className="text-sm text-muted-foreground">All book, series, and author journal entries, newest first.</p>
+        <AppHeading level={1}>Journal</AppHeading>
+        <HeadingDescription>All book, series, and author journal entries, newest first.</HeadingDescription>
       </div>
 
       {error && (

@@ -1,6 +1,5 @@
 import type { Author, Book, BookJournalEntryRecord } from "@/types";
 import { sortBookJournalEntryRecords } from "@/lib/bookJournal";
-import { formatPublicationDateForDisplay } from "@/lib/publicationDate";
 
 export type AuthorShelfGroupKey = "read" | "reading" | "want-to-read" | "uncategorized";
 
@@ -154,13 +153,8 @@ function makeSyntheticAuthorSummary(name: string): AuthorSummary {
     user_id: "",
     name,
     photo_url: null,
-    birth_date: null,
-    birth_date_precision: null,
-    death_date: null,
-    death_date_precision: null,
     bio: null,
     is_favorite: false,
-    nationality: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
     books: [],
@@ -290,35 +284,6 @@ export function findAuthorSummary(
 
   const key = authorKey(decoded);
   return authors.find((author) => authorKey(author.name) === key) ?? null;
-}
-
-export function formatAuthorDate(date: string | null): string {
-  if (!date) return "No date yet";
-
-  const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return "No date yet";
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(parsedDate);
-}
-
-export function formatAuthorYear(date: string | null): string {
-  if (!date) return "No date yet";
-
-  const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return "No date yet";
-
-  return new Intl.DateTimeFormat(undefined, { year: "numeric" }).format(parsedDate);
-}
-
-export function formatAuthorPartialDate(
-  value: string | null | undefined,
-  precision: Author["birth_date_precision"] | Author["death_date_precision"] | null | undefined,
-): string {
-  return formatPublicationDateForDisplay(value ?? null, precision ?? null);
 }
 
 export function getAuthorInitials(name: string): string {

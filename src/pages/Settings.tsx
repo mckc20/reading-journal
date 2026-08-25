@@ -20,6 +20,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import SetPasswordDialog from "@/components/SetPasswordDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -1519,10 +1520,10 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="space-y-2">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Settings</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
+        <AppHeading level={1} as="h1">Settings</AppHeading>
+        <HeadingDescription className="max-w-2xl">
           Manage your profile, app preferences, reading defaults, notifications, and account.
-        </p>
+        </HeadingDescription>
       </div>
 
       <SettingsTabs activeTab={activeTab} />

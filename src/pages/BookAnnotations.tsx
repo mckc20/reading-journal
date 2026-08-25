@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, NotebookPen, RefreshCw } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -100,7 +101,7 @@ export default function BookAnnotations() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-        <h1 className="text-lg font-heading leading-snug font-medium">Book not found</h1>
+        <AppHeading level={1} as="h1">Book not found</AppHeading>
         <BackButton fallbackTo="/library" />
       </div>
     );
@@ -112,8 +113,8 @@ export default function BookAnnotations() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-muted-foreground">{book.title}</p>
-          <h1 className="text-2xl font-heading leading-snug font-medium">Journal</h1>
+          <HeadingDescription>{book.title}</HeadingDescription>
+          <AppHeading level={1} as="h1">Journal</AppHeading>
         </div>
         <Button type="button" size="sm" onClick={() => setComposerOpen(true)} disabled={!user}>
           <NotebookPen className="mr-1.5 h-4 w-4" />

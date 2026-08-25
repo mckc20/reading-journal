@@ -35,7 +35,7 @@ Summary: Authors now come from their own database table, and book forms use a se
 - Author picker for books
   You can now pick existing authors or open the Add Author dialog directly from the book form.
 - Author metadata and detail pages
-  Author pages now read from saved author records, so bio, photo, favorite, and nationality can show up there.
+  Author pages now read from saved author records, so bio, photo, and favorite details can show up there.
 - Stable author links
   Author detail pages now use stable IDs, which keeps links working even if an author name changes later.
 

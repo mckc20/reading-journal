@@ -35,13 +35,8 @@ export interface Author {
   user_id: string;
   name: string;
   photo_url?: string | null;
-  birth_date?: string | null;
-  birth_date_precision?: PublicationDatePrecision | null;
-  death_date?: string | null;
-  death_date_precision?: PublicationDatePrecision | null;
   bio?: string | null;
   is_favorite: boolean;
-  nationality?: string | null;
   created_at: string;
   updated_at: string;
 }

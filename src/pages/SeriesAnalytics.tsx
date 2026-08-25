@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackButton from "@/components/BackButton";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { SeriesAnalyticsFull } from "@/components/series/SeriesAnalyticsSections";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -96,8 +97,8 @@ export default function SeriesAnalytics() {
     <div className="space-y-8">
       <BackButton fallbackTo={`/series/${seriesRecord.id}`} />
       <header>
-        <p className="text-sm font-medium text-muted-foreground">{seriesRecord.name}</p>
-        <h1 className="mt-1 font-heading text-3xl font-medium leading-tight">Analytics</h1>
+        <HeadingDescription>{seriesRecord.name}</HeadingDescription>
+        <AppHeading level={1} className="mt-1">Analytics</AppHeading>
       </header>
       {seriesBooks.length === 0 ? (
         <EmptyState message="Books added to this series will appear here." />

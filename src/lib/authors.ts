@@ -1,20 +1,14 @@
 import { supabase } from "@/lib/supabase";
-import { parsePublicationDate, parsePublicationDateInput } from "@/lib/publicationDate";
 import { deletePublicImageVariants, uploadPublicImage } from "@/lib/storage";
-import type { Author, PublicationDatePrecision } from "@/types";
+import type { Author } from "@/types";
 
 export interface AuthorInput {
   name: string;
   photo_url?: string | null;
   photo_file?: File | null;
   remove_photo?: boolean;
-  birth_date?: string | null;
-  birth_date_precision?: PublicationDatePrecision | null;
-  death_date?: string | null;
-  death_date_precision?: PublicationDatePrecision | null;
   bio?: string | null;
   is_favorite?: boolean;
-  nationality?: string | null;
 }
 
 function normalizeAuthorName(value: string): string {
@@ -26,30 +20,6 @@ function normalizeOptionalText(value?: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
-function normalizeOptionalDate(value?: string | null): { date: string | null; precision: "year" | "month" | "day" | null } {
-  const parsed = parsePublicationDate(value ?? undefined);
-  return {
-    date: parsed?.date ?? null,
-    precision: parsed?.precision ?? null,
-  };
-}
-
-function normalizeOptionalDateWithPrecision(
-  value?: string | null,
-  precision?: PublicationDatePrecision | null,
-): { date: string | null; precision: PublicationDatePrecision | null } {
-  if (value && precision) {
-    const parsed = parsePublicationDateInput(value, precision);
-    if (parsed) return parsed;
-  }
-
-  const parsed = normalizeOptionalDate(value);
-  return {
-    date: parsed.date,
-    precision: parsed.precision,
-  };
-}
-
 function authorKey(name: string): string {
   return normalizeAuthorName(name).toLocaleLowerCase();
 }
@@ -57,21 +27,14 @@ function authorKey(name: string): string {
 function normalizeAuthorInput(input: AuthorInput): Omit<AuthorInput, "name"> & { name: string } {
   const name = normalizeAuthorName(input.name);
   if (!name) throw new Error("Author name is required.");
-  const birth = normalizeOptionalDateWithPrecision(input.birth_date, input.birth_date_precision);
-  const death = normalizeOptionalDateWithPrecision(input.death_date, input.death_date_precision);
 
   return {
     name,
     photo_url: normalizeOptionalText(input.photo_url),
     photo_file: input.photo_file ?? null,
     remove_photo: input.remove_photo ?? false,
-    birth_date: birth.date,
-    birth_date_precision: birth.precision,
-    death_date: death.date,
-    death_date_precision: death.precision,
     bio: normalizeOptionalText(input.bio),
     is_favorite: input.is_favorite ?? false,
-    nationality: normalizeOptionalText(input.nationality),
   };
 }
 

@@ -37,7 +37,6 @@ export default function AuthorMultiSelect({
     return authors.filter((author) => {
       const haystack = [
         author.name,
-        author.nationality,
         author.bio,
       ]
         .filter(Boolean)

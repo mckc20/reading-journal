@@ -1,10 +1,11 @@
-import { useEffect, useId, useMemo, useState } from "react";
-import { BarChart3, ChevronDown, ChevronUp, PauseCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
+import { VerticalBarChart } from "@/components/design";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import {
-  buildProgressTimeline,
   formatCalendarSpan,
   formatTotalReadingTime,
   getEstimatedFinish,
@@ -44,14 +45,6 @@ function formatDayLabel(date: Date): string {
   return String(date.getDate());
 }
 
-function formatFullDayLabel(dayKey: string): string {
-  return dayFromKey(dayKey).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -84,12 +77,9 @@ function formatEstimateConfidence(confidence: "low" | "medium" | "high" | null):
 }
 
 export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
-  const progressGradientId = `book-progress-fill-${useId().replace(/:/g, "")}`;
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
-  const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
 
   async function loadLogs() {
@@ -184,11 +174,6 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     [entries, hasMoreEntries, showAllEntries]
   );
 
-  const progressTimeline = useMemo(
-    () => buildProgressTimeline(logs, book.total_pages, book.pause_periods),
-    [book.pause_periods, book.total_pages, logs]
-  );
-
   const totalPagesRead = useMemo(
     () => chartPoints.reduce((sum, point) => sum + point.pagesRead, 0),
     [chartPoints]
@@ -237,107 +222,6 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     if (chartPoints.length === 0) return 0;
     return totalPagesRead / chartPoints.length;
   }, [chartPoints.length, totalPagesRead]);
-
-  const labelStep = useMemo(() => {
-    if (chartPoints.length <= 14) return 1;
-    if (chartPoints.length <= 28) return 2;
-    if (chartPoints.length <= 42) return 3;
-    if (chartPoints.length <= 56) return 4;
-    return 7;
-  }, [chartPoints.length]);
-
-  const activePoint = useMemo(() => {
-    if (!activeDayKey || chartPoints.length === 0) return null;
-    return chartPoints.find((point) => point.dayKey === activeDayKey) ?? null;
-  }, [activeDayKey, chartPoints]);
-
-  const activePointIndex = useMemo(() => {
-    if (!activePoint) return -1;
-    return chartPoints.findIndex((point) => point.dayKey === activePoint.dayKey);
-  }, [activePoint, chartPoints]);
-
-  const activePointXPercent =
-    activePointIndex < 0 || chartPoints.length === 0
-      ? 0
-      : ((activePointIndex + 0.5) / chartPoints.length) * 100;
-  const activePointTooltipTransform =
-    activePointXPercent < 12
-      ? "translateX(0)"
-      : activePointXPercent > 88
-        ? "translateX(-100%)"
-        : "translateX(-50%)";
-  const dailyChartGridStyle = {
-    gridTemplateColumns: `repeat(${chartPoints.length}, minmax(0, 1fr))`,
-  };
-
-  const progressChartHeight = 176;
-  const progressDatePoints = useMemo(
-    () => progressTimeline.points.filter((point) => !point.isStart),
-    [progressTimeline.points]
-  );
-  const progressStartOffsetPercent = 1.5;
-  const getProgressXPercent = (dayKey: string, isStart = false): number => {
-    const index = progressDatePoints.findIndex((point) => point.dayKey === dayKey);
-    if (index < 0) return 0;
-    if (progressDatePoints.length === 1) {
-      return isStart ? 50 - progressStartOffsetPercent : 50;
-    }
-
-    const dateX =
-      progressStartOffsetPercent +
-      (index / (progressDatePoints.length - 1)) * (100 - progressStartOffsetPercent);
-    return isStart ? Math.max(0, dateX - progressStartOffsetPercent) : dateX;
-  };
-  const progressLinePoints = progressTimeline.points
-    .map((point) => {
-      const x = getProgressXPercent(point.dayKey, point.isStart);
-      const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  const progressAreaPoints =
-    progressTimeline.points.length > 0
-      ? `0,${progressChartHeight} ${progressTimeline.points
-          .map((point) => {
-            const x = getProgressXPercent(point.dayKey, point.isStart);
-            const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-            return `${x},${y}`;
-          })
-          .join(" ")} 100,${progressChartHeight}`
-      : "";
-  const activeProgressPoint =
-    activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
-  const activeProgressXPercent =
-    activeProgressPoint === null
-      ? 0
-      : getProgressXPercent(activeProgressPoint.dayKey, activeProgressPoint.isStart);
-  const activeProgressTooltipTransform =
-    activeProgressXPercent < 8
-      ? "translateX(0)"
-      : activeProgressXPercent > 92
-        ? "translateX(-100%)"
-        : "translateX(-50%)";
-  const progressLabelStep = useMemo(() => {
-    if (progressDatePoints.length <= 14) return 1;
-    if (progressDatePoints.length <= 28) return 2;
-    if (progressDatePoints.length <= 42) return 3;
-    if (progressDatePoints.length <= 56) return 4;
-    return 7;
-  }, [progressDatePoints.length]);
-  const pauseBands = progressTimeline.pauseSegments.map((segment, index) => {
-    const startX = getProgressXPercent(segment.startDayKey);
-    const endX = Math.max(startX + 3, getProgressXPercent(segment.endDayKey));
-    return {
-      key: `${segment.startDayKey}-${segment.endDayKey}-${index}`,
-      startX,
-      endX,
-      segment,
-    };
-  });
-
-  const maxPages = Math.max(...chartPoints.map((p) => p.pagesRead), 0);
-  const yAxisMax = maxPages > 0 ? maxPages : 1;
-  const yTicks = [yAxisMax, Math.ceil(yAxisMax / 2), 0];
 
   if (loading) {
     return (
@@ -444,164 +328,11 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
           <p className="text-sm font-medium">Progress over time</p>
         </div>
 
-        {!progressTimeline.isAvailable ? (
-          <div className="rounded-md border bg-background/80 p-3">
-            <p className="text-sm font-medium">Total pages needed</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Add the book's total pages in the Properties tab to calculate progress percentages.
-            </p>
-          </div>
-        ) : progressTimeline.points.length === 0 ? (
-          <div className="rounded-md border bg-background/80 p-3">
-            <p className="text-sm font-medium">No increased progress yet</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              The line appears after at least one progress entry moves to a higher page.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-[2.5rem_1fr] gap-2">
-            <div className="h-44 flex flex-col justify-between text-[10px] text-muted-foreground">
-              <span>100%</span>
-              <span>50%</span>
-              <span>0%</span>
-            </div>
-
-            <div className="min-w-0">
-              <div className="space-y-2 px-1">
-                <div className="relative h-44 w-full">
-                  <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                    <div className="border-t border-border/70" />
-                    <div className="border-t border-border/50" />
-                    <div className="border-t border-border/70" />
-                  </div>
-
-                  {pauseBands.map(({ key, startX, endX, segment }) => (
-                    <div
-                      key={key}
-                      className="pointer-events-none absolute inset-y-0 z-[1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 bg-muted/20"
-                      style={{ left: `${startX}%`, width: `${Math.max(4, endX - startX)}%` }}
-                    >
-                      <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">
-                        <span className="inline-flex flex-col items-center gap-1">
-                          <PauseCircle className="h-5 w-5 text-muted-foreground/70" />
-                          <span>
-                            Paused for {segment.durationDays}
-                            {segment.durationDays === 1 ? " day" : " days"}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {activeProgressPoint && (
-                    <div
-                      className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                      style={{
-                        left: `${activeProgressXPercent}%`,
-                        transform: activeProgressTooltipTransform,
-                      }}
-                    >
-                      {activeProgressPoint.isStart
-                        ? "Start"
-                        : formatFullDayLabel(activeProgressPoint.dayKey)}
-                      : {activeProgressPoint.progressPercent}% · page{" "}
-                      {activeProgressPoint.currentPage}
-                    </div>
-                  )}
-
-                  <svg
-                    className="absolute inset-0 overflow-visible"
-                    width="100%"
-                    height={progressChartHeight}
-                    viewBox={`0 0 100 ${progressChartHeight}`}
-                    preserveAspectRatio="none"
-                    role="img"
-                    aria-label="Line chart showing book progress through time"
-                  >
-                    <defs>
-                      <linearGradient id={progressGradientId} x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.34" />
-                        <stop offset="70%" stopColor="var(--primary)" stopOpacity="0.1" />
-                        <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <polygon points={progressAreaPoints} fill={`url(#${progressGradientId})`} />
-                    <polyline
-                      points={progressLinePoints}
-                      fill="none"
-                      stroke="var(--primary)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-
-                  {progressTimeline.points.map((point, index) => {
-                    const nextPoint = progressTimeline.points[index + 1];
-                    const isDayBeforeProgressIncrease =
-                      !point.isStart && !point.hasProgressIncrease && !!nextPoint?.hasProgressIncrease;
-                    const showMarker =
-                      point.isStart || point.hasProgressIncrease || isDayBeforeProgressIncrease;
-                    const x = getProgressXPercent(point.dayKey, point.isStart);
-                    const y =
-                      progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-                    const label = point.isStart
-                      ? `Start: ${point.progressPercent}% progress`
-                      : `${formatFullDayLabel(point.dayKey)}: ${point.progressPercent}% progress, page ${point.currentPage}`;
-
-                    return (
-                      <button
-                        key={`${point.dayKey}-${point.currentPage}-${index}`}
-                        type="button"
-                        className={
-                          showMarker
-                            ? "absolute h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                            : "absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                        }
-                        style={{
-                          left: `${x}%`,
-                          top: `${y}px`,
-                          borderColor:
-                            showMarker
-                              ? "color-mix(in oklch, var(--muted) 20%, var(--background))"
-                              : "transparent",
-                        }}
-                        onMouseEnter={() => setActiveProgressIndex(index)}
-                        onMouseLeave={() => setActiveProgressIndex(null)}
-                        onFocus={() => setActiveProgressIndex(index)}
-                        onBlur={() => setActiveProgressIndex(null)}
-                        aria-label={label}
-                      />
-                    );
-                  })}
-                </div>
-
-                <div className="relative h-4 w-full">
-                  {progressDatePoints.map((point, index) => {
-                    const x = getProgressXPercent(point.dayKey);
-                    const shouldShow =
-                      progressDatePoints.length <= 10 ||
-                      index === 0 ||
-                      index === progressDatePoints.length - 1 ||
-                      index % progressLabelStep === 0;
-                    const label = formatDayLabel(dayFromKey(point.dayKey));
-
-                    return (
-                      <span
-                        key={`${point.dayKey}-label-${index}`}
-                        className="absolute w-16 -translate-x-1/2 text-center text-[10px] text-muted-foreground"
-                        style={{ left: `${x}%` }}
-                      >
-                        {shouldShow ? label : ""}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <ProgressOverTimeChart
+          logs={logs}
+          totalPages={book.total_pages}
+          pausePeriods={book.pause_periods}
+        />
       </section>
 
       <section className="space-y-3">
@@ -624,81 +355,15 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[2rem_1fr] gap-2">
-          <div className="h-44 flex flex-col justify-between text-[10px] text-muted-foreground">
-            {yTicks.map((tick, index) => (
-              <span key={`${tick}-${index}`}>{tick}</span>
-            ))}
-          </div>
-
-          <div className="min-w-0">
-            <div className="w-full space-y-2 px-1">
-              <div className="relative h-44 w-full">
-                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                  <div className="border-t border-border/70" />
-                  <div className="border-t border-border/50" />
-                  <div className="border-t border-border/70" />
-                </div>
-
-                {activePoint && activePointIndex >= 0 && (
-                  <div
-                    className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                    style={{
-                      left: `${activePointXPercent}%`,
-                      transform: activePointTooltipTransform,
-                    }}
-                  >
-                    {formatFullDayLabel(activePoint.dayKey)}: {activePoint.pagesRead} page{activePoint.pagesRead === 1 ? "" : "s"}
-                  </div>
-                )}
-
-                <div
-                  className="relative grid h-full w-full items-end"
-                  style={dailyChartGridStyle}
-                >
-                  {chartPoints.map((point) => {
-                    const chartHeightPx = 176; // h-44 = 11rem = 176px
-                    const normalizedHeight = Math.round((point.pagesRead / yAxisMax) * chartHeightPx);
-                    const barHeight = point.pagesRead > 0 ? Math.max(normalizedHeight, 4) : 0;
-                    return (
-                      <button
-                        key={point.dayKey}
-                        type="button"
-                        className="flex h-full min-w-0 items-end justify-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                        onMouseEnter={() => setActiveDayKey(point.dayKey)}
-                        onMouseLeave={() => setActiveDayKey(null)}
-                        onFocus={() => setActiveDayKey(point.dayKey)}
-                        onBlur={() => setActiveDayKey(null)}
-                        aria-label={`${formatFullDayLabel(point.dayKey)}: ${point.pagesRead} page${point.pagesRead === 1 ? "" : "s"} read`}
-                      >
-                        <div
-                          className="w-[70%] max-w-8 rounded-t-sm bg-primary/85 transition-colors hover:bg-primary"
-                          style={{ height: `${barHeight}px` }}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div
-                className="grid w-full"
-                style={dailyChartGridStyle}
-              >
-                {chartPoints.map((point, index) => (
-                  <span
-                    key={point.dayKey}
-                    className="min-w-0 text-center text-[10px] text-muted-foreground"
-                  >
-                    {chartPoints.length <= 10 || index === 0 || index === chartPoints.length - 1 || index % labelStep === 0
-                      ? point.dayLabel
-                      : ""}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <VerticalBarChart
+          data={chartPoints.map((point) => ({
+            key: point.dayKey,
+            label: point.dayLabel,
+            value: point.pagesRead,
+          }))}
+          formatValue={(value) => `${Math.round(value)} page${Math.round(value) === 1 ? "" : "s"}`}
+          yAxisClassName="grid-cols-[2rem_1fr]"
+        />
       </section>
 
       <section className="space-y-3">

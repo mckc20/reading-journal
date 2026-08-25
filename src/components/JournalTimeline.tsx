@@ -24,6 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
+import { AppHeading } from "@/components/design";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import JournalEntryCard from "@/components/JournalEntryCard";
@@ -768,7 +769,7 @@ function JournalNoteEntry({
           allowAttach={allowAttach}
         />
         {displayEntryTitle(entry) && (
-          <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
+          <p className="mb-2 text-sm font-medium leading-snug">{displayEntryTitle(entry)}</p>
         )}
         <JournalEntryMediaContent
           markdown={note.content}
@@ -918,7 +919,7 @@ function JournalReviewEntry({
           allowAttach={allowAttach}
         />
         {displayEntryTitle(entry) && (
-          <h3 className="mb-2 text-sm font-heading leading-snug font-medium">{displayEntryTitle(entry)}</h3>
+          <p className="mb-2 text-sm font-medium leading-snug">{displayEntryTitle(entry)}</p>
         )}
         <JournalEntryMediaContent
           markdown={note.content}
@@ -1122,7 +1123,7 @@ function GeneratedBookEventEntry({
         </div>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-1">
-            <h3 className="text-sm font-heading leading-snug font-medium">{entry.label}</h3>
+            <p className="text-sm font-medium leading-snug">{entry.label}</p>
             {typeof rating === "number" && <RatingStars rating={rating} />}
             {details && <p className="text-sm text-muted-foreground">{details}</p>}
           </div>
@@ -1384,7 +1385,7 @@ function NotebookEntryContent({ entry }: { entry: ManualJournalTimelineEntry }) 
 
   return (
     <div className="space-y-3">
-      {title && <h3 className="font-heading text-xl font-medium leading-snug">{title}</h3>}
+      {title && <AppHeading level={3} as="h3">{title}</AppHeading>}
       <JournalEntryMediaContent
         markdown={note.content}
         media={getManualNoteMedia(entry)}
@@ -2810,9 +2811,9 @@ export default function JournalTimeline({
           {journalListGroups.map((group) => (
             <section key={group.dateKey} className="space-y-2">
               <header className="border-b border-border/70 pb-3">
-                <h2 className="font-heading text-3xl font-medium leading-tight">
+                <AppHeading level={1} as="h2">
                   {formatJournalDate(group.dateKey)}
-                </h2>
+                </AppHeading>
               </header>
               <div>
                 {group.entries.map((entry) => {

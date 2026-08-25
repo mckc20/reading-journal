@@ -20,6 +20,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -965,10 +966,10 @@ export function GroupsManager() {
       <div className="space-y-4">
         {showHeading && (
           <div>
-            <h2 className="font-heading text-base font-medium leading-snug">Chat Settings</h2>
-            <p className="text-sm text-muted-foreground">
+            <AppHeading level={4} as="h2">Chat Settings</AppHeading>
+            <HeadingDescription>
               {members.length} member{members.length === 1 ? "" : "s"}
-            </p>
+            </HeadingDescription>
           </div>
         )}
 
@@ -1543,8 +1544,8 @@ export function GroupsManager() {
           <div className="space-y-4 border-b p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="font-heading text-lg font-medium leading-snug">Start Chat</h2>
-                <p className="text-xs text-muted-foreground">Find a reader or create a group.</p>
+                <AppHeading level={4} as="h2">Start Chat</AppHeading>
+                <HeadingDescription className="text-xs">Find a reader or create a group.</HeadingDescription>
               </div>
               <MessageCircle className="h-5 w-5 text-muted-foreground" />
             </div>
@@ -1619,10 +1620,10 @@ export function GroupsManager() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             <div className="px-2 py-2">
-              <h2 className="font-heading text-lg font-medium leading-snug">Chats</h2>
-              <p className="text-xs text-muted-foreground">
+              <AppHeading level={4} as="h2">Chats</AppHeading>
+              <HeadingDescription className="text-xs">
                 {loading ? "Loading..." : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
-              </p>
+              </HeadingDescription>
             </div>
 
             {threads.length === 0 && !loading ? (
@@ -1703,9 +1704,9 @@ export function GroupsManager() {
                   <MessageAvatar profile={selectedThread.avatarProfile} fallback={selectedThread.title} />
                 </div>
                 <div className="min-w-0 text-center">
-                  <h1 className="truncate font-heading text-base font-medium leading-snug sm:text-lg">
+                  <AppHeading level={4} as="h1" className="truncate">
                     {selectedThread.title}
-                  </h1>
+                  </AppHeading>
                   <p className="truncate text-xs text-muted-foreground">
                     {selectedThread.group.kind === "direct"
                       ? "Direct chat"

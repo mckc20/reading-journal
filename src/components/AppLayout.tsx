@@ -135,13 +135,12 @@ function AppLayoutContent() {
   const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
   const [detailEditingOpen, setDetailEditingOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
-  const addMenuRef = useRef<HTMLDivElement>(null);
+  const desktopAddButtonRef = useRef<HTMLButtonElement>(null);
+  const desktopAddMenuRef = useRef<HTMLDivElement>(null);
+  const floatingAddButtonRef = useRef<HTMLButtonElement>(null);
+  const floatingAddMenuRef = useRef<HTMLDivElement>(null);
   const displayName = getDisplayName(profile, user?.email);
-  const hideAddBookButton =
-    location.pathname.startsWith("/groups") ||
-    location.pathname.startsWith("/messages") ||
-    detailEditingOpen;
+  const hideFloatingAddButton = detailEditingOpen;
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return;
@@ -165,7 +164,14 @@ function AppLayoutContent() {
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
-      if (addButtonRef.current?.contains(target) || addMenuRef.current?.contains(target)) {
+      const clickedInsideAddMenu = [
+        desktopAddButtonRef,
+        desktopAddMenuRef,
+        floatingAddButtonRef,
+        floatingAddMenuRef,
+      ].some((ref) => ref.current?.contains(target));
+
+      if (clickedInsideAddMenu) {
         return;
       }
       setAddMenuOpen(false);
@@ -234,9 +240,8 @@ function AppLayoutContent() {
           displayName={displayName}
           drawerOpen={drawerOpen}
           addMenuOpen={addMenuOpen}
-          addButtonRef={addButtonRef}
-          addMenuRef={addMenuRef}
-          hideAddButton={hideAddBookButton}
+          addButtonRef={desktopAddButtonRef}
+          addMenuRef={desktopAddMenuRef}
           onToggleDrawer={() => setDrawerOpen((current) => !current)}
           onCloseDrawer={() => setDrawerOpen(false)}
           onToggleAddMenu={() => setAddMenuOpen((current) => !current)}
@@ -268,10 +273,10 @@ function AppLayoutContent() {
           />
         </main>
 
-        {!hideAddBookButton && (
+        {!hideFloatingAddButton && (
           <FloatingAddButtonMenu
-            buttonRef={addButtonRef}
-            menuRef={addMenuRef}
+            buttonRef={floatingAddButtonRef}
+            menuRef={floatingAddMenuRef}
             open={addMenuOpen}
             onToggleOpen={() => setAddMenuOpen((current) => !current)}
             onSelect={openAddDialog}
@@ -301,6 +306,7 @@ function AppLayoutContent() {
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
             openAddBook={openAddBook}
+            onSaved={(series) => navigate(`/series/${series.id}`)}
           />
         )}
         {activeAddAction === "chat" && (
@@ -332,7 +338,6 @@ function AppHeader({
   addMenuOpen,
   addButtonRef,
   addMenuRef,
-  hideAddButton,
   onToggleDrawer,
   onCloseDrawer,
   onToggleAddMenu,
@@ -347,7 +352,6 @@ function AppHeader({
   addMenuOpen: boolean;
   addButtonRef: RefObject<HTMLButtonElement>;
   addMenuRef: RefObject<HTMLDivElement>;
-  hideAddButton: boolean;
   onToggleDrawer: () => void;
   onCloseDrawer: () => void;
   onToggleAddMenu: () => void;
@@ -397,15 +401,13 @@ function AppHeader({
         </nav>
 
         <div className="flex min-w-0 items-center justify-end gap-1">
-          {!hideAddButton && (
-            <DesktopAddButtonMenu
-              buttonRef={addButtonRef}
-              menuRef={addMenuRef}
-              open={addMenuOpen}
-              onToggleOpen={onToggleAddMenu}
-              onSelect={onSelectAddAction}
-            />
-          )}
+          <DesktopAddButtonMenu
+            buttonRef={addButtonRef}
+            menuRef={addMenuRef}
+            open={addMenuOpen}
+            onToggleOpen={onToggleAddMenu}
+            onSelect={onSelectAddAction}
+          />
           <Button size="icon" variant="ghost" asChild>
             <Link to="/search" aria-label="Search">
               <Search className="h-5 w-5" />

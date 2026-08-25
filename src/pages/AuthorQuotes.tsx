@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
 import BackButton from "@/components/BackButton";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -114,8 +115,8 @@ export default function AuthorQuotes() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-muted-foreground">{author.name}</p>
-          <h1 className="text-2xl font-heading leading-snug font-medium">Annotations</h1>
+          <HeadingDescription>{author.name}</HeadingDescription>
+          <AppHeading level={1} as="h1">Annotations</AppHeading>
         </div>
       </div>
 
