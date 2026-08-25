@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import type { ReadingLog } from "@/types";
 import { cn } from "@/lib/utils";
@@ -189,8 +190,8 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-base font-heading leading-snug font-medium">Reading activity</h2>
-        <p className="text-sm text-muted-foreground">12-month view by day (minutes read)</p>
+        <AppHeading level={4} as="h2">Reading activity</AppHeading>
+        <HeadingDescription>12-month view by day (minutes read)</HeadingDescription>
       </div>
 
       {hasAnyReading ? (

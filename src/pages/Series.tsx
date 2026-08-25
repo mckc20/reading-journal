@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Heart } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { buildSeriesGroups, type SeriesBookGroup } from "@/lib/libraryShelves";
@@ -69,10 +70,10 @@ export default function Series() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Series</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <AppHeading level={1} as="h1">Series</AppHeading>
+        <HeadingDescription>
           Browse the series in your library.
-        </p>
+        </HeadingDescription>
       </div>
 
       {error ? (

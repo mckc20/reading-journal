@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Check, SlidersHorizontal } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -125,7 +126,7 @@ export default function Search() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Search</h1>
+        <AppHeading level={1} as="h1">Search</AppHeading>
         <span className="text-sm text-muted-foreground">
           {loading ? "…" : `${books.length} book${books.length !== 1 ? "s" : ""}`}
         </span>
@@ -229,12 +230,12 @@ export default function Search() {
       {sections.map((section) => (
         <section key={section.property.key} className="space-y-3">
           <div>
-            <h2 className="font-heading leading-snug font-medium">
+            <AppHeading level={4} as="h2">
               {section.property.label}
-            </h2>
-            <p className="text-xs text-muted-foreground">
+            </AppHeading>
+            <HeadingDescription className="text-xs">
               {section.matches.length} match{section.matches.length !== 1 ? "es" : ""}
-            </p>
+            </HeadingDescription>
           </div>
           <Separator />
           <div className="space-y-2">
@@ -289,12 +290,12 @@ export default function Search() {
       {hasQuery && (journalEntriesLoading || noteMatches.length > 0) && (
         <section className="space-y-3">
           <div>
-            <h2 className="font-heading leading-snug font-medium">Journal entries</h2>
-            <p className="text-xs text-muted-foreground">
+            <AppHeading level={4} as="h2">Journal entries</AppHeading>
+            <HeadingDescription className="text-xs">
               {journalEntriesLoading
                 ? "Searching journal entries..."
                 : `${noteMatches.length} match${noteMatches.length !== 1 ? "es" : ""}`}
-            </p>
+            </HeadingDescription>
           </div>
           <Separator />
           {!journalEntriesLoading && (

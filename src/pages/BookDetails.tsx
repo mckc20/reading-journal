@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ReactNode,
 } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
@@ -29,9 +28,17 @@ import {
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BackButton from "@/components/BackButton";
+import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
+import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
 import JournalTimeline from "@/components/JournalTimeline";
+import {
+  buildBookLibraryFilterPath,
+  MetadataGroup,
+  MetadataItem,
+  MetadataLink,
+} from "@/components/LinkedMetadata";
 import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
@@ -184,14 +191,6 @@ function getProgressPercent(book: Book): number {
   return Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)));
 }
 
-function buildLibraryFilterPath(
-  key: "language" | "format" | "publicationYear" | "publisher" | "source",
-  value: string,
-): string {
-  const params = new URLSearchParams({ [key]: value });
-  return `/library/books?${params.toString()}`;
-}
-
 function getPublicationYear(value?: string | null): string | null {
   const [year] = (value ?? "").split("-");
   return year && /^\d{4}$/.test(year) ? year : null;
@@ -240,7 +239,6 @@ export default function BookDetails() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverPreviewUrlRef = useRef<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
@@ -275,7 +273,6 @@ export default function BookDetails() {
     setLocalRating(book.rating ?? null);
     setIsEditMode(false);
     setErrorMsg(null);
-    setDescriptionExpanded(false);
     clearCoverDraft();
     reset(bookToFormValues(book));
   }, [book, reset]);
@@ -698,7 +695,7 @@ export default function BookDetails() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-        <h1 className="text-lg font-heading leading-snug font-medium">Book not found</h1>
+        <AppHeading level={1} as="h1">Book not found</AppHeading>
         <p className="max-w-md text-sm text-muted-foreground">
           This book may not exist, may have been deleted, or you may not have access.
         </p>
@@ -832,7 +829,6 @@ export default function BookDetails() {
             },
           ];
   const description = book.description?.trim() || "";
-  const shouldCollapseDescription = description.length > 420;
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
@@ -897,7 +893,7 @@ export default function BookDetails() {
             )}
 
             <div className="flex items-start gap-3">
-              <h1 className="text-4xl font-heading leading-tight font-medium">{book.title}</h1>
+              <AppHeading level={1}>{book.title}</AppHeading>
               <button
                 type="button"
                 onClick={toggleFavorite}
@@ -1103,31 +1099,16 @@ export default function BookDetails() {
       {!isEditMode && (
         <>
           <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
-            <div className="rounded-xl border bg-card p-5">
-              <h2 className="text-xl font-heading leading-snug font-medium">
-                <span className="font-serif italic">About</span> the Book
-              </h2>
-              <div className="mt-4 space-y-4">
-                <p
-                  className={`whitespace-pre-line text-sm leading-7 text-muted-foreground ${
-                    shouldCollapseDescription && !descriptionExpanded ? "line-clamp-6" : ""
-                  }`}
-                >
-                  {description || "No description yet."}
-                </p>
-                {shouldCollapseDescription && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto px-0"
-                    onClick={() => setDescriptionExpanded((current) => !current)}
-                  >
-                    {descriptionExpanded ? "Show less" : "Show more"}
-                  </Button>
-                )}
-              </div>
-            </div>
+            <AboutSection
+              title={
+                <>
+                  <span className="font-serif italic">About</span> the Book
+                </>
+              }
+              text={description}
+              emptyText="No description yet."
+              clampClassName="line-clamp-6"
+            />
 
             <div className="rounded-xl border bg-card p-5">
               <div className="space-y-5">
@@ -1158,7 +1139,7 @@ export default function BookDetails() {
                     label="Language"
                     value={
                       book.language ? (
-                        <MetadataLink to={buildLibraryFilterPath("language", book.language)}>
+                        <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>
                           {book.language}
                         </MetadataLink>
                       ) : (
@@ -1170,7 +1151,7 @@ export default function BookDetails() {
                     label="Format"
                     value={
                       book.format ? (
-                        <MetadataLink to={buildLibraryFilterPath("format", book.format)}>
+                        <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>
                           {book.format}
                         </MetadataLink>
                       ) : (
@@ -1182,7 +1163,7 @@ export default function BookDetails() {
                     label="Publication Date"
                     value={
                       publicationYear ? (
-                        <MetadataLink to={buildLibraryFilterPath("publicationYear", publicationYear)}>
+                        <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
                           {formatPublicationDateForDisplay(
                             book.publication_date,
                             book.publication_date_precision,
@@ -1200,7 +1181,7 @@ export default function BookDetails() {
                     label="Publisher"
                     value={
                       book.publisher ? (
-                        <MetadataLink to={buildLibraryFilterPath("publisher", book.publisher)}>
+                        <MetadataLink to={buildBookLibraryFilterPath("publisher", book.publisher)}>
                           {book.publisher}
                         </MetadataLink>
                       ) : (
@@ -1212,7 +1193,7 @@ export default function BookDetails() {
                     label="Source"
                     value={
                       book.source ? (
-                        <MetadataLink to={buildLibraryFilterPath("source", book.source)}>
+                        <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>
                           {book.source}
                         </MetadataLink>
                       ) : (
@@ -1228,9 +1209,9 @@ export default function BookDetails() {
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-heading leading-snug font-medium">
+              <AppHeading level={2}>
                 Reading <span className="font-serif italic">Progress</span>
-              </h2>
+              </AppHeading>
               <Button asChild variant="link" className="px-0">
                 <Link to={`/books/${book.id}/analytics`}>
                   View more
@@ -1241,7 +1222,7 @@ export default function BookDetails() {
             <ProgressStatsStrip stats={readingProgressStats} />
 
             <div className="rounded-xl border bg-card p-5">
-              <h3 className="text-sm font-medium">Progress over time</h3>
+              <AppHeading level={4} as="h3">Progress over time</AppHeading>
               <div className="mt-4">
                 {logsLoading ? (
                   <div className="h-52 animate-pulse rounded-lg bg-muted" />
@@ -1260,9 +1241,9 @@ export default function BookDetails() {
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-heading leading-snug font-medium">
+              <AppHeading level={2}>
                 <span className="font-serif italic">Journal</span>
-              </h2>
+              </AppHeading>
               <Button asChild variant="link" className="px-0">
                 <Link to={`/books/${book.id}/journal`} className="text-primary">
                   Open journal
@@ -1306,9 +1287,9 @@ export default function BookDetails() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-heading leading-snug font-medium">
+            <AppHeading level={2}>
               More to <span className="font-serif italic">Explore</span>
-            </h2>
+            </AppHeading>
             <div className="grid gap-5 lg:grid-cols-3">
               <RelatedBooksGroup
                 title={
@@ -1332,9 +1313,9 @@ export default function BookDetails() {
                 books={relatedByGenre}
               />
               <div className="rounded-xl border bg-card p-4">
-                <h3 className="text-sm font-medium">
+                <AppHeading level={4} as="h3">
                   You Might Also <span className="font-serif italic">Like</span>
-                </h3>
+                </AppHeading>
                 <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
                   Recommendations coming later.
                 </div>
@@ -1343,35 +1324,6 @@ export default function BookDetails() {
           </section>
         </>
       )}
-    </div>
-  );
-}
-
-function MetadataGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h3 className="font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">{title}</h3>
-      <div className="mt-2">{children}</div>
-    </div>
-  );
-}
-
-function MetadataLink({ to, children }: { to: string; children: ReactNode }) {
-  return (
-    <Link
-      to={to}
-      className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function MetadataItem({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <p className="font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">{label}</p>
-      <p className="mt-1 text-sm">{value}</p>
     </div>
   );
 }
@@ -1414,9 +1366,11 @@ function ProgressStatItem({
 }
 
 function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Book[] }) {
+  const navigate = useNavigate();
+
   return (
     <div className="rounded-xl border bg-card p-4">
-      <h3 className="text-sm font-medium">{title}</h3>
+      <AppHeading level={4} as="h3">{title}</AppHeading>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           No matches in your library yet.
@@ -1424,26 +1378,11 @@ function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Bo
       ) : (
         <div className="mt-4 grid grid-cols-3 gap-3">
           {books.slice(0, 3).map((book) => (
-            <Link
+            <CoverOnlyBookCard
               key={book.id}
-              to={`/books/${book.id}`}
-              className="group min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label={`Open ${book.title}`}
-            >
-              <div className="aspect-[2/3] overflow-hidden rounded-md border bg-muted">
-                {book.cover_url ? (
-                  <img
-                    src={book.cover_url}
-                    alt=""
-                    className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-muted-foreground/40" />
-                  </div>
-                )}
-              </div>
-            </Link>
+              book={book}
+              onBook={(item) => navigate(`/books/${item.id}`)}
+            />
           ))}
         </div>
       )}

@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookAnalyticsPanel from "@/components/BookAnalyticsPanel";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 
@@ -35,7 +36,7 @@ export default function BookAnalytics() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-        <h1 className="text-lg font-heading leading-snug font-medium">Book not found</h1>
+        <AppHeading level={1} as="h1">Book not found</AppHeading>
         <BackButton fallbackTo="/library" />
       </div>
     );
@@ -46,8 +47,8 @@ export default function BookAnalytics() {
       <BackButton fallbackTo="/library" />
 
       <div>
-        <p className="text-sm text-muted-foreground">{book.title}</p>
-        <h1 className="text-2xl font-heading leading-snug font-medium">Analytics</h1>
+        <HeadingDescription>{book.title}</HeadingDescription>
+        <AppHeading level={1} as="h1">Analytics</AppHeading>
       </div>
 
       <BookAnalyticsPanel book={book} />

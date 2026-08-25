@@ -3,8 +3,6 @@ import test from "node:test";
 import {
   buildAuthorSummaries,
   findAuthorSummary,
-  formatAuthorPartialDate,
-  formatAuthorYear,
 } from "../src/lib/authorShelf";
 import {
   sortAuthorsForTopShelf,
@@ -101,11 +99,6 @@ test("finds an author by stable id", () => {
   assert.equal(findAuthorSummary(authors, "octavia-butler")?.name, "Octavia E. Butler");
 });
 
-test("formats missing author dates as empty friendly text", () => {
-  assert.equal(formatAuthorYear(null), "No date yet");
-  assert.equal(formatAuthorPartialDate("2026-05-14", "day"), "May 14, 2026");
-});
-
 test("orders top authors by favorites first and then rating", () => {
   const authors = buildAuthorSummaries([
     makeAuthor({
@@ -163,13 +156,8 @@ function makeAuthor(overrides: Partial<Author>): Author {
     user_id: "user-1",
     name: "Author",
     photo_url: null,
-    birth_date: null,
-    birth_date_precision: null,
-    death_date: null,
-    death_date_precision: null,
     bio: null,
     is_favorite: false,
-    nationality: null,
     created_at: "2026-05-01T08:00:00Z",
     updated_at: "2026-05-01T08:00:00Z",
     ...overrides,

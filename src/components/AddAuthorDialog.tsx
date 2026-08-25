@@ -7,15 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthorsContext } from "@/context";
-import { formatPublicationDateInput, parsePublicationDate } from "@/lib/publicationDate";
 import type { Author } from "@/types";
 
 type AuthorFormValues = {
   name: string;
-  birth_date: string;
-  death_date: string;
   bio: string;
-  nationality: string;
   is_favorite: boolean;
 };
 
@@ -30,10 +26,7 @@ interface AddAuthorDialogProps {
 function toFormValues(author?: Author | null, initialName = ""): AuthorFormValues {
   return {
     name: author?.name ?? initialName,
-    birth_date: formatPublicationDateInput(author?.birth_date, author?.birth_date_precision),
-    death_date: formatPublicationDateInput(author?.death_date, author?.death_date_precision),
     bio: author?.bio ?? "",
-    nationality: author?.nationality ?? "",
     is_favorite: author?.is_favorite ?? false,
   };
 }
@@ -100,18 +93,10 @@ export default function AddAuthorDialog({
   }
 
   async function onSubmit(values: AuthorFormValues) {
-    const birthDate = parsePublicationDate(values.birth_date);
-    const deathDate = parsePublicationDate(values.death_date);
-
     const payload = {
       name: values.name,
-      birth_date: birthDate?.date ?? null,
-      birth_date_precision: birthDate?.precision ?? null,
-      death_date: deathDate?.date ?? null,
-      death_date_precision: deathDate?.precision ?? null,
       bio: values.bio.trim() || null,
       is_favorite: values.is_favorite,
-      nationality: values.nationality.trim() || null,
       photo_file: photoFile,
       remove_photo: removePhoto,
     };
@@ -174,39 +159,7 @@ export default function AddAuthorDialog({
 
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="author-birth_date">Birth date</Label>
-                  <Input
-                    id="author-birth_date"
-                    placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
-                    {...register("birth_date", {
-                      validate: (value) =>
-                        !value.trim() || parsePublicationDate(value)
-                          ? true
-                          : "Enter a year, month, or full date",
-                    })}
-                  />
-                  {errors.birth_date && <p className="text-xs text-destructive">{errors.birth_date.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="author-death_date">Death date</Label>
-                  <Input
-                    id="author-death_date"
-                    placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
-                    {...register("death_date", {
-                      validate: (value) =>
-                        !value.trim() || parsePublicationDate(value)
-                          ? true
-                          : "Enter a year, month, or full date",
-                    })}
-                  />
-                  {errors.death_date && <p className="text-xs text-destructive">{errors.death_date.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="author-nationality">Nationality</Label>
-                  <Input id="author-nationality" {...register("nationality")} />
-                </div>
-                <label className="flex items-center gap-2 self-end rounded-md border border-input px-3 py-2 text-sm">
+                <label className="flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm">
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-input"

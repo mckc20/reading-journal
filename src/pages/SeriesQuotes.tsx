@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import AnnotationCard from "@/components/AnnotationCard";
 import BackButton from "@/components/BackButton";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -102,8 +103,8 @@ export default function SeriesQuotes() {
     <div className="space-y-6">
       <BackButton fallbackTo={`/series/${seriesRecord.id}`} />
       <div>
-        <p className="text-sm text-muted-foreground">{seriesRecord.name}</p>
-        <h1 className="font-heading text-3xl font-medium leading-tight sm:text-4xl">Quotes</h1>
+        <HeadingDescription>{seriesRecord.name}</HeadingDescription>
+        <AppHeading level={1}>Quotes</AppHeading>
       </div>
 
       {quoteGroups.length === 0 ? (
@@ -118,10 +119,10 @@ export default function SeriesQuotes() {
             return (
               <section key={book.id} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-                  <h2 className="font-heading text-2xl font-medium leading-snug">{book.title}</h2>
-                  <p className="text-sm text-muted-foreground">
+                  <AppHeading level={2} as="h2">{book.title}</AppHeading>
+                  <HeadingDescription>
                     {entries.length} quote{entries.length === 1 ? "" : "s"}
-                  </p>
+                  </HeadingDescription>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {visibleEntries.map(({ note }) => (

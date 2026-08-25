@@ -4,6 +4,7 @@ import { BookOpen, Grid2X2, Timeline } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import BookTimeline, { type BookTimelineItem } from "@/components/BookTimeline";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -274,8 +275,8 @@ export default function AuthorBooks() {
       <section className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">{author.name}</p>
-            <h1 className="font-heading text-3xl font-medium leading-tight sm:text-4xl">Books</h1>
+            <HeadingDescription>{author.name}</HeadingDescription>
+            <AppHeading level={1}>Books</AppHeading>
           </div>
 
           <div className="flex flex-col items-end gap-2">

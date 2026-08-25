@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -67,7 +68,7 @@ export default function GenreDetails() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <ListTree className="h-10 w-10 text-muted-foreground/40" />
-        <h1 className="text-lg font-heading leading-snug font-medium">Genre not found</h1>
+        <AppHeading level={1} as="h1">Genre not found</AppHeading>
         <BackButton fallbackTo="/library/genres" />
       </div>
     );
@@ -101,12 +102,12 @@ export default function GenreDetails() {
 
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-heading leading-tight font-medium">{genre.name}</h1>
+                <AppHeading level={1}>{genre.name}</AppHeading>
                 <Badge variant={genre.is_system ? "secondary" : "outline"}>
                   {genre.is_system ? "System" : "Custom"}
                 </Badge>
               </div>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{metadata.description}</p>
+              <HeadingDescription className="max-w-2xl">{metadata.description}</HeadingDescription>
             </div>
 
             <div className="grid max-w-xl grid-cols-3 overflow-hidden rounded-xl border bg-background/75">
@@ -129,7 +130,7 @@ export default function GenreDetails() {
 
       {subgenres.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-xl font-heading leading-snug font-medium">Subgenres</h2>
+          <AppHeading level={3} as="h2">Subgenres</AppHeading>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {subgenres.map((subgenre) => {
               const count = getGenreBookCount(subgenre.id, books, genres).total;
@@ -156,10 +157,10 @@ export default function GenreDetails() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-heading leading-snug font-medium">Books</h2>
-          <p className="text-sm text-muted-foreground">
+          <AppHeading level={3} as="h2">Books</AppHeading>
+          <HeadingDescription>
             {matchingBooks.length} matching book{matchingBooks.length === 1 ? "" : "s"}.
-          </p>
+          </HeadingDescription>
         </div>
 
         {matchingBooks.length === 0 ? (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { NotebookPen } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -64,8 +65,8 @@ export default function AuthorJournal() {
       <BackButton fallbackTo={`/authors/${author.id}`} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-muted-foreground">{author.name}</p>
-          <h1 className="text-2xl font-heading leading-snug font-medium">Journal</h1>
+          <HeadingDescription>{author.name}</HeadingDescription>
+          <AppHeading level={1} as="h1">Journal</AppHeading>
         </div>
         <Button type="button" size="sm" onClick={() => setComposerOpen(true)} disabled={!user}>
           <NotebookPen className="mr-1.5 h-4 w-4" />

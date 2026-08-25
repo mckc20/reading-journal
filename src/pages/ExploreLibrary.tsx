@@ -13,6 +13,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -614,10 +615,10 @@ function ManagementMode({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="font-heading text-lg font-medium leading-snug">Management Mode</h2>
-          <p className="text-sm text-muted-foreground">
+          <AppHeading level={4} as="h2">Management Mode</AppHeading>
+          <HeadingDescription>
             {selectedCount} selected from {books.length} visible books
-          </p>
+          </HeadingDescription>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-44">
@@ -733,9 +734,9 @@ function LibrarySection({
     <section className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-heading text-xl font-medium leading-snug">{title}</h2>
+          <AppHeading level={3} as="h2">{title}</AppHeading>
           {countLabel && (
-            <p className="text-xs text-muted-foreground">{countLabel}</p>
+            <HeadingDescription className="text-xs">{countLabel}</HeadingDescription>
           )}
         </div>
         {action}
@@ -1678,10 +1679,10 @@ function LibraryToolbar({
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
-        <h1 className="font-heading text-4xl font-bold leading-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <AppHeading level={1}>{title}</AppHeading>
+        <HeadingDescription>
           {title === "My Books" ? "Your library, your stories." : loading ? "..." : countLabel}
-        </p>
+        </HeadingDescription>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
@@ -1716,8 +1717,8 @@ function GroupedBooksView({
       {groups.map((group) => (
         <section key={group.name} className="space-y-3">
           <div>
-            <h3 className="font-heading leading-snug font-medium">{group.name}</h3>
-            <p className="text-xs text-muted-foreground">{groupCountLabel(group.books.length)}</p>
+            <AppHeading level={4} as="h3">{group.name}</AppHeading>
+            <HeadingDescription className="text-xs">{groupCountLabel(group.books.length)}</HeadingDescription>
           </div>
           <Separator />
           <BooksGrid books={group.books} onBook={onBook} />
@@ -1803,8 +1804,8 @@ function GroupedJournalEntriesView({
       {groups.map((group) => (
         <section key={group.name} className="space-y-3">
           <div>
-            <h3 className="font-heading leading-snug font-medium">{group.name}</h3>
-            <p className="text-xs text-muted-foreground">{noteGroupCountLabel(group.journalEntries.length)}</p>
+            <AppHeading level={4} as="h3">{group.name}</AppHeading>
+            <HeadingDescription className="text-xs">{noteGroupCountLabel(group.journalEntries.length)}</HeadingDescription>
           </div>
           <Separator />
           <div className="space-y-3">
@@ -2431,9 +2432,9 @@ export default function Library() {
 
       {!showLibraryToolbar && (
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-heading leading-snug font-medium">
+          <AppHeading level={1} as="h1">
             {pageTitle}
-          </h1>
+          </AppHeading>
           <span className="text-sm text-muted-foreground">
             {loading ? "..." : displayedCountLabel}
           </span>

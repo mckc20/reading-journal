@@ -3,6 +3,8 @@ import { BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import BookCard from "@/components/BookCard";
+import CurrentlyReadingBookCard from "@/components/CurrentlyReadingBookCard";
+import { AppHeading } from "@/components/design";
 import type { Book } from "@/types";
 
 const RECENTLY_FINISHED_DAYS = 28;
@@ -80,7 +82,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-8">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
+        <AppHeading level={1} as="h1">Home</AppHeading>
         <SkeletonGrid />
       </div>
     );
@@ -89,7 +91,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="space-y-8">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
+        <AppHeading level={1} as="h1">Home</AppHeading>
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <p className="text-sm text-destructive">{error}</p>
           <Button variant="outline" size="sm" onClick={() => reload()}>
@@ -105,7 +107,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-heading leading-snug font-medium">Home</h1>
+      <AppHeading level={1} as="h1">Home</AppHeading>
 
       {!hasActiveBooks && (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -119,13 +121,13 @@ export default function Dashboard() {
 
       {currentlyReading.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-heading leading-snug font-medium">Currently Reading</h2>
+          <AppHeading level={4} as="h2">Currently Reading</AppHeading>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {currentlyReading.map((book) => (
-              <BookCard
+              <CurrentlyReadingBookCard
                 key={book.id}
                 book={book}
-                onClick={openBook}
+                onBook={openBook}
                 showQuickProgress
               />
             ))}
@@ -135,7 +137,7 @@ export default function Dashboard() {
 
       {pausedBooks.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-heading leading-snug font-medium">Paused</h2>
+          <AppHeading level={4} as="h2">Paused</AppHeading>
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {pausedBooks.map((book) => (
               <BookCard
@@ -151,7 +153,7 @@ export default function Dashboard() {
 
       {upNext.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-heading leading-snug font-medium">Up Next</h2>
+          <AppHeading level={4} as="h2">Up Next</AppHeading>
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {upNext.map((book) => (
               <BookCard
@@ -166,7 +168,7 @@ export default function Dashboard() {
       )}
 
       <section className="space-y-3">
-        <h2 className="text-lg font-heading leading-snug font-medium">Recently Finished</h2>
+        <AppHeading level={4} as="h2">Recently Finished</AppHeading>
         {recentlyFinished.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {recentlyFinished.map((book) => (

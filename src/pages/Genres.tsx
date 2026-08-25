@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BookOpen, ChevronRight, ListTree } from "lucide-react";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
@@ -93,10 +94,10 @@ export default function Genres() {
           <ListTree className="h-4 w-4" />
           Genre discovery
         </div>
-        <h1 className="text-3xl font-heading leading-tight font-medium">Browse Genres</h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+        <AppHeading level={1}>Browse Genres</AppHeading>
+        <HeadingDescription className="max-w-2xl">
           Explore your genre tree from broad categories down to specific subgenres. Counts include books tagged directly on a genre and books tagged on any of its descendants.
-        </p>
+        </HeadingDescription>
       </section>
 
       {tree.length === 0 ? (
@@ -119,10 +120,10 @@ export default function Genres() {
                   className="group mb-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md border-b px-3 pb-3 pt-1 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="min-w-0">
-                    <h2 className="truncate text-lg font-heading leading-snug font-medium">{section.name}</h2>
-                    <p className="text-xs text-muted-foreground">
+                    <AppHeading level={4} as="h2" className="truncate">{section.name}</AppHeading>
+                    <HeadingDescription className="text-xs">
                       {section.children.length} top-level genre{section.children.length === 1 ? "" : "s"}
-                    </p>
+                    </HeadingDescription>
                   </div>
                   <Badge variant="outline" className="justify-self-end whitespace-nowrap">
                     {formatBookCount(countsById.get(section.id)?.total ?? 0)}
@@ -146,8 +147,8 @@ export default function Genres() {
           {customRoots.length > 0 && (
             <section className="rounded-xl border bg-card p-4">
               <div className="mb-3 border-b pb-3">
-                <h2 className="text-lg font-heading leading-snug font-medium">Custom Genres</h2>
-                <p className="text-xs text-muted-foreground">Genres you created outside the system sections.</p>
+                <AppHeading level={4} as="h2">Custom Genres</AppHeading>
+                <HeadingDescription className="text-xs">Genres you created outside the system sections.</HeadingDescription>
               </div>
               <ul className="space-y-1">
                 {customRoots.map((node) => (

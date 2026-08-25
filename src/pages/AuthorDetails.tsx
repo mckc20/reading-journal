@@ -4,17 +4,24 @@ import { BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
+import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import JournalTimeline from "@/components/JournalTimeline";
+import {
+  buildBookLibraryFilterPath,
+  buildGenreDetailPath,
+  MetadataGroup,
+} from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
+import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import {
   buildAuthorSummaries,
   findAuthorSummary,
-  formatAuthorPartialDate,
   getAuthorAverageRating,
   getAuthorInitials,
   getAuthorPagesWritten,
@@ -25,11 +32,12 @@ import {
 } from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { buildGenreSlugLookup } from "@/lib/genreTree";
 import { authorJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { cn } from "@/lib/utils";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
-import type { AuthorJournalEntryRecord, BookJournalEntryRecord, PublicationDatePrecision } from "@/types";
+import type { AuthorJournalEntryRecord, BookJournalEntryRecord } from "@/types";
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
@@ -45,28 +53,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return String((error as { message: unknown }).message);
   }
   return fallback;
-}
-
-function buildLifeLine({
-  nationality,
-  birth_date,
-  birth_date_precision,
-  death_date,
-  death_date_precision,
-}: {
-  nationality?: string | null;
-  birth_date?: string | null;
-  birth_date_precision?: PublicationDatePrecision | null;
-  death_date?: string | null;
-  death_date_precision?: PublicationDatePrecision | null;
-}): string {
-  const parts: string[] = [];
-
-  if (nationality) parts.push(nationality);
-  if (birth_date) parts.push(`Born ${formatAuthorPartialDate(birth_date, birth_date_precision)}`);
-  if (death_date) parts.push(`Died ${formatAuthorPartialDate(death_date, death_date_precision)}`);
-
-  return parts.join(" · ") || "No author details yet.";
 }
 
 function AuthorPhoto({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
@@ -110,7 +96,7 @@ function SectionTitle({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-2xl font-heading leading-snug font-medium">{title}</h2>
+      <AppHeading level={2} as="h2">{title}</AppHeading>
       {action}
     </div>
   );
@@ -122,6 +108,32 @@ function EmptySection({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
+    (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
+  );
+}
+
+function getTopValues(values: Array<string | null | undefined>, limit: number): string[] {
+  const counts = new Map<string, { value: string; count: number }>();
+
+  values.forEach((rawValue) => {
+    const value = rawValue?.trim();
+    if (!value) return;
+    const key = value.toLocaleLowerCase();
+    const current = counts.get(key);
+    counts.set(key, {
+      value: current?.value ?? value,
+      count: (current?.count ?? 0) + 1,
+    });
+  });
+
+  return Array.from(counts.values())
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, undefined, { sensitivity: "base", numeric: true }))
+    .slice(0, limit)
+    .map((item) => item.value);
 }
 
 function AuthorJournalSection({ author }: { author: { id: string; name: string } }) {
@@ -212,6 +224,7 @@ export default function AuthorDetails() {
     removeAuthor,
   } = useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { genres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
@@ -219,7 +232,6 @@ export default function AuthorDetails() {
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [bioExpanded, setBioExpanded] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -249,6 +261,20 @@ export default function AuthorDetails() {
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
   const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
   const pagesWritten = useMemo(() => (author ? getAuthorPagesWritten(author) : 0), [author]);
+  const authorGenres = useMemo(
+    () => getTopValues(authorBooks.flatMap((book) => book.genres ?? []), 6),
+    [authorBooks],
+  );
+  const authorLanguages = useMemo(
+    () => uniqueSortedValues(authorBooks.map((book) => book.language)).slice(0, 4),
+    [authorBooks],
+  );
+  const genreSlugByName = useMemo(() => {
+    const { slugById } = buildGenreSlugLookup(genres);
+    return new Map(
+      genres.map((genre) => [genre.name.toLocaleLowerCase(), slugById.get(genre.id) ?? genre.id]),
+    );
+  }, [genres]);
   const loading = authorsLoading || booksLoading || journalEntriesLoading || seriesLoading;
 
   function openAttachmentPicker() {
@@ -275,13 +301,8 @@ export default function AuthorDetails() {
       await editAuthor(author.id, {
         name: author.name,
         photo_url: author.photo_url,
-        birth_date: author.birth_date,
-        birth_date_precision: author.birth_date_precision,
-        death_date: author.death_date,
-        death_date_precision: author.death_date_precision,
         bio: author.bio,
         is_favorite: !author.isFavorite,
-        nationality: author.nationality,
       });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to update author");
@@ -324,11 +345,8 @@ export default function AuthorDetails() {
     );
   }
 
-  const lifeLine = buildLifeLine(author);
   const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
   const bio = author.bio?.trim() || "";
-  const shouldClampBio = bio.length > 320 && !bioExpanded;
-
   return (
     <div className="space-y-10">
       <div className="flex items-start justify-between gap-3">
@@ -362,7 +380,7 @@ export default function AuthorDetails() {
         <AuthorPhoto name={author.name} photoUrl={author.photo_url} />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-heading text-2xl font-medium leading-tight sm:text-3xl">{author.name}</h1>
+            <AppHeading level={1}>{author.name}</AppHeading>
             <button
               type="button"
               onClick={handleToggleFavorite}
@@ -378,8 +396,6 @@ export default function AuthorDetails() {
             </button>
           </div>
 
-          <p className="text-sm text-muted-foreground">{lifeLine}</p>
-
           <div className="grid grid-cols-3 gap-3 sm:gap-5">
             <StatTile icon={BookOpen} label="Books Written" value={formatNumber(author.bookCount)} />
             <StatTile icon={FileText} label="Pages Written" value={`~${formatNumber(pagesWritten)}`} />
@@ -388,34 +404,50 @@ export default function AuthorDetails() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="space-y-4">
-          <h2 className="mb-4 text-2xl font-heading leading-snug font-medium">
-            <span className="font-serif italic">About</span> this author
-          </h2>
-          {bio ? (
-            <div className="space-y-4">
-              <p className={cn("whitespace-pre-line text-sm leading-7 text-muted-foreground", shouldClampBio && "line-clamp-4")}>
-                {bio}
-              </p>
-              {bio.length > 320 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="px-0 text-sm text-muted-foreground"
-                  onClick={() => setBioExpanded((current) => !current)}
-                >
-                  {bioExpanded ? "Show less" : "Show more"}
-                  <ChevronRight className={cn("h-4 w-4 transition-transform", bioExpanded && "rotate-90")} />
-                </Button>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No bio yet.</p>
+      {(authorGenres.length > 0 || authorLanguages.length > 0) && (
+        <section className="grid gap-4 sm:grid-cols-2">
+          {authorLanguages.length > 0 && (
+            <MetadataGroup title="Languages">
+              <div className="flex flex-wrap gap-1.5">
+                {authorLanguages.map((language) => (
+                  <Badge key={language} variant="outline" className="max-w-full font-normal" asChild>
+                    <Link to={buildBookLibraryFilterPath("language", language)}>
+                      {language}
+                    </Link>
+                  </Badge>
+                ))}
+              </div>
+            </MetadataGroup>
           )}
-        </div>
-      </section>
+
+          {authorGenres.length > 0 && (
+            <MetadataGroup title="Genres">
+              <div className="flex flex-wrap gap-1.5">
+                {authorGenres.map((genre) => {
+                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                  return (
+                    <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
+                      <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+                        {genre}
+                      </Link>
+                    </Badge>
+                  );
+                })}
+              </div>
+            </MetadataGroup>
+          )}
+        </section>
+      )}
+
+      <AboutSection
+        title={
+          <>
+            <span className="font-serif italic">About</span> this author
+          </>
+        }
+        text={bio}
+        emptyText="No bio yet."
+      />
 
       <AuthorJournalSection author={author} />
 

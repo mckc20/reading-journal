@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -12,8 +11,16 @@ import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom
 import { BookOpen, CalendarDays, ChevronRight, Gauge, Heart, ImagePlus, Loader2, PauseCircle, Route, Star, Trash2 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
+import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
+import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import JournalTimeline from "@/components/JournalTimeline";
+import {
+  buildAuthorDetailPath,
+  buildBookLibraryFilterPath,
+  buildGenreDetailPath,
+  MetadataLink,
+} from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { SeriesAnalyticsOverview, SeriesAnalyticsPaceChart } from "@/components/series/SeriesAnalyticsSections";
@@ -29,11 +36,13 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
+import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
+import { buildGenreSlugLookup } from "@/lib/genreTree";
 import {
   filterSeriesLogs,
   estimateSeriesCompletionDate,
@@ -171,7 +180,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="font-heading text-2xl font-medium leading-snug">{title}</h2>
+      <AppHeading level={2} as="h2">{title}</AppHeading>
       {action}
     </div>
   );
@@ -370,9 +379,9 @@ function SeriesProgressCard({
 }) {
   return (
     <section className="rounded-xl border bg-card p-5 shadow-[var(--shadow-card)]">
-      <h2 className="font-heading text-lg font-medium">
+      <AppHeading level={4} as="h2">
         Your Series <span className="font-serif italic">Progress</span>
-      </h2>
+      </AppHeading>
       <div className="mt-4 grid gap-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
         <div className="flex justify-center lg:justify-start">
           <CircularSeriesProgress value={progress.percentage} />
@@ -470,75 +479,6 @@ function SeriesProgressCard({
   );
 }
 
-function SeriesAboutSection({
-  description,
-  expanded,
-  onExpandedChange,
-}: {
-  description: string;
-  expanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
-}) {
-  const measurementRef = useRef<HTMLParagraphElement>(null);
-  const [hasHiddenDescription, setHasHiddenDescription] = useState(false);
-  const shouldClamp = hasHiddenDescription && !expanded;
-
-  useEffect(() => {
-    const element = measurementRef.current;
-    if (!element) {
-      setHasHiddenDescription(false);
-      return;
-    }
-
-    const measure = () => {
-      setHasHiddenDescription(element.scrollHeight > element.clientHeight + 1);
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [description]);
-
-  return (
-    <section className="space-y-4">
-      <h2 className="font-heading text-2xl font-medium leading-snug">
-        <span className="font-serif italic">About</span> this Series
-      </h2>
-      <div className="relative space-y-3">
-        {description ? (
-          <>
-            <p
-              ref={measurementRef}
-              className="pointer-events-none invisible absolute inset-x-0 top-0 whitespace-pre-line text-sm leading-7 line-clamp-4 lg:line-clamp-[11]"
-              aria-hidden
-            >
-              {description}
-            </p>
-            <p className={cn("whitespace-pre-line text-sm leading-7 text-muted-foreground", shouldClamp && "line-clamp-4 lg:line-clamp-[11]")}>
-              {description}
-            </p>
-            {hasHiddenDescription && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="px-0 text-sm text-muted-foreground"
-                onClick={() => onExpandedChange(!expanded)}
-              >
-                {expanded ? "Show Less" : "Show More"}
-                <ChevronRight className={cn("h-4 w-4 transition-transform", expanded && "rotate-90")} />
-              </Button>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">No description yet.</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function ExploreBooksCard({
   title,
   books,
@@ -560,27 +500,7 @@ function ExploreBooksCard({
       ) : (
         <div className="mt-4 grid grid-cols-3 gap-3">
           {books.slice(0, 3).map((book) => (
-            <button
-              key={book.id}
-              type="button"
-              onClick={() => onBook(book)}
-              className="group min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label={`Open ${book.title}`}
-            >
-              <div className="aspect-[2/3] overflow-hidden rounded-md border bg-muted">
-                {book.cover_url ? (
-                  <img
-                    src={book.cover_url}
-                    alt=""
-                    className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-muted-foreground/40" />
-                  </div>
-                )}
-              </div>
-            </button>
+            <CoverOnlyBookCard key={book.id} book={book} onBook={onBook} />
           ))}
         </div>
       )}
@@ -772,7 +692,7 @@ function SeriesEditPage({
 
           <section className="space-y-3">
             <div>
-              <h2 className="font-heading text-lg font-medium">Books in this series</h2>
+              <AppHeading level={4} as="h2">Books in this series</AppHeading>
               <p className="mt-1 text-xs text-muted-foreground">
                 Search for books, drag by the handle, edit volume numbers, or remove books from this series.
               </p>
@@ -843,6 +763,7 @@ export default function SeriesDetails() {
     updateBookSeriesPlacement,
     updateBookVolumeNumber,
   } = useBooksContext();
+  const { genres: availableGenres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError, editSeries, removeSeries } = useSeries();
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -854,7 +775,6 @@ export default function SeriesDetails() {
   const [savingSeries, setSavingSeries] = useState(false);
   const [startingBookId, setStartingBookId] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const seriesBooks = useMemo(
@@ -903,6 +823,12 @@ export default function SeriesDetails() {
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesBooks), [seriesBooks]);
   const genres = useMemo(() => getSeriesGenres(seriesBooks), [seriesBooks]);
+  const genreSlugByName = useMemo(() => {
+    const { slugById } = buildGenreSlugLookup(availableGenres);
+    return new Map(
+      availableGenres.map((genre) => [genre.name.toLocaleLowerCase(), slugById.get(genre.id) ?? genre.id]),
+    );
+  }, [availableGenres]);
   const averageRating = useMemo(() => getAverageSeriesRating(seriesBooks), [seriesBooks]);
   const currentBook = useMemo(() => getCurrentSeriesBook(seriesBooks), [seriesBooks]);
   const derivedStatus = useMemo(() => getDerivedSeriesStatus(seriesBooks), [seriesBooks]);
@@ -1111,7 +1037,7 @@ export default function SeriesDetails() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-        <h1 className="font-heading text-xl font-medium">Series not found</h1>
+        <AppHeading level={1} as="h1">Series not found</AppHeading>
         <p className="text-sm text-muted-foreground">
           This series may have been deleted or you may not have access.
         </p>
@@ -1120,7 +1046,7 @@ export default function SeriesDetails() {
     );
   }
 
-  const headerAuthors = authors.length > 0 ? authors.join(", ") : "Unknown author";
+  const headerGenres = genres.slice(0, 2);
 
   if (isEditMode) {
     return (
@@ -1202,14 +1128,50 @@ export default function SeriesDetails() {
           </button>
         </div>
         <div className="relative space-y-3 p-6 text-white sm:p-8">
-          <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl">
+          <AppHeading level={1} className="text-white">
             {seriesRecord.name}
-          </h1>
-          <p className="text-base text-white/85">by {headerAuthors}</p>
+          </AppHeading>
+          <p className="flex flex-wrap gap-x-1 text-base text-white/85">
+            <span>by</span>
+            {authors.length > 0 ? (
+              authors.map((author, index) => (
+                <span key={author}>
+                  <MetadataLink
+                    to={buildAuthorDetailPath(author)}
+                    className="text-white/85 hover:text-white focus-visible:ring-white/80 focus-visible:ring-offset-foreground"
+                  >
+                    {author}
+                  </MetadataLink>
+                  {index < authors.length - 1 ? "," : ""}
+                </span>
+              ))
+            ) : (
+              <span>Unknown author</span>
+            )}
+          </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
             <span>{bookCountLabel(seriesBooks.length)}</span>
             <span aria-hidden>·</span>
-            <span>{genres.slice(0, 2).join(", ") || "No genre"}</span>
+            <span className="flex flex-wrap gap-x-1">
+              {headerGenres.length > 0 ? (
+                headerGenres.map((genre, index) => {
+                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                  return (
+                    <span key={genre}>
+                      <MetadataLink
+                        to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}
+                        className="text-white/80 hover:text-white focus-visible:ring-white/80 focus-visible:ring-offset-foreground"
+                      >
+                        {genre}
+                      </MetadataLink>
+                      {index < headerGenres.length - 1 ? "," : ""}
+                    </span>
+                  );
+                })
+              ) : (
+                "No genre"
+              )}
+            </span>
             <span aria-hidden>·</span>
             <span>{derivedStatus}</span>
           </div>
@@ -1221,10 +1183,15 @@ export default function SeriesDetails() {
       ) : (
         <div className="space-y-10">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(24rem,1.1fr)] lg:items-start">
-            <SeriesAboutSection
-              description={seriesRecord.description?.trim() ?? ""}
-              expanded={descriptionExpanded}
-              onExpandedChange={setDescriptionExpanded}
+            <AboutSection
+              title={
+                <>
+                  <span className="font-serif italic">About</span> this Series
+                </>
+              }
+              text={seriesRecord.description}
+              emptyText="No description yet."
+              clampClassName="line-clamp-4 lg:line-clamp-[11]"
             />
             <SeriesProgressCard
               progress={progress}

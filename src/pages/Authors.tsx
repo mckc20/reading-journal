@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -279,8 +280,8 @@ export default function Authors() {
     return (
       <div className="space-y-8">
         <div className="space-y-1">
-          <h1 className="text-2xl font-heading leading-snug font-medium">Authors</h1>
-          <p className="text-sm text-muted-foreground">The writers behind your stories</p>
+          <AppHeading level={1} as="h1">Authors</AppHeading>
+          <HeadingDescription>The writers behind your stories</HeadingDescription>
         </div>
         <LoadingAuthors />
       </div>
@@ -306,8 +307,8 @@ export default function Authors() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-heading leading-snug font-medium">Authors</h1>
-        <p className="text-sm text-muted-foreground">The writers behind your stories</p>
+        <AppHeading level={1} as="h1">Authors</AppHeading>
+        <HeadingDescription>The writers behind your stories</HeadingDescription>
         {journalEntriesError && (
           <p className="text-xs text-muted-foreground">
             Quotes could not be loaded right now, so some counts may be incomplete.
@@ -343,7 +344,7 @@ export default function Authors() {
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="font-heading text-xl font-medium leading-snug">All Authors</h2>
+                <AppHeading level={3} as="h2">All Authors</AppHeading>
               </div>
               <Button asChild variant="ghost" size="sm" className="text-sm text-muted-foreground">
                 <Link to="/library/authors">

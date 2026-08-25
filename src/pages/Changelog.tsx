@@ -1,5 +1,6 @@
 import { Clock3, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,8 +55,8 @@ function ChangelogEntryCard({
             {entry.version}
           </Badge>
         </div>
-        <h2 className="mt-3 font-heading text-xl font-medium leading-tight">{entry.title}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{entry.summary}</p>
+        <AppHeading level={3} as="h2" className="mt-3">{entry.title}</AppHeading>
+        <HeadingDescription className="mt-2 max-w-2xl">{entry.summary}</HeadingDescription>
       </div>
       <div className="px-5 py-5 sm:px-6">
         <ul className="grid gap-3">
@@ -84,14 +85,14 @@ export default function Changelog() {
             Changelog
           </div>
           <div className="space-y-2">
-            <h1 className="font-heading text-3xl font-medium leading-tight sm:text-4xl">
+            <AppHeading level={1}>
               Notable updates over time
-            </h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            </AppHeading>
+            <HeadingDescription className="max-w-2xl">
               This archive keeps the important releases, feature drops, and notable fixes in
               reverse chronological order. Very small maintenance changes are intentionally left
               out.
-            </p>
+            </HeadingDescription>
           </div>
         </div>
 

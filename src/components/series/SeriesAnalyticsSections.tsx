@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { BarChart3, BookOpen, CalendarDays, Clock3, PauseCircle, Podium, Timer, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
@@ -35,7 +36,7 @@ function SummaryCard({
 }) {
   return (
     <section className={`rounded-xl border bg-card ${compact ? "p-4" : "p-5"} ${className}`}>
-      {title && <h2 className="font-heading text-base font-medium text-muted-foreground">{title}</h2>}
+      {title && <AppHeading level={4} as="h2" className="text-muted-foreground">{title}</AppHeading>}
       <div className={title ? (compact ? "mt-3" : "mt-4") : ""}>{children}</div>
     </section>
   );
@@ -140,7 +141,7 @@ function StatsBarChart({
 
   return (
     <SummaryCard compact>
-      {title && <h3 className="mb-4 text-sm font-medium">{title}</h3>}
+      {title && <AppHeading level={4} as="h3" className="mb-4">{title}</AppHeading>}
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
@@ -433,7 +434,7 @@ export function SeriesAnalyticsFull({
           <div>
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />
-              <h2 className="font-heading text-xl font-medium leading-snug">Book Comparisons</h2>
+              <AppHeading level={3} as="h2">Book Comparisons</AppHeading>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Compare how long each book took and how quickly pages moved.
@@ -463,7 +464,7 @@ export function SeriesAnalyticsFull({
           <div>
             <div className="flex items-center gap-2">
               <Podium className="h-4 w-4 text-primary" />
-              <h2 className="font-heading text-xl font-medium leading-snug">Book Rankings</h2>
+              <AppHeading level={3} as="h2">Book Rankings</AppHeading>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Compare standout volumes by rating, length, and annotations.
