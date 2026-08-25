@@ -4,14 +4,11 @@ import { BookOpen, NotebookPen, RefreshCw } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import JournalTimeline from "@/components/JournalTimeline";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { bookJournalToJournalEntries, sortJournalEntries, type JournalTimelineEntry } from "@/lib/journal";
 import type { BookJournalEntryRecord } from "@/types";
-
-type JournalViewMode = "list" | "book";
 
 function compareStableEntryTie(left: JournalTimelineEntry, right: JournalTimelineEntry): number {
   return right.id.localeCompare(left.id);
@@ -31,7 +28,6 @@ export default function BookAnnotations() {
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(searchParams.get("new") === "1");
-  const [viewMode, setViewMode] = useState<JournalViewMode>("list");
   const { user } = useAuth();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
@@ -131,19 +127,6 @@ export default function BookAnnotations() {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <Select value={viewMode} onValueChange={(value) => setViewMode(value as JournalViewMode)}>
-          <SelectTrigger className="w-[11rem] justify-between gap-1.5" aria-label="Journal view">
-            <span className="text-muted-foreground">View:</span>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="book">Book View</SelectItem>
-            <SelectItem value="list">List</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {journalEntriesLoading ? (
         <div className="grid gap-3 md:grid-cols-2">
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
@@ -152,9 +135,7 @@ export default function BookAnnotations() {
       ) : (
         <JournalTimeline
           entries={timelineEntries}
-          layout={viewMode === "book" ? "pages" : "list"}
-          bookViewTitle={book.title}
-          bookViewSubtitle="Reading Journal"
+          layout="list"
           selectedEntryId={selectedEntryId}
           inlineComposer={{
             open: composerOpen,

@@ -1,6 +1,23 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
+import { AlignJustify, ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +33,13 @@ import { createBookJournalEntryRecord, updateBookJournalEntryRecord } from "@/li
 import { createAuthorJournalEntryRecord, updateAuthorJournalEntryRecord } from "@/lib/authorJournal";
 import {
   detachJournalEntryMediaItem,
-  journalParagraphCount,
-  nextJournalMediaPosition,
   removeLegacyJournalMediaReferences,
+  sortJournalMedia,
   sourceForJournalEntryRecord,
   updateJournalEntryMediaItem,
   uploadJournalImage,
 } from "@/lib/journalMedia";
+import type { JournalLinkTarget } from "@/lib/journalLinks";
 import { isInternalJournalTag, normalizeJournalTags, visibleJournalTags } from "@/lib/journalTags";
 import { createSeriesJournalEntryRecord, updateSeriesJournalEntryRecord } from "@/lib/seriesJournal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
@@ -40,6 +57,7 @@ interface AddJournalEntryDialogProps {
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
+  entryLinkTargets?: JournalLinkTarget[];
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
 }
 
@@ -54,6 +72,7 @@ interface JournalEntryFormProps {
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
+  entryLinkTargets?: JournalLinkTarget[];
   variant?: "dialog" | "inline";
   heading?: ReactNode;
   hideEntitySelector?: boolean;
@@ -169,6 +188,83 @@ function removeJournalEntryDraft(key: string | null) {
   }
 }
 
+function SortableJournalMediaRow({
+  item,
+  disabled,
+  onCaptionDraftChange,
+  onCaptionSave,
+  onRemove,
+}: {
+  item: JournalEntryMediaItem;
+  disabled: boolean;
+  onCaptionDraftChange: (itemId: string, caption: string) => void;
+  onCaptionSave: (item: JournalEntryMediaItem, caption: string) => void;
+  onRemove: (item: JournalEntryMediaItem) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "grid grid-cols-[2rem_7rem_minmax(0,1fr)] items-start gap-3 rounded-lg border bg-card p-2 shadow-sm transition-shadow",
+        isDragging && "relative z-10 shadow-lg",
+      )}
+    >
+      <button
+        type="button"
+        className="flex h-8 w-8 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
+        aria-label={`Reorder ${item.media_attachment.file_name}`}
+        disabled={disabled}
+        {...attributes}
+        {...listeners}
+      >
+        <AlignJustify className="h-4 w-4" />
+      </button>
+      <img
+        src={item.thumbnailUrl ?? item.url}
+        alt={item.caption?.trim() || item.media_attachment.file_name}
+        className="h-24 w-full rounded-md object-cover"
+      />
+      <div className="min-w-0 space-y-2">
+        <Input
+          value={item.caption ?? ""}
+          placeholder="Caption"
+          className="h-9"
+          disabled={disabled}
+          onChange={(event) => onCaptionDraftChange(item.id, event.target.value)}
+          onBlur={(event) => onCaptionSave(item, event.target.value)}
+        />
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            aria-label="Remove image"
+            disabled={disabled}
+            onClick={() => onRemove(item)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function JournalEntryForm({
   active = true,
   initialBookId = "",
@@ -180,6 +276,7 @@ export function JournalEntryForm({
   preferInitialPageAndDate = false,
   systemTags = EMPTY_SYSTEM_TAGS,
   replaceSystemTagPrefixes = EMPTY_SYSTEM_TAG_PREFIXES,
+  entryLinkTargets = [],
   variant = "dialog",
   heading,
   hideEntitySelector = false,
@@ -258,7 +355,11 @@ export function JournalEntryForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const isInline = variant === "inline";
-  const paragraphCount = useMemo(() => journalParagraphCount(content), [content]);
+  const mediaDragDisabled = uploadingImage || isSubmitting;
+  const mediaSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const systemTagsKey = systemTags.join("\u0001");
   const replaceSystemTagPrefixesKey = replaceSystemTagPrefixes.join("\u0001");
   const initialEntryResetKey = initialEntry ? `${journalEntryDraftSource(initialEntry)}:${initialEntry.id}` : "new";
@@ -610,13 +711,9 @@ export function JournalEntryForm({
         journalEntrySource: sourceForJournalEntryRecord(note),
         journalEntryId: note.id,
         file,
-        position: nextJournalMediaPosition(content),
+        position: mediaItems.length + 1,
       });
-      const nextMedia = [...(note.media ?? mediaItems), uploaded].sort((a, b) => {
-        const positionCompare = a.position - b.position;
-        if (positionCompare !== 0) return positionCompare;
-        return a.created_at.localeCompare(b.created_at);
-      });
+      const nextMedia = sortJournalMedia([...(note.media ?? mediaItems), uploaded]);
       setMediaItems(nextMedia);
       updateSavedEntryMedia(nextMedia, note);
       removeJournalEntryDraft(draftKey);
@@ -636,19 +733,53 @@ export function JournalEntryForm({
       ...item,
       ...changes,
     };
-    const nextMedia = mediaItems
-      .map((mediaItem) => (mediaItem.id === item.id ? nextItem : mediaItem))
-      .sort((a, b) => {
-        const positionCompare = a.position - b.position;
-        if (positionCompare !== 0) return positionCompare;
-        return a.created_at.localeCompare(b.created_at);
-      });
+    const nextMedia = sortJournalMedia(
+      mediaItems.map((mediaItem) => (mediaItem.id === item.id ? nextItem : mediaItem)),
+    );
     setMediaItems(nextMedia);
     updateSavedEntryMedia(nextMedia);
     try {
       await updateJournalEntryMediaItem(nextItem);
     } catch (updateError) {
       setMediaError(updateError instanceof Error ? updateError.message : "Could not update this image.");
+    }
+  }
+
+  function updateMediaCaptionDraft(itemId: string, caption: string) {
+    setMediaItems((current) => current.map((mediaItem) => (
+      mediaItem.id === itemId ? { ...mediaItem, caption } : mediaItem
+    )));
+  }
+
+  async function handleMediaDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const previousMedia = mediaItems;
+    const orderedMedia = sortJournalMedia(mediaItems);
+    const oldIndex = orderedMedia.findIndex((item) => item.id === active.id);
+    const newIndex = orderedMedia.findIndex((item) => item.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const nextMedia = arrayMove(orderedMedia, oldIndex, newIndex).map((item, index) => ({
+      ...item,
+      position: index + 1,
+    }));
+
+    setMediaItems(nextMedia);
+    updateSavedEntryMedia(nextMedia);
+    setMediaError(null);
+
+    try {
+      await Promise.all(
+        nextMedia
+          .filter((item) => previousMedia.find((previousItem) => previousItem.id === item.id)?.position !== item.position)
+          .map((item) => updateJournalEntryMediaItem(item)),
+      );
+    } catch (reorderError) {
+      setMediaItems(previousMedia);
+      updateSavedEntryMedia(previousMedia);
+      setMediaError(reorderError instanceof Error ? reorderError.message : "Could not reorder images.");
     }
   }
 
@@ -684,6 +815,7 @@ export function JournalEntryForm({
                   placeholder={entryType === "quote" ? "Write the quote..." : "Start writing..."}
                   minHeightClassName="min-h-32"
                   autoFocus={autoFocus}
+                  entryLinkTargets={entryLinkTargets}
                   onBlur={handleInlineEditorBlur}
                   onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
                 />
@@ -694,6 +826,7 @@ export function JournalEntryForm({
                   placeholder={entryType === "quote" ? "Write the quote..." : "Start writing..."}
                   minHeightClassName="min-h-56"
                   media={mediaItems}
+                  entryLinkTargets={entryLinkTargets}
                   onChange={(nextContent) => setValue("content", nextContent, { shouldDirty: true, shouldValidate: true })}
                 />
               )}
@@ -725,57 +858,22 @@ export function JournalEntryForm({
                 </div>
 
                 {mediaItems.length > 0 && (
-                  <div className="space-y-3">
-                    {mediaItems.map((item) => (
-                      <div key={item.id} className="grid gap-3 border-l-2 border-primary/30 pl-3 sm:grid-cols-[7rem_1fr]">
-                        <img
-                          src={item.thumbnailUrl ?? item.url}
-                          alt={item.caption?.trim() || item.media_attachment.file_name}
-                          className="h-28 w-full rounded-md object-cover"
-                        />
-                        <div className="min-w-0 space-y-2">
-                          <Input
-                            value={item.caption ?? ""}
-                            placeholder="Caption"
-                            className="h-9"
-                            onChange={(event) => {
-                              const caption = event.target.value;
-                              setMediaItems((current) => current.map((mediaItem) => mediaItem.id === item.id ? { ...mediaItem, caption } : mediaItem));
-                            }}
-                            onBlur={(event) => void updateMediaItem(item, { caption: event.target.value })}
+                  <DndContext sensors={mediaSensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleMediaDragEnd(event)}>
+                    <SortableContext items={sortJournalMedia(mediaItems).map((item) => item.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {sortJournalMedia(mediaItems).map((item) => (
+                          <SortableJournalMediaRow
+                            key={item.id}
+                            item={item}
+                            disabled={mediaDragDisabled}
+                            onCaptionDraftChange={updateMediaCaptionDraft}
+                            onCaptionSave={(mediaItem, caption) => void updateMediaItem(mediaItem, { caption })}
+                            onRemove={(mediaItem) => void removeMediaItem(mediaItem)}
                           />
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>Placement</span>
-                            <Select
-                              value={String(Math.min(Math.max(1, item.position), Math.max(1, paragraphCount)))}
-                              onValueChange={(value) => void updateMediaItem(item, { position: Number(value) })}
-                            >
-                              <SelectTrigger className="h-8 w-44">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: Math.max(1, paragraphCount) }, (_, index) => (
-                                  <SelectItem key={index + 1} value={String(index + 1)}>
-                                    {paragraphCount === 0 ? "After text" : `After paragraph ${index + 1}`}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              aria-label="Remove image"
-                              onClick={() => void removeMediaItem(item)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
                 {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
               </div>
@@ -1031,6 +1129,7 @@ export default function AddJournalEntryDialog({
   preferInitialPageAndDate = false,
   systemTags = [],
   replaceSystemTagPrefixes = [],
+  entryLinkTargets = [],
   onSaved,
 }: AddJournalEntryDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
@@ -1055,6 +1154,7 @@ export default function AddJournalEntryDialog({
           preferInitialPageAndDate={preferInitialPageAndDate}
           systemTags={systemTags}
           replaceSystemTagPrefixes={replaceSystemTagPrefixes}
+          entryLinkTargets={entryLinkTargets}
           onCancel={() => onOpenChange(false)}
           onSaved={(note) => {
             onSaved?.(note);

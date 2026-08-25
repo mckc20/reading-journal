@@ -8,8 +8,8 @@ Summary: Books, series, and authors now have dedicated journal pages for writing
 
 - Dedicated journal pages
   Open a full journal view from book, series, and author pages instead of working only from smaller preview sections.
-- List and Book View modes
-  Switch between a scannable timeline list and a paginated Book View that makes entries feel more like a collected reading journal.
+- Focused journal list
+  Review entries in one scannable journal list without switching between separate view modes.
 - Faster entry writing
   Add new entries directly from the journal page, with deep links that can open the composer when you start from a book, series, or author.
 - Richer journal organization

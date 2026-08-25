@@ -17,9 +17,17 @@ import {
   Star,
 } from "lucide-react";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
+import JournalEntryLinkPicker from "@/components/JournalEntryLinkPicker";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  applyJournalEntryLinkToMarkdown,
+  findMarkdownLinkAtSelection,
+  removeMarkdownLink,
+  type JournalLinkTarget,
+  type MarkdownLinkRange,
+} from "@/lib/journalLinks";
 import { cn } from "@/lib/utils";
 import type { NoteCalloutType } from "@/lib/noteFormatting";
 import type { JournalEntryMediaItem } from "@/types";
@@ -30,6 +38,7 @@ interface MarkdownEditorProps {
   placeholder?: string;
   minHeightClassName?: string;
   media?: JournalEntryMediaItem[];
+  entryLinkTargets?: JournalLinkTarget[];
   onChange: (value: string) => void;
   onBlur?: () => void;
 }
@@ -88,6 +97,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   placeholder,
   minHeightClassName = "min-h-56",
   media = [],
+  entryLinkTargets = [],
   onChange,
   onBlur,
 }, ref) {
@@ -95,6 +105,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
   const lastSelectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [calloutMenuOpen, setCalloutMenuOpen] = useState(false);
+  const [entryLinkPickerOpen, setEntryLinkPickerOpen] = useState(false);
+  const [activeMarkdownLink, setActiveMarkdownLink] = useState<MarkdownLinkRange | null>(null);
 
   function currentSelection(): SelectionRange {
     const textarea = textareaRef.current;
@@ -224,14 +236,32 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
     replaceSelection(nextValue, { start: cursor, end: cursor });
   }
 
-  function insertLink() {
+  function openLinkPicker() {
     const selection = currentSelection();
-    const selectedText = value.slice(selection.start, selection.end) || "text";
-    const nextText = `[${selectedText}](url)`;
-    const nextValue = value.slice(0, selection.start) + nextText + value.slice(selection.end);
-    const urlStart = selection.start + selectedText.length + 3;
+    setActiveMarkdownLink(findMarkdownLinkAtSelection(value, selection.start, selection.end));
+    setEntryLinkPickerOpen((current) => !current);
+  }
 
-    replaceSelection(nextValue, { start: urlStart, end: urlStart + 3 });
+  function insertEntryLink(target: JournalLinkTarget) {
+    const selection = lastSelectionRef.current;
+    const link = activeMarkdownLink ?? findMarkdownLinkAtSelection(value, selection.start, selection.end);
+    const next = link && selection.start === selection.end
+      ? applyJournalEntryLinkToMarkdown(removeMarkdownLink(value, link).markdown, link.start, link.start + link.text.length, target)
+      : applyJournalEntryLinkToMarkdown(value, selection.start, selection.end, target);
+
+    setActiveMarkdownLink(null);
+    setEntryLinkPickerOpen(false);
+    replaceSelection(next.markdown, next.selection);
+  }
+
+  function removeActiveEntryLink() {
+    const selection = lastSelectionRef.current;
+    const link = activeMarkdownLink ?? findMarkdownLinkAtSelection(value, selection.start, selection.end);
+    if (!link) return;
+    const next = removeMarkdownLink(value, link);
+
+    setActiveMarkdownLink(null);
+    replaceSelection(next.markdown, next.selection);
   }
 
   function insertCallout(type: NoteCalloutType) {
@@ -287,9 +317,22 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
           <Button type="button" variant="ghost" size="icon-sm" aria-label="Divider" title="Divider" onMouseDown={(event) => event.preventDefault()} onClick={insertDivider}>
             <Minus className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Link" title="Link" onMouseDown={(event) => event.preventDefault()} onClick={insertLink}>
-            <Link className="h-4 w-4" />
-          </Button>
+          <JournalEntryLinkPicker
+            open={entryLinkPickerOpen}
+            targets={entryLinkTargets}
+            canRemoveLink={Boolean(activeMarkdownLink)}
+            onOpenChange={(open) => {
+              setEntryLinkPickerOpen(open);
+              if (!open) setActiveMarkdownLink(null);
+            }}
+            onRemoveLink={removeActiveEntryLink}
+            onSelect={insertEntryLink}
+            trigger={(
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Link" title="Link" onMouseDown={(event) => event.preventDefault()} onClick={openLinkPicker}>
+                <Link className="h-4 w-4" />
+              </Button>
+            )}
+          />
           <div className="relative">
             <Button
               type="button"
@@ -340,9 +383,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
         <div className={cn("px-3 py-3 text-sm leading-6", minHeightClassName)}>
           {value.trim() ? (
             media.length > 0 ? (
-              <JournalEntryMediaContent markdown={value} media={media} />
+              <JournalEntryMediaContent markdown={value} media={media} interactiveLinks={false} />
             ) : (
-              <FormattedNoteContent markdown={value} />
+              <FormattedNoteContent markdown={value} interactiveLinks={false} />
             )
           ) : (
             <p className="text-muted-foreground">{placeholder}</p>

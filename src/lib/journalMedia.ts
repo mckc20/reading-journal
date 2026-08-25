@@ -60,54 +60,12 @@ export function removeLegacyJournalMediaReferences(markdown: string): string {
     .trim();
 }
 
-export interface JournalContentBlock {
-  key: string;
-  markdown: string;
-  media: JournalEntryMediaItem[];
-}
-
-export function journalParagraphCount(markdown: string): number {
-  return removeLegacyJournalMediaReferences(markdown)
-    .trim()
-    .split(/\n{2,}/)
-    .filter((paragraph) => paragraph.trim().length > 0)
-    .length;
-}
-
-export function nextJournalMediaPosition(markdown: string): number {
-  return Math.max(1, journalParagraphCount(markdown));
-}
-
-export function splitMarkdownIntoJournalBlocks(
-  markdown: string,
-  media: JournalEntryMediaItem[] = [],
-): JournalContentBlock[] {
-  const paragraphs = removeLegacyJournalMediaReferences(markdown)
-    .trim()
-    .split(/\n{2,}/)
-    .filter((paragraph) => paragraph.trim().length > 0);
-  const blocks: JournalContentBlock[] = paragraphs.length > 0
-    ? paragraphs.map((paragraph, index) => ({
-      key: `paragraph-${index + 1}`,
-      markdown: paragraph,
-      media: [],
-    }))
-    : [{ key: "media-only", markdown: "", media: [] }];
-
-  const sortedMedia = [...media].sort((a, b) => {
+export function sortJournalMedia(media: JournalEntryMediaItem[] = []): JournalEntryMediaItem[] {
+  return [...media].sort((a, b) => {
     const positionCompare = a.position - b.position;
     if (positionCompare !== 0) return positionCompare;
     return a.created_at.localeCompare(b.created_at);
   });
-
-  sortedMedia.forEach((item) => {
-    const targetIndex = paragraphs.length === 0
-      ? 0
-      : Math.min(Math.max(1, item.position), paragraphs.length) - 1;
-    blocks[targetIndex].media.push(item);
-  });
-
-  return blocks.filter((block) => block.markdown.trim() || block.media.length > 0);
 }
 
 export function sourceForJournalEntryRecord(record: {

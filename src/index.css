@@ -265,7 +265,7 @@
   }
 
   .journal-markdown a {
-    @apply text-primary underline underline-offset-4;
+    @apply text-primary underline underline-offset-4 transition-colors hover:text-primary/80;
   }
 
   .journal-markdown hr {

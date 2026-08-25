@@ -20,6 +20,34 @@ test("renders links that open in a new tab", () => {
   );
 });
 
+test("renders internal journal links in the current tab", () => {
+  assert.match(
+    renderNoteMarkdownToHtml("[Earlier thought](/books/book-1/journal?entry=entry-1)"),
+    /<a href="\/books\/book-1\/journal\?entry=entry-1">Earlier thought<\/a>/,
+  );
+});
+
+test("auto-links raw web URLs", () => {
+  assert.match(
+    renderNoteMarkdownToHtml("Visit https://example.com now"),
+    /<a href="https:\/\/example\.com" target="_blank" rel="noopener noreferrer">https:\/\/example\.com<\/a>/,
+  );
+});
+
+test("auto-links common www web URLs", () => {
+  assert.match(
+    renderNoteMarkdownToHtml("Visit www.example.com now"),
+    /<a href="https:\/\/www\.example\.com" target="_blank" rel="noopener noreferrer">www\.example\.com<\/a>/,
+  );
+});
+
+test("does not double-link URLs inside explicit markdown links", () => {
+  assert.equal(
+    renderNoteMarkdownToHtml("[www.example.com](https://example.com)").trim(),
+    '<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">www.example.com</a></p>',
+  );
+});
+
 test("removes unsafe link targets", () => {
   assert.equal(renderNoteMarkdownToHtml("[bad](javascript:alert(1))").trim(), "<p>bad</p>");
 });

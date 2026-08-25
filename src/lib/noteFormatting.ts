@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { Marked, Renderer } from "marked";
+import { isAppRelativeHref } from "@/lib/journalLinks";
 
 export type NoteCalloutType = "note" | "idea" | "question" | "favorite" | "spoiler";
 
@@ -29,9 +30,14 @@ function escapeAttribute(value: string): string {
   return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
+function externalLinkHtml(href: string, label: string): string {
+  return `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+}
+
 function isSafeUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
+  if (isAppRelativeHref(trimmed)) return true;
 
   try {
     const url = new URL(trimmed, "https://reading-journal.local");
@@ -81,10 +87,12 @@ renderer.html = ({ text }) => escapeHtml(text);
 
 renderer.link = function link({ href, title, tokens }) {
   const label = this.parser.parseInline(tokens);
-  if (!isSafeUrl(href)) return label;
+  const normalizedHref = href.toLowerCase().startsWith("http://www.") ? `https://${href.slice("http://".length)}` : href;
+  if (!isSafeUrl(normalizedHref)) return label;
 
   const titleAttribute = title ? ` title="${escapeAttribute(title)}"` : "";
-  return `<a href="${escapeAttribute(href)}"${titleAttribute} target="_blank" rel="noopener noreferrer">${label}</a>`;
+  const externalAttributes = isAppRelativeHref(normalizedHref) ? "" : ' target="_blank" rel="noopener noreferrer"';
+  return `<a href="${escapeAttribute(normalizedHref)}"${titleAttribute}${externalAttributes}>${label}</a>`;
 };
 
 renderer.image = function image({ text }) {
@@ -115,6 +123,33 @@ marked = new Marked({
 
 function renderMarkdownWithoutSanitizing(markdown: string): string {
   return marked.parse(markdown, { async: false }) as string;
+}
+
+function autolinkPlainWebUrlsInText(text: string): string {
+  return text.replace(
+    /(^|[\s(])((?:https?:\/\/|www\.)[^\s<>()]+[^\s<>().,!?;:'"])/gi,
+    (match, prefix: string, rawUrl: string) => {
+      const href = rawUrl.toLowerCase().startsWith("www.") ? `https://${rawUrl}` : rawUrl;
+      if (!isSafeUrl(href)) return match;
+      return `${prefix}${externalLinkHtml(href, rawUrl)}`;
+    },
+  );
+}
+
+function autolinkPlainWebUrls(html: string): string {
+  const parts = html.split(/(<[^>]+>)/g);
+  let anchorDepth = 0;
+
+  return parts.map((part) => {
+    if (part.startsWith("<")) {
+      if (/^<a\b/i.test(part)) anchorDepth += 1;
+      if (/^<\/a\b/i.test(part)) anchorDepth = Math.max(0, anchorDepth - 1);
+      return part;
+    }
+
+    if (anchorDepth > 0) return part;
+    return autolinkPlainWebUrlsInText(part);
+  }).join("");
 }
 
 function sanitizeRenderedHtml(html: string): string {
@@ -190,7 +225,7 @@ export function renderNoteMarkdownToHtml(markdown: string): string {
   const normalized = markdown.replace(/\r\n?/g, "\n").trim();
   if (!normalized) return "";
 
-  return sanitizeRenderedHtml(renderMarkdownWithoutSanitizing(normalized));
+  return sanitizeRenderedHtml(autolinkPlainWebUrls(renderMarkdownWithoutSanitizing(normalized)));
 }
 
 export function noteMarkdownToEditorHtml(markdown: string): string {
