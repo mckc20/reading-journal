@@ -1,20 +1,25 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  BarChart3,
+  Bell,
   BookOpen,
   Compass,
   Home,
   Library,
   LibraryBig,
-  LogOut,
+  Menu,
   MessageCircle,
+  MessageSquare,
   NotebookPen,
   Plus,
   Search,
   Settings,
+  Sparkles,
   SwatchBook,
   UserRound,
-  Users,
+  X,
+  createLucideIcon,
   type LucideIcon,
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -69,9 +74,22 @@ type NavLink = {
 
 const primaryNavLinks: NavLink[] = [
   { to: "/", label: "Home", icon: Home },
-  { to: "/library", label: "Books", icon: Library },
-  { to: "/authors", label: "Authors", icon: UserRound },
+  { to: "/library", label: "Library", icon: Library },
   { to: "/discover", label: "Discover", icon: Compass },
+];
+
+const RotateCcwClock = createLucideIcon("rotate-ccw-clock", [
+  ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
+  ["path", { d: "M3 3v5h5", key: "1xhq8a" }],
+  ["path", { d: "M12 7v5l4 2", key: "1fdv2h" }],
+]);
+
+const drawerNavLinks: NavLink[] = [
+  { to: "/statistics", label: "Reading Statistics", icon: BarChart3 },
+  { to: "/reading-history", label: "Reading History", icon: RotateCcwClock },
+  { to: "/wrap-ups", label: "Wrap-Ups", icon: Sparkles },
+  { to: "/messages", label: "Messages", icon: MessageSquare },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 function isActiveRoute(pathname: string, search: string, to: string): boolean {
@@ -107,7 +125,7 @@ function getDisplayName(
 }
 
 function AppLayoutContent() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,10 +134,14 @@ function AppLayoutContent() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
   const [detailEditingOpen, setDetailEditingOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const displayName = getDisplayName(profile, user?.email);
-  const hideAddBookButton = location.pathname.startsWith("/groups") || detailEditingOpen;
+  const hideAddBookButton =
+    location.pathname.startsWith("/groups") ||
+    location.pathname.startsWith("/messages") ||
+    detailEditingOpen;
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return;
@@ -195,7 +217,7 @@ function AppLayoutContent() {
         return;
       }
 
-      navigate("/library/explore?view=journalEntries");
+      navigate("/library/journal");
       return;
     }
     setActiveAddAction(action);
@@ -210,10 +232,31 @@ function AppLayoutContent() {
           profile={profile}
           email={user?.email}
           displayName={displayName}
-          onSignOut={signOut}
+          drawerOpen={drawerOpen}
+          addMenuOpen={addMenuOpen}
+          addButtonRef={addButtonRef}
+          addMenuRef={addMenuRef}
+          hideAddButton={hideAddBookButton}
+          onToggleDrawer={() => setDrawerOpen((current) => !current)}
+          onCloseDrawer={() => setDrawerOpen(false)}
+          onToggleAddMenu={() => setAddMenuOpen((current) => !current)}
+          onSelectAddAction={openAddDialog}
         />
 
-        <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 sm:px-8 md:px-10 md:py-8 lg:px-12">
+        <SideDrawer
+          open={drawerOpen}
+          pathname={location.pathname}
+          search={location.search}
+          onToggleOpen={() => setDrawerOpen((current) => !current)}
+          onClose={() => setDrawerOpen(false)}
+        />
+
+        <main
+          className={cn(
+            "mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
+            drawerOpen ? "md:pl-72" : "md:pl-24",
+          )}
+        >
           <Outlet
             context={
               {
@@ -285,26 +328,63 @@ function AppHeader({
   profile,
   email,
   displayName,
-  onSignOut,
+  drawerOpen,
+  addMenuOpen,
+  addButtonRef,
+  addMenuRef,
+  hideAddButton,
+  onToggleDrawer,
+  onCloseDrawer,
+  onToggleAddMenu,
+  onSelectAddAction,
 }: {
   pathname: string;
   search: string;
   profile: ReturnType<typeof useProfile>["profile"];
   email?: string | null;
   displayName: string;
-  onSignOut: () => Promise<void>;
+  drawerOpen: boolean;
+  addMenuOpen: boolean;
+  addButtonRef: RefObject<HTMLButtonElement>;
+  addMenuRef: RefObject<HTMLDivElement>;
+  hideAddButton: boolean;
+  onToggleDrawer: () => void;
+  onCloseDrawer: () => void;
+  onToggleAddMenu: () => void;
+  onSelectAddAction: (action: AddAction) => void;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-      <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 sm:px-8 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-10 lg:px-12">
-        <Link
-          to="/"
-          className="flex min-w-0 items-center gap-3 font-heading font-medium text-foreground"
-          aria-label="Reading Journal home"
-        >
-          <BookOpen className="h-6 w-6 shrink-0 text-primary" aria-hidden="true" />
-          <span className="truncate text-base">Reading Journal</span>
-        </Link>
+    <header
+      className={cn(
+        "sticky top-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:fixed md:left-16 md:right-0",
+      )}
+    >
+      <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-8 lg:px-10">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="md:hidden"
+            aria-label={drawerOpen ? "Close menu" : "Open menu"}
+            aria-expanded={drawerOpen}
+            onClick={onToggleDrawer}
+          >
+            {drawerOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+          <Link
+            to="/"
+            className={cn(
+              "flex min-w-0 items-center gap-3 font-heading font-medium text-foreground",
+              drawerOpen ? "md:hidden" : "md:flex",
+            )}
+            aria-label="Reading Journal home"
+            onClick={onCloseDrawer}
+          >
+            <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <span className="sr-only truncate text-sm md:not-sr-only">Reading Journal</span>
+          </Link>
+        </div>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
           {primaryNavLinks.map((link) => (
@@ -317,25 +397,123 @@ function AppHeader({
         </nav>
 
         <div className="flex min-w-0 items-center justify-end gap-1">
+          {!hideAddButton && (
+            <DesktopAddButtonMenu
+              buttonRef={addButtonRef}
+              menuRef={addMenuRef}
+              open={addMenuOpen}
+              onToggleOpen={onToggleAddMenu}
+              onSelect={onSelectAddAction}
+            />
+          )}
           <Button size="icon" variant="ghost" asChild>
             <Link to="/search" aria-label="Search">
               <Search className="h-5 w-5" />
             </Link>
           </Button>
-          <Button size="icon" variant="ghost" asChild>
-            <Link to="/groups" aria-label="Groups">
-              <Users className="h-5 w-5" />
-            </Link>
-          </Button>
-          <ProfileMenu
-            profile={profile}
-            email={email}
-            displayName={displayName}
-            onSignOut={onSignOut}
-          />
+          <NotificationsMenu />
+          <Link
+            to="/profile"
+            className="flex rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/35"
+            aria-label={`Open profile for ${displayName}`}
+          >
+            <ProfileAvatar profile={profile} email={email} className="h-9 w-9 text-sm" />
+          </Link>
         </div>
       </div>
     </header>
+  );
+}
+
+function SideDrawer({
+  open,
+  pathname,
+  search,
+  onToggleOpen,
+  onClose,
+}: {
+  open: boolean;
+  pathname: string;
+  search: string;
+  onToggleOpen: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      {open && (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm md:hidden"
+          aria-label="Close menu"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border bg-background transition-all duration-200",
+          "md:block",
+          open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          open ? "w-72 md:w-64" : "w-16",
+          open ? "md:z-[60]" : "md:z-40",
+        )}
+        aria-label="Side navigation"
+      >
+        <div
+          className={cn(
+            "flex shrink-0 px-2",
+            open ? "h-16 items-center gap-2" : "h-16 items-center justify-center",
+          )}
+        >
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="shrink-0"
+            aria-label={open ? "Collapse menu" : "Expand menu"}
+            aria-expanded={open}
+            onClick={onToggleOpen}
+          >
+            {open ? <X className="h-5 w-5 md:hidden" /> : null}
+            <Menu className={cn("h-5 w-5", open && "hidden md:block")} />
+          </Button>
+          {open && (
+            <Link
+              to="/"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-2 font-heading font-medium text-foreground transition-colors hover:text-primary"
+              aria-label="Reading Journal home"
+              onClick={onClose}
+            >
+              <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="truncate text-sm">Reading Journal</span>
+            </Link>
+          )}
+        </div>
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 px-2 py-4">
+          {drawerNavLinks.map((link) => {
+            const active = isActiveRoute(pathname, search, link.to);
+            const Icon = link.icon;
+
+            return (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={cn(
+                  "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors hover:bg-surface-hover",
+                  active ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
+                  !open && "md:justify-center md:px-0",
+                )}
+                aria-label={link.label}
+                title={!open ? link.label : undefined}
+                onClick={onClose}
+              >
+                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className={cn("truncate", !open && "md:sr-only")}>{link.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }
 
@@ -353,17 +531,7 @@ function TopNavLink({ link, active }: { link: NavLink; active: boolean }) {
   );
 }
 
-function ProfileMenu({
-  profile,
-  email,
-  displayName,
-  onSignOut,
-}: {
-  profile: ReturnType<typeof useProfile>["profile"];
-  email?: string | null;
-  displayName: string;
-  onSignOut: () => Promise<void>;
-}) {
+function NotificationsMenu() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -389,69 +557,95 @@ function ProfileMenu({
     };
   }, [open]);
 
-  async function handleSignOut() {
-    setOpen(false);
-    await onSignOut();
-  }
-
   return (
     <div ref={menuRef} className="relative">
-      <button
+      <Button
         type="button"
-        className="flex rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/35"
-        aria-label={`Open profile menu for ${displayName}`}
+        size="icon"
+        variant="ghost"
+        aria-label="Notifications"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <ProfileAvatar profile={profile} email={email} className="h-9 w-9 text-sm" />
-      </button>
+        <Bell className="h-5 w-5" />
+      </Button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-11 z-50 w-48 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="absolute right-0 top-11 z-50 w-64 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-popover)]"
         >
-          <ProfileMenuLink to="/profile" icon={UserRound} label="Profile" onSelect={() => setOpen(false)} />
-          <ProfileMenuLink to="/settings/profile" icon={Settings} label="Settings" onSelect={() => setOpen(false)} />
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
-            onClick={() => void handleSignOut()}
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            Log out
-          </button>
+          <p className="text-sm font-medium">Notifications</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            New message notifications will appear here.
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-function ProfileMenuLink({
-  to,
-  icon,
-  label,
-  onSelect,
-}: {
-  to: string;
-  icon: LucideIcon;
-  label: string;
-  onSelect: () => void;
-}) {
-  const Icon = icon;
-
+function AddMenuPanel({ onSelect }: { onSelect: (action: AddAction) => void }) {
   return (
-    <Link
-      to={to}
-      role="menuitem"
-      className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm transition-colors hover:bg-surface-hover"
-      onClick={onSelect}
-    >
-      <Icon className="h-4 w-4" aria-hidden="true" />
-      {label}
-    </Link>
+    <>
+      <div className="mb-1 px-2 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        Add
+      </div>
+      <div className="space-y-1">
+        {addActions.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover"
+            onClick={() => onSelect(key)}
+          >
+            <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DesktopAddButtonMenu({
+  open,
+  onToggleOpen,
+  onSelect,
+  buttonRef,
+  menuRef,
+}: {
+  open: boolean;
+  onToggleOpen: () => void;
+  onSelect: (action: AddAction) => void;
+  buttonRef: RefObject<HTMLButtonElement>;
+  menuRef: RefObject<HTMLDivElement>;
+}) {
+  return (
+    <div className="relative hidden md:block">
+      <Button
+        ref={buttonRef}
+        type="button"
+        size="sm"
+        className="gap-1.5"
+        aria-label="Add"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={onToggleOpen}
+      >
+        <Plus className="h-4 w-4" />
+        Add
+      </Button>
+      {open && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
+        >
+          <AddMenuPanel onSelect={onSelect} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -469,28 +663,13 @@ function FloatingAddButtonMenu({
   menuRef: RefObject<HTMLDivElement>;
 }) {
   return (
-    <div className="fixed bottom-20 right-4 z-40 md:bottom-6 md:right-6">
+    <div className="fixed bottom-20 right-4 z-40 md:hidden">
       {open && (
         <div
           ref={menuRef}
           className="absolute bottom-full right-0 mb-3 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
         >
-          <div className="mb-1 px-2 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Add
-          </div>
-          <div className="space-y-1">
-            {addActions.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover"
-                onClick={() => onSelect(key)}
-              >
-                <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
+          <AddMenuPanel onSelect={onSelect} />
         </div>
       )}
       <Button
