@@ -1,8 +1,6 @@
 import { attachmentTitle } from "@/lib/chatAttachments";
 import type {
   ChatAttachmentPayload,
-  ChatReaction,
-  ChatReactionSummary,
   ChatReplySnapshot,
   GroupMembership,
   GroupMessage,
@@ -56,33 +54,6 @@ export function buildReplySnapshot({
     attachment_title: attachment ? attachmentTitle(attachment) : null,
     created_at: message.created_at,
   };
-}
-
-export function summarizeHeartReactions({
-  reactions,
-  profiles,
-  currentUserId,
-}: {
-  reactions: ChatReaction[];
-  profiles: Map<string, { display_name?: string; username?: string }>;
-  currentUserId: string;
-}): ChatReactionSummary[] {
-  if (reactions.length === 0) return [];
-
-  return [
-    {
-      reaction: "heart",
-      count: reactions.length,
-      reacted_by_current_user: reactions.some((reaction) => reaction.user_id === currentUserId),
-      participants: reactions.map((reaction) => {
-        const profile = profiles.get(reaction.user_id);
-        return {
-          user_id: reaction.user_id,
-          display_name: profile?.display_name?.trim() || profile?.username?.trim() || "Unknown user",
-        };
-      }),
-    },
-  ];
 }
 
 export function countUnreadMessages({

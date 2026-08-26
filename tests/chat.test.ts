@@ -6,7 +6,6 @@ import {
   getMessagePreview,
   normalizeChatMessageContent,
   normalizeMessageContent,
-  summarizeHeartReactions,
   sortChatThreads,
 } from "../src/lib/chatLogic";
 import {
@@ -206,42 +205,6 @@ test("builds reply snapshots from attachment-only messages", () => {
   assert.equal(snapshot.text, "Shared Book");
   assert.equal(snapshot.attachment_type, "book");
   assert.equal(snapshot.attachment_title, "Shared Book");
-});
-
-test("summarizes heart reactions with participant names", () => {
-  const summary = summarizeHeartReactions({
-    currentUserId: "current-user",
-    profiles: new Map([
-      ["current-user", { display_name: "Martina" }],
-      ["other-user", { username: "sabine" }],
-    ]),
-    reactions: [
-      {
-        message_id: "message-1",
-        user_id: "current-user",
-        reaction: "heart",
-        created_at: "2026-06-20T10:00:00Z",
-      },
-      {
-        message_id: "message-1",
-        user_id: "other-user",
-        reaction: "heart",
-        created_at: "2026-06-20T10:01:00Z",
-      },
-    ],
-  });
-
-  assert.deepEqual(summary, [
-    {
-      reaction: "heart",
-      count: 2,
-      reacted_by_current_user: true,
-      participants: [
-        { user_id: "current-user", display_name: "Martina" },
-        { user_id: "other-user", display_name: "sabine" },
-      ],
-    },
-  ]);
 });
 
 test("builds series attachments with included quotes", () => {
