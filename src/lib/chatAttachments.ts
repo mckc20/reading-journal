@@ -1,4 +1,5 @@
 import type {
+  AuthorJournalEntryRecord,
   Book,
   BookJournalEntryRecord,
   ChatAttachmentPayload,
@@ -8,16 +9,29 @@ import type {
   ChatSeriesAttachment,
   ChatSharedBookSnapshot,
   ChatSharedNoteSnapshot,
+  SeriesJournalEntryRecord,
 } from "@/types";
 import type { AddBookPayload } from "@/hooks/useBooks";
 import type { CreateBookJournalEntryRecordInput } from "@/lib/bookJournal";
 
+type ShareableJournalEntry = BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
+
+export type SharedJournalSource = {
+  type: "book" | "series" | "author";
+  id: string;
+  title: string;
+  authors?: string[];
+  imageUrl?: string | null;
+};
+
 export const MAX_INCLUDED_ATTACHMENT_NOTES = 3;
 
 export function buildSharedNoteSnapshot(
-  note: BookJournalEntryRecord,
-  book?: Book | null,
+  note: ShareableJournalEntry,
+  source?: SharedJournalSource,
 ): ChatSharedNoteSnapshot {
+  const isBookSource = source?.type === "book" || "book_id" in note;
+  const bookId = "book_id" in note ? note.book_id : null;
   return {
     id: note.id,
     label: note.label,
@@ -25,9 +39,15 @@ export function buildSharedNoteSnapshot(
     attribution: note.attribution ?? null,
     page_start: note.page_start ?? null,
     entry_date: note.entry_date ?? null,
-    book_id: note.book_id,
-    book_title: book?.title ?? null,
-    book_authors: book?.authors ?? [],
+    tags: note.tags ?? null,
+    book_id: bookId,
+    book_title: isBookSource ? source?.title ?? null : null,
+    book_authors: isBookSource ? source?.authors ?? [] : [],
+    source_type: source?.type ?? (isBookSource ? "book" : undefined),
+    source_id: source?.id ?? bookId,
+    source_title: source?.title ?? null,
+    source_authors: source?.authors ?? [],
+    source_image_url: source?.imageUrl ?? null,
   };
 }
 
@@ -52,7 +72,13 @@ export function buildSharedBookSnapshot(
     volume_number: book.volume_number ?? null,
     included_journalEntries: includedJournalEntries
       .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
-      .map((note) => buildSharedNoteSnapshot(note, book)),
+      .map((note) => buildSharedNoteSnapshot(note, {
+        type: "book",
+        id: book.id,
+        title: book.title,
+        authors: book.authors,
+        imageUrl: book.cover_url,
+      })),
   };
 }
 
@@ -66,22 +92,31 @@ export function buildBookAttachment(
   };
 }
 
-export function buildNoteAttachment(note: BookJournalEntryRecord, book?: Book | null): ChatNoteAttachment {
+export function buildNoteAttachment(note: ShareableJournalEntry, source: SharedJournalSource): ChatNoteAttachment {
   return {
     type: "note",
-    note: buildSharedNoteSnapshot(note, book),
-    book: book ? buildSharedBookSnapshot(book) : null,
+    note: buildSharedNoteSnapshot(note, source),
+    book: source.type === "book" ? {
+      id: source.id,
+      title: source.title,
+      authors: source.authors ?? [],
+      cover_url: source.imageUrl ?? null,
+    } : null,
   };
 }
 
 export function buildAuthorAttachment({
   authorId,
   authorName,
+  authorPhotoUrl,
+  authorBio,
   books,
   includedQuotes,
 }: {
   authorId?: string;
   authorName: string;
+  authorPhotoUrl?: string | null;
+  authorBio?: string | null;
   books: Book[];
   includedQuotes: BookJournalEntryRecord[];
 }): ChatAuthorAttachment {
@@ -90,10 +125,21 @@ export function buildAuthorAttachment({
     author: {
       id: authorId,
       name: authorName,
+      photo_url: authorPhotoUrl ?? null,
+      bio: authorBio ?? null,
       books: books.map((book) => buildSharedBookSnapshot(book)),
       included_quotes: includedQuotes
         .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
-        .map((note) => buildSharedNoteSnapshot(note, books.find((book) => book.id === note.book_id))),
+        .map((note) => {
+          const book = books.find((item) => item.id === note.book_id);
+          return buildSharedNoteSnapshot(note, book ? {
+            type: "book",
+            id: book.id,
+            title: book.title,
+            authors: book.authors,
+            imageUrl: book.cover_url,
+          } : undefined);
+        }),
     },
   };
 }
@@ -101,11 +147,15 @@ export function buildAuthorAttachment({
 export function buildSeriesAttachment({
   seriesId,
   seriesName,
+  seriesCoverUrl,
+  seriesDescription,
   books,
   includedQuotes,
 }: {
   seriesId?: string | null;
   seriesName: string;
+  seriesCoverUrl?: string | null;
+  seriesDescription?: string | null;
   books: Book[];
   includedQuotes: BookJournalEntryRecord[];
 }): ChatSeriesAttachment {
@@ -114,10 +164,22 @@ export function buildSeriesAttachment({
     series: {
       id: seriesId ?? undefined,
       name: seriesName,
+      cover_url: seriesCoverUrl ?? null,
+      authors: Array.from(new Set(books.flatMap((book) => book.authors))),
+      description: seriesDescription ?? null,
       books: books.map((book) => buildSharedBookSnapshot(book)),
       included_quotes: includedQuotes
         .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
-        .map((note) => buildSharedNoteSnapshot(note, books.find((book) => book.id === note.book_id))),
+        .map((note) => {
+          const book = books.find((item) => item.id === note.book_id);
+          return buildSharedNoteSnapshot(note, book ? {
+            type: "book",
+            id: book.id,
+            title: book.title,
+            authors: book.authors,
+            imageUrl: book.cover_url,
+          } : undefined);
+        }),
     },
   };
 }
@@ -129,6 +191,7 @@ export function bookSnapshotToAddBookPayload(
   return {
     title: book.title,
     authors: book.authors.length > 0 ? book.authors : ["Unknown"],
+    cover_url: book.cover_url ?? undefined,
     genres: book.genres,
     status: "To Read",
     total_pages: book.total_pages ?? undefined,
@@ -161,6 +224,7 @@ export function noteSnapshotToCreateInput({
     attribution: note.attribution ?? undefined,
     content: note.content,
     pageStart: note.page_start ?? undefined,
+    ...(note.tags?.length ? { tags: note.tags } : {}),
     noteDate: note.entry_date ?? undefined,
     isFavorite: false,
   };

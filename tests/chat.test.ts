@@ -132,6 +132,14 @@ test("builds clean book import payloads without personal reading state", () => {
   assert.equal("date_finished" in payload, false);
 });
 
+test("keeps a shared book cover in the attachment and imported library payload", () => {
+  const attachment = buildBookAttachment(makeBook({ cover_url: "https://example.com/shared-cover.jpg" }));
+  const payload = bookSnapshotToAddBookPayload(attachment.book);
+
+  assert.equal(attachment.book.cover_url, "https://example.com/shared-cover.jpg");
+  assert.equal(payload.cover_url, "https://example.com/shared-cover.jpg");
+});
+
 test("maps note snapshots to a selected target book", () => {
   const note = makeNote({ label: "quote", content: "A quote", attribution: "Author" });
   const attachment = buildBookAttachment(makeBook(), [note]);

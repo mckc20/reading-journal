@@ -8,26 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { addGroupMember } from "@/lib/profiles";
 import { createGroupChat, createOrGetDirectChat, searchPublicProfiles } from "@/lib/chat";
-import type { PublicProfile } from "@/types";
+import type { Group, PublicProfile } from "@/types";
 
 interface AddChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (groupId: string) => void;
 }
-
-type ChatMode = "direct" | "group";
 
 function profileLabel(profile: PublicProfile): string {
   return profile.display_name?.trim() || profile.username?.trim() || "Unknown user";
 }
 
-export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps) {
+export default function AddChatDialog({ open, onOpenChange, onCreated }: AddChatDialogProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PublicProfile[]>([]);
   const [selected, setSelected] = useState<PublicProfile[]>([]);
-  const [mode, setMode] = useState<ChatMode>("direct");
   const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,17 +62,10 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
     };
   }, [query]);
 
-  useEffect(() => {
-    if (mode === "direct" && selected.length > 1) {
-      setSelected(selected.slice(0, 1));
-    }
-  }, [mode, selected]);
-
   function toggleProfile(profile: PublicProfile) {
     setSelected((current) => {
       const exists = current.some((item) => item.id === profile.id);
       if (exists) return current.filter((item) => item.id !== profile.id);
-      if (mode === "direct") return [profile];
       return [...current, profile];
     });
   }
@@ -87,7 +78,6 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
     setQuery("");
     setResults([]);
     setSelected([]);
-    setMode("direct");
     setGroupName("");
     setLoading(false);
     setSaving(false);
@@ -100,13 +90,8 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
       return;
     }
 
-    if (mode === "direct" && selected.length !== 1) {
-      setError("Choose one person for a direct chat.");
-      return;
-    }
-
-    if (mode === "group" && selected.length < 2) {
-      setError("Choose at least two people for a group chat.");
+    if (selected.length === 0) {
+      setError("Choose at least one person.");
       return;
     }
 
@@ -114,18 +99,23 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
     setError(null);
 
     try {
-      if (mode === "direct") {
-        await createOrGetDirectChat(selected[0].id);
+      let chat: Group;
+      if (selected.length === 1) {
+        chat = await createOrGetDirectChat(selected[0].id);
       } else {
-        const group = await createGroupChat({
+        chat = await createGroupChat({
           name: groupName.trim() || "New group chat",
         });
-        await Promise.all(selected.map((profile) => addGroupMember(group.id, profile.id)));
+        await Promise.all(selected.map((profile) => addGroupMember(chat.id, profile.id)));
       }
 
       reset();
       onOpenChange(false);
-      navigate("/messages");
+      if (onCreated) {
+        onCreated(chat.id);
+      } else {
+        navigate("/messages", { state: { preferredGroupId: chat.id } });
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Could not create chat.");
     } finally {
@@ -144,33 +134,11 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
         <DialogHeader>
           <DialogTitle>Add Chat</DialogTitle>
           <DialogDescription>
-            Pick the people to chat with, then create a direct chat or a group chat.
+            Choose one person for a direct chat or several people for a group chat.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Chat type</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={mode === "direct" ? "default" : "outline"}
-                onClick={() => setMode("direct")}
-                className="flex-1"
-              >
-                Direct
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "group" ? "default" : "outline"}
-                onClick={() => setMode("group")}
-                className="flex-1"
-              >
-                Group
-              </Button>
-            </div>
-          </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="chat-search">Search people</Label>
             <Input
@@ -238,7 +206,7 @@ export default function AddChatDialog({ open, onOpenChange }: AddChatDialogProps
             </div>
           </div>
 
-          {mode === "group" && (
+          {selected.length > 1 && (
             <div className="space-y-1.5">
               <Label htmlFor="chat-name">Chat name</Label>
               <Input

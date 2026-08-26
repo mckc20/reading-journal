@@ -9,7 +9,6 @@ import {
   Library,
   LibraryBig,
   Menu,
-  MessageCircle,
   MessageSquare,
   NotebookPen,
   Plus,
@@ -28,16 +27,17 @@ import { BooksProvider } from "@/context/BooksContext";
 import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useProfile } from "@/context";
+import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
-import type { Book } from "@/types";
+import type { Book, ChatMessageNotification } from "@/types";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
-const AddChatDialog = lazy(() => import("./AddChatDialog"));
 
-type AddAction = "book" | "author" | "series" | "note" | "chat";
+type AddAction = "book" | "author" | "series" | "note";
 
 const addActions: Array<{
   key: AddAction;
@@ -48,7 +48,6 @@ const addActions: Array<{
   { key: "author", label: "Author", icon: UserRound },
   { key: "series", label: "Series", icon: LibraryBig },
   { key: "note", label: "Entry", icon: NotebookPen },
-  { key: "chat", label: "Chat", icon: MessageCircle },
 ];
 
 export interface AppLayoutOutletContext {
@@ -138,6 +137,7 @@ function AppLayoutContent() {
   const floatingAddMenuRef = useRef<HTMLDivElement>(null);
   const displayName = getDisplayName(profile, user?.email);
   const hideFloatingAddButton = detailEditingOpen;
+  const isMessagesPage = location.pathname === "/messages";
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return;
@@ -255,10 +255,16 @@ function AppLayoutContent() {
 
         <main
           className={cn(
-            "mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
+            isMessagesPage
+              ? "w-full max-w-none flex-1 px-0 py-0 pb-16 transition-[padding] duration-200 md:pb-0 md:pt-16"
+              : "mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
             drawerOpen
-              ? "md:pl-72 md:[--detail-bg-left-offset:7.75rem] lg:[--detail-bg-left-offset:7.5rem]"
-              : "md:pl-24 md:[--detail-bg-left-offset:1.75rem] lg:[--detail-bg-left-offset:1.5rem]",
+              ? isMessagesPage
+                ? "md:pl-64"
+                : "md:pl-72 md:[--detail-bg-left-offset:7.75rem] lg:[--detail-bg-left-offset:7.5rem]"
+              : isMessagesPage
+                ? "md:pl-16"
+                : "md:pl-24 md:[--detail-bg-left-offset:1.75rem] lg:[--detail-bg-left-offset:1.5rem]",
           )}
         >
           <Outlet
@@ -306,12 +312,6 @@ function AppLayoutContent() {
             onOpenChange={(open) => !open && setActiveAddAction(null)}
             openAddBook={openAddBook}
             onSaved={(series) => navigate(`/series/${series.id}`)}
-          />
-        )}
-        {activeAddAction === "chat" && (
-          <AddChatDialog
-            open
-            onOpenChange={(open) => !open && setActiveAddAction(null)}
           />
         )}
       </Suspense>
@@ -527,8 +527,51 @@ function TopNavLink({ link, active }: { link: NavLink; active: boolean }) {
 }
 
 function NotificationsMenu() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<ChatMessageNotification[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    function loadNotifications() {
+      void getChatNotifications()
+        .then((nextNotifications) => {
+          if (!cancelled) setNotifications(nextNotifications);
+        })
+        .catch(() => {
+          if (!cancelled) setNotifications([]);
+        });
+    }
+
+    loadNotifications();
+
+    const channel = supabase
+      .channel(`chat-notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_message_notifications",
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        loadNotifications,
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -552,6 +595,19 @@ function NotificationsMenu() {
     };
   }, [open]);
 
+  function openNotification(notification: ChatMessageNotification) {
+    setNotifications((current) => current.map((item) => (
+      item.id === notification.id && !item.read_at
+        ? { ...item, read_at: new Date().toISOString() }
+        : item
+    )));
+    setOpen(false);
+    void markChatNotificationRead(notification.id).catch(() => undefined);
+    navigate("/messages", { state: { preferredGroupId: notification.group_id } });
+  }
+
+  const unreadCount = notifications.filter((notification) => !notification.read_at).length;
+
   return (
     <div ref={menuRef} className="relative">
       <Button
@@ -565,16 +621,44 @@ function NotificationsMenu() {
       >
         <Bell className="h-5 w-5" />
       </Button>
+      {unreadCount > 0 && (
+        <span
+          className="pointer-events-none absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background"
+          aria-label={`${unreadCount} unread message notification${unreadCount === 1 ? "" : "s"}`}
+        />
+      )}
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-11 z-50 w-64 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popover)]"
         >
-          <p className="text-sm font-medium">Notifications</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            New message notifications will appear here.
-          </p>
+          <div className="border-b px-3 py-2.5">
+            <p className="text-sm font-medium">Notifications</p>
+          </div>
+          {notifications.length === 0 ? (
+            <p className="px-3 py-4 text-xs leading-5 text-muted-foreground">No new messages.</p>
+          ) : (
+            <div className="max-h-80 overflow-y-auto p-1.5">
+              {notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  type="button"
+                  role="menuitem"
+                  className={cn(
+                    "w-full rounded-md px-2.5 py-2.5 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    !notification.read_at && "bg-primary/10 hover:bg-primary/15",
+                  )}
+                  onClick={() => openNotification(notification)}
+                >
+                  <p className="truncate text-sm font-medium">{notification.sender_name}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    {notification.message_preview}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
