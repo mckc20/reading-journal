@@ -2,13 +2,29 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
   type ReactNode,
 } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { BookOpen, CalendarDays, ChevronRight, Gauge, Heart, ImagePlus, Loader2, PauseCircle, Route, Star, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  ChevronRight,
+  Gauge,
+  Heart,
+  ImagePlus,
+  Languages,
+  Loader2,
+  PauseCircle,
+  Route,
+  Star,
+  Tags,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
@@ -30,6 +46,7 @@ import SeriesBooksEditor, {
   type EditableSeriesBook,
 } from "@/components/series/SeriesBooksEditor";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -202,6 +219,27 @@ function EmptySection({ message }: { message: string }) {
     <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
       {message}
     </div>
+  );
+}
+
+function SeriesMetadataHeading({
+  icon: Icon,
+  title,
+}: {
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
+      <Icon className="h-3.5 w-3.5 text-primary" />
+      {title}
+    </h3>
+  );
+}
+
+function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
+    (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
   );
 }
 
@@ -380,7 +418,7 @@ function SeriesProgressCard({
   return (
     <section className="rounded-xl border bg-card p-5 shadow-[var(--shadow-card)]">
       <AppHeading level={4} as="h2">
-        Your Series <span className="font-serif italic">Progress</span>
+        Reading <span className="font-serif italic">Progress</span>
       </AppHeading>
       <div className="mt-4 grid gap-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
         <div className="flex justify-center lg:justify-start">
@@ -491,7 +529,7 @@ function ExploreBooksCard({
   emptyLabel?: string;
 }) {
   return (
-    <article className="rounded-xl border bg-card p-4">
+    <article className="rounded-xl border p-4">
       <h3 className="text-sm font-medium">{title}</h3>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
@@ -775,6 +813,7 @@ export default function SeriesDetails() {
   const [savingSeries, setSavingSeries] = useState(false);
   const [startingBookId, setStartingBookId] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const progressCardRef = useRef<HTMLDivElement>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   const seriesBooks = useMemo(
@@ -823,6 +862,10 @@ export default function SeriesDetails() {
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesBooks), [seriesBooks]);
   const genres = useMemo(() => getSeriesGenres(seriesBooks), [seriesBooks]);
+  const languages = useMemo(
+    () => uniqueSortedValues(seriesBooks.map((book) => book.language)),
+    [seriesBooks],
+  );
   const genreSlugByName = useMemo(() => {
     const { slugById } = buildGenreSlugLookup(availableGenres);
     return new Map(
@@ -1046,8 +1089,6 @@ export default function SeriesDetails() {
     );
   }
 
-  const headerGenres = genres.slice(0, 2);
-
   if (isEditMode) {
     return (
       <div className="space-y-6">
@@ -1084,53 +1125,60 @@ export default function SeriesDetails() {
           {shareStatus}
         </div>
       )}
-      <div className="flex items-start justify-between gap-3">
-        <BackButton fallbackTo="/library/series" />
-        <DetailActionsMenu
-          kind="series"
-          label={seriesRecord.name}
-          shareAttachmentLabel="Send the series as attachment in a chat"
-          onEdit={() => setIsEditMode(true)}
-          onDelete={handleDeleteSeries}
-          onSendAttachment={openAttachmentPicker}
-          deleteTitle="Delete this series?"
-          deleteDescription="Are you sure you want to delete this series? The books will stay in your library and be detached from this series."
-        />
-      </div>
-
-      <header className="relative flex min-h-64 items-end overflow-hidden rounded-2xl border bg-muted">
-        {seriesRecord.cover_url ? (
-          <img
-            src={seriesRecord.cover_url}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <div
-            className="absolute inset-0 bg-primary"
-            aria-label="Series banner placeholder"
-          />
-        )}
-        <div className="absolute inset-0 bg-foreground/45" />
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleToggleFavorite()}
-            aria-label={seriesRecord.is_favorite ? "Remove series from favorites" : "Add series to favorites"}
-            className="flex h-10 w-10 items-center justify-center text-white transition-colors hover:text-white/80"
-          >
-            <Heart
-              className={cn(
-                "h-5 w-5",
-                seriesRecord.is_favorite ? "fill-favorite text-favorite" : "text-white",
-              )}
+      <header className="relative -mt-5 flex min-h-[clamp(15rem,24vh,25rem)] flex-col justify-between pb-5 pt-5 sm:pb-6 sm:pt-6 md:-mt-24 md:pt-24">
+        <div className="absolute inset-y-0 left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] z-0 w-screen overflow-hidden border-y bg-muted">
+          {seriesRecord.cover_url ? (
+            <img
+              src={seriesRecord.cover_url}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
             />
-          </button>
+          ) : (
+            <div
+              className="absolute inset-0 bg-primary"
+              aria-label="Series banner placeholder"
+            />
+          )}
+          <div className="absolute inset-0 bg-foreground/45" />
         </div>
-        <div className="relative space-y-3 p-6 text-white sm:p-8">
-          <AppHeading level={1} className="text-white">
-            {seriesRecord.name}
-          </AppHeading>
+
+        <div className="relative z-10 flex items-start justify-between gap-3">
+          <BackButton
+            fallbackTo="/library/series"
+            className="text-white hover:bg-white/10 hover:text-white"
+          />
+          <DetailActionsMenu
+            kind="series"
+            label={seriesRecord.name}
+            shareAttachmentLabel="Send the series as attachment in a chat"
+            onEdit={() => setIsEditMode(true)}
+            onDelete={handleDeleteSeries}
+            onSendAttachment={openAttachmentPicker}
+            deleteTitle="Delete this series?"
+            deleteDescription="Are you sure you want to delete this series? The books will stay in your library and be detached from this series."
+            buttonClassName="text-white hover:bg-white/10 hover:text-white aria-expanded:bg-white/15 aria-expanded:text-white"
+          />
+        </div>
+
+        <div className="relative z-10 space-y-3 pb-2 pt-16 text-white sm:pb-4">
+          <div className="flex items-start gap-3">
+            <AppHeading level={1} className="text-white">
+              {seriesRecord.name}
+            </AppHeading>
+            <button
+              type="button"
+              onClick={() => void handleToggleFavorite()}
+              aria-label={seriesRecord.is_favorite ? "Remove series from favorites" : "Add series to favorites"}
+              className="mt-2 shrink-0 rounded p-1 text-white transition-colors hover:bg-white/10"
+            >
+              <Heart
+                className={cn(
+                  "h-5 w-5",
+                  seriesRecord.is_favorite ? "fill-favorite text-favorite" : "text-white",
+                )}
+              />
+            </button>
+          </div>
           <p className="flex flex-wrap gap-x-1 text-base text-white/85">
             <span>by</span>
             {authors.length > 0 ? (
@@ -1149,32 +1197,6 @@ export default function SeriesDetails() {
               <span>Unknown author</span>
             )}
           </p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
-            <span>{bookCountLabel(seriesBooks.length)}</span>
-            <span aria-hidden>·</span>
-            <span className="flex flex-wrap gap-x-1">
-              {headerGenres.length > 0 ? (
-                headerGenres.map((genre, index) => {
-                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                  return (
-                    <span key={genre}>
-                      <MetadataLink
-                        to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}
-                        className="text-white/80 hover:text-white focus-visible:ring-white/80 focus-visible:ring-offset-foreground"
-                      >
-                        {genre}
-                      </MetadataLink>
-                      {index < headerGenres.length - 1 ? "," : ""}
-                    </span>
-                  );
-                })
-              ) : (
-                "No genre"
-              )}
-            </span>
-            <span aria-hidden>·</span>
-            <span>{derivedStatus}</span>
-          </div>
         </div>
       </header>
 
@@ -1186,19 +1208,71 @@ export default function SeriesDetails() {
             <AboutSection
               title={
                 <>
-                  <span className="font-serif italic">About</span> this Series
+                  <span className="font-serif italic">About</span> this series
                 </>
               }
+              titleContent={
+                <div className="grid gap-4 pb-2 pt-1 sm:grid-cols-3">
+                  <div>
+                    <SeriesMetadataHeading icon={Tags} title="Genres" />
+                    <div className="mt-1.5">
+                      {genres.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {genres.map((genre) => {
+                            const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                            return (
+                              <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
+                                <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+                                  {genre}
+                                </Link>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Not set</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <SeriesMetadataHeading icon={Languages} title="Language" />
+                    <p className="mt-1.5 text-base">
+                      {languages.length > 0 ? (
+                        languages.map((language, index) => (
+                          <span key={language}>
+                            {index > 0 ? ", " : null}
+                            <MetadataLink to={buildBookLibraryFilterPath("language", language)}>
+                              {language}
+                            </MetadataLink>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <SeriesMetadataHeading icon={BookOpen} title="Books" />
+                    <p className="mt-1.5 text-base">{bookCountLabel(seriesBooks.length)}</p>
+                  </div>
+                </div>
+              }
               text={seriesRecord.description}
-              emptyText="No description yet."
+              emptyText=""
               clampClassName="line-clamp-4 lg:line-clamp-[11]"
+              collapsedBottomRef={progressCardRef}
+              collapsedBottomMinWidth={1024}
             />
-            <SeriesProgressCard
-              progress={progress}
-              totalBooks={seriesBooks.length}
-              averageRating={averageRating}
-              detail={progressDetail}
-            />
+            <div ref={progressCardRef}>
+              <SeriesProgressCard
+                progress={progress}
+                totalBooks={seriesBooks.length}
+                averageRating={averageRating}
+                detail={progressDetail}
+              />
+            </div>
           </div>
 
           <section className="space-y-4">
@@ -1210,13 +1284,13 @@ export default function SeriesDetails() {
             </div>
           </section>
 
-          <SeriesJournalSection series={seriesRecord} />
-
           <section className="space-y-4">
             <SectionHeader title={<span className="font-serif italic">Analytics</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
             <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
             <SeriesAnalyticsPaceChart stats={seriesStats} />
           </section>
+
+          <SeriesJournalSection series={seriesRecord} />
 
           <section className="space-y-5">
             <SectionHeader title={<>More to <span className="font-serif italic">Explore</span></>} />
@@ -1237,7 +1311,7 @@ export default function SeriesDetails() {
                 books={moreByGenre}
                 onBook={(book) => navigate(`/books/${book.id}`)}
               />
-              <article className="rounded-xl border bg-card p-4">
+              <article className="rounded-xl border p-4">
                 <h3 className="text-sm font-medium">
                   You Might Also <span className="font-serif italic">Like</span>
                 </h3>

@@ -26,7 +26,6 @@ test("uses Open Library metadata before Google Books", async () => {
           number_of_pages: 208,
           subjects: [{ name: "Science fiction" }, { name: "Fiction" }, { name: "Science fiction" }],
           languages: [{ key: "/languages/eng" }],
-          publishers: [{ name: "Farrar, Straus and Giroux" }],
           publish_date: "February 2014",
           description: { value: "Area X has been cut off from the rest of the continent." },
         },
@@ -49,9 +48,7 @@ test("uses Open Library metadata before Google Books", async () => {
       totalPages: 208,
       genres: ["Science fiction", "Fiction"],
       language: "English",
-      publisher: "Farrar, Straus and Giroux",
-      publicationDate: "2014-02-01",
-      publicationDatePrecision: "month",
+      publicationDate: "2014-01-01",
       description: "Area X has been cut off from the rest of the continent.",
       coverUrl: "https://covers.example/annihilation.jpg",
       metadataSource: "open_library",
@@ -87,7 +84,6 @@ test("falls back to Google Books when Open Library has no result", async () => {
               pageCount: 333,
               categories: ["Fiction"],
               language: "en",
-              publisher: "Vintage",
               publishedDate: "2015-06-02",
               description: "A novel about art, fame, and survival.",
             },
@@ -109,9 +105,7 @@ test("falls back to Google Books when Open Library has no result", async () => {
     assert.equal(result?.metadataSource, "google_books");
     assert.equal(result?.metadataSourceUrl, "https://www.googleapis.com/books/v1/volumes/google-id");
     assert.equal(result?.title, "Station Eleven");
-    assert.equal(result?.publisher, "Vintage");
-    assert.equal(result?.publicationDate, "2015-06-02");
-    assert.equal(result?.publicationDatePrecision, "day");
+    assert.equal(result?.publicationDate, "2015-01-01");
     assert.equal(result?.description, "A novel about art, fame, and survival.");
     assert.equal(result?.coverUrl, undefined);
   } finally {
@@ -119,26 +113,21 @@ test("falls back to Google Books when Open Library has no result", async () => {
   }
 });
 
-test("parses publication date precision from common provider formats", () => {
+test("parses publication years from common provider formats", () => {
   assert.deepEqual(parsePublicationDate("2002"), {
     date: "2002-01-01",
-    precision: "year",
   });
   assert.deepEqual(parsePublicationDate("2002-10"), {
-    date: "2002-10-01",
-    precision: "month",
+    date: "2002-01-01",
   });
   assert.deepEqual(parsePublicationDate("2002-10-10"), {
-    date: "2002-10-10",
-    precision: "day",
+    date: "2002-01-01",
   });
   assert.deepEqual(parsePublicationDate("October 2002"), {
-    date: "2002-10-01",
-    precision: "month",
+    date: "2002-01-01",
   });
   assert.deepEqual(parsePublicationDate("10 October 2002"), {
-    date: "2002-10-10",
-    precision: "day",
+    date: "2002-01-01",
   });
 });
 

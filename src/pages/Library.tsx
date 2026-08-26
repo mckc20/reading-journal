@@ -33,7 +33,6 @@ const libraryRedirectParamKeys = [
   "year",
   "format",
   "language",
-  "publisher",
   "source",
   "status",
   "progress",

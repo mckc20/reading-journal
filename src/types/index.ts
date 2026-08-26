@@ -14,8 +14,6 @@ export type BookFormat = "eBook" | "Audiobook" | "Paperback" | "Hardcover";
 
 export type BookMetadataSource = "open_library" | "google_books";
 
-export type PublicationDatePrecision = "year" | "month" | "day";
-
 export type SeriesStatus = "ongoing" | "completed";
 
 export interface Series {
@@ -79,9 +77,7 @@ export interface Book {
   source?: BookSource;
   format?: BookFormat;
   isbn?: string;
-  publisher?: string | null;
   publication_date?: string | null;
-  publication_date_precision?: PublicationDatePrecision | null;
   description?: string | null;
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
@@ -478,9 +474,7 @@ export interface ChatSharedBookSnapshot {
   language?: BookLanguage | null;
   format?: BookFormat | null;
   isbn?: string | null;
-  publisher?: string | null;
   publication_date?: string | null;
-  publication_date_precision?: PublicationDatePrecision | null;
   description?: string | null;
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;

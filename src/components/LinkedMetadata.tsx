@@ -8,7 +8,6 @@ export type BookLibraryFilterKey =
   | "genre"
   | "language"
   | "publicationYear"
-  | "publisher"
   | "series"
   | "source"
   | "status";
