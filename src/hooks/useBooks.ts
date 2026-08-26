@@ -16,7 +16,7 @@ import {
 import type { Book, BookUpdate } from "@/types";
 
 export interface AddBookPayload
-  extends Omit<BookInsert, "id" | "cover_url" | "user_id"> {}
+  extends Omit<BookInsert, "id" | "user_id"> {}
 
 export interface AddBookResult {
   book: Book;

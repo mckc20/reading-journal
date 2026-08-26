@@ -1329,6 +1329,8 @@ export default function SeriesDetails() {
         attachment={buildSeriesAttachment({
           seriesId: seriesRecord.id,
           seriesName: seriesRecord.name,
+          seriesCoverUrl: seriesRecord.cover_url,
+          seriesDescription: seriesRecord.description,
           books: seriesBooks,
           includedQuotes: journalEntries
             .filter((note) => note.label === "quote" && seriesBookIds.has(note.book_id))

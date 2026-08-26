@@ -35,10 +35,11 @@ type NullableGroupRow = Omit<Group, "description" | "avatar_url" | "direct_pair_
   direct_pair_key: string | null;
 };
 
-type NullablePublicProfileRow = Omit<PublicProfile, "username" | "display_name" | "avatar_url"> & {
+type NullablePublicProfileRow = Omit<PublicProfile, "username" | "display_name" | "avatar_url" | "bio"> & {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  bio: string | null;
 };
 
 type NullableMessageRow = Omit<GroupMessage, "edited_at" | "deleted_at"> & {
@@ -96,6 +97,7 @@ function normalizePublicProfile(row: NullablePublicProfileRow): PublicProfile {
     username: row.username ?? undefined,
     display_name: row.display_name ?? undefined,
     avatar_url: row.avatar_url ?? undefined,
+    bio: row.bio ?? undefined,
     created_at: row.created_at,
   };
 }
@@ -212,6 +214,11 @@ export async function searchPublicProfiles(
   return ((data ?? []) as NullablePublicProfileRow[]).map(normalizePublicProfile);
 }
 
+export async function getPublicProfile(profileId: string): Promise<PublicProfile | null> {
+  const profiles = await getProfilesById([profileId]);
+  return profiles.get(profileId) ?? null;
+}
+
 export async function getChatThreads(currentUserId: string): Promise<ChatThread[]> {
   const { data: groupData, error: groupError } = await supabase
     .from("groups")
@@ -296,6 +303,48 @@ export async function getChatMessages(groupId: string, currentUserId: string): P
     currentUserId,
   );
   return attachReactionSummaries(messages, reactionsByMessageId);
+}
+
+export async function getSavedChatAttachmentMessageIds(messageIds: string[]): Promise<Set<string>> {
+  if (messageIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
+    .from("chat_attachment_saves")
+    .select("message_id")
+    .in("message_id", messageIds);
+  if (error) throw error;
+
+  return new Set((data ?? []).map((row) => String(row.message_id)));
+}
+
+export async function saveChatAttachment(userId: string, messageId: string): Promise<void> {
+  const { error } = await supabase
+    .from("chat_attachment_saves")
+    .upsert({ user_id: userId, message_id: messageId }, { onConflict: "user_id,message_id", ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export async function copyChatAttachmentImage(
+  messageId: string,
+  targetType: "book" | "author" | "series",
+  targetId: string,
+  sourceBookId?: string,
+): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("copy-chat-attachment-image", {
+    body: { messageId, targetType, targetId, sourceBookId },
+  });
+  if (error) {
+    const response = (error as { context?: Response }).context;
+    if (response) {
+      const errorBody = await response.clone().json().catch(() => null) as { error?: unknown } | null;
+      if (typeof errorBody?.error === "string") throw new Error(errorBody.error);
+    }
+    throw error;
+  }
+  if (!data || typeof data.publicUrl !== "string") {
+    throw new Error("The image-copy service did not return an image URL.");
+  }
+  return data.publicUrl;
 }
 
 export async function getChatMembers(groupId: string): Promise<ChatMember[]> {

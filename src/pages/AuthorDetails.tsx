@@ -544,6 +544,8 @@ export default function AuthorDetails() {
         attachment={buildAuthorAttachment({
           authorId: author.id,
           authorName: author.name,
+          authorPhotoUrl: author.photo_url,
+          authorBio: author.bio,
           books: authorBooks,
           includedQuotes: author.quotes.slice(0, 3),
         })}

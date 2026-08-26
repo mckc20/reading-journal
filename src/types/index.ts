@@ -396,7 +396,7 @@ export interface GroupMembership {
 
 export type PublicProfile = Pick<
   Profile,
-  "id" | "username" | "display_name" | "avatar_url" | "created_at"
+  "id" | "username" | "display_name" | "avatar_url" | "bio" | "created_at"
 >;
 
 export interface GroupMessage {
@@ -413,6 +413,18 @@ export interface GroupMessage {
   updated_at: string;
   edited_at?: string | null;
   deleted_at?: string | null;
+}
+
+export interface ChatMessageNotification {
+  id: string;
+  recipient_id: string;
+  group_id: string;
+  message_id: string;
+  sender_id: string;
+  sender_name: string;
+  message_preview: string;
+  created_at: string;
+  read_at: string | null;
 }
 
 export type ChatReactionType = "heart";
@@ -462,6 +474,12 @@ export interface ChatSharedNoteSnapshot {
   book_id?: string | null;
   book_title?: string | null;
   book_authors?: string[];
+  tags?: string[] | null;
+  source_type?: "book" | "series" | "author";
+  source_id?: string | null;
+  source_title?: string | null;
+  source_authors?: string[];
+  source_image_url?: string | null;
 }
 
 export interface ChatSharedBookSnapshot {
@@ -498,6 +516,8 @@ export interface ChatAuthorAttachment {
   author: {
     id?: string;
     name: string;
+    photo_url?: string | null;
+    bio?: string | null;
     books: ChatSharedBookSnapshot[];
     included_quotes?: ChatSharedNoteSnapshot[];
   };
@@ -506,6 +526,9 @@ export interface ChatAuthorAttachment {
 export interface ChatSharedSeriesSnapshot {
   id?: string;
   name: string;
+  cover_url?: string | null;
+  authors?: string[];
+  description?: string | null;
   books: ChatSharedBookSnapshot[];
   included_quotes?: ChatSharedNoteSnapshot[];
 }

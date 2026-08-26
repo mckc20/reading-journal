@@ -1,18 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
+  CircleCheck,
+  CirclePlus,
+  ChevronRight,
   Copy,
+  FileSearchCorner,
   Heart,
+  LibraryBig,
   MessageCircle,
-  Paperclip,
+  MessageCirclePlus,
   Pencil,
   Plus,
   Reply,
-  Search,
   Send,
-  Settings,
+  Sticker,
   StickyNote,
   Trash2,
   UserPlus,
@@ -21,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
+import AddChatDialog from "@/components/AddChatDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,24 +57,23 @@ import {
   buildNoteAttachment,
   buildSeriesAttachment,
   noteSnapshotToCreateInput,
-  MAX_INCLUDED_ATTACHMENT_NOTES,
 } from "@/lib/chatAttachments";
 import {
   addGroupMemberByUsername,
   changeGroupMemberRole,
-  createGroupChat,
-  createOrGetDirectChat,
+  copyChatAttachmentImage,
   deleteChatMessage,
   editChatMessage,
   buildReplySnapshot,
   getChatMembers,
   getChatMessages,
+  getSavedChatAttachmentMessageIds,
   getChatThreads,
   getMessagePreview,
   markChatRead,
   removeChatMember,
-  searchPublicProfiles,
   sendChatMessage,
+  saveChatAttachment,
   toggleHeartReaction,
   toChatErrorMessage,
   type ChatMember,
@@ -78,10 +82,13 @@ import {
 import { supabase } from "@/lib/supabase";
 import { buildAuthorSummaries } from "@/lib/authorShelf";
 import { createBookJournalEntryRecord, fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { createSeriesJournalEntryRecord, fetchAllSeriesJournalEntryRecords } from "@/lib/seriesJournal";
+import { createAuthorJournalEntryRecord, fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
 import type {
   Book,
+  AuthorJournalEntryRecord,
   BookJournalEntryRecord,
   ChatAttachmentPayload,
   ChatReplySnapshot,
@@ -91,10 +98,20 @@ import type {
   PublicProfile,
   GroupMembershipRole,
   Series,
+  SeriesJournalEntryRecord,
 } from "@/types";
 
-type ComposeMode = "direct" | "group";
 type AttachmentPickerMode = "book" | "note" | "author" | "series";
+type JournalTargetKind = "book" | "series" | "author";
+
+type JournalAttachmentPickerItem = {
+  sourceType: JournalTargetKind;
+  sourceId: string;
+  sourceTitle: string;
+  sourceAuthors: string[];
+  sourceImageUrl: string | null;
+  entry: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord;
+};
 
 type OpenAttachmentState =
   | { type: "book"; bookId: string }
@@ -114,11 +131,21 @@ type MessageActionMenu = {
 
 function formatMessageTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatMessageDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
+function messageDayKey(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
 function profileLabel(profile?: PublicProfile): string {
@@ -209,11 +236,6 @@ function attachmentHref(attachment: ChatAttachmentPayload): string | null {
   return null;
 }
 
-function quoteHref(note: ChatSharedNoteSnapshot): string | null {
-  if (!note.book_id) return null;
-  return `/books/${note.book_id}/journal`;
-}
-
 function sortSeriesByName(series: Series[]): Series[] {
   return [...series].sort((first, second) =>
     first.name.localeCompare(second.name, undefined, { sensitivity: "base", numeric: true }),
@@ -224,14 +246,6 @@ function sortBooksByTitle(books: Book[]): Book[] {
   return [...books].sort((first, second) =>
     first.title.localeCompare(second.title, undefined, { sensitivity: "base", numeric: true }),
   );
-}
-
-function sortJournalEntriesForPicker(journalEntries: BookJournalEntryRecord[]): BookJournalEntryRecord[] {
-  return [...journalEntries].sort((first, second) => {
-    const dateCompare = (second.entry_date ?? second.created_at).localeCompare(first.entry_date ?? first.created_at);
-    if (dateCompare !== 0) return dateCompare;
-    return second.created_at.localeCompare(first.created_at);
-  });
 }
 
 function AttachmentSummary({ attachment }: { attachment: ChatAttachmentPayload }) {
@@ -274,365 +288,222 @@ function reactionNames(reaction: NonNullable<GroupMessage["reactions"]>[number])
   return reaction.participants.map((participant) => participant.display_name).join(", ");
 }
 
-function AttachmentCard({
-  message,
-  mine,
-  books,
-  noteImportOpen,
-  noteImportTargetBookId,
-  onImportBook,
-  onImportSeries,
-  onOpenNoteImport,
-  onCancelNoteImport,
-  onNoteTargetChange,
-  onImportNote,
-}: {
-  message: GroupMessage;
-  mine: boolean;
-  books: Book[];
-  noteImportOpen: boolean;
-  noteImportTargetBookId: string;
-  onImportBook: (book: ChatSharedBookSnapshot) => void;
-  onImportSeries: (series: Extract<ChatAttachmentPayload, { type: "series" }>["series"]) => void;
-  onOpenNoteImport: () => void;
-  onCancelNoteImport: () => void;
-  onNoteTargetChange: (bookId: string) => void;
-  onImportNote: () => void;
-}) {
-  const attachment = message.attachment_payload;
-  if (!attachment) return null;
-  const href = attachmentHref(attachment);
-  const isClickable = mine && href;
+function imageCopyErrorMessage(error: unknown): string {
+  return toChatErrorMessage(error, "The image-copy function failed.");
+}
 
-  const body = (
-    <div className="mt-2 space-y-3 rounded-lg border bg-background p-3 text-foreground shadow-sm">
-      <div className="flex items-center gap-2">
-        <Badge variant="outline">{attachmentTypeLabel(attachment)}</Badge>
-        <span className="min-w-0 truncate text-sm font-medium">{attachmentTitle(attachment)}</span>
+function importPayloadForBookSnapshot(
+  book: ChatSharedBookSnapshot,
+  seriesId?: string,
+) {
+  const { cover_url: _sharedCoverUrl, ...payload } = bookSnapshotToAddBookPayload(
+    book,
+    seriesId ? { series_id: seriesId } : undefined,
+  );
+  return payload;
+}
+
+function attachmentImage(attachment: ChatAttachmentPayload): string | null {
+  if (attachment.type === "book") return attachment.book.cover_url ?? null;
+  if (attachment.type === "author") return attachment.author.photo_url ?? null;
+  if (attachment.type === "series") return attachment.series.cover_url ?? attachment.series.books[0]?.cover_url ?? null;
+  return null;
+}
+
+function attachmentSecondaryInfo(attachment: ChatAttachmentPayload): string | null {
+  if (attachment.type === "book") return attachment.book.authors.join(", ") || null;
+  if (attachment.type === "author") return null;
+  if (attachment.type === "series") return attachment.series.authors?.join(", ") || attachment.series.books.flatMap((book) => book.authors).find(Boolean) || null;
+  return null;
+}
+
+function AttachmentThumbnail({ attachment }: { attachment: ChatAttachmentPayload }) {
+  const image = attachmentImage(attachment);
+  const Icon = attachment.type === "author" ? UserRound : attachment.type === "note" ? StickyNote : BookOpen;
+
+  return image ? (
+    <img src={image} alt="" className="h-16 w-11 shrink-0 rounded-md object-cover" />
+  ) : (
+    <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded-md bg-muted">
+      <Icon className="h-5 w-5 text-muted-foreground" />
+    </div>
+  );
+}
+
+function AttachmentPreviewContent({ attachment }: { attachment: ChatAttachmentPayload }) {
+  const title = attachmentTitle(attachment);
+  const secondaryInfo = attachmentSecondaryInfo(attachment);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-4">
+        <AttachmentThumbnail attachment={attachment} />
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase text-muted-foreground">{attachmentTypeLabel(attachment)}</p>
+          <h3 className="mt-1 text-lg font-semibold leading-snug">{title}</h3>
+          {secondaryInfo && <p className="mt-1 text-sm text-muted-foreground">{secondaryInfo}</p>}
+        </div>
       </div>
 
       {attachment.type === "book" && (
-        <div className="flex gap-3">
-          {attachment.book.cover_url ? (
-            <img
-              src={attachment.book.cover_url}
-              alt=""
-              className="h-24 w-16 shrink-0 rounded-md object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-md bg-muted">
-              <BookOpen className="h-5 w-5 text-muted-foreground" />
+        <div className="space-y-3 text-sm">
+          {attachment.book.description && <p className="whitespace-pre-wrap text-muted-foreground">{attachment.book.description}</p>}
+          <p className="text-muted-foreground">
+            {[attachment.book.language, attachment.book.format, attachment.book.total_pages ? `${attachment.book.total_pages} pages` : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {attachment.book.included_journalEntries?.map((note, index) => (
+            <div key={`${note.id ?? index}-${note.content}`} className="rounded-md border bg-muted/25 p-3">
+              <p className="text-xs font-medium text-muted-foreground">{noteLabel(note.label)}</p>
+              <p className="mt-1 whitespace-pre-wrap">{note.content}</p>
+              {note.attribution && <p className="mt-1 text-xs text-muted-foreground">- {note.attribution}</p>}
             </div>
-          )}
-          <div className="min-w-0 flex-1 space-y-2">
-            <div>
-              <p className="line-clamp-2 font-medium leading-snug">{attachment.book.title}</p>
-              <p className="text-xs text-muted-foreground">{attachment.book.authors.join(", ")}</p>
-            </div>
-            {attachment.book.description && (
-              <p className="line-clamp-3 text-xs text-muted-foreground">{attachment.book.description}</p>
-            )}
-            {attachment.book.included_journalEntries && attachment.book.included_journalEntries.length > 0 && (
-              <div className="space-y-1">
-                {attachment.book.included_journalEntries.map((note, index) => {
-                  const noteItem = (
-                    <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                      <span className="font-medium">{noteLabel(note.label)}:</span> {note.content}
-                    </span>
-                  );
-                  return mine ? (
-                    <p key={`${note.id ?? index}-${note.label}`} className="text-xs">
-                      {noteItem}
-                    </p>
-                  ) : (
-                    <Link
-                      key={`${note.id ?? index}-${note.label}`}
-                      to={quoteHref(note) ?? "#"}
-                      className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      {noteItem}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-            {!mine && (
-              <Button type="button" size="sm" variant="outline" onClick={() => onImportBook(attachment.book)}>
-                Save to own library
-              </Button>
-            )}
-          </div>
+          ))}
         </div>
       )}
 
       {attachment.type === "note" && (
-        <div className="space-y-3">
-          {mine ? (
-            <div className="rounded-md bg-muted/50 px-3 py-2">
-              <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
-              <p className="mt-1 text-sm">{attachment.note.content}</p>
-              {attachment.note.attribution && (
-                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.attribution}</p>
-              )}
-              {attachment.note.book_title && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  From {attachment.note.book_title}
-                </p>
-              )}
-            </div>
-          ) : (
-            <Link
-              to={href ?? "#"}
-              className="block rounded-md bg-muted/50 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label={`Open ${attachment.note.book_title ?? "quote"}`}
-            >
-              <p className="text-xs font-medium uppercase text-muted-foreground">{noteLabel(attachment.note.label)}</p>
-              <p className="mt-1 text-sm">{attachment.note.content}</p>
-              {attachment.note.attribution && (
-                <p className="mt-1 text-xs text-muted-foreground">- {attachment.note.attribution}</p>
-              )}
-              {attachment.note.book_title && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  From {attachment.note.book_title}
-                </p>
-              )}
-            </Link>
-          )}
-
-          {!mine && !noteImportOpen && (
-            <Button type="button" size="sm" variant="outline" onClick={onOpenNoteImport}>
-              Save to own library
-            </Button>
-          )}
-
-          {!mine && noteImportOpen && (
-            <div className="space-y-2 rounded-md border p-3">
-              <Label>Choose a book</Label>
-              <Select value={noteImportTargetBookId} onValueChange={onNoteTargetChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a book" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortBooksByTitle(books).map((book) => (
-                    <SelectItem key={book.id} value={book.id}>
-                      {book.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={onCancelNoteImport}>
-                  Cancel
-                </Button>
-                <Button type="button" size="sm" disabled={!noteImportTargetBookId} onClick={onImportNote}>
-                  Save
-                </Button>
-              </div>
-            </div>
-          )}
+        <div className="rounded-md border bg-muted/25 p-3 text-sm">
+          <p className="text-xs font-medium text-muted-foreground">{noteLabel(attachment.note.label)}</p>
+          <p className="mt-1 whitespace-pre-wrap">{attachment.note.content}</p>
+          {attachment.note.attribution && <p className="mt-2 text-xs text-muted-foreground">- {attachment.note.attribution}</p>}
+          {attachment.note.source_title && <p className="mt-3 text-xs text-muted-foreground">From {attachment.note.source_title}</p>}
         </div>
       )}
 
       {attachment.type === "author" && (
-        <div className="space-y-3">
-          <div>
-            {mine ? (
-              <p className="font-medium">{attachment.author.name}</p>
-            ) : (
-              <Link
-                to={href ?? "#"}
-                className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {attachment.author.name}
-              </Link>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {attachment.author.books.length} book{attachment.author.books.length === 1 ? "" : "s"} shared
-            </p>
-          </div>
-          {attachment.author.books.length > 0 && (
-            <div className="space-y-2">
-              {attachment.author.books.map((book, index) => (
-                <div
-                  key={`${book.id ?? book.title}-${index}`}
-                  className="flex items-center gap-3 rounded-md border bg-muted/20 p-2"
-                >
-                  {book.cover_url ? (
-                    <img src={book.cover_url} alt="" className="h-14 w-10 shrink-0 rounded object-cover" />
-                  ) : (
-                    <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-muted">
-                      <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{book.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
-                  </div>
-                  {!mine && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => onImportBook(book)}>
-                      Save
-                    </Button>
-                  )}
-                </div>
-              ))}
+        <div className="space-y-3 text-sm">
+          {attachment.author.bio && <p className="whitespace-pre-wrap text-muted-foreground">{attachment.author.bio}</p>}
+          {attachment.author.books.map((book, index) => (
+            <div key={`${book.id ?? book.title}-${index}`} className="flex items-center gap-3 rounded-md border p-2">
+              {book.cover_url ? <img src={book.cover_url} alt="" className="h-12 w-8 rounded object-cover" /> : <BookOpen className="h-5 w-5 text-muted-foreground" />}
+              <div className="min-w-0"><p className="truncate font-medium">{book.title}</p><p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p></div>
             </div>
-          )}
-          {attachment.author.included_quotes && attachment.author.included_quotes.length > 0 && (
-            <div className="space-y-1">
-              {attachment.author.included_quotes.map((quote, index) => {
-                const quoteItem = (
-                  <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                    {quote.content}
-                    {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
-                  </span>
-                );
-                return mine ? (
-                  <p key={`${quote.id ?? index}-${quote.content}`} className="text-xs">
-                    {quoteItem}
-                  </p>
-                ) : (
-                  <Link
-                    key={`${quote.id ?? index}-${quote.content}`}
-                    to={quoteHref(quote) ?? "#"}
-                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {quoteItem}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          ))}
         </div>
       )}
 
       {attachment.type === "series" && (
-        <div className="space-y-3">
-          <div>
-            {mine ? (
-              <p className="font-medium">{attachment.series.name}</p>
-            ) : (
-              <Link
-                to={href ?? "#"}
-                className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {attachment.series.name}
-              </Link>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {attachment.series.books.length} book{attachment.series.books.length === 1 ? "" : "s"} shared
-            </p>
-          </div>
-          {attachment.series.books.length > 0 && (
-            <div className="space-y-2">
-              {attachment.series.books.map((book, index) => (
-                <div
-                  key={`${book.id ?? book.title}-${index}`}
-                  className="flex items-center gap-3 rounded-md border bg-muted/20 p-2"
-                >
-                  {book.cover_url ? (
-                    <img src={book.cover_url} alt="" className="h-14 w-10 shrink-0 rounded object-cover" />
-                  ) : (
-                    <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-muted">
-                      <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{book.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-3 text-sm">
+          {attachment.series.description && <p className="whitespace-pre-wrap text-muted-foreground">{attachment.series.description}</p>}
+          {attachment.series.books.map((book, index) => (
+            <div key={`${book.id ?? book.title}-${index}`} className="flex items-center gap-3 rounded-md border p-2">
+              {book.cover_url ? <img src={book.cover_url} alt="" className="h-12 w-8 rounded object-cover" /> : <BookOpen className="h-5 w-5 text-muted-foreground" />}
+              <div className="min-w-0"><p className="truncate font-medium">{book.title}</p><p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p></div>
             </div>
-          )}
-          {!mine && (
-            <Button type="button" size="sm" variant="outline" onClick={() => onImportSeries(attachment.series)}>
-              Save to own library
-            </Button>
-          )}
-          {attachment.series.included_quotes && attachment.series.included_quotes.length > 0 && (
-            <div className="space-y-1">
-              {attachment.series.included_quotes.map((quote, index) => {
-                const quoteLink = mine ? quoteHref(quote) : null;
-                const quoteItem = (
-                  <span className="rounded-md bg-muted/50 px-2 py-1 text-xs">
-                    {quote.content}
-                    {quote.book_title && <span className="text-muted-foreground"> - {quote.book_title}</span>}
-                  </span>
-                );
-                return quoteLink ? (
-                  <Link
-                    key={`${quote.id ?? index}-${quote.content}`}
-                    to={quoteLink}
-                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {quoteItem}
-                  </Link>
-                ) : (
-                  <p key={`${quote.id ?? index}-${quote.content}`} className="text-xs">
-                    {quoteItem}
-                  </p>
-                );
-              })}
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>
   );
+}
 
-  if (isClickable) {
-    return (
-      <Link
-        to={href}
-        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-label={`Open ${attachmentTitle(attachment)}`}
+function AttachmentCard({
+  message,
+  mine,
+  saved,
+  onOpenDetails,
+  onAddToLibrary,
+}: {
+  message: GroupMessage;
+  mine: boolean;
+  saved: boolean;
+  onOpenDetails: (attachment: ChatAttachmentPayload) => void;
+  onAddToLibrary: () => void;
+}) {
+  if (!message.attachment_payload) return null;
+  const attachment = message.attachment_payload as ChatAttachmentPayload;
+
+  const secondaryInfo = attachmentSecondaryInfo(attachment);
+  const actions = (
+    <div className={cn("flex shrink-0 flex-col gap-1", mine ? "items-end" : "items-start")}>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className={cn("h-8 gap-1.5 px-2 text-xs", mine && "flex-row-reverse")}
+        onClick={() => onOpenDetails(attachment)}
       >
-        {body}
-      </Link>
-    );
-  }
+        <FileSearchCorner className="h-3.5 w-3.5" />
+        See details
+      </Button>
+      {!mine && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={saved}
+          className="h-8 gap-1.5 px-2 text-xs disabled:opacity-100"
+          onClick={onAddToLibrary}
+        >
+          {saved ? <CircleCheck className="h-3.5 w-3.5 text-emerald-700" /> : <CirclePlus className="h-3.5 w-3.5" />}
+          {saved ? "Saved to library" : "Save to library"}
+        </Button>
+      )}
+    </div>
+  );
 
-  return body;
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      {mine && actions}
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border bg-background p-2 text-left text-foreground shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => onOpenDetails(attachment)}
+        aria-label={`View ${attachmentTitle(attachment)} details`}
+      >
+        {attachment.type === "note" ? (
+          <div className="min-w-0 py-1 text-sm">
+            <p className="text-xs font-medium text-muted-foreground">{noteLabel(attachment.note.label)}</p>
+            <p className="mt-1 line-clamp-3 whitespace-pre-wrap">{attachment.note.content}</p>
+          </div>
+        ) : (
+          <>
+            <AttachmentThumbnail attachment={attachment} />
+            {secondaryInfo && <p className="min-w-0 truncate text-xs text-muted-foreground">{secondaryInfo}</p>}
+          </>
+        )}
+      </button>
+      {!mine && actions}
+    </div>
+  );
 }
 
 export function GroupsManager() {
   const { user } = useAuth();
-  const { authors: authorRecords } = useAuthorsContext();
-  const { books, addBook } = useBooksContext();
-  const { series: librarySeries, addSeries } = useSeries();
+  const { authors: authorRecords, addAuthor, editAuthor } = useAuthorsContext();
+  const { books, addBook, updateBook } = useBooksContext();
+  const { series: librarySeries, addSeries, editSeries } = useSeries();
   const navigate = useNavigate();
   const location = useLocation();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [savedAttachmentMessageIds, setSavedAttachmentMessageIds] = useState<Set<string>>(new Set());
   const [members, setMembers] = useState<ChatMember[]>([]);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
-  const [composeMode, setComposeMode] = useState<ComposeMode>("direct");
-  const [directSearch, setDirectSearch] = useState("");
-  const [profileResults, setProfileResults] = useState<PublicProfile[]>([]);
-  const [groupName, setGroupName] = useState("");
-  const [groupDescription, setGroupDescription] = useState("");
+  const [seriesJournalEntries, setSeriesJournalEntries] = useState<SeriesJournalEntryRecord[]>([]);
+  const [authorJournalEntries, setAuthorJournalEntries] = useState<AuthorJournalEntryRecord[]>([]);
   const [memberUsername, setMemberUsername] = useState("");
   const [messageText, setMessageText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [addChatOpen, setAddChatOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachmentPicker, setAttachmentPicker] = useState<AttachmentPickerMode | null>(null);
   const [attachmentSearch, setAttachmentSearch] = useState("");
-  const [selectedBookId, setSelectedBookId] = useState("");
-  const [selectedNoteId, setSelectedNoteId] = useState("");
-  const [selectedAuthorName, setSelectedAuthorName] = useState("");
-  const [selectedSeriesId, setSelectedSeriesId] = useState("");
-  const [selectedIncludedNoteIds, setSelectedIncludedNoteIds] = useState<string[]>([]);
+  const [attachmentPickerHeight, setAttachmentPickerHeight] = useState(360);
   const [selectedAttachment, setSelectedAttachment] = useState<ChatAttachmentPayload | null>(null);
   const [selectedReply, setSelectedReply] = useState<ChatReplySnapshot | null>(null);
   const [messageActionMenu, setMessageActionMenu] = useState<MessageActionMenu | null>(null);
   const [reactionDetailsMessageId, setReactionDetailsMessageId] = useState<string | null>(null);
-  const [noteImportMessageId, setNoteImportMessageId] = useState<string | null>(null);
-  const [noteImportTargetBookId, setNoteImportTargetBookId] = useState("");
+  const [attachmentPreview, setAttachmentPreview] = useState<ChatAttachmentPayload | null>(null);
+  const [noteImportMessage, setNoteImportMessage] = useState<GroupMessage | null>(null);
+  const [noteImportTargetKind, setNoteImportTargetKind] = useState<JournalTargetKind>("book");
+  const [noteImportTargetId, setNoteImportTargetId] = useState("");
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -640,10 +511,22 @@ export function GroupsManager() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<number | null>(null);
+  const attachmentPickerRef = useRef<HTMLDivElement>(null);
+  const attachmentAddButtonRef = useRef<HTMLButtonElement>(null);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.group.id === selectedGroupId) ?? null,
     [threads, selectedGroupId],
+  );
+
+  const directChatProfile = useMemo(
+    () => members.find((member) => member.user_id !== user?.id)?.profile,
+    [members, user?.id],
+  );
+
+  const sharedAttachments = useMemo(
+    () => messages.flatMap((message) => message.attachment_payload ? [{ id: message.id, attachment: message.attachment_payload }] : []),
+    [messages],
   );
 
   const memberProfiles = useMemo(
@@ -665,19 +548,10 @@ export function GroupsManager() {
     [books],
   );
 
-  const journalEntriesByBookId = useMemo(() => {
-    const map = new Map<string, BookJournalEntryRecord[]>();
-    journalEntries.forEach((note) => {
-      map.set(note.book_id, [...(map.get(note.book_id) ?? []), note]);
-    });
-    return map;
-  }, [journalEntries]);
-
   const authorSummaries = useMemo(
     () => buildAuthorSummaries(authorRecords, books, journalEntries),
     [authorRecords, books, journalEntries],
   );
-  const seriesById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item])), [librarySeries]);
   const seriesBooksById = useMemo(() => {
     const map = new Map<string, Book[]>();
     books.forEach((book) => {
@@ -686,17 +560,6 @@ export function GroupsManager() {
     });
     return map;
   }, [books]);
-  const seriesQuoteJournalEntriesById = useMemo(() => {
-    const map = new Map<string, BookJournalEntryRecord[]>();
-    books.forEach((book) => {
-      if (!book.series_id) return;
-      const bookJournal = journalEntriesByBookId.get(book.id) ?? [];
-      const quoteJournalEntries = bookJournal.filter((note) => note.label === "quote");
-      if (quoteJournalEntries.length === 0) return;
-      map.set(book.series_id, [...(map.get(book.series_id) ?? []), ...quoteJournalEntries]);
-    });
-    return map;
-  }, [books, journalEntriesByBookId]);
 
   const filteredBooks = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
@@ -709,15 +572,54 @@ export function GroupsManager() {
 
   const filteredJournalEntries = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
-    const sorted = sortJournalEntriesForPicker(journalEntries);
+    const sorted: JournalAttachmentPickerItem[] = [
+      ...journalEntries.map((entry) => {
+        const book = booksById.get(entry.book_id);
+        return {
+          sourceType: "book" as const,
+          sourceId: entry.book_id,
+          sourceTitle: book?.title ?? "Unknown book",
+          sourceAuthors: book?.authors ?? [],
+          sourceImageUrl: book?.cover_url ?? null,
+          entry,
+        };
+      }),
+      ...seriesJournalEntries.map((entry) => {
+        const series = librarySeries.find((item) => item.id === entry.series_id);
+        const seriesBooks = seriesBooksById.get(entry.series_id) ?? [];
+        return {
+          sourceType: "series" as const,
+          sourceId: entry.series_id,
+          sourceTitle: series?.name ?? "Unknown series",
+          sourceAuthors: Array.from(new Set(seriesBooks.flatMap((book) => book.authors))),
+          sourceImageUrl: series?.cover_url ?? seriesBooks[0]?.cover_url ?? null,
+          entry,
+        };
+      }),
+      ...authorJournalEntries.map((entry) => {
+        const author = authorRecords.find((item) => item.id === entry.author_id);
+        return {
+          sourceType: "author" as const,
+          sourceId: entry.author_id,
+          sourceTitle: author?.name ?? "Unknown author",
+          sourceAuthors: [],
+          sourceImageUrl: author?.photo_url ?? null,
+          entry,
+        };
+      }),
+    ].sort((first, second) => {
+      const firstDate = first.entry.entry_date ?? first.entry.created_at;
+      const secondDate = second.entry.entry_date ?? second.entry.created_at;
+      return secondDate.localeCompare(firstDate) || second.entry.created_at.localeCompare(first.entry.created_at);
+    });
     if (!query) return sorted;
-    return sorted.filter((note) => {
-      const book = booksById.get(note.book_id);
-      return [note.content, note.attribution, book?.title]
+    return sorted.filter((item) => {
+      const note = item.entry;
+      return [note.content, note.attribution, item.sourceTitle, ...item.sourceAuthors]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
-  }, [attachmentSearch, booksById, journalEntries]);
+  }, [attachmentSearch, authorJournalEntries, authorRecords, booksById, journalEntries, librarySeries, seriesBooksById, seriesJournalEntries]);
 
   const filteredAuthors = useMemo(() => {
     const query = attachmentSearch.trim().toLowerCase();
@@ -732,27 +634,37 @@ export function GroupsManager() {
     return sorted.filter((item) => item.name.toLowerCase().includes(query));
   }, [attachmentSearch, librarySeries]);
 
-  const selectedBook = selectedBookId ? booksById.get(selectedBookId) ?? null : null;
-  const selectedNote = selectedNoteId ? journalEntries.find((note) => note.id === selectedNoteId) ?? null : null;
-  const selectedAuthor = selectedAuthorName
-    ? authorSummaries.find((author) => author.name === selectedAuthorName) ?? null
-    : null;
-  const selectedSeries = selectedSeriesId ? seriesById.get(selectedSeriesId) ?? null : null;
-
-  const selectedBookJournalEntryRecords = selectedBook ? sortJournalEntriesForPicker(journalEntriesByBookId.get(selectedBook.id) ?? []) : [];
-  const selectedAuthorQuotes = selectedAuthor ? sortJournalEntriesForPicker(selectedAuthor.quotes) : [];
-  const selectedSeriesBooks = selectedSeries ? sortBooksByTitle(seriesBooksById.get(selectedSeries.id) ?? []) : [];
-  const selectedSeriesQuotes = selectedSeries ? sortJournalEntriesForPicker(seriesQuoteJournalEntriesById.get(selectedSeries.id) ?? []) : [];
+  const noteImportTargets = useMemo(() => {
+    if (noteImportTargetKind === "book") {
+      return sortBooksByTitle(books).map((book) => ({ id: book.id, label: book.title }));
+    }
+    if (noteImportTargetKind === "series") {
+      return sortSeriesByName(librarySeries).map((series) => ({ id: series.id, label: series.name }));
+    }
+    return [...authorRecords]
+      .sort((first, second) => first.name.localeCompare(second.name))
+      .map((author) => ({ id: author.id, label: author.name }));
+  }, [authorRecords, books, librarySeries, noteImportTargetKind]);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetchAllBookJournalEntryRecords()
-      .then((nextJournalEntries) => {
-        if (!cancelled) setJournalEntries(nextJournalEntries);
+    Promise.all([
+      fetchAllBookJournalEntryRecords(),
+      fetchAllSeriesJournalEntryRecords(),
+      fetchAllAuthorJournalEntryRecords(),
+    ])
+      .then(([nextBookEntries, nextSeriesEntries, nextAuthorEntries]) => {
+        if (cancelled) return;
+        setJournalEntries(nextBookEntries);
+        setSeriesJournalEntries(nextSeriesEntries);
+        setAuthorJournalEntries(nextAuthorEntries);
       })
       .catch(() => {
-        if (!cancelled) setJournalEntries([]);
+        if (cancelled) return;
+        setJournalEntries([]);
+        setSeriesJournalEntries([]);
+        setAuthorJournalEntries([]);
       });
 
     return () => {
@@ -765,19 +677,33 @@ export function GroupsManager() {
     const launch = state?.openAttachmentPicker;
     if (!launch) return;
 
-    if (launch.type === "book") {
-      setAttachmentPicker("book");
-      setSelectedBookId(launch.bookId);
-    } else if (launch.type === "author") {
-      setAttachmentPicker("author");
-      setSelectedAuthorName(launch.authorName);
-    } else if (launch.type === "series") {
-      setAttachmentPicker("series");
-      setSelectedSeriesId(launch.seriesId);
-    }
+    setAttachmentPicker(launch.type);
+    setAttachmentSearch("");
 
     navigate(location.pathname + location.search, { replace: true });
   }, [location.key, location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
+    const state = location.state as { preferredGroupId?: string } | null;
+    if (!state?.preferredGroupId) return;
+
+    void loadThreads(state.preferredGroupId);
+    setMobileThreadOpen(true);
+    navigate(location.pathname + location.search, { replace: true });
+  }, [location.key, location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
+    if (!attachmentPicker) return;
+
+    function closeAttachmentPicker(event: PointerEvent) {
+      const target = event.target as Node;
+      if (attachmentPickerRef.current?.contains(target) || attachmentAddButtonRef.current?.contains(target)) return;
+      setAttachmentPicker(null);
+    }
+
+    document.addEventListener("pointerdown", closeAttachmentPicker);
+    return () => document.removeEventListener("pointerdown", closeAttachmentPicker);
+  }, [attachmentPicker]);
 
   async function loadThreads(preferredGroupId?: string) {
     if (!user) return;
@@ -808,6 +734,7 @@ export function GroupsManager() {
     if (!selectedGroupId || !user) {
       setMessages([]);
       setMembers([]);
+      setSavedAttachmentMessageIds(new Set());
       return;
     }
 
@@ -818,8 +745,15 @@ export function GroupsManager() {
     Promise.all([getChatMessages(selectedGroupId, user.id), getChatMembers(selectedGroupId)])
       .then(async ([nextMessages, nextMembers]) => {
         if (cancelled) return;
+        const savedIds = await getSavedChatAttachmentMessageIds(
+          nextMessages
+            .filter((message) => message.attachment_payload)
+            .map((message) => message.id),
+        );
+        if (cancelled) return;
         setMessages(nextMessages);
         setMembers(nextMembers);
+        setSavedAttachmentMessageIds(savedIds);
         await markChatRead(selectedGroupId);
         if (!cancelled) {
           setThreads((current) =>
@@ -864,7 +798,15 @@ export function GroupsManager() {
 
           const nextMessage = messageFromPayload(payload.new);
           void getChatMessages(selectedGroupId, currentUserId)
-            .then(setMessages)
+            .then(async (nextMessages) => {
+              const savedIds = await getSavedChatAttachmentMessageIds(
+                nextMessages
+                  .filter((message) => message.attachment_payload)
+                  .map((message) => message.id),
+              );
+              setMessages(nextMessages);
+              setSavedAttachmentMessageIds(savedIds);
+            })
             .catch(() => setMessages((current) => upsertMessage(current, nextMessage)));
           void loadThreads(selectedGroupId);
 
@@ -1049,9 +991,118 @@ export function GroupsManager() {
     );
   }
 
-  function renderChatComposer() {
+  function renderChatDetails() {
+    const profileHref = directChatProfile ? `/profiles/${directChatProfile.id}` : null;
+    const profileContent = (
+      <div className="flex min-w-0 items-center gap-3">
+        <MessageAvatar profile={selectedThread?.avatarProfile} fallback={selectedThread?.title} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{selectedThread?.title}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {selectedThread?.group.kind === "direct" ? profileSubLabel(directChatProfile) : `${members.length} members`}
+          </p>
+        </div>
+      </div>
+    );
+
     return (
-      <form className="space-y-2 border-t bg-background p-3" onSubmit={submitMessage}>
+      <aside className="min-h-0 overflow-y-auto border-t bg-background p-4 lg:border-t-0 lg:border-l">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            <AppHeading level={4} as="h2">Chat Details</AppHeading>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="lg:hidden"
+              aria-label="Back to messages"
+              onClick={() => setSettingsOpen(false)}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {profileHref ? (
+            <Link
+              to={profileHref}
+              className="block rounded-md p-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {profileContent}
+            </Link>
+          ) : (
+            <div className="rounded-md p-2">{profileContent}</div>
+          )}
+
+          <section className="space-y-2">
+            <div>
+              <AppHeading level={4} as="h3">Shared</AppHeading>
+              <HeadingDescription className="text-xs">
+                {sharedAttachments.length} item{sharedAttachments.length === 1 ? "" : "s"}
+              </HeadingDescription>
+            </div>
+            {sharedAttachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No shared content yet.</p>
+            ) : (
+              <div className="space-y-1">
+                {sharedAttachments.map(({ id, attachment }) => {
+                  const href = attachmentHref(attachment);
+                  const item = (
+                    <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                      <Badge variant="outline" className="shrink-0">{attachmentTypeLabel(attachment)}</Badge>
+                      <span className="min-w-0 flex-1 truncate text-sm">{attachmentTitle(attachment)}</span>
+                      {href && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    </div>
+                  );
+                  return href ? (
+                    <Link key={id} to={href} className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {item}
+                    </Link>
+                  ) : (
+                    <div key={id}>{item}</div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {selectedThread?.group.kind === "group" && (
+            <section className="space-y-2">
+              <AppHeading level={4} as="h3">Members</AppHeading>
+              {renderSettingsPanelContent({ showHeading: false })}
+            </section>
+          )}
+        </div>
+      </aside>
+    );
+  }
+
+  function startAttachmentPickerResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = attachmentPickerHeight;
+
+    function resizePicker(moveEvent: PointerEvent) {
+      setAttachmentPickerHeight(Math.min(600, Math.max(240, startHeight + startY - moveEvent.clientY)));
+    }
+
+    function stopResizing() {
+      window.removeEventListener("pointermove", resizePicker);
+      window.removeEventListener("pointerup", stopResizing);
+    }
+
+    window.addEventListener("pointermove", resizePicker);
+    window.addEventListener("pointerup", stopResizing);
+  }
+
+  function renderChatComposer() {
+    function chooseAttachment(attachment: ChatAttachmentPayload) {
+      setSelectedAttachment(attachment);
+      setAttachmentPicker(null);
+      setAttachmentSearch("");
+    }
+
+    return (
+      <form className="relative space-y-2 bg-background p-3" onSubmit={submitMessage}>
         {selectedReply && <ReplyPreview reply={selectedReply} onCancel={() => setSelectedReply(null)} />}
 
         {selectedAttachment && (
@@ -1071,129 +1122,200 @@ export function GroupsManager() {
           </div>
         )}
 
-        <div className="flex items-end gap-2">
-          <div className="relative">
-            <Button
+        {attachmentPicker && (
+          <div
+            ref={attachmentPickerRef}
+            className="absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[34rem]"
+            style={{ height: `${attachmentPickerHeight}px` }}
+          >
+            <div className="flex min-h-0 flex-1 flex-col">
+            <button
               type="button"
-              size="icon"
-              variant="outline"
-              aria-label="Attach"
-              onClick={() => setAttachMenuOpen((current) => !current)}
+              aria-label="Resize shared content picker"
+              className="flex h-6 shrink-0 cursor-ns-resize touch-none items-center justify-center border-b hover:bg-muted"
+              onPointerDown={startAttachmentPickerResize}
             >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            {attachMenuOpen && (
-              <div className="absolute bottom-12 left-0 z-20 w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => openAttachmentPicker("book")}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  Attach Book
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => openAttachmentPicker("note")}
-                >
-                  <StickyNote className="h-4 w-4" />
-                  Attach JournalEntries
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => openAttachmentPicker("author")}
-                >
-                  <UserRound className="h-4 w-4" />
-                  Attach Author
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => openAttachmentPicker("series")}
-                >
-                  <Users className="h-4 w-4" />
-                  Attach Series
-                </button>
+              <span className="h-1 w-10 rounded-full bg-muted-foreground/45" />
+            </button>
+            <div className="space-y-3 border-b p-3">
+              <Input
+                aria-label="Search shared content"
+                placeholder={`Search ${attachmentPicker === "note" ? "journal entries" : `${attachmentPicker}s`}`}
+                value={attachmentSearch}
+                onChange={(event) => setAttachmentSearch(event.target.value)}
+              />
+              <div className="grid grid-cols-4 gap-1 rounded-md bg-muted p-1">
+                {([
+                  ["book", "Books", BookOpen],
+                  ["author", "Authors", UserRound],
+                  ["series", "Series", LibraryBig],
+                  ["note", "Entries", StickyNote],
+                ] as const).map(([mode, label, Icon]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={cn(
+                      "flex min-h-8 items-center justify-center gap-1 rounded px-1 text-xs font-medium transition-colors hover:bg-background",
+                      attachmentPicker === mode && "bg-background shadow-sm",
+                    )}
+                    onClick={() => {
+                      setAttachmentPicker(mode);
+                      setAttachmentSearch("");
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="truncate">{label}</span>
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {attachmentPicker === "book" && filteredBooks.map((book) => (
+                <div key={book.id} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
+                  {book.cover_url ? (
+                    <img src={book.cover_url} alt="" className="h-12 w-8 shrink-0 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-8 shrink-0 items-center justify-center rounded bg-muted">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{book.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => chooseAttachment(buildBookAttachment(book))}>
+                    Add
+                  </Button>
+                </div>
+              ))}
+
+              {attachmentPicker === "author" && filteredAuthors.map((author) => (
+                <div key={author.name} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
+                  <UserRound className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{author.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {author.bookCount} book{author.bookCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => chooseAttachment(buildAuthorAttachment({
+                      authorId: author.id,
+                      authorName: author.name,
+                      authorPhotoUrl: authorRecords.find((item) => item.id === author.id)?.photo_url,
+                      authorBio: authorRecords.find((item) => item.id === author.id)?.bio,
+                      books: author.books,
+                      includedQuotes: [],
+                    }))}
+                  >
+                    Add
+                  </Button>
+                </div>
+              ))}
+
+              {attachmentPicker === "series" && filteredSeries.map((item) => {
+                const booksInSeries = sortBooksByTitle(seriesBooksById.get(item.id) ?? []);
+                return (
+                  <div key={item.id} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
+                    <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{item.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {booksInSeries.length} book{booksInSeries.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => chooseAttachment(buildSeriesAttachment({
+                        seriesId: item.id,
+                        seriesName: item.name,
+                        seriesCoverUrl: item.cover_url,
+                        seriesDescription: item.description,
+                        books: booksInSeries,
+                        includedQuotes: [],
+                      }))}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                );
+              })}
+
+              {attachmentPicker === "note" && filteredJournalEntries.map((item) => {
+                const note = item.entry;
+                return (
+                  <div key={`${item.sourceType}-${note.id}`} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
+                    <StickyNote className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{note.content}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {noteLabel(note.label)} - {item.sourceTitle}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => chooseAttachment(buildNoteAttachment(note, {
+                        type: item.sourceType,
+                        id: item.sourceId,
+                        title: item.sourceTitle,
+                        authors: item.sourceAuthors,
+                        imageUrl: item.sourceImageUrl,
+                      }))}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
           <Textarea
             aria-label="Message"
             value={messageText}
             onChange={(event) => setMessageText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }}
             placeholder="Write a message"
             rows={2}
-            className="min-h-12 resize-none rounded-full px-4 py-3"
+            className="min-h-12 flex-1 resize-none rounded-full px-4 py-3"
           />
+          <Button
+            ref={attachmentAddButtonRef}
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label="Add shared content"
+            onClick={() => {
+              setAttachmentPicker((current) => current ? null : "book");
+              setAttachmentSearch("");
+            }}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button type="button" size="icon" variant="outline" aria-label="Stickers">
+            <Sticker className="h-4 w-4" />
+          </Button>
           <Button type="submit" size="icon" disabled={saving || (!messageText.trim() && !selectedAttachment)}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
       </form>
     );
-  }
-
-  async function submitGroup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!groupName.trim()) return;
-
-    setSaving(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      const group = await createGroupChat({
-        name: groupName.trim(),
-        description: groupDescription.trim() || undefined,
-      });
-      setGroupName("");
-      setGroupDescription("");
-      setStatusMessage("Group chat created.");
-      await loadThreads(group.id);
-      setMobileThreadOpen(true);
-    } catch (createError) {
-      setError(toChatErrorMessage(createError, "Could not create group chat."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function searchProfiles(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!user) return;
-
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      const results = await searchPublicProfiles(directSearch);
-      setProfileResults(results);
-      if (results.length === 0) setStatusMessage("No matching users found.");
-    } catch (searchError) {
-      setError(toChatErrorMessage(searchError, "Could not search users."));
-    }
-  }
-
-  async function startDirectChat(profileId: string) {
-    setSaving(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      const group = await createOrGetDirectChat(profileId);
-      setDirectSearch("");
-      setProfileResults([]);
-      setStatusMessage("Direct chat ready.");
-      await loadThreads(group.id);
-      setMobileThreadOpen(true);
-    } catch (directError) {
-      setError(toChatErrorMessage(directError, "Could not start direct chat."));
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function submitMember(event: FormEvent<HTMLFormElement>) {
@@ -1215,69 +1337,6 @@ export function GroupsManager() {
     } finally {
       setSaving(false);
     }
-  }
-
-  function openAttachmentPicker(mode: AttachmentPickerMode) {
-    setAttachmentPicker(mode);
-    setAttachMenuOpen(false);
-    setAttachmentSearch("");
-    setSelectedBookId("");
-    setSelectedNoteId("");
-    setSelectedAuthorName("");
-    setSelectedSeriesId("");
-    setSelectedIncludedNoteIds([]);
-  }
-
-  function toggleIncludedNote(noteId: string) {
-    setSelectedIncludedNoteIds((current) => {
-      if (current.includes(noteId)) return current.filter((id) => id !== noteId);
-      if (current.length >= MAX_INCLUDED_ATTACHMENT_NOTES) return current;
-      return [...current, noteId];
-    });
-  }
-
-  function attachSelectedItem() {
-    if (attachmentPicker === "book" && selectedBook) {
-      const includedJournalEntries = selectedIncludedNoteIds
-        .map((noteId) => journalEntries.find((note) => note.id === noteId))
-        .filter((note): note is BookJournalEntryRecord => Boolean(note));
-      setSelectedAttachment(buildBookAttachment(selectedBook, includedJournalEntries));
-    }
-
-    if (attachmentPicker === "note" && selectedNote) {
-      setSelectedAttachment(buildNoteAttachment(selectedNote, booksById.get(selectedNote.book_id)));
-    }
-
-    if (attachmentPicker === "author" && selectedAuthor) {
-      const includedQuotes = selectedIncludedNoteIds
-        .map((noteId) => journalEntries.find((note) => note.id === noteId))
-        .filter((note): note is BookJournalEntryRecord => Boolean(note));
-      setSelectedAttachment(
-        buildAuthorAttachment({
-          authorId: selectedAuthor.id,
-          authorName: selectedAuthor.name,
-          books: selectedAuthor.books,
-          includedQuotes,
-        }),
-      );
-    }
-
-    if (attachmentPicker === "series" && selectedSeries) {
-      const includedQuotes = selectedIncludedNoteIds
-        .map((noteId) => journalEntries.find((note) => note.id === noteId))
-        .filter((note): note is BookJournalEntryRecord => Boolean(note));
-      setSelectedAttachment(
-        buildSeriesAttachment({
-          seriesId: selectedSeries.id,
-          seriesName: selectedSeries.name,
-          books: selectedSeriesBooks,
-          includedQuotes,
-        }),
-      );
-    }
-
-    setAttachmentPicker(null);
-    setSelectedIncludedNoteIds([]);
   }
 
   async function submitMessage(event: FormEvent<HTMLFormElement>) {
@@ -1308,14 +1367,34 @@ export function GroupsManager() {
     }
   }
 
-  async function importBookSnapshot(book: ChatSharedBookSnapshot) {
+  async function markAttachmentSaved(messageId: string) {
+    if (!user) return;
+    await saveChatAttachment(user.id, messageId);
+    setSavedAttachmentMessageIds((current) => new Set(current).add(messageId));
+  }
+
+  async function importBookSnapshot(messageId: string, book: ChatSharedBookSnapshot) {
     setSaving(true);
     setError(null);
     setStatusMessage(null);
 
     try {
-      await addBook(bookSnapshotToAddBookPayload(book));
-      setStatusMessage("Book saved to your library.");
+      let imageCopyError: string | null = null;
+      const result = await addBook(importPayloadForBookSnapshot(book));
+      if (book.cover_url) {
+        try {
+          const coverUrl = await copyChatAttachmentImage(messageId, "book", result.book.id);
+          await updateBook(result.book.id, { cover_url: coverUrl });
+        } catch (copyError) {
+          imageCopyError = imageCopyErrorMessage(copyError);
+        }
+      }
+      await markAttachmentSaved(messageId);
+      setStatusMessage(
+        imageCopyError
+          ? `Book saved, but its cover could not be copied: ${imageCopyError}`
+          : "Book and cover saved to your library.",
+      );
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save book."));
     } finally {
@@ -1323,22 +1402,52 @@ export function GroupsManager() {
     }
   }
 
-  async function importSeriesAttachment(seriesSnapshot: Extract<ChatAttachmentPayload, { type: "series" }>["series"]) {
+  async function importSeriesAttachment(
+    messageId: string,
+    seriesSnapshot: Extract<ChatAttachmentPayload, { type: "series" }>["series"],
+  ) {
+    if (!user) return;
     setSaving(true);
     setError(null);
     setStatusMessage(null);
 
     try {
+      let imageCopyError: string | null = null;
       const existingSeries = librarySeries.find(
         (item) => item.name.trim().toLowerCase() === seriesSnapshot.name.trim().toLowerCase(),
       );
-      const seriesId = existingSeries?.id ?? (await addSeries(seriesSnapshot.name)).id;
+      let savedSeries = existingSeries ?? await addSeries({
+        name: seriesSnapshot.name,
+        description: seriesSnapshot.description ?? undefined,
+      });
 
-      for (const book of seriesSnapshot.books) {
-        await addBook(bookSnapshotToAddBookPayload(book, { series_id: seriesId }));
+      if (seriesSnapshot.cover_url && (!existingSeries || !existingSeries.cover_url)) {
+        try {
+          const coverUrl = await copyChatAttachmentImage(messageId, "series", savedSeries.id);
+          savedSeries = await editSeries(savedSeries.id, { cover_url: coverUrl });
+        } catch (copyError) {
+          imageCopyError ??= imageCopyErrorMessage(copyError);
+        }
       }
 
-      setStatusMessage("Series saved to your library.");
+      for (const book of seriesSnapshot.books) {
+        const result = await addBook(importPayloadForBookSnapshot(book, savedSeries.id));
+        if (book.cover_url) {
+          try {
+            const coverUrl = await copyChatAttachmentImage(messageId, "book", result.book.id, book.id);
+            await updateBook(result.book.id, { cover_url: coverUrl });
+          } catch (copyError) {
+            imageCopyError ??= imageCopyErrorMessage(copyError);
+          }
+        }
+      }
+
+      await markAttachmentSaved(messageId);
+      setStatusMessage(
+        imageCopyError
+          ? `Series saved, but one or more images could not be copied: ${imageCopyError}`
+          : "Series, books, and images saved to your library.",
+      );
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save series."));
     } finally {
@@ -1346,24 +1455,109 @@ export function GroupsManager() {
     }
   }
 
-  async function importNoteAttachment(message: GroupMessage) {
-    if (!user || message.attachment_payload?.type !== "note" || !noteImportTargetBookId) return;
+  async function importAuthorAttachment(
+    messageId: string,
+    authorSnapshot: Extract<ChatAttachmentPayload, { type: "author" }>["author"],
+  ) {
+    setSaving(true);
+    setError(null);
+    setStatusMessage(null);
+
+    try {
+      let imageCopyError: string | null = null;
+      let savedAuthor = await addAuthor({
+        name: authorSnapshot.name,
+        bio: authorSnapshot.bio ?? null,
+      });
+      if (authorSnapshot.photo_url && !savedAuthor.photo_url) {
+        try {
+          const photoUrl = await copyChatAttachmentImage(messageId, "author", savedAuthor.id);
+          savedAuthor = await editAuthor(savedAuthor.id, {
+            name: savedAuthor.name,
+            bio: savedAuthor.bio ?? null,
+            photo_url: photoUrl,
+          });
+        } catch (copyError) {
+          imageCopyError = imageCopyErrorMessage(copyError);
+        }
+      }
+      await markAttachmentSaved(messageId);
+      setStatusMessage(
+        imageCopyError
+          ? `Author saved, but their profile picture could not be copied: ${imageCopyError}`
+          : "Author and profile picture saved to your library.",
+      );
+    } catch (importError) {
+      setError(toChatErrorMessage(importError, "Could not save author."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startAttachmentImport(message: GroupMessage) {
+    if (!message.attachment_payload) return;
+    if (savedAttachmentMessageIds.has(message.id)) return;
+    if (message.attachment_payload.type === "book") {
+      void importBookSnapshot(message.id, message.attachment_payload.book);
+      return;
+    }
+    if (message.attachment_payload.type === "author") {
+      void importAuthorAttachment(message.id, message.attachment_payload.author);
+      return;
+    }
+    if (message.attachment_payload.type === "series") {
+      void importSeriesAttachment(message.id, message.attachment_payload.series);
+      return;
+    }
+    setNoteImportMessage(message);
+    setNoteImportTargetKind("book");
+    setNoteImportTargetId("");
+  }
+
+  async function importNoteAttachment() {
+    if (!user || noteImportMessage?.attachment_payload?.type !== "note" || !noteImportTargetId) return;
 
     setSaving(true);
     setError(null);
     setStatusMessage(null);
 
     try {
-      const savedNote = await createBookJournalEntryRecord(
-        noteSnapshotToCreateInput({
-          note: message.attachment_payload.note,
-          bookId: noteImportTargetBookId,
+      const note = noteImportMessage.attachment_payload.note;
+      if (noteImportTargetKind === "book") {
+        const savedNote = await createBookJournalEntryRecord(noteSnapshotToCreateInput({
+          note,
+          bookId: noteImportTargetId,
           userId: user.id,
-        }),
-      );
-      setJournalEntries((current) => [savedNote, ...current]);
-      setNoteImportMessageId(null);
-      setNoteImportTargetBookId("");
+        }));
+        setJournalEntries((current) => [savedNote, ...current]);
+      } else if (noteImportTargetKind === "series") {
+        const savedNote = await createSeriesJournalEntryRecord({
+          seriesId: noteImportTargetId,
+          userId: user.id,
+          label: note.label,
+          attribution: note.attribution ?? undefined,
+          content: note.content,
+          tags: note.tags ?? undefined,
+          pageStart: note.page_start ?? undefined,
+          noteDate: note.entry_date ?? undefined,
+        });
+        setSeriesJournalEntries((current) => [savedNote, ...current]);
+      } else {
+        const savedNote = await createAuthorJournalEntryRecord({
+          authorId: noteImportTargetId,
+          userId: user.id,
+          label: note.label,
+          attribution: note.attribution ?? undefined,
+          content: note.content,
+          tags: note.tags ?? undefined,
+          pageStart: note.page_start ?? undefined,
+          noteDate: note.entry_date ?? undefined,
+        });
+        setAuthorJournalEntries((current) => [savedNote, ...current]);
+      }
+      await markAttachmentSaved(noteImportMessage.id);
+      setNoteImportMessage(null);
+      setNoteImportTargetId("");
       setStatusMessage("Note saved.");
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save note."));
@@ -1463,7 +1657,7 @@ export function GroupsManager() {
   const actionMenuMine = actionMenuMessage?.sender_id === user?.id;
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-background shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden bg-background">
       {(error || statusMessage) && (
         <div className="space-y-1 border-b px-4 py-3">
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -1539,96 +1733,30 @@ export function GroupsManager() {
         </div>
       )}
 
-      <div className="grid h-[calc(100svh-8rem)] min-h-[38rem] lg:grid-cols-[22rem_minmax(0,1fr)]">
-        <aside className={cn("min-h-0 border-r bg-muted/20", mobileThreadOpen && "hidden lg:flex", "flex-col")}>
-          <div className="space-y-4 border-b p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <AppHeading level={4} as="h2">Start Chat</AppHeading>
-                <HeadingDescription className="text-xs">Find a reader or create a group.</HeadingDescription>
-              </div>
-              <MessageCircle className="h-5 w-5 text-muted-foreground" />
-            </div>
-
-            <Select value={composeMode} onValueChange={(value) => setComposeMode(value as ComposeMode)}>
-              <SelectTrigger aria-label="Chat type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="direct">Direct chat</SelectItem>
-                <SelectItem value="group">Group chat</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {composeMode === "direct" ? (
-              <div className="space-y-3">
-                <form className="flex gap-2" onSubmit={searchProfiles}>
-                  <Input
-                    aria-label="Search username"
-                    placeholder="Username or display name"
-                    value={directSearch}
-                    onChange={(event) => setDirectSearch(event.target.value)}
-                  />
-                  <Button type="submit" size="icon" variant="outline" disabled={directSearch.trim().length < 2}>
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </form>
-
-                {profileResults.length > 0 && (
-                  <div className="space-y-2">
-                    {profileResults.map((profile) => (
-                      <button
-                        key={profile.id}
-                        type="button"
-                        className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={() => startDirectChat(profile.id)}
-                        disabled={saving}
-                      >
-                        <MessageAvatar profile={profile} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{profileLabel(profile)}</span>
-                          <span className="block truncate text-xs text-muted-foreground">{profileSubLabel(profile)}</span>
-                        </span>
-                        <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <form className="space-y-3" onSubmit={submitGroup}>
-                <div className="space-y-2">
-                  <Label htmlFor="group-name">Name</Label>
-                  <Input id="group-name" value={groupName} onChange={(event) => setGroupName(event.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="group-description">Description</Label>
-                  <Textarea
-                    id="group-description"
-                    value={groupDescription}
-                    onChange={(event) => setGroupDescription(event.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <Button type="submit" disabled={saving || !groupName.trim()}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create group
-                </Button>
-              </form>
-            )}
-          </div>
-
+      <div className="grid h-[calc(100svh-8rem)] min-h-[38rem] lg:h-[calc(100svh-4rem)] lg:grid-cols-[22rem_minmax(0,1fr)]">
+        <aside className={cn("min-h-0 border-r-0 bg-muted/20 lg:border-r", mobileThreadOpen && "hidden lg:flex", "flex-col")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            <div className="px-2 py-2">
-              <AppHeading level={4} as="h2">Chats</AppHeading>
-              <HeadingDescription className="text-xs">
-                {loading ? "Loading..." : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
-              </HeadingDescription>
+            <div className="flex items-center justify-between gap-3 px-2 py-3">
+              <div>
+                <AppHeading level={4} as="h2">Chats</AppHeading>
+                <HeadingDescription className="text-xs">
+                  {loading ? "Loading..." : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
+                </HeadingDescription>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Add chat"
+                onClick={() => setAddChatOpen(true)}
+              >
+                <MessageCirclePlus className="h-5 w-5" />
+              </Button>
             </div>
 
             {threads.length === 0 && !loading ? (
               <p className="px-2 py-6 text-sm text-muted-foreground">
-                Start a direct chat or create a group chat.
+                Add a chat to start a conversation.
               </p>
             ) : (
               <div className="space-y-1">
@@ -1703,7 +1831,11 @@ export function GroupsManager() {
                   </Button>
                   <MessageAvatar profile={selectedThread.avatarProfile} fallback={selectedThread.title} />
                 </div>
-                <div className="min-w-0 text-center">
+                <button
+                  type="button"
+                  className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => setSettingsOpen(true)}
+                >
                   <AppHeading level={4} as="h1" className="truncate">
                     {selectedThread.title}
                   </AppHeading>
@@ -1712,15 +1844,15 @@ export function GroupsManager() {
                       ? "Direct chat"
                       : selectedThread.description || `${members.length} members`}
                   </p>
-                </div>
+                </button>
                 <Button
                   type="button"
                   size="icon"
                   variant={settingsOpen ? "secondary" : "ghost"}
-                  aria-label="Chat settings"
-                  onClick={() => setSettingsOpen((current) => !current)}
+                  aria-label="Open chat details"
+                  onClick={() => setSettingsOpen(true)}
                 >
-                  <Settings className="h-5 w-5" />
+                  <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
 
@@ -1732,16 +1864,26 @@ export function GroupsManager() {
                     ) : messages.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No messages yet.</p>
                     ) : (
-                      messages.map((message) => {
+                      messages.map((message, index) => {
                         const mine = message.sender_id === user?.id;
                         const senderProfile = memberProfiles.get(message.sender_id);
                         const editing = editingMessageId === message.id;
                         const heartReaction = message.reactions?.find((reaction) => reaction.reaction === "heart");
                         const canUseActions = !message.deleted_at;
+                        const isGroupChat = selectedThread.group.kind === "group";
+                        const showDate = index === 0 || messageDayKey(messages[index - 1].created_at) !== messageDayKey(message.created_at);
 
                         return (
-                          <div key={message.id} className={cn("flex gap-3", mine && "justify-end")}>
-                            {!mine && <MessageAvatar profile={senderProfile} fallback={message.sender_id} />}
+                          <div key={message.id}>
+                            {showDate && (
+                              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground" aria-label={formatMessageDate(message.created_at)}>
+                                <span className="h-px flex-1 bg-border" />
+                                <span>{formatMessageDate(message.created_at)}</span>
+                                <span className="h-px flex-1 bg-border" />
+                              </div>
+                            )}
+                            <div className={cn("flex gap-3", mine && "justify-end")}>
+                            {isGroupChat && !mine && <MessageAvatar profile={senderProfile} fallback={message.sender_id} />}
                             <div className={cn("max-w-[min(34rem,80%)] space-y-1", mine && "items-end")}>
                               {editing ? (
                                 <div className="space-y-2">
@@ -1800,8 +1942,17 @@ export function GroupsManager() {
                                     onTouchEnd={clearLongPressTimer}
                                     onTouchCancel={clearLongPressTimer}
                                   >
+                                    {isGroupChat && (
+                                      <p className={cn("text-xs font-medium", mine ? "text-primary-foreground/85" : "text-muted-foreground")}>
+                                        {mine ? "You" : profileLabel(senderProfile)}
+                                      </p>
+                                    )}
                                     {message.reply_snapshot && <ReplyPreview reply={message.reply_snapshot} compact />}
                                     {message.deleted_at ? "Message deleted" : message.content}
+                                    <p className={cn("text-left text-[0.68rem]", mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
+                                      {formatMessageTime(message.created_at)}
+                                      {message.edited_at && !message.deleted_at ? " · edited" : ""}
+                                    </p>
                                   </div>
                                   {heartReaction && heartReaction.count > 0 && (
                                     <div
@@ -1860,21 +2011,9 @@ export function GroupsManager() {
                                   <AttachmentCard
                                     message={message}
                                     mine={mine}
-                                    books={books}
-                                    noteImportOpen={noteImportMessageId === message.id}
-                                    noteImportTargetBookId={noteImportTargetBookId}
-                                    onImportBook={importBookSnapshot}
-                                    onImportSeries={importSeriesAttachment}
-                                    onOpenNoteImport={() => {
-                                      setNoteImportMessageId(message.id);
-                                      setNoteImportTargetBookId("");
-                                    }}
-                                    onCancelNoteImport={() => {
-                                      setNoteImportMessageId(null);
-                                      setNoteImportTargetBookId("");
-                                    }}
-                                    onNoteTargetChange={setNoteImportTargetBookId}
-                                    onImportNote={() => importNoteAttachment(message)}
+                                    saved={savedAttachmentMessageIds.has(message.id)}
+                                    onOpenDetails={setAttachmentPreview}
+                                    onAddToLibrary={() => startAttachmentImport(message)}
                                   />
                                 </div>
                               )}
@@ -1914,16 +2053,8 @@ export function GroupsManager() {
                                   </div>
                                 )}
 
-                              <div className={cn("flex items-center gap-2", mine && "justify-end")}>
-                                <span className="truncate text-xs font-medium text-muted-foreground">
-                                  {mine ? "You" : profileLabel(senderProfile)}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatMessageTime(message.created_at)}
-                                  {message.edited_at && !message.deleted_at ? " · edited" : ""}
-                                </span>
-                              </div>
                             </div>
+                          </div>
                           </div>
                         );
                       })
@@ -1932,14 +2063,12 @@ export function GroupsManager() {
                   </div>
                 </div>
 
-                {settingsOpen && (
-                  <aside className="min-h-0 overflow-y-auto border-t bg-muted/20 p-4 lg:border-l lg:border-t-0">
-                    {renderSettingsPanelContent()}
-                  </aside>
-                )}
+                {settingsOpen && renderChatDetails()}
               </div>
 
-              <div className="border-t bg-background">{renderChatComposer()}</div>
+              <div className={cn("border-t bg-background", settingsOpen && "hidden lg:block")}>
+                {renderChatComposer()}
+              </div>
             </div>
           ) : (
             <div className="flex h-full min-h-[38rem] items-center justify-center">
@@ -1947,7 +2076,7 @@ export function GroupsManager() {
                 <MessageCircle className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
                 <p className="font-medium">No chat selected</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Start a chat or choose a conversation from the list.
+                  Add a chat or choose a conversation from the list.
                 </p>
               </div>
             </div>
@@ -1974,245 +2103,69 @@ export function GroupsManager() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={attachmentPicker !== null} onOpenChange={(open) => !open && setAttachmentPicker(null)}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog open={attachmentPreview !== null} onOpenChange={(open) => !open && setAttachmentPreview(null)}>
+        <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              {attachmentPicker === "book"
-                ? "Attach Book"
-                : attachmentPicker === "note"
-                  ? "Attach journal entries"
-                  : attachmentPicker === "author"
-                    ? "Attach Author"
-                    : "Attach Series"}
-            </DialogTitle>
-            <DialogDescription>
-              Select what you want to send in this chat.
-            </DialogDescription>
+            <DialogTitle>Shared content</DialogTitle>
           </DialogHeader>
+          {attachmentPreview && <AttachmentPreviewContent attachment={attachmentPreview} />}
+        </DialogContent>
+      </Dialog>
 
+      <Dialog open={noteImportMessage !== null} onOpenChange={(open) => !open && setNoteImportMessage(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add journal entry to library</DialogTitle>
+            <DialogDescription>Choose where this shared entry should be saved.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4">
-            <Input
-              aria-label="Search attachments"
-              placeholder="Search"
-              value={attachmentSearch}
-              onChange={(event) => setAttachmentSearch(event.target.value)}
-            />
-
-            {attachmentPicker === "book" && (
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="max-h-72 space-y-1 overflow-y-auto">
-                  {filteredBooks.map((book) => (
-                    <button
-                      key={book.id}
-                      type="button"
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-muted",
-                        selectedBookId === book.id && "bg-muted",
-                      )}
-                      onClick={() => {
-                        setSelectedBookId(book.id);
-                        setSelectedIncludedNoteIds([]);
-                      }}
-                    >
-                      {book.cover_url ? (
-                        <img src={book.cover_url} alt="" className="h-12 w-8 rounded object-cover" />
-                      ) : (
-                        <div className="flex h-12 w-8 items-center justify-center rounded bg-muted">
-                          <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{book.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{book.authors.join(", ")}</span>
-                      </span>
-                    </button>
+            <div className="grid grid-cols-3 gap-2">
+              {(["book", "series", "author"] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  type="button"
+                  variant={noteImportTargetKind === kind ? "secondary" : "outline"}
+                  className="capitalize"
+                  onClick={() => {
+                    setNoteImportTargetKind(kind);
+                    setNoteImportTargetId("");
+                  }}
+                >
+                  {kind}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="chat-note-import-target">Choose a {noteImportTargetKind}</Label>
+              <Select value={noteImportTargetId} onValueChange={setNoteImportTargetId}>
+                <SelectTrigger id="chat-note-import-target">
+                  <SelectValue placeholder={`Select a ${noteImportTargetKind}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {noteImportTargets.map((target) => (
+                    <SelectItem key={target.id} value={target.id}>{target.label}</SelectItem>
                   ))}
-                </div>
-
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
-                  <p className="text-sm font-medium">Include journal entries, reviews, or quotes</p>
-                  {!selectedBook ? (
-                    <p className="text-sm text-muted-foreground">Select a book first.</p>
-                  ) : selectedBookJournalEntryRecords.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">This book has no journal entries yet.</p>
-                  ) : (
-                    selectedBookJournalEntryRecords.map((note) => (
-                      <label key={note.id} className="flex gap-2 rounded-md p-2 text-sm hover:bg-muted">
-                        <input
-                          type="checkbox"
-                          checked={selectedIncludedNoteIds.includes(note.id)}
-                          disabled={
-                            !selectedIncludedNoteIds.includes(note.id) &&
-                            selectedIncludedNoteIds.length >= MAX_INCLUDED_ATTACHMENT_NOTES
-                          }
-                          onChange={() => toggleIncludedNote(note.id)}
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-xs font-medium uppercase text-muted-foreground">
-                            {noteLabel(note.label)}
-                          </span>
-                          <span className="line-clamp-2">{note.content}</span>
-                        </span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {attachmentPicker === "note" && (
-              <div className="max-h-80 space-y-1 overflow-y-auto">
-                {filteredJournalEntries.map((note) => {
-                  const book = booksById.get(note.book_id);
-                  return (
-                    <button
-                      key={note.id}
-                      type="button"
-                      className={cn(
-                        "w-full rounded-md p-3 text-left hover:bg-muted",
-                        selectedNoteId === note.id && "bg-muted",
-                      )}
-                      onClick={() => setSelectedNoteId(note.id)}
-                    >
-                      <span className="block text-xs font-medium uppercase text-muted-foreground">
-                        {noteLabel(note.label)}
-                      </span>
-                      <span className="mt-1 line-clamp-2 text-sm">{note.content}</span>
-                      <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {book?.title ?? "Unknown book"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {attachmentPicker === "author" && (
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="max-h-72 space-y-1 overflow-y-auto">
-                  {filteredAuthors.map((author) => (
-                    <button
-                      key={author.name}
-                      type="button"
-                      className={cn(
-                        "w-full rounded-md p-3 text-left hover:bg-muted",
-                        selectedAuthorName === author.name && "bg-muted",
-                      )}
-                      onClick={() => {
-                        setSelectedAuthorName(author.name);
-                        setSelectedIncludedNoteIds([]);
-                      }}
-                    >
-                      <span className="block truncate text-sm font-medium">{author.name}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {author.bookCount} book{author.bookCount === 1 ? "" : "s"} · {author.quoteCount} quote{author.quoteCount === 1 ? "" : "s"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
-                  <p className="text-sm font-medium">Include quotes</p>
-                  {!selectedAuthor ? (
-                    <p className="text-sm text-muted-foreground">Select an author first.</p>
-                  ) : selectedAuthorQuotes.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No quotes for this author yet.</p>
-                  ) : (
-                    selectedAuthorQuotes.map((quote) => (
-                      <label key={quote.id} className="flex gap-2 rounded-md p-2 text-sm hover:bg-muted">
-                        <input
-                          type="checkbox"
-                          checked={selectedIncludedNoteIds.includes(quote.id)}
-                          disabled={
-                            !selectedIncludedNoteIds.includes(quote.id) &&
-                            selectedIncludedNoteIds.length >= MAX_INCLUDED_ATTACHMENT_NOTES
-                          }
-                          onChange={() => toggleIncludedNote(quote.id)}
-                        />
-                        <span className="line-clamp-2">{quote.content}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {attachmentPicker === "series" && (
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="max-h-72 space-y-1 overflow-y-auto">
-                  {filteredSeries.map((item) => {
-                    const booksInSeries = seriesBooksById.get(item.id) ?? [];
-                    const quotesInSeries = seriesQuoteJournalEntriesById.get(item.id) ?? [];
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={cn(
-                          "w-full rounded-md p-3 text-left hover:bg-muted",
-                          selectedSeriesId === item.id && "bg-muted",
-                        )}
-                        onClick={() => {
-                          setSelectedSeriesId(item.id);
-                          setSelectedIncludedNoteIds([]);
-                        }}
-                      >
-                        <span className="block truncate text-sm font-medium">{item.name}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {booksInSeries.length} book{booksInSeries.length === 1 ? "" : "s"} · {quotesInSeries.length} quote
-                          {quotesInSeries.length === 1 ? "" : "s"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
-                  <p className="text-sm font-medium">Include quotes</p>
-                  {!selectedSeries ? (
-                    <p className="text-sm text-muted-foreground">Select a series first.</p>
-                  ) : selectedSeriesQuotes.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No quotes for this series yet.</p>
-                  ) : (
-                    selectedSeriesQuotes.map((quote) => (
-                      <label key={quote.id} className="flex gap-2 rounded-md p-2 text-sm hover:bg-muted">
-                        <input
-                          type="checkbox"
-                          checked={selectedIncludedNoteIds.includes(quote.id)}
-                          disabled={
-                            !selectedIncludedNoteIds.includes(quote.id) &&
-                            selectedIncludedNoteIds.length >= MAX_INCLUDED_ATTACHMENT_NOTES
-                          }
-                          onChange={() => toggleIncludedNote(quote.id)}
-                        />
-                        <span className="line-clamp-2">{quote.content}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setAttachmentPicker(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={attachSelectedItem}
-              disabled={
-                (attachmentPicker === "book" && !selectedBook) ||
-                (attachmentPicker === "note" && !selectedNote) ||
-                (attachmentPicker === "author" && !selectedAuthor) ||
-                (attachmentPicker === "series" && !selectedSeries)
-              }
-            >
-              Attach
+            <Button type="button" variant="outline" onClick={() => setNoteImportMessage(null)}>Cancel</Button>
+            <Button type="button" disabled={!noteImportTargetId || saving} onClick={() => void importNoteAttachment()}>
+              Add to library
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddChatDialog
+        open={addChatOpen}
+        onOpenChange={setAddChatOpen}
+        onCreated={(groupId) => {
+          void loadThreads(groupId);
+          setMobileThreadOpen(true);
+        }}
+      />
     </div>
   );
 }

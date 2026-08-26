@@ -34,6 +34,7 @@ const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
 const Changelog = lazy(() => import("@/pages/Changelog"));
 const Groups = lazy(() => import("@/pages/Groups"));
 const Profile = lazy(() => import("@/pages/Profile"));
+const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
 function lazyRoute(element: ReactNode) {
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
           { path: "/group", element: <Navigate to="/messages" replace /> },
           { path: "/groups", element: <Navigate to="/messages" replace /> },
           { path: "/profile", element: lazyRoute(<Profile />) },
+          { path: "/profiles/:profileId", element: lazyRoute(<PublicProfile />) },
           { path: "/settings", element: lazyRoute(<Settings />) },
           { path: "/settings/:tab", element: lazyRoute(<Settings />) },
         ],
