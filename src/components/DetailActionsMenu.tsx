@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MoreVertical, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ export default function DetailActionsMenu({
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const currentUrl = useMemo(() => window.location.href, []);
+  const menuPortalTarget = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -141,10 +143,10 @@ export default function DetailActionsMenu({
         <MoreVertical className="h-5 w-5" />
       </Button>
 
-      {menuOpen && menuPosition && (
+      {menuOpen && menuPosition && menuPortalTarget && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-50 w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="fixed z-[70] w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
           style={{ top: menuPosition.top, left: menuPosition.left }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -209,7 +211,8 @@ export default function DetailActionsMenu({
             <Trash2 className="h-4 w-4" />
             Delete
           </button>
-        </div>
+        </div>,
+        menuPortalTarget,
       )}
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
