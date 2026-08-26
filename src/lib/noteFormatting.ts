@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { Marked, Renderer } from "marked";
-import { isAppRelativeHref } from "@/lib/journalLinks";
+import { isAppRelativeHref, isInternalJournalProtocolHref, journalPublicIdFromHref, journalRouteForPublicId } from "@/lib/journalLinks";
 
 export type NoteCalloutType = "note" | "idea" | "question" | "favorite" | "spoiler";
 
@@ -37,6 +37,7 @@ function externalLinkHtml(href: string, label: string): string {
 function isSafeUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
+  if (isInternalJournalProtocolHref(trimmed)) return true;
   if (isAppRelativeHref(trimmed)) return true;
 
   try {
@@ -89,6 +90,18 @@ renderer.link = function link({ href, title, tokens }) {
   const label = this.parser.parseInline(tokens);
   const normalizedHref = href.toLowerCase().startsWith("http://www.") ? `https://${href.slice("http://".length)}` : href;
   if (!isSafeUrl(normalizedHref)) return label;
+
+  const journalPublicId = journalPublicIdFromHref(normalizedHref);
+  if (journalPublicId) {
+    return [
+      `<a href="${escapeAttribute(journalRouteForPublicId(journalPublicId))}" class="journal-internal-link" data-journal-public-id="${escapeAttribute(journalPublicId)}">`,
+      '<span class="journal-internal-link-title">',
+      '<svg class="journal-internal-link-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>',
+      label,
+      "</span>",
+      "</a>",
+    ].join("");
+  }
 
   const titleAttribute = title ? ` title="${escapeAttribute(title)}"` : "";
   const externalAttributes = isAppRelativeHref(normalizedHref) ? "" : ' target="_blank" rel="noopener noreferrer"';
@@ -177,6 +190,7 @@ function sanitizeRenderedHtml(html: string): string {
       "svg",
       "circle",
       "line",
+      "path",
       "polygon",
       "rect",
       "strong",
@@ -191,6 +205,7 @@ function sanitizeRenderedHtml(html: string): string {
       "d",
       "data-callout",
       "data-callout-title",
+      "data-journal-public-id",
       "dominant-baseline",
       "fill",
       "font-size",

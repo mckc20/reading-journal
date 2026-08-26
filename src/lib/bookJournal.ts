@@ -211,14 +211,17 @@ export async function fetchBookJournalEntryRecords(bookId: string): Promise<Book
   return sortBookJournalEntryRecords(await withJournalMedia("book_note", (data ?? []) as BookJournalEntryRecord[]));
 }
 
-export async function fetchAllBookJournalEntryRecords(): Promise<BookJournalEntryRecord[]> {
+export async function fetchAllBookJournalEntryRecords(
+  options: { includeReplies?: boolean } = {},
+): Promise<BookJournalEntryRecord[]> {
   const { supabase } = await import("./supabase");
-  const { data, error } = await supabase
+  let query = supabase
     .from("book_journal")
     .select("*")
-    .is("parent_entry_id", null)
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false });
+  if (!options.includeReplies) query = query.is("parent_entry_id", null);
+  const { data, error } = await query;
 
   if (error) throw bookJournalEntryErrorToError(error);
   return sortBookJournalEntryRecords(await withJournalMedia("book_note", (data ?? []) as BookJournalEntryRecord[]));

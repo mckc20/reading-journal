@@ -160,14 +160,17 @@ export async function fetchAuthorJournalEntryRecords(authorId: string): Promise<
   return sortAuthorJournalEntryRecords(await withJournalMedia("author_note", (data ?? []) as AuthorJournalEntryRecord[]));
 }
 
-export async function fetchAllAuthorJournalEntryRecords(): Promise<AuthorJournalEntryRecord[]> {
+export async function fetchAllAuthorJournalEntryRecords(
+  options: { includeReplies?: boolean } = {},
+): Promise<AuthorJournalEntryRecord[]> {
   const { supabase } = await import("./supabase");
-  const { data, error } = await supabase
+  let query = supabase
     .from("author_journal")
     .select("*")
-    .is("parent_entry_id", null)
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false });
+  if (!options.includeReplies) query = query.is("parent_entry_id", null);
+  const { data, error } = await query;
 
   if (error) throw authorJournalEntryErrorToError(error);
   return sortAuthorJournalEntryRecords(await withJournalMedia("author_note", (data ?? []) as AuthorJournalEntryRecord[]));

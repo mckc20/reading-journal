@@ -1,4 +1,5 @@
 import {
+  ArrowUpRight,
   Bookmark,
   ChevronLeft,
   CheckCircle2,
@@ -58,6 +59,12 @@ import {
   restoreJournalEntry,
 } from "@/lib/journalVisibility";
 import {
+  buildJournalBacklinks,
+  fetchAllJournalEntriesForLinking,
+  getJournalEntryPublicId,
+  type JournalBacklink,
+} from "@/lib/journalEntryLookup";
+import {
   authorJournalEntryToJournalEntry,
   bookJournalEntryToJournalEntry,
   getJournalEntryTags,
@@ -70,7 +77,7 @@ import {
   type JournalTimelineEntry,
   type SeriesJournalEntryRecordJournalEntry,
 } from "@/lib/journal";
-import type { JournalLinkTarget } from "@/lib/journalLinks";
+import { journalHrefForPublicId, type JournalLinkTarget } from "@/lib/journalLinks";
 import {
   deleteSeriesJournalEntryRecord,
   getSeriesJournalReplies,
@@ -1301,6 +1308,7 @@ function ListJournalEntry({
   busy,
   isHidden,
   attachedCount = 0,
+  backlinks = [],
   onToggleSaved,
   onReply,
   onAttach,
@@ -1316,6 +1324,7 @@ function ListJournalEntry({
   busy: boolean;
   isHidden: boolean;
   attachedCount?: number;
+  backlinks?: JournalBacklink[];
   onToggleSaved: (entry: JournalTimelineEntry) => void;
   onReply?: (entry: JournalTimelineEntry) => void;
   onAttach: (entry: ManualJournalTimelineEntry) => void;
@@ -1353,8 +1362,36 @@ function ListJournalEntry({
       <div className="pr-16">
         <NotebookEntryContent entry={entry} />
         <NotebookEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
+        <JournalEntryBacklinks backlinks={backlinks} />
       </div>
     </article>
+  );
+}
+
+function JournalEntryBacklinks({ backlinks }: { backlinks: JournalBacklink[] }) {
+  if (backlinks.length === 0) return null;
+
+  return (
+    <section className="mt-4 border-l border-border/70 pl-3">
+      <p className="text-xs font-medium text-muted-foreground">Referenced by</p>
+      <div className="mt-2 space-y-2">
+        {backlinks.map((backlink) => (
+          <Link
+            key={backlink.publicId}
+            to={backlink.href}
+            className="block rounded-md py-1 text-sm transition-colors hover:text-primary"
+          >
+            <span className="flex min-w-0 items-center gap-1.5 font-medium">
+              <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="truncate">{entryTitle(backlink.entry)}</span>
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {formatJournalDate(entryDate(backlink.entry))}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1505,16 +1542,6 @@ function journalEntryElementId(entryId: string): string {
   return `journal-entry-${entryId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
-function journalEntryHref(entry: ManualJournalTimelineEntry): string {
-  if (isBookJournalEntryRecordEntry(entry)) {
-    return `/books/${encodeURIComponent(entry.bookJournalEntry.book_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
-  }
-  if (isSeriesJournalEntryRecordEntry(entry)) {
-    return `/series/${encodeURIComponent(entry.seriesJournalEntry.series_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
-  }
-  return `/authors/${encodeURIComponent(entry.authorJournalEntry.author_id)}/journal?entry=${encodeURIComponent(entry.sourceId)}`;
-}
-
 function journalEntryLinkPreview(entry: ManualJournalTimelineEntry): string {
   const content = entryContentText(entry)
     .replace(/!\[[^\]]*]\([^)]*\)/g, "")
@@ -1526,16 +1553,19 @@ function journalEntryLinkPreview(entry: ManualJournalTimelineEntry): string {
   return content.length > 90 ? `${content.slice(0, 87).trim()}...` : content;
 }
 
-function journalEntryLinkTarget(entry: ManualJournalTimelineEntry): JournalLinkTarget {
+function journalEntryLinkTarget(entry: ManualJournalTimelineEntry): JournalLinkTarget | null {
   const page = entryPage(entry);
   const formattedDate = formatJournalDate(entryDate(entry));
   const descriptionParts = [page, journalEntryLinkPreview(entry)].filter(Boolean);
+  const publicId = getJournalEntryPublicId(entry);
+  if (!publicId) return null;
 
   return {
     id: entry.id,
+    publicId,
     label: `${entryTitle(entry)} · ${formattedDate}`,
     description: descriptionParts.join(" · "),
-    href: journalEntryHref(entry),
+    href: journalHrefForPublicId(publicId),
   };
 }
 
@@ -2079,6 +2109,7 @@ export default function JournalTimeline({
   const [attachingError, setAttachingError] = useState<string | null>(null);
   const [attachingBusyEntryId, setAttachingBusyEntryId] = useState<string | null>(null);
   const [timelineRepliesByParentId, setTimelineRepliesByParentId] = useState<Record<string, ManualJournalTimelineEntry[]>>({});
+  const [globalJournalLinkEntries, setGlobalJournalLinkEntries] = useState<ManualJournalTimelineEntry[]>([]);
   const [hiddenEntries, setHiddenEntries] = useState<Set<string>>(new Set());
   const [hiddenSectionOpen, setHiddenSectionOpen] = useState(false);
   const [busyEntryId, setBusyEntryId] = useState<string | null>(null);
@@ -2157,6 +2188,21 @@ export default function JournalTimeline({
     };
   }, [entity?.id, entity?.type]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllJournalEntriesForLinking()
+      .then((data) => {
+        if (!cancelled) setGlobalJournalLinkEntries(data.filter(isManualEntry));
+      })
+      .catch(() => {
+        if (!cancelled) setGlobalJournalLinkEntries([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const generatedAttachmentTagsInTimeline = useMemo(() => {
     const tags = new Set<string>();
     displayEntries.forEach((entry) => {
@@ -2195,17 +2241,52 @@ export default function JournalTimeline({
   }, [visibleEntries]);
   const journalLinkTargets = useMemo(() => {
     const targetsById = new Map<string, JournalLinkTarget>();
-    splitEntries.visible.filter(isManualEntry).forEach((entry) => {
-      targetsById.set(entry.id, journalEntryLinkTarget(entry));
+    const linkEntries = globalJournalLinkEntries.length > 0
+      ? globalJournalLinkEntries
+      : splitEntries.visible.filter(isManualEntry);
+
+    linkEntries.forEach((entry) => {
+      const target = journalEntryLinkTarget(entry);
+      if (target) targetsById.set(entry.id, target);
     });
     Object.values(timelineRepliesByParentId).flat().forEach((entry) => {
-      if (!isEntryHidden(entry)) targetsById.set(entry.id, journalEntryLinkTarget(entry));
+      const target = journalEntryLinkTarget(entry);
+      if (!isEntryHidden(entry) && target) targetsById.set(entry.id, target);
     });
 
     return [...targetsById.values()];
-  }, [splitEntries.visible, timelineRepliesByParentId, hiddenEntries]);
+  }, [globalJournalLinkEntries, splitEntries.visible, timelineRepliesByParentId, hiddenEntries]);
   const journalLinkTargetsExcept = (entry: ManualJournalTimelineEntry): JournalLinkTarget[] =>
     journalLinkTargets.filter((target) => target.id !== entry.id);
+  const backlinkEntries = useMemo(() => {
+    const entriesByPublicId = new Map<string, ManualJournalTimelineEntry>();
+
+    globalJournalLinkEntries.forEach((entry) => {
+      const publicId = getJournalEntryPublicId(entry);
+      if (publicId) entriesByPublicId.set(publicId, entry);
+    });
+
+    [
+      ...splitEntries.visible.filter(isManualEntry),
+      ...Object.values(timelineRepliesByParentId).flat().filter((entry) => !isEntryHidden(entry)),
+    ].forEach((entry) => {
+      const publicId = getJournalEntryPublicId(entry);
+      if (publicId) entriesByPublicId.set(publicId, entry);
+    });
+
+    return [...entriesByPublicId.values()];
+  }, [globalJournalLinkEntries, splitEntries.visible, timelineRepliesByParentId, hiddenEntries]);
+  const backlinksByPublicId = useMemo(() => {
+    const backlinks = new Map<string, JournalBacklink[]>();
+
+    backlinkEntries.forEach((entry) => {
+      const publicId = getJournalEntryPublicId(entry);
+      if (!publicId) return;
+      backlinks.set(publicId, buildJournalBacklinks(backlinkEntries, publicId));
+    });
+
+    return backlinks;
+  }, [backlinkEntries]);
 
   const availableAttachTargets = useMemo(() => {
     if (!attachingEntry) return [];
@@ -2847,6 +2928,7 @@ export default function JournalTimeline({
                           busy={busyEntryId === entry.id}
                           isHidden={isEntryHidden(entry)}
                           attachedCount={attachedCountForEntry(entry)}
+                          backlinks={backlinksByPublicId.get(getJournalEntryPublicId(entry) ?? "") ?? []}
                           onToggleSaved={(item) => void handleToggleSaved(item)}
                           onReply={startReply}
                           onAttach={startAttaching}
@@ -2888,6 +2970,7 @@ export default function JournalTimeline({
                               entry={reply}
                               busy={busyEntryId === reply.id}
                               isHidden={isEntryHidden(reply)}
+                              backlinks={backlinksByPublicId.get(getJournalEntryPublicId(reply) ?? "") ?? []}
                               onToggleSaved={(item) => void handleToggleSaved(item)}
                               onAttach={startAttaching}
                               onUnattach={requestUnattachNote}

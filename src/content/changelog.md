@@ -2,6 +2,15 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-08-26 - Journal entry links
+Version: `2026-08-26-journal-entry-links`
+Summary: Journal entries can now reference other entries with simple internal links.
+
+- Internal journal links
+  Insert links to other journal entries while writing, and open them through stable journal URLs.
+- Automatic references
+  Entries now show subtle backlinks when another journal entry points to them.
+
 ## 2026-07-23 - Journal pages for books, series, and authors
 Version: `2026-07-23-journal-pages`
 Summary: Books, series, and authors now have dedicated journal pages for writing, reviewing, and organizing reading notes in one focused place.

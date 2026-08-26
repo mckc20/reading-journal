@@ -1,5 +1,6 @@
 export interface JournalLinkTarget {
   id: string;
+  publicId: string;
   label: string;
   description: string;
   href: string;
@@ -21,18 +22,54 @@ export function isAppRelativeHref(href: string): boolean {
 }
 
 export function isInternalJournalHref(href: string): boolean {
+  if (isInternalJournalProtocolHref(href)) return true;
   if (!isAppRelativeHref(href)) return false;
 
   try {
     const url = new URL(href, "https://reading-journal.local");
-    return (
-      /^\/books\/[^/]+\/journal$/.test(url.pathname) ||
-      /^\/series\/[^/]+\/journal$/.test(url.pathname) ||
-      /^\/authors\/[^/]+\/journal$/.test(url.pathname)
-    ) && Boolean(url.searchParams.get("entry"));
+    return /^\/journal\/[^/]+$/.test(url.pathname);
   } catch {
     return false;
   }
+}
+
+export function isInternalJournalProtocolHref(href: string): boolean {
+  return /^journal:\/\/entry\/[A-Za-z0-9_-]+$/.test(href.trim());
+}
+
+export function journalPublicIdFromHref(href: string): string | null {
+  const trimmed = href.trim();
+  const protocolMatch = trimmed.match(/^journal:\/\/entry\/([A-Za-z0-9_-]+)$/);
+  if (protocolMatch) return protocolMatch[1];
+
+  try {
+    const url = new URL(trimmed, "https://reading-journal.local");
+    const pathMatch = url.pathname.match(/^\/journal\/([A-Za-z0-9_-]+)$/);
+    return pathMatch ? pathMatch[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+export function journalHrefForPublicId(publicId: string): string {
+  return `journal://entry/${publicId}`;
+}
+
+export function journalRouteForPublicId(publicId: string): string {
+  return `/journal/${encodeURIComponent(publicId)}`;
+}
+
+export function extractJournalEntryPublicIds(markdown: string): string[] {
+  const ids = new Set<string>();
+  const linkPattern = /\[[^\]\n]+]\(([^)\s]+)\)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(markdown)) !== null) {
+    const publicId = journalPublicIdFromHref(match[1]);
+    if (publicId) ids.add(publicId);
+  }
+
+  return [...ids];
 }
 
 export function escapeMarkdownLinkText(value: string): string {

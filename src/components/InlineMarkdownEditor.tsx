@@ -61,6 +61,7 @@ const InlineMarkdownEditor = forwardRef<InlineMarkdownEditorHandle, InlineMarkdo
         openOnClick: false,
         autolink: true,
         defaultProtocol: "https",
+        protocols: ["http", "https", "mailto", "tel", "journal"],
       }),
       Markdown.configure({
         markedOptions: {

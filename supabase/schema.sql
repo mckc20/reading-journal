@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS book_pause_periods (
 -- ── BOOK JOURNAL ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS book_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  public_id  text NOT NULL UNIQUE DEFAULT lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12)),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   book_id    uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   parent_entry_id uuid REFERENCES book_journal(id) ON DELETE CASCADE,
@@ -205,6 +206,7 @@ CREATE TABLE IF NOT EXISTS book_journal (
 -- ── SERIES JOURNAL ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS series_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  public_id  text NOT NULL UNIQUE DEFAULT lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12)),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   series_id  uuid NOT NULL REFERENCES series(id) ON DELETE CASCADE,
   parent_entry_id uuid REFERENCES series_journal(id) ON DELETE CASCADE,
@@ -223,6 +225,7 @@ CREATE TABLE IF NOT EXISTS series_journal (
 -- ── AUTHOR JOURNAL ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS author_journal (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  public_id  text NOT NULL UNIQUE DEFAULT lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12)),
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   author_id  uuid NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
   parent_entry_id uuid REFERENCES author_journal(id) ON DELETE CASCADE,
@@ -237,6 +240,79 @@ CREATE TABLE IF NOT EXISTS author_journal (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK (parent_entry_id IS NULL OR parent_entry_id <> id)
 );
+
+CREATE OR REPLACE FUNCTION generate_journal_entry_public_id()
+RETURNS text
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  candidate text;
+BEGIN
+  LOOP
+    candidate := lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM book_journal WHERE public_id = candidate)
+      AND NOT EXISTS (SELECT 1 FROM series_journal WHERE public_id = candidate)
+      AND NOT EXISTS (SELECT 1 FROM author_journal WHERE public_id = candidate);
+  END LOOP;
+
+  RETURN candidate;
+END;
+$$;
+
+ALTER TABLE book_journal ALTER COLUMN public_id SET DEFAULT generate_journal_entry_public_id();
+ALTER TABLE series_journal ALTER COLUMN public_id SET DEFAULT generate_journal_entry_public_id();
+ALTER TABLE author_journal ALTER COLUMN public_id SET DEFAULT generate_journal_entry_public_id();
+
+CREATE OR REPLACE FUNCTION ensure_journal_entry_public_id()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.public_id IS NULL OR btrim(NEW.public_id) = '' THEN
+    NEW.public_id := generate_journal_entry_public_id();
+  END IF;
+
+  NEW.public_id := btrim(NEW.public_id);
+
+  IF EXISTS (
+    SELECT 1 FROM book_journal
+    WHERE public_id = NEW.public_id
+      AND (TG_TABLE_NAME <> 'book_journal' OR id <> NEW.id)
+  ) OR EXISTS (
+    SELECT 1 FROM series_journal
+    WHERE public_id = NEW.public_id
+      AND (TG_TABLE_NAME <> 'series_journal' OR id <> NEW.id)
+  ) OR EXISTS (
+    SELECT 1 FROM author_journal
+    WHERE public_id = NEW.public_id
+      AND (TG_TABLE_NAME <> 'author_journal' OR id <> NEW.id)
+  ) THEN
+    RAISE unique_violation USING MESSAGE = 'journal entry public_id must be unique';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS book_journal_ensure_public_id ON book_journal;
+CREATE TRIGGER book_journal_ensure_public_id
+  BEFORE INSERT OR UPDATE OF public_id ON book_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION ensure_journal_entry_public_id();
+
+DROP TRIGGER IF EXISTS series_journal_ensure_public_id ON series_journal;
+CREATE TRIGGER series_journal_ensure_public_id
+  BEFORE INSERT OR UPDATE OF public_id ON series_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION ensure_journal_entry_public_id();
+
+DROP TRIGGER IF EXISTS author_journal_ensure_public_id ON author_journal;
+CREATE TRIGGER author_journal_ensure_public_id
+  BEFORE INSERT OR UPDATE OF public_id ON author_journal
+  FOR EACH ROW
+  EXECUTE FUNCTION ensure_journal_entry_public_id();
 
 -- ── JOURNAL ENTRY VISIBILITY ──────────────────────────────
 CREATE TABLE IF NOT EXISTS journal_entry_visibility (
