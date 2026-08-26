@@ -16,7 +16,6 @@ import {
   Search,
   Settings,
   Sparkles,
-  SwatchBook,
   UserRound,
   X,
   createLucideIcon,
@@ -37,9 +36,8 @@ const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
 const AddChatDialog = lazy(() => import("./AddChatDialog"));
-const AddGenreDialog = lazy(() => import("./AddGenreDialog"));
 
-type AddAction = "book" | "author" | "series" | "note" | "chat" | "genre";
+type AddAction = "book" | "author" | "series" | "note" | "chat";
 
 const addActions: Array<{
   key: AddAction;
@@ -51,7 +49,6 @@ const addActions: Array<{
   { key: "series", label: "Series", icon: LibraryBig },
   { key: "note", label: "Entry", icon: NotebookPen },
   { key: "chat", label: "Chat", icon: MessageCircle },
-  { key: "genre", label: "Genre", icon: SwatchBook },
 ];
 
 export interface AppLayoutOutletContext {
@@ -311,12 +308,6 @@ function AppLayoutContent() {
         )}
         {activeAddAction === "chat" && (
           <AddChatDialog
-            open
-            onOpenChange={(open) => !open && setActiveAddAction(null)}
-          />
-        )}
-        {activeAddAction === "genre" && (
-          <AddGenreDialog
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
           />

@@ -1419,27 +1419,6 @@ CREATE POLICY "genres: visible select"
   ON genres FOR SELECT
   USING (is_system = true OR auth.uid() = user_id);
 
-CREATE POLICY "genres: owner insert custom"
-  ON genres FOR INSERT
-  WITH CHECK (
-    is_system = false
-    AND auth.uid() = user_id
-    AND can_use_genre_parent(parent_id, auth.uid())
-  );
-
-CREATE POLICY "genres: owner update custom"
-  ON genres FOR UPDATE
-  USING (is_system = false AND auth.uid() = user_id)
-  WITH CHECK (
-    is_system = false
-    AND auth.uid() = user_id
-    AND can_use_genre_parent(parent_id, auth.uid())
-  );
-
-CREATE POLICY "genres: owner delete custom"
-  ON genres FOR DELETE
-  USING (is_system = false AND auth.uid() = user_id);
-
 -- book_genres
 CREATE POLICY "book_genres: owner select"
   ON book_genres FOR SELECT

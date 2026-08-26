@@ -178,7 +178,7 @@ export function getGenreMetadata(slug: string, name: string, isSystem: boolean):
       name,
       description: isSystem
         ? `Browse books filed under ${name} and any of its subgenres.`
-        : `${name} is a custom genre in your library. Books from this genre and its subgenres are grouped here.`,
+        : `${name} is a read-only genre in your library. Books from this genre and its subgenres are grouped here.`,
     }
   );
 }

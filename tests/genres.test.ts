@@ -33,6 +33,8 @@ const genres = [
   makeGenre({ id: "epic", name: "Epic Fantasy", parent_id: "fantasy" }),
   makeGenre({ id: "high", name: "High Fantasy", parent_id: "fantasy" }),
   makeGenre({ id: "dark", name: "Dark Fantasy", parent_id: "fantasy" }),
+  makeGenre({ id: "scifi", name: "Science Fiction", parent_id: "fiction" }),
+  makeGenre({ id: "space-opera", name: "Space Opera", parent_id: "scifi" }),
   makeGenre({ id: "nonfiction", name: "Non-Fiction" }),
   makeGenre({ id: "history", name: "History", parent_id: "nonfiction" }),
   makeGenre({ id: "age", name: "Age Target" }),
@@ -73,6 +75,16 @@ test("searches by full path", () => {
   assert.deepEqual(results.map((result) => result.pathLabel), ["Fiction -> Fantasy -> Epic Fantasy"]);
 });
 
+test("searches genre names and parent category context case-insensitively", () => {
+  const epicResults = searchGenres(genres, "EPIC");
+  const fantasyResults = searchGenres(genres, "fantasy");
+
+  assert.deepEqual(epicResults.map((result) => result.pathLabel), ["Fiction -> Fantasy -> Epic Fantasy"]);
+  assert.ok(fantasyResults.some((result) => result.genre.id === "fantasy"));
+  assert.ok(fantasyResults.some((result) => result.genre.id === "epic"));
+  assert.ok(fantasyResults.some((result) => result.genre.id === "dark"));
+});
+
 test("keeps only most-specific selected genres for compact display", () => {
   const selected = genres.filter((genre) => ["fantasy", "epic", "history"].includes(genre.id));
 
@@ -91,11 +103,19 @@ test("keeps selected parents as separate tags instead of path prefixes", () => {
   );
 });
 
-test("maps external genre labels and age labels to known genre ids case-insensitively", () => {
-  assert.deepEqual(mapGenreLabelsToIds(["epic fantasy", "History", "young adult", "graphic novel", "Unknown"], genres), [
+test("maps external genre labels, subgenres, and age labels to known genre ids case-insensitively", () => {
+  assert.deepEqual(mapGenreLabelsToIds(["epic fantasy", "History", "young adult", "Space Opera", "Unknown"], genres), [
     "epic",
     "history",
     "ya",
+    "space-opera",
+  ]);
+});
+
+test("maps known external aliases without creating unknown genres", () => {
+  assert.deepEqual(mapGenreLabelsToIds(["Juvenile Fiction", "Fiction / Fantasy", "Graphic Novel"], genres), [
+    "ya",
+    "fantasy",
   ]);
 });
 

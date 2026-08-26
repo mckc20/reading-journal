@@ -317,16 +317,25 @@ export function getMostSpecificGenreLabels(book: { selected_genres?: Genre[]; ge
 
 export function mapGenreLabelsToIds(labels: string[] | undefined, genres: Genre[]): string[] {
   if (!labels) return [];
-  const byName = new Map(genres.map((genre) => [genre.name.trim().toLocaleLowerCase(), genre.id]));
+  const byName = new Map(
+    genres
+      .filter((genre) => !isGenreRoot(genre))
+      .map((genre) => [genre.name.trim().toLocaleLowerCase(), genre.id]),
+  );
   const aliases = new Map<string, string>([
+    ["juvenile fiction", "young adult"],
     ["sci-fi", "science fiction"],
+    ["science fiction & fantasy", "science fiction"],
     ["mystery", "mystery & crime"],
     ["crime", "mystery & crime"],
+    ["detective and mystery stories", "mystery & crime"],
     ["thriller", "thriller & suspense"],
     ["suspense", "thriller & suspense"],
     ["adventure", "action & adventure"],
+    ["action", "action & adventure"],
     ["childrens", "children's"],
     ["middle grade / mg", "middle grade"],
+    ["mg", "middle grade"],
     ["ya", "young adult"],
     ["new adult / na", "new adult"],
     ["na", "new adult"],
@@ -358,8 +367,16 @@ export function mapGenreLabelsToIds(labels: string[] | undefined, genres: Genre[
     ["spirituality", "philosophy & spirituality"],
     ["politics", "politics & current events"],
     ["current events", "politics & current events"],
+    ["social science", "politics & current events"],
     ["essays", "essays & anthologies"],
     ["anthologies", "essays & anthologies"],
+    ["romantic fantasy", "romance"],
+    ["fantasy romance", "romance"],
+    ["dark fantasy", "fantasy"],
+    ["historical fantasy", "fantasy"],
+    ["cyberpunk", "science fiction"],
+    ["climate fiction", "science fiction"],
+    ["cli-fi", "science fiction"],
   ]);
 
   return Array.from(
@@ -367,7 +384,16 @@ export function mapGenreLabelsToIds(labels: string[] | undefined, genres: Genre[
       labels
         .map((label) => {
           const normalizedLabel = label.trim().toLocaleLowerCase();
-          return byName.get(normalizedLabel) ?? byName.get(aliases.get(normalizedLabel) ?? "");
+          const normalizedParts = normalizedLabel
+            .split(/[>/,;|]+/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+          const candidates = [normalizedLabel, ...normalizedParts.reverse()];
+          const match = candidates
+            .map((candidate) => byName.get(candidate) ?? byName.get(aliases.get(candidate) ?? ""))
+            .find(Boolean);
+
+          return match;
         })
         .filter((id): id is string => Boolean(id)),
     ),
