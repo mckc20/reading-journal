@@ -22,8 +22,8 @@ test("renders links that open in a new tab", () => {
 
 test("renders internal journal links in the current tab", () => {
   assert.match(
-    renderNoteMarkdownToHtml("[Earlier thought](/books/book-1/journal?entry=entry-1)"),
-    /<a href="\/books\/book-1\/journal\?entry=entry-1">Earlier thought<\/a>/,
+    renderNoteMarkdownToHtml("[Earlier thought](journal://entry/a8f4d2)"),
+    /<a href="\/journal\/a8f4d2" class="journal-internal-link" data-journal-public-id="a8f4d2">/,
   );
 });
 

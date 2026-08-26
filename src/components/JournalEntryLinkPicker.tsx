@@ -1,6 +1,7 @@
 import { Search, Unlink } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { JournalLinkTarget } from "@/lib/journalLinks";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,6 @@ export default function JournalEntryLinkPicker({
   onRemoveLink,
   onSelect,
 }: JournalEntryLinkPickerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const filteredTargets = useMemo(() => {
@@ -46,29 +46,17 @@ export default function JournalEntryLinkPicker({
 
     window.requestAnimationFrame(() => searchRef.current?.focus());
 
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node | null;
-      if (target && containerRef.current?.contains(target)) return;
-      onOpenChange(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onOpenChange(false);
-    }
-
-    window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onOpenChange, open]);
+  }, [open]);
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       {trigger}
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-md border bg-popover p-2 text-popover-foreground shadow-[var(--shadow-popover)]">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <div className="space-y-1">
+            <DialogTitle>Insert journal entry link</DialogTitle>
+            <DialogDescription>Choose an entry from your journal.</DialogDescription>
+          </div>
           {canRemoveLink && (
             <button
               type="button"
@@ -93,7 +81,7 @@ export default function JournalEntryLinkPicker({
             />
           </div>
 
-          <div className="mt-2 max-h-72 space-y-1 overflow-y-auto pr-1">
+          <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
             {filteredTargets.length > 0 ? (
               filteredTargets.map((target) => (
                 <button
@@ -112,8 +100,8 @@ export default function JournalEntryLinkPicker({
               <p className="px-2.5 py-3 text-sm text-muted-foreground">No entries found.</p>
             )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

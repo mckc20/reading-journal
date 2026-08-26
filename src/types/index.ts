@@ -107,6 +107,7 @@ export type JournalEntryLabel = "quote" | "review" | "note";
 
 export interface BookJournalEntryRecord {
   id: string;
+  public_id?: string;
   user_id: string;
   book_id: string;
   parent_entry_id?: string | null;
@@ -124,6 +125,7 @@ export interface BookJournalEntryRecord {
 
 export interface SeriesJournalEntryRecord {
   id: string;
+  public_id?: string;
   user_id: string;
   series_id: string;
   parent_entry_id?: string | null;
@@ -141,6 +143,7 @@ export interface SeriesJournalEntryRecord {
 
 export interface AuthorJournalEntryRecord {
   id: string;
+  public_id?: string;
   user_id: string;
   author_id: string;
   parent_entry_id?: string | null;

@@ -25,6 +25,7 @@ const Discover = lazy(() => import("@/pages/Discover"));
 const ReadingHistory = lazy(() => import("@/pages/ReadingHistory"));
 const WrapUps = lazy(() => import("@/pages/WrapUps"));
 const LibraryJournal = lazy(() => import("@/pages/LibraryJournal"));
+const JournalEntryRedirect = lazy(() => import("@/pages/JournalEntryRedirect"));
 const Genres = lazy(() => import("@/pages/Genres"));
 const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
           { path: "/library/series", element: lazyRoute(<Series />) },
           { path: "/library/genres", element: lazyRoute(<Genres />) },
           { path: "/library/journal", element: lazyRoute(<LibraryJournal />) },
+          { path: "/journal/:publicId", element: lazyRoute(<JournalEntryRedirect />) },
           { path: "/statistics", element: lazyRoute(<Analytics />) },
           { path: "/reading-history", element: lazyRoute(<ReadingHistory />) },
           { path: "/wrap-ups", element: lazyRoute(<WrapUps />) },
