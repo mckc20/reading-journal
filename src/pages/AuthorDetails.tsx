@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ChevronRight, FileText, Heart, Star } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Heart, Languages, Star, Tags } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
@@ -10,7 +18,6 @@ import JournalTimeline from "@/components/JournalTimeline";
 import {
   buildBookLibraryFilterPath,
   buildGenreDetailPath,
-  MetadataGroup,
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
+import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import {
   buildAuthorSummaries,
@@ -107,6 +115,21 @@ function EmptySection({ message }: { message: string }) {
     <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
       {message}
     </div>
+  );
+}
+
+function AuthorMetadataHeading({
+  icon: Icon,
+  title,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+}) {
+  return (
+    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
+      <Icon className="h-3.5 w-3.5 text-primary" />
+      {title}
+    </h3>
   );
 }
 
@@ -256,6 +279,7 @@ export default function AuthorDetails() {
 
   const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
+  const dominantPhotoColor = useDominantImageColor(author?.photo_url);
   const authorBooks = author?.books ?? [];
   const previewBooks = authorBooks.slice(0, 4);
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
@@ -334,7 +358,10 @@ export default function AuthorDetails() {
   if (!author) {
     return (
       <div className="space-y-4">
-        <BackButton fallbackTo="/authors" />
+        <BackButton
+          fallbackTo="/authors"
+          className="hover:bg-transparent hover:text-foreground/80"
+        />
         <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="font-heading text-lg font-medium">Author not found</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -347,10 +374,18 @@ export default function AuthorDetails() {
 
   const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
   const bio = author.bio?.trim() || "";
+  const detailBackgroundStyle = {
+    "--detail-image-color": dominantPhotoColor,
+  } as CSSProperties;
+
   return (
-    <div className="space-y-10">
-      <div className="flex items-start justify-between gap-3">
-        <BackButton fallbackTo="/authors" />
+    <div className="relative isolate -mt-5 space-y-10 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
+      <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(11.5rem,26vh,14rem)] w-screen md:h-[clamp(17.5rem,31vh,19.5rem)]" />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <BackButton
+          fallbackTo="/authors"
+          className="hover:bg-background/20 hover:text-foreground"
+        />
 
         <DetailActionsMenu
           kind="author"
@@ -361,6 +396,7 @@ export default function AuthorDetails() {
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this author?"
           deleteDescription="Deleting this author removes the record and unlinks it from books. The books stay in your library."
+          buttonClassName="hover:bg-background/20 hover:text-foreground aria-expanded:bg-background/25 aria-expanded:text-foreground"
         />
       </div>
 
@@ -376,7 +412,7 @@ export default function AuthorDetails() {
         </div>
       )}
 
-      <section className="flex items-start gap-4 sm:gap-6">
+      <section className="relative z-10 flex items-start gap-4 sm:gap-6">
         <AuthorPhoto name={author.name} photoUrl={author.photo_url} />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -385,7 +421,7 @@ export default function AuthorDetails() {
               type="button"
               onClick={handleToggleFavorite}
               aria-label={author.isFavorite ? "Remove from favorites" : "Add to favorites"}
-              className="shrink-0 rounded p-1 transition-colors hover:bg-muted"
+              className="shrink-0 rounded p-1 transition-colors hover:bg-background/20"
             >
               <Heart
                 className={cn(
@@ -404,52 +440,57 @@ export default function AuthorDetails() {
         </div>
       </section>
 
-      {(authorGenres.length > 0 || authorLanguages.length > 0) && (
-        <section className="grid gap-4 sm:grid-cols-2">
-          {authorLanguages.length > 0 && (
-            <MetadataGroup title="Languages">
-              <div className="flex flex-wrap gap-1.5">
-                {authorLanguages.map((language) => (
-                  <Badge key={language} variant="outline" className="max-w-full font-normal" asChild>
-                    <Link to={buildBookLibraryFilterPath("language", language)}>
-                      {language}
-                    </Link>
-                  </Badge>
-                ))}
-              </div>
-            </MetadataGroup>
-          )}
-
-          {authorGenres.length > 0 && (
-            <MetadataGroup title="Genres">
-              <div className="flex flex-wrap gap-1.5">
-                {authorGenres.map((genre) => {
-                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                  return (
-                    <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
-                      <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-                        {genre}
-                      </Link>
-                    </Badge>
-                  );
-                })}
-              </div>
-            </MetadataGroup>
-          )}
-        </section>
-      )}
-
       <AboutSection
         title={
           <>
             <span className="font-serif italic">About</span> this author
           </>
         }
-        text={bio}
-        emptyText="No bio yet."
-      />
+        titleContent={
+          (authorGenres.length > 0 || authorLanguages.length > 0) ? (
+            <div className="grid gap-3 pb-2 pt-1 sm:grid-cols-2">
+              {authorGenres.length > 0 && (
+                <div>
+                  <AuthorMetadataHeading icon={Tags} title="Genres" />
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {authorGenres.map((genre) => {
+                      const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                      return (
+                        <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
+                          <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+                            {genre}
+                          </Link>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-      <AuthorJournalSection author={author} />
+              {authorLanguages.length > 0 && (
+                <div>
+                  <AuthorMetadataHeading icon={Languages} title="Languages" />
+                  <p className="mt-1.5 text-base">
+                    {authorLanguages.map((language, index) => (
+                      <span key={language}>
+                        {index > 0 ? ", " : null}
+                        <Link
+                          to={buildBookLibraryFilterPath("language", language)}
+                          className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          {language}
+                        </Link>
+                      </span>
+                    ))}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : undefined
+        }
+        text={bio}
+        emptyText=""
+      />
 
       <section className="space-y-4">
         <SectionTitle
@@ -494,6 +535,8 @@ export default function AuthorDetails() {
           </div>
         </section>
       )}
+
+      <AuthorJournalSection author={author} />
 
       <SendAttachmentDialog
         open={sendAttachmentOpen}

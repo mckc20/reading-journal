@@ -12,7 +12,6 @@ export type BookSearchPropertyKey =
   | "language"
   | "source"
   | "format"
-  | "publisher"
   | "publicationDate"
   | "description"
   | "isbn"
@@ -77,7 +76,6 @@ export const BOOK_SEARCH_PROPERTIES: Array<{
   { key: "language", label: "Language" },
   { key: "format", label: "Format" },
   { key: "source", label: "Source" },
-  { key: "publisher", label: "Publisher" },
   { key: "publicationDate", label: "Publication Date" },
   { key: "description", label: "Description" },
   { key: "rating", label: "Rating" },
@@ -141,14 +139,12 @@ const BASE_SOURCES: BookSearchSource[] = [
     getValues: (book) => (book.source ? [book.source] : []),
   },
   {
-    key: "publisher",
-    label: "Publisher",
-    getValues: (book) => (book.publisher ? [book.publisher] : []),
-  },
-  {
     key: "publicationDate",
     label: "Publication Date",
-    getValues: (book) => (book.publication_date ? [book.publication_date] : []),
+    getValues: (book) => {
+      const year = book.publication_date?.slice(0, 4);
+      return year && /^\d{4}$/.test(year) ? [year] : [];
+    },
   },
   {
     key: "description",

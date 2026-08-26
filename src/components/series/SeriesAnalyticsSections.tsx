@@ -28,14 +28,25 @@ function SummaryCard({
   children,
   className = "",
   compact = false,
+  unframed = false,
 }: {
   title?: string;
   children: ReactNode;
   className?: string;
   compact?: boolean;
+  unframed?: boolean;
 }) {
+  if (unframed) {
+    return (
+      <section className={className}>
+        {title && <AppHeading level={4} as="h2" className="text-muted-foreground">{title}</AppHeading>}
+        <div className={title ? (compact ? "mt-3" : "mt-4") : ""}>{children}</div>
+      </section>
+    );
+  }
+
   return (
-    <section className={`rounded-xl border bg-card ${compact ? "p-4" : "p-5"} ${className}`}>
+    <section className={`rounded-xl border ${compact ? "p-4" : "p-5"} ${className}`}>
       {title && <AppHeading level={4} as="h2" className="text-muted-foreground">{title}</AppHeading>}
       <div className={title ? (compact ? "mt-3" : "mt-4") : ""}>{children}</div>
     </section>
@@ -58,9 +69,10 @@ function StatsOverviewCard({
       <Icon className="mt-0.5 h-4 w-4 text-primary" />
       <div className="min-w-0">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 font-heading text-xl font-semibold">{value ?? "--"}</p>
-        {value === null && unavailableLabel && (
-          <p className="mt-2 text-xs text-muted-foreground">{unavailableLabel}</p>
+        {value === null && unavailableLabel ? (
+          <p className="mt-1 text-xs text-muted-foreground">{unavailableLabel}</p>
+        ) : (
+          <p className="mt-1 font-heading text-xl font-semibold">{value ?? "--"}</p>
         )}
       </div>
     </div>
@@ -132,22 +144,30 @@ function StatsBarChart({
   rows,
   emptyLabel,
   title,
+  unframed = false,
 }: {
   rows: Array<{ book: Book; value: number; formattedValue: string }>;
   emptyLabel: string;
   title?: string;
+  unframed?: boolean;
 }) {
   const maximumValue = Math.max(...rows.map((row) => row.value), 0);
 
   return (
-    <SummaryCard compact>
+    <SummaryCard compact unframed={unframed}>
       {title && <AppHeading level={4} as="h3" className="mb-4">{title}</AppHeading>}
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className="space-y-4">
+        <div className={cn(unframed ? "divide-y divide-border" : "space-y-4")}>
           {rows.map((row) => (
-            <div key={row.book.id} className="grid gap-2 sm:grid-cols-[minmax(8rem,0.9fr)_minmax(0,2fr)_auto] sm:items-center">
+            <div
+              key={row.book.id}
+              className={cn(
+                "grid gap-2 sm:grid-cols-[minmax(8rem,0.9fr)_minmax(0,2fr)_auto] sm:items-center",
+                unframed && "py-4 first:pt-0 last:pb-0",
+              )}
+            >
               <Link to={`/books/${row.book.id}`} className="min-w-0 text-sm font-medium hover:underline">
                 <span className="line-clamp-2">{row.book.title}</span>
               </Link>
@@ -206,7 +226,7 @@ function PodiumCoverStack({ books }: { books: Book[] }) {
         <BookThumbnail key={book.id} book={book} />
       ))}
       {books.length > 4 && (
-        <span className="mb-1 rounded-full border bg-card px-2 py-1 text-xs font-semibold text-muted-foreground">
+        <span className="mb-1 rounded-full border px-2 py-1 text-xs font-semibold text-muted-foreground">
           +{books.length - 4}
         </span>
       )}
@@ -238,7 +258,7 @@ function PodiumColumn({
           rank === 1 && "border-primary/40 bg-primary/10",
         )}
       >
-        <div className={cn("mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full border bg-card text-sm font-semibold", rank === 1 && "border-primary text-primary")}>
+        <div className={cn("mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold", rank === 1 && "border-primary text-primary")}>
           {rank ? `#${rank}` : "--"}
         </div>
         {group ? (
@@ -274,7 +294,7 @@ function SeriesRankingPodium({
   const hasRemainingGroups = remainingGroups.length > 0;
 
   return (
-    <SummaryCard compact>
+    <SummaryCard compact unframed>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
@@ -289,7 +309,7 @@ function SeriesRankingPodium({
               <ol className="mx-auto mt-5 flex max-w-4xl flex-wrap justify-center gap-2 px-3">
                 {remainingGroups.map((group) => (
                   <li key={`${group.rank}-${group.key}`}>
-                    <div className="flex max-w-72 items-start gap-2 rounded-lg border bg-background px-3 py-2 text-left shadow-sm">
+                    <div className="flex max-w-72 items-start gap-2 rounded-lg border px-3 py-2 text-left shadow-sm">
                       <span className="shrink-0 text-sm font-semibold text-primary">#{group.rank}</span>
                       <div className="min-w-0 space-y-1">
                         {group.rows.map((row) => (
@@ -321,7 +341,7 @@ export function SeriesAnalyticsOverview({
   logsError: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-card)]">
       <div className="grid md:grid-cols-4">
         <div className="border-b md:border-b-0 md:border-r">
           <StatsOverviewCard
@@ -379,8 +399,9 @@ function getSpeedChartRows(stats: SeriesStats, mode: SpeedChartMode) {
 export function SeriesAnalyticsPaceChart({ stats }: { stats: SeriesStats }) {
   return (
     <StatsBarChart
-      title="Speed by Book"
+      title="Speed"
       rows={getSpeedChartRows(stats, "speed")}
+      unframed
       emptyLabel="Add reading time and page progress to compare reading speed."
     />
   );
@@ -426,10 +447,10 @@ export function SeriesAnalyticsFull({
   }, [rankingMode, stats.rankings]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <SeriesAnalyticsOverview stats={stats} logsLoading={logsLoading} logsError={logsError} />
 
-      <section className="space-y-4">
+      <section className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -444,13 +465,14 @@ export function SeriesAnalyticsFull({
             value={paceMode}
             onChange={setPaceMode}
             options={[
-              { value: "speed", label: "Speed by Book" },
-              { value: "duration", label: "Duration by Book" },
+              { value: "speed", label: "Speed" },
+              { value: "duration", label: "Duration" },
             ]}
           />
         </div>
         <StatsBarChart
           rows={paceRows}
+          unframed
           emptyLabel={
             paceMode === "duration"
               ? "No books with start dates yet."
@@ -459,7 +481,7 @@ export function SeriesAnalyticsFull({
         />
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex items-center gap-2">

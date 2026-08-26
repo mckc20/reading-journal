@@ -256,7 +256,9 @@ function AppLayoutContent() {
         <main
           className={cn(
             "mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
-            drawerOpen ? "md:pl-72" : "md:pl-24",
+            drawerOpen
+              ? "md:pl-72 md:[--detail-bg-left-offset:7.75rem] lg:[--detail-bg-left-offset:7.5rem]"
+              : "md:pl-24 md:[--detail-bg-left-offset:1.75rem] lg:[--detail-bg-left-offset:1.5rem]",
           )}
         >
           <Outlet

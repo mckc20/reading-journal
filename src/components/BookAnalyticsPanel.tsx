@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { BarChart3, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { BarChart3, CalendarClock, CalendarRange, ChevronDown, ChevronUp, Clock, ClockFading } from "lucide-react";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
-import { VerticalBarChart } from "@/components/design";
+import ProgressOverTimeChart, {
+  type ProgressOverTimeChartMode,
+} from "@/components/ProgressOverTimeChart";
 import { fetchReadingLogsForBook } from "@/lib/books";
 import {
   formatCalendarSpan,
@@ -19,30 +21,8 @@ interface BookAnalyticsPanelProps {
   book: Book;
 }
 
-interface ChartPoint {
-  dayKey: string;
-  dayLabel: string;
-  pagesRead: number;
-}
-
 interface ReadingLogWithDelta extends ReadingLog {
   pagesReadDelta: number;
-}
-
-function toLocalDayKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function dayFromKey(dayKey: string): Date {
-  const [year, month, day] = dayKey.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function formatDayLabel(date: Date): string {
-  return String(date.getDate());
 }
 
 function formatDateTime(value: string): string {
@@ -76,11 +56,64 @@ function formatEstimateConfidence(confidence: "low" | "medium" | "high" | null):
   return "Confidence unavailable";
 }
 
+function AnalyticsStatBox({
+  label,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  icon: ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/10 p-3 transition-colors">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-1 text-sm font-medium leading-tight">{value}</p>
+        {detail ? <p className="mt-1 text-xs text-muted-foreground">{detail}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsOverviewStat({
+  label,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  icon: ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3 p-4">
+      <Icon className="mt-0.5 h-4 w-4 text-primary" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-heading text-xl font-semibold">
+          <span>{value}</span>
+          {detail ? (
+            <span className="font-sans text-xs font-normal text-muted-foreground">{detail}</span>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
+  const [timelineMode, setTimelineMode] = useState<ProgressOverTimeChartMode>("progress");
 
   async function loadLogs() {
     try {
@@ -138,45 +171,11 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     });
   }, [logs]);
 
-  const chartPoints = useMemo<ChartPoint[]>(() => {
-    if (logsWithDelta.length === 0) return [];
-
-    const dailyTotals = new Map<string, number>();
-    for (const log of logsWithDelta) {
-      const dayKey = toLocalDayKey(new Date(log.logged_at));
-      const current = dailyTotals.get(dayKey) ?? 0;
-      dailyTotals.set(dayKey, current + log.pagesReadDelta);
-    }
-
-    const keys = [...dailyTotals.keys()].sort();
-    const first = dayFromKey(keys[0]);
-    const last = dayFromKey(keys[keys.length - 1]);
-    const points: ChartPoint[] = [];
-
-    const cursor = new Date(first.getFullYear(), first.getMonth(), first.getDate());
-    while (cursor <= last) {
-      const dayKey = toLocalDayKey(cursor);
-      points.push({
-        dayKey,
-        dayLabel: formatDayLabel(cursor),
-        pagesRead: dailyTotals.get(dayKey) ?? 0,
-      });
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    return points;
-  }, [logsWithDelta]);
-
   const entries = useMemo(() => [...logsWithDelta].reverse(), [logsWithDelta]);
   const hasMoreEntries = entries.length > 3;
   const visibleEntries = useMemo(
     () => (showAllEntries || !hasMoreEntries ? entries : entries.slice(0, 3)),
     [entries, hasMoreEntries, showAllEntries]
-  );
-
-  const totalPagesRead = useMemo(
-    () => chartPoints.reduce((sum, point) => sum + point.pagesRead, 0),
-    [chartPoints]
   );
 
   const totalReadingMinutes = useMemo(() => sumReadingMinutes(logs), [logs]);
@@ -212,16 +211,6 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
     if (!readingDuration.isAvailable || !readingDuration.span) return "Not available";
     return formatCalendarSpan(readingDuration.span);
   }, [readingDuration.isAvailable, readingDuration.span]);
-
-  const activeDays = useMemo(
-    () => chartPoints.filter((point) => point.pagesRead > 0).length,
-    [chartPoints]
-  );
-
-  const avgPerDay = useMemo(() => {
-    if (chartPoints.length === 0) return 0;
-    return totalPagesRead / chartPoints.length;
-  }, [chartPoints.length, totalPagesRead]);
 
   if (loading) {
     return (
@@ -260,109 +249,92 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
   return (
     <ScrollArea className="flex-1 min-h-0 pr-2">
       <div className="space-y-3 py-2">
-        {estimatedFinish.shouldShow && (
-          <section className="space-y-3">
-            <p className="text-sm font-medium">Estimated finish</p>
-            {estimatedFinish.isAvailable && estimatedFinish.finishDate ? (
-              <>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border bg-background/80 px-2 py-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Finish date
-                    </p>
-                    <p className="mt-1 text-sm font-medium">
-                      {formatFinishDate(estimatedFinish.finishDate)}
-                    </p>
-                  </div>
-                  <div className="rounded-md border bg-background/80 px-2 py-2">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Reading time left
-                    </p>
-                    <p className="mt-1 text-sm font-medium">
-                      {estimatedFinish.remainingMinutes
-                        ? formatReadingTime(estimatedFinish.remainingMinutes)
-                        : "Not enough timed sessions"}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {formatEstimateConfidence(estimatedFinish.confidence)} · Based on{" "}
-                  {estimatedFinish.readingSessionCount} reading session
-                  {estimatedFinish.readingSessionCount === 1 ? "" : "s"} and your average speed for
-                  this book.
-                </p>
-              </>
-            ) : (
-              <div className="mt-3 rounded-md border bg-background/80 px-2 py-2">
-                <p className="text-sm font-medium">Not enough data yet</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Log at least {MIN_READING_LOGS_FOR_ESTIMATED_FINISH} progress updates to
-                  estimate this.
-                </p>
+        <section className="space-y-3">
+          <div className="overflow-hidden rounded-xl border shadow-[var(--shadow-card)]">
+            <div className="grid sm:grid-cols-2">
+              <div className="border-b sm:border-b-0 sm:border-r">
+                <AnalyticsOverviewStat
+                  label="Total time spent reading"
+                  value={totalReadingTimeLabel}
+                  icon={Clock}
+                />
               </div>
+              <div>
+                <AnalyticsOverviewStat
+                  label="Reading duration"
+                  value={readingDurationLabel}
+                  detail={readingDuration.isAvailable && readingDuration.isInProgress ? "In progress" : undefined}
+                  icon={CalendarRange}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {estimatedFinish.shouldShow && (
+          <section className="space-y-3 pt-5">
+            <AppHeading level={2} as="h2">Estimated Finish</AppHeading>
+            {estimatedFinish.isAvailable && estimatedFinish.finishDate ? (
+              <p className="text-xs text-muted-foreground">
+                {formatEstimateConfidence(estimatedFinish.confidence)} · Based on{" "}
+                {estimatedFinish.readingSessionCount} reading session
+                {estimatedFinish.readingSessionCount === 1 ? "" : "s"} and your average speed for
+                this book.
+              </p>
+            ) : null}
+            {estimatedFinish.isAvailable && estimatedFinish.finishDate ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AnalyticsStatBox
+                  label="Finish date"
+                  value={formatFinishDate(estimatedFinish.finishDate)}
+                  icon={CalendarClock}
+                />
+                <AnalyticsStatBox
+                  label="Reading time left"
+                  value={
+                    estimatedFinish.remainingMinutes
+                      ? formatReadingTime(estimatedFinish.remainingMinutes) ?? "Not enough timed sessions"
+                      : "Not enough timed sessions"
+                  }
+                  icon={ClockFading}
+                />
+              </div>
+            ) : (
+              <AnalyticsStatBox
+                label="Estimated Finish"
+                value="Not enough data yet"
+                detail={`Log at least ${MIN_READING_LOGS_FOR_ESTIMATED_FINISH} progress updates to estimate this.`}
+                icon={CalendarClock}
+              />
             )}
           </section>
         )}
 
       <section className="space-y-3">
-        <p className="text-sm font-medium">Time-based stats</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-md border bg-background/80 px-2 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Total time spent reading
-            </p>
-            <p className="mt-1 text-sm font-medium">{totalReadingTimeLabel}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">
+            {timelineMode === "progress" ? "Progress over time" : "Speed over time"}
+          </p>
+          <div className="inline-flex rounded-md bg-background p-1">
+            {(["progress", "speed"] as ProgressOverTimeChartMode[]).map((mode) => (
+              <Button
+                key={mode}
+                type="button"
+                variant={timelineMode === mode ? "default" : "ghost"}
+                size="xs"
+                onClick={() => setTimelineMode(mode)}
+              >
+                {mode === "progress" ? "Progress" : "Speed"}
+              </Button>
+            ))}
           </div>
-          <div className="rounded-md border bg-background/80 px-2 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reading duration</p>
-            <p className="mt-1 text-sm font-medium">{readingDurationLabel}</p>
-            {readingDuration.isAvailable && readingDuration.isInProgress && (
-              <p className="mt-0.5 text-xs text-muted-foreground">In progress (to today)</p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-sm font-medium">Progress over time</p>
         </div>
 
         <ProgressOverTimeChart
           logs={logs}
           totalPages={book.total_pages}
           pausePeriods={book.pause_periods}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-sm font-medium">Pages read per day</p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-md border bg-background/80 px-2 py-1.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total pages</p>
-            <p className="text-sm font-medium">{totalPagesRead}</p>
-          </div>
-          <div className="rounded-md border bg-background/80 px-2 py-1.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Active days</p>
-            <p className="text-sm font-medium">{activeDays}</p>
-          </div>
-          <div className="rounded-md border bg-background/80 px-2 py-1.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg/day</p>
-            <p className="text-sm font-medium">{avgPerDay.toFixed(1)}</p>
-          </div>
-        </div>
-
-        <VerticalBarChart
-          data={chartPoints.map((point) => ({
-            key: point.dayKey,
-            label: point.dayLabel,
-            value: point.pagesRead,
-          }))}
-          formatValue={(value) => `${Math.round(value)} page${Math.round(value) === 1 ? "" : "s"}`}
-          yAxisClassName="grid-cols-[2rem_1fr]"
+          mode={timelineMode}
         />
       </section>
 

@@ -209,6 +209,10 @@
 }
 
 @layer utilities {
+  .detail-image-color-band {
+    background: color-mix(in srgb, var(--detail-image-color, var(--primary)) 18%, transparent);
+  }
+
   .journal-markdown {
     overflow-wrap: anywhere;
   }

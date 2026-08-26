@@ -1,5 +1,5 @@
 import { parsePublicationDate } from "@/lib/publicationDate";
-import type { BookMetadataSource, PublicationDatePrecision } from "@/types";
+import type { BookMetadataSource } from "@/types";
 
 export { parsePublicationDate } from "@/lib/publicationDate";
 
@@ -11,9 +11,7 @@ export interface BookLookupResult {
   language?: string;
   format?: string;
   coverUrl?: string;
-  publisher?: string;
   publicationDate?: string;
-  publicationDatePrecision?: PublicationDatePrecision;
   description?: string;
   metadataSource: BookMetadataSource;
   metadataSourceUrl: string;
@@ -27,7 +25,6 @@ interface OpenLibraryBooksResponse {
         number_of_pages?: number;
         subjects?: { name?: string }[];
         languages?: { key?: string }[];
-        publishers?: { name?: string }[];
         publish_date?: string;
         description?: string | { value?: string };
         excerpts?: { text?: string }[];
@@ -44,7 +41,6 @@ interface GoogleBooksVolume {
       pageCount?: number;
       categories?: string[];
       language?: string;
-      publisher?: string;
       publishedDate?: string;
       description?: string;
     };
@@ -126,7 +122,6 @@ async function fetchOpenLibraryMetadata(isbn: string): Promise<BookLookupResult 
   const language = book.languages
     ?.map((item) => mapLanguage(languageKeyToCode(item.key)))
     .find(Boolean);
-  const publisher = uniqueClean(book.publishers?.map((publisherItem) => publisherItem.name ?? ""))[0];
   const publicationDate = parsePublicationDate(book.publish_date);
 
   return {
@@ -135,9 +130,7 @@ async function fetchOpenLibraryMetadata(isbn: string): Promise<BookLookupResult 
     totalPages: book.number_of_pages,
     genres: genres.length > 0 ? genres : undefined,
     language,
-    publisher,
     publicationDate: publicationDate?.date,
-    publicationDatePrecision: publicationDate?.precision,
     description: getOpenLibraryDescription(book.description, book.excerpts),
     metadataSource: "open_library",
     metadataSourceUrl: url,
@@ -164,9 +157,7 @@ async function fetchGoogleBooksMetadata(isbn: string): Promise<BookLookupResult 
     totalPages: info.pageCount,
     genres: genres.length > 0 ? genres : undefined,
     language: mapLanguage(info.language),
-    publisher: cleanText(info.publisher),
     publicationDate: publicationDate?.date,
-    publicationDatePrecision: publicationDate?.precision,
     description: cleanText(info.description),
     metadataSource: "google_books",
     metadataSourceUrl: item.selfLink ?? url,

@@ -115,7 +115,6 @@ type LibraryFilterKey =
   | "progress"
   | "format"
   | "language"
-  | "publisher"
   | "source"
   | "series"
   | "author"
@@ -165,7 +164,6 @@ const filterKeys: LibraryFilterKey[] = [
   "progress",
   "format",
   "language",
-  "publisher",
   "source",
   "series",
   "author",
@@ -181,7 +179,6 @@ const filterLabels: Record<LibraryFilterKey, string> = {
   progress: "Progress",
   format: "Format",
   language: "Language",
-  publisher: "Publisher",
   source: "Source",
   series: "Series",
   author: "Author",
@@ -464,7 +461,6 @@ function downloadBooksCsv(books: Book[]) {
     "Language",
     "Format",
     "Source",
-    "Publisher",
     "Publication Date",
     "Description",
     "ISBN",
@@ -483,8 +479,7 @@ function downloadBooksCsv(books: Book[]) {
     book.language ?? "",
     book.format ?? "",
     book.source ?? "",
-    book.publisher ?? "",
-    book.publication_date ?? "",
+    getPublicationYear(book) ?? "",
     book.description ?? "",
     book.isbn ?? "",
   ]);
@@ -834,7 +829,6 @@ function getLibraryFilters(searchParams: URLSearchParams): LibraryFilters {
     progress: getFilterValues(searchParams, "progress"),
     format: getFilterValues(searchParams, "format"),
     language: getFilterValues(searchParams, "language"),
-    publisher: getFilterValues(searchParams, "publisher"),
     source: getFilterValues(searchParams, "source"),
     series: getFilterValues(searchParams, "series"),
     author: getFilterValues(searchParams, "author"),
@@ -868,7 +862,6 @@ function buildLibraryFilterOptions(books: Book[], series: Series[]): LibraryFilt
     progress: progressFilterOptions,
     format: uniqueSortedValues(books.map((book) => book.format)),
     language: uniqueSortedValues(books.map((book) => book.language)),
-    publisher: uniqueSortedValues(books.map((book) => book.publisher)),
     source: uniqueSortedValues(books.map((book) => book.source)),
     series: uniqueSortedValues(books.map((book) => (book.series_id ? seriesById.get(book.series_id) : null))),
     author: uniqueSortedValues(books.flatMap((book) => book.authors)),
@@ -909,7 +902,6 @@ function bookMatchesLibraryFilters(book: Book, filters: LibraryFilters, series: 
   if (!matchesAnyFilterValue(filters.publicationYear, (filter) => getPublicationYear(book) === filter)) return false;
   if (!matchesAnyFilterValue(filters.format, (filter) => book.format === filter)) return false;
   if (!matchesAnyFilterValue(filters.language, (filter) => book.language === filter)) return false;
-  if (!matchesAnyFilterValue(filters.publisher, (filter) => book.publisher === filter)) return false;
   if (!matchesAnyFilterValue(filters.source, (filter) => book.source === filter)) return false;
   if (!matchesAnyFilterValue(filters.series, (filter) => getSeriesName(book, series) === filter)) return false;
   if (!matchesAnyFilterValue(filters.author, (filter) => book.authors.includes(filter))) return false;
@@ -1319,14 +1311,6 @@ function AllFilterFields({
           value={filters.format}
           options={filterOptions.format}
           onChange={(value) => onFilterChange("format", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Publisher"
-          value={filters.publisher}
-          options={filterOptions.publisher}
-          onChange={(value) => onFilterChange("publisher", value)}
           emptyLabel="--"
           mutedEmptyValue
         />

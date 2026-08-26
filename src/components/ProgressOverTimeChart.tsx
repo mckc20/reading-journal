@@ -1,13 +1,43 @@
 import { useId, useMemo, useState } from "react";
 import { PauseCircle } from "lucide-react";
-import { buildProgressTimeline } from "@/lib/bookAnalytics";
+import {
+  buildProgressTimeline,
+  formatPagesPerHour,
+  getPagesPerHour,
+} from "@/lib/bookAnalytics";
+import type { ProgressTimelinePoint } from "@/lib/bookAnalytics";
 import type { BookPausePeriod, ReadingLog } from "@/types";
+
+export type ProgressOverTimeChartMode = "progress" | "speed";
 
 interface ProgressOverTimeChartProps {
   logs: ReadingLog[];
   totalPages?: number;
   pausePeriods?: BookPausePeriod[];
+  mode?: ProgressOverTimeChartMode;
 }
+
+interface SpeedTimelinePoint {
+  dayKey: string;
+  value: number;
+}
+
+interface BaseChartPoint {
+  dayKey: string;
+  value: number;
+  x: number;
+  y: number;
+}
+
+interface ProgressChartPoint extends BaseChartPoint, ProgressTimelinePoint {
+  mode: "progress";
+}
+
+interface SpeedChartPoint extends BaseChartPoint {
+  mode: "speed";
+}
+
+type ChartPoint = ProgressChartPoint | SpeedChartPoint;
 
 function dayFromKey(dayKey: string): Date {
   const [year, month, day] = dayKey.split("-").map(Number);
@@ -26,48 +56,111 @@ function formatFullDayLabel(dayKey: string): string {
   });
 }
 
+function toLocalDayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildSpeedTimeline(logs: ReadingLog[]): SpeedTimelinePoint[] {
+  let previousPage = 0;
+  const dailyTotals = new Map<string, { pages: number; minutes: number }>();
+  const sortedLogs = [...logs].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
+  );
+
+  for (const log of sortedLogs) {
+    const pagesRead = Math.max(0, log.current_page - previousPage);
+    previousPage = log.current_page;
+    if (!log.reading_time_minutes || log.reading_time_minutes <= 0) continue;
+
+    const dayKey = toLocalDayKey(new Date(log.logged_at));
+    const current = dailyTotals.get(dayKey) ?? { pages: 0, minutes: 0 };
+    dailyTotals.set(dayKey, {
+      pages: current.pages + pagesRead,
+      minutes: current.minutes + log.reading_time_minutes,
+    });
+  }
+
+  const keys = [...dailyTotals.keys()].sort();
+  if (keys.length === 0) return [];
+
+  const first = dayFromKey(keys[0]);
+  const last = dayFromKey(keys[keys.length - 1]);
+  const points: SpeedTimelinePoint[] = [];
+  const cursor = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+
+  while (cursor <= last) {
+    const dayKey = toLocalDayKey(cursor);
+    const total = dailyTotals.get(dayKey);
+    const speed = getPagesPerHour({
+      pages: total?.pages,
+      readingMinutes: total?.minutes,
+    });
+
+    points.push({
+      dayKey,
+      value: speed ?? 0,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return points;
+}
+
 export default function ProgressOverTimeChart({
   logs,
   totalPages,
   pausePeriods = [],
+  mode = "progress",
 }: ProgressOverTimeChartProps) {
-  const [activeProgressIndex, setActiveProgressIndex] = useState<number | null>(null);
-  const gradientId = `progress-fill-${useId().replace(/:/g, "")}`;
+  const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+  const gradientId = `timeline-fill-${useId().replace(/:/g, "")}`;
   const progressTimeline = useMemo(
     () => buildProgressTimeline(logs, totalPages, pausePeriods),
     [logs, pausePeriods, totalPages],
   );
+  const speedTimeline = useMemo(() => buildSpeedTimeline(logs), [logs]);
+  const isSpeedMode = mode === "speed";
 
-  const progressChartHeight = 176;
+  const chartHeight = 176;
   const progressDatePoints = useMemo(
     () => progressTimeline.points.filter((point) => !point.isStart),
     [progressTimeline.points],
   );
+  const speedDatePoints = speedTimeline;
+  const datePoints = isSpeedMode ? speedDatePoints : progressDatePoints;
+  const maxSpeed = Math.max(...speedTimeline.map((point) => point.value), 0);
+  const yAxisMax = isSpeedMode ? Math.max(maxSpeed, 1) : 100;
+  const yAxisLabels = isSpeedMode
+    ? [yAxisMax, yAxisMax / 2, 0].map((value) => formatPagesPerHour(value))
+    : ["100%", "50%", "0%"];
   const progressStartOffsetPercent = 1.5;
 
-  const getProgressXPercent = (dayKey: string, isStart = false): number => {
-    const index = progressDatePoints.findIndex((point) => point.dayKey === dayKey);
+  const getXPercent = (dayKey: string, isStart = false): number => {
+    const index = datePoints.findIndex((point) => point.dayKey === dayKey);
     if (index < 0) {
-      if (progressDatePoints.length === 0) return 0;
-      const firstDayKey = progressDatePoints[0].dayKey;
-      const lastDayKey = progressDatePoints[progressDatePoints.length - 1].dayKey;
+      if (datePoints.length === 0) return 0;
+      const firstDayKey = datePoints[0].dayKey;
+      const lastDayKey = datePoints[datePoints.length - 1].dayKey;
       if (dayKey < firstDayKey) return 0;
       if (dayKey > lastDayKey) return 100;
       return 0;
     }
-    if (progressDatePoints.length === 1) {
+    if (datePoints.length === 1) {
       return isStart ? 50 - progressStartOffsetPercent : 50;
     }
 
     const dateX =
       progressStartOffsetPercent +
-      (index / (progressDatePoints.length - 1)) * (100 - progressStartOffsetPercent);
+      (index / (datePoints.length - 1)) * (100 - progressStartOffsetPercent);
     return isStart ? Math.max(0, dateX - progressStartOffsetPercent) : dateX;
   };
 
   const pauseBands = progressTimeline.pauseSegments.map((segment, index) => {
-    const startX = getProgressXPercent(segment.startDayKey);
-    const endX = Math.max(startX + 3, getProgressXPercent(segment.endDayKey));
+    const startX = getXPercent(segment.startDayKey);
+    const endX = Math.max(startX + 3, getXPercent(segment.endDayKey));
     return {
       key: `${segment.startDayKey}-${segment.endDayKey}-${index}`,
       startX,
@@ -76,41 +169,44 @@ export default function ProgressOverTimeChart({
     };
   });
 
-  const progressPoints = progressTimeline.points.map((point) => {
-    const x = getProgressXPercent(point.dayKey, point.isStart);
-    const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-    return { ...point, x, y };
-  });
-  const progressLinePoints = progressPoints
+  const chartPoints: ChartPoint[] = isSpeedMode
+    ? speedTimeline.map((point) => {
+        const x = getXPercent(point.dayKey);
+        const y = chartHeight - (point.value / yAxisMax) * chartHeight;
+        return { ...point, mode: "speed", x, y };
+      })
+    : progressTimeline.points.map((point) => {
+        const x = getXPercent(point.dayKey, point.isStart);
+        const y = chartHeight - (point.progressPercent / 100) * chartHeight;
+        return { ...point, mode: "progress", value: point.progressPercent, x, y };
+      });
+  const linePoints = chartPoints
     .map((point) => `${point.x},${point.y}`)
     .join(" ");
-  const progressAreaPoints =
-    progressPoints.length > 0
-      ? `0,${progressChartHeight} ${progressPoints.map((point) => `${point.x},${point.y}`).join(" ")} 100,${progressChartHeight}`
+  const areaPoints =
+    chartPoints.length > 0
+      ? `0,${chartHeight} ${chartPoints.map((point) => `${point.x},${point.y}`).join(" ")} 100,${chartHeight}`
       : "";
 
-  const activeProgressPoint =
-    activeProgressIndex === null ? null : progressTimeline.points[activeProgressIndex] ?? null;
-  const activeProgressXPercent =
-    activeProgressPoint === null
-      ? 0
-      : getProgressXPercent(activeProgressPoint.dayKey, activeProgressPoint.isStart);
-  const activeProgressTooltipTransform =
-    activeProgressXPercent < 8
+  const activePoint =
+    activePointIndex === null ? null : chartPoints[activePointIndex] ?? null;
+  const activePointXPercent = activePoint === null ? 0 : activePoint.x;
+  const activeTooltipTransform =
+    activePointXPercent < 8
       ? "translateX(0)"
-      : activeProgressXPercent > 92
+      : activePointXPercent > 92
         ? "translateX(-100%)"
         : "translateX(-50%)";
 
-  const progressLabelStep = useMemo(() => {
-    if (progressDatePoints.length <= 14) return 1;
-    if (progressDatePoints.length <= 28) return 2;
-    if (progressDatePoints.length <= 42) return 3;
-    if (progressDatePoints.length <= 56) return 4;
+  const labelStep = useMemo(() => {
+    if (datePoints.length <= 14) return 1;
+    if (datePoints.length <= 28) return 2;
+    if (datePoints.length <= 42) return 3;
+    if (datePoints.length <= 56) return 4;
     return 7;
-  }, [progressDatePoints.length]);
+  }, [datePoints.length]);
 
-  if (!progressTimeline.isAvailable) {
+  if (!isSpeedMode && !progressTimeline.isAvailable) {
     return (
       <div className="rounded-md border bg-background/80 p-3">
         <p className="text-sm font-medium">Total pages needed</p>
@@ -121,7 +217,7 @@ export default function ProgressOverTimeChart({
     );
   }
 
-  if (progressTimeline.points.length === 0) {
+  if (!isSpeedMode && progressTimeline.points.length === 0) {
     return (
       <div className="rounded-md border bg-background/80 p-3">
         <p className="text-sm font-medium">No reading log entries yet</p>
@@ -132,12 +228,23 @@ export default function ProgressOverTimeChart({
     );
   }
 
+  if (isSpeedMode && maxSpeed <= 0) {
+    return (
+      <div className="rounded-md border bg-background/80 p-3">
+        <p className="text-sm font-medium">No speed data yet</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Add reading time to your progress entries to see reading speed over time.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-[2.5rem_1fr] gap-2">
+    <div className={isSpeedMode ? "grid grid-cols-[4.5rem_1fr] gap-2" : "grid grid-cols-[2.5rem_1fr] gap-2"}>
       <div className="flex h-44 flex-col justify-between text-[10px] text-muted-foreground">
-        <span>100%</span>
-        <span>50%</span>
-        <span>0%</span>
+        {yAxisLabels.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
       </div>
 
       <div className="min-w-0">
@@ -167,30 +274,42 @@ export default function ProgressOverTimeChart({
               </div>
             ))}
 
-            {activeProgressPoint && (
+            {activePoint && (
               <div
                 className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
                 style={{
-                  left: `${activeProgressXPercent}%`,
-                  transform: activeProgressTooltipTransform,
+                  left: `${activePointXPercent}%`,
+                  transform: activeTooltipTransform,
                 }}
               >
-                {activeProgressPoint.isStart
-                  ? "Start"
-                  : formatFullDayLabel(activeProgressPoint.dayKey)}
-                : {activeProgressPoint.progressPercent}% · page{" "}
-                {activeProgressPoint.currentPage}
+                {activePoint.mode === "progress" ? (
+                  <>
+                    {activePoint.isStart
+                      ? "Start"
+                      : formatFullDayLabel(activePoint.dayKey)}
+                    : {activePoint.progressPercent}% · page {activePoint.currentPage}
+                  </>
+                ) : (
+                  <>
+                    {formatFullDayLabel(activePoint.dayKey)}:{" "}
+                    {formatPagesPerHour(activePoint.value)}
+                  </>
+                )}
               </div>
             )}
 
             <svg
               className="absolute inset-0 z-[2] overflow-visible"
               width="100%"
-              height={progressChartHeight}
-              viewBox={`0 0 100 ${progressChartHeight}`}
+              height={chartHeight}
+              viewBox={`0 0 100 ${chartHeight}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Line chart showing book progress through time"
+              aria-label={
+                isSpeedMode
+                  ? "Line chart showing reading speed through time"
+                  : "Line chart showing book progress through time"
+              }
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
@@ -199,9 +318,9 @@ export default function ProgressOverTimeChart({
                   <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <polygon points={progressAreaPoints} fill={`url(#${gradientId})`} />
+              <polygon points={areaPoints} fill={`url(#${gradientId})`} />
               <polyline
-                points={progressLinePoints}
+                points={linePoints}
                 fill="none"
                 stroke="var(--primary)"
                 strokeWidth="2.5"
@@ -211,25 +330,30 @@ export default function ProgressOverTimeChart({
               />
             </svg>
 
-            {progressTimeline.points.map((point, index) => {
-              const nextPoint = progressTimeline.points[index + 1];
+            {chartPoints.map((point, index) => {
+              const isProgressPoint = point.mode === "progress";
+              const nextPoint = isProgressPoint ? chartPoints[index + 1] : null;
               const isDayBeforeProgressIncrease =
+                isProgressPoint &&
                 !point.isStart &&
                 !point.hasProgressIncrease &&
-                !!nextPoint?.hasProgressIncrease;
-              const showMarker =
-                point.isStart || point.hasProgressIncrease || isDayBeforeProgressIncrease;
-              const x = getProgressXPercent(point.dayKey, point.isStart);
-              const y = progressChartHeight - (point.progressPercent / 100) * progressChartHeight;
-              const label = point.isStart
-                ? `Start: ${point.progressPercent}% progress`
-                : `${formatFullDayLabel(point.dayKey)}: ${point.progressPercent}% progress, page ${
-                    point.currentPage
-                  }`;
+                !!nextPoint &&
+                nextPoint.mode === "progress" &&
+                nextPoint.hasProgressIncrease;
+              const showMarker = isProgressPoint
+                ? point.isStart || point.hasProgressIncrease || isDayBeforeProgressIncrease
+                : point.value > 0;
+              const label = isProgressPoint
+                ? point.isStart
+                  ? `Start: ${point.progressPercent}% progress`
+                  : `${formatFullDayLabel(point.dayKey)}: ${point.progressPercent}% progress, page ${
+                      point.currentPage
+                    }`
+                : `${formatFullDayLabel(point.dayKey)}: ${formatPagesPerHour(point.value)}`;
 
               return (
                 <button
-                  key={`${point.dayKey}-${point.currentPage}-${index}`}
+                  key={`${point.dayKey}-${point.value}-${index}`}
                   type="button"
                   className={
                     showMarker
@@ -237,16 +361,16 @@ export default function ProgressOverTimeChart({
                       : "absolute z-[3] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   }
                   style={{
-                    left: `${x}%`,
-                    top: `${y}px`,
+                    left: `${point.x}%`,
+                    top: `${point.y}px`,
                     borderColor: showMarker
                       ? "color-mix(in oklch, var(--muted) 20%, var(--background))"
                       : "transparent",
                   }}
-                  onMouseEnter={() => setActiveProgressIndex(index)}
-                  onMouseLeave={() => setActiveProgressIndex(null)}
-                  onFocus={() => setActiveProgressIndex(index)}
-                  onBlur={() => setActiveProgressIndex(null)}
+                  onMouseEnter={() => setActivePointIndex(index)}
+                  onMouseLeave={() => setActivePointIndex(null)}
+                  onFocus={() => setActivePointIndex(index)}
+                  onBlur={() => setActivePointIndex(null)}
                   aria-label={label}
                 />
               );
@@ -254,13 +378,13 @@ export default function ProgressOverTimeChart({
           </div>
 
           <div className="relative h-4 w-full">
-            {progressDatePoints.map((point, index) => {
-              const x = getProgressXPercent(point.dayKey);
+            {datePoints.map((point, index) => {
+              const x = getXPercent(point.dayKey);
               const shouldShow =
-                progressDatePoints.length <= 10 ||
+                datePoints.length <= 10 ||
                 index === 0 ||
-                index === progressDatePoints.length - 1 ||
-                index % progressLabelStep === 0;
+                index === datePoints.length - 1 ||
+                index % labelStep === 0;
               const label = formatDayLabel(dayFromKey(point.dayKey));
 
               return (

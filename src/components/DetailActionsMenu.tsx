@@ -31,6 +31,7 @@ interface DetailActionsMenuProps {
   deleteDescription: string;
   deleteConfirmLabel?: string;
   className?: string;
+  buttonClassName?: string;
 }
 
 function entityLabel(kind: DetailKind): string {
@@ -53,6 +54,7 @@ export default function DetailActionsMenu({
   deleteDescription,
   deleteConfirmLabel = "Delete",
   className,
+  buttonClassName,
 }: DetailActionsMenuProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -131,7 +133,10 @@ export default function DetailActionsMenu({
         aria-label="More actions"
         aria-expanded={menuOpen}
         onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
-        className="h-8 w-8 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-transparent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0"
+        className={cn(
+          "h-8 w-8 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-transparent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
+          buttonClassName,
+        )}
       >
         <MoreVertical className="h-5 w-5" />
       </Button>

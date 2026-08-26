@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
 } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
@@ -22,6 +23,8 @@ import {
   PauseCircle,
   RefreshCw,
   Star,
+  Languages,
+  Tags,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -35,8 +38,6 @@ import GenreMultiSelect from "@/components/GenreMultiSelect";
 import JournalTimeline from "@/components/JournalTimeline";
 import {
   buildBookLibraryFilterPath,
-  MetadataGroup,
-  MetadataItem,
   MetadataLink,
 } from "@/components/LinkedMetadata";
 import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
@@ -60,6 +61,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
+import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatCalendarSpan,
@@ -84,7 +86,6 @@ import {
   formatPublicationDateForDisplay,
   formatPublicationDateInput,
   parsePublicationDateInput,
-  trimPublicationDateInputForPrecision,
 } from "@/lib/publicationDate";
 import { bookHasGenreName, getBookGenreNames, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
@@ -99,7 +100,6 @@ import type {
   BookJournalEntryRecord,
   BookSource,
   BookStatus,
-  PublicationDatePrecision,
   ReadingLog,
 } from "@/types";
 
@@ -113,9 +113,7 @@ interface FormValues {
   format: BookFormat | "";
   source: BookSource | "";
   total_pages: string;
-  publisher: string;
   publication_date: string;
-  publication_date_precision: PublicationDatePrecision | "";
   description: string;
   date_started: string;
   date_finished: string;
@@ -150,12 +148,7 @@ function bookToFormValues(book: Book): FormValues {
     format: book.format ?? "",
     source: book.source ?? "",
     total_pages: book.total_pages?.toString() ?? "",
-    publisher: book.publisher ?? "",
-    publication_date: formatPublicationDateInput(
-      book.publication_date,
-      book.publication_date_precision,
-    ),
-    publication_date_precision: book.publication_date_precision ?? "",
+    publication_date: formatPublicationDateInput(book.publication_date),
     description: book.description ?? "",
     date_started: book.date_started ?? "",
     date_finished: book.date_finished ?? "",
@@ -215,6 +208,7 @@ export default function BookDetails() {
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+  const dominantCoverColor = useDominantImageColor(book?.cover_url);
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const linkedGenres = useMemo(() => {
     if (!book?.selected_genres?.length) return [];
@@ -340,8 +334,6 @@ export default function BookDetails() {
   }, [bookId]);
 
   const watchedSeriesId = watch("series_id");
-  const publicationDate = watch("publication_date") ?? "";
-  const publicationDatePrecision = watch("publication_date_precision") ?? "";
   const progressPercent = book ? getProgressPercent(book) : 0;
   const totalReadingMinutes = useMemo(() => sumReadingMinutes(readingLogs), [readingLogs]);
   const readingDuration = useMemo(
@@ -548,24 +540,15 @@ export default function BookDetails() {
     if (dirtyFields.total_pages) {
       payload.total_pages = values.total_pages ? Number(values.total_pages) : undefined;
     }
-    if (dirtyFields.publisher) payload.publisher = values.publisher.trim() || undefined;
-    if (dirtyFields.publication_date || dirtyFields.publication_date_precision) {
-      const parsedPublicationDate = parsePublicationDateInput(
-        values.publication_date,
-        values.publication_date_precision,
-      );
-      if (values.publication_date.trim() && !values.publication_date_precision) {
-        setError("publication_date", { message: "Select which parts of the date count." });
-        return;
-      }
+    if (dirtyFields.publication_date) {
+      const parsedPublicationDate = parsePublicationDateInput(values.publication_date);
       if (values.publication_date.trim() && !parsedPublicationDate) {
         setError("publication_date", {
-          message: "Use YYYY, YYYY-MM, or YYYY-MM-DD to match the selected boxes.",
+          message: "Use a four-digit year, like 2020.",
         });
         return;
       }
       payload.publication_date = parsedPublicationDate?.date ?? null;
-      payload.publication_date_precision = parsedPublicationDate?.precision ?? null;
     }
     if (dirtyFields.description) payload.description = values.description.trim() || undefined;
     if (dirtyFields.date_started) payload.date_started = values.date_started || undefined;
@@ -620,19 +603,6 @@ export default function BookDetails() {
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
-  }
-
-  function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
-    setValue(
-      "publication_date",
-      trimPublicationDateInputForPrecision(publicationDate, nextPrecision),
-      { shouldDirty: true, shouldTouch: true },
-    );
-    setValue("publication_date_precision", nextPrecision, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    clearErrors("publication_date");
   }
 
   const quoteJournalEntries = useMemo(
@@ -699,7 +669,10 @@ export default function BookDetails() {
         <p className="max-w-md text-sm text-muted-foreground">
           This book may not exist, may have been deleted, or you may not have access.
         </p>
-        <BackButton fallbackTo="/library" />
+        <BackButton
+          fallbackTo="/library"
+          className="hover:bg-transparent hover:text-foreground/80"
+        />
       </div>
     );
   }
@@ -707,7 +680,10 @@ export default function BookDetails() {
   if (isEditMode) {
     return (
       <div className="space-y-6">
-        <BackButton fallbackTo="/library" />
+        <BackButton
+          fallbackTo="/library"
+          className="hover:bg-background/20 hover:text-foreground"
+        />
 
         {errorMsg && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -730,8 +706,6 @@ export default function BookDetails() {
           errors={errors}
           series={series}
           watchedSeriesId={watchedSeriesId}
-          publicationDatePrecision={publicationDatePrecision}
-          updatePublicationDatePrecision={updatePublicationDatePrecision}
           clearPublicationDateError={() => clearErrors("publication_date")}
           uploadingCover={uploadingCover}
           handleCoverChange={handleCoverChange}
@@ -746,13 +720,27 @@ export default function BookDetails() {
   const totalPages = book.total_pages ?? 0;
   const isPaused = book.status === "Paused";
   const isReading = book.status === "Reading";
+  const hasSecondaryMetadata = Boolean(publicationYear || book.source || book.isbn);
   const readingProgressStats: ProgressStat[] =
-    isReading || isPaused
+    isReading
       ? [
           {
             icon: Calendar,
             label: "Started On",
             value: formatDateForDisplay(book.date_started),
+          },
+          {
+            icon: CalendarClock,
+            label: "Estimated Finish",
+            value:
+              estimatedFinish.isAvailable && estimatedFinish.finishDate
+                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
+                : "Not available",
+          },
+          {
+            icon: Clock,
+            label: "Time Reading",
+            value: formatTotalReadingTime(totalReadingMinutes),
           },
           {
             icon: TrendingUp,
@@ -764,20 +752,38 @@ export default function BookDetails() {
               }),
             ),
           },
-          {
-            icon: Clock,
-            label: "Time Reading",
-            value: formatTotalReadingTime(totalReadingMinutes),
-          },
-          {
-            icon: CalendarClock,
-            label: "Estimated Finish",
-            value:
-              estimatedFinish.isAvailable && estimatedFinish.finishDate
-                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
-                : "Not available",
-          },
         ]
+      : isPaused
+        ? [
+            {
+              icon: Calendar,
+              label: "Started On",
+              value: formatDateForDisplay(book.date_started),
+            },
+            {
+              icon: TrendingUp,
+              label: "Current Speed",
+              value: formatPagesPerHour(
+                getPagesPerHour({
+                  pages: currentPage,
+                  readingMinutes: totalReadingMinutes,
+                }),
+              ),
+            },
+            {
+              icon: Clock,
+              label: "Time Reading",
+              value: formatTotalReadingTime(totalReadingMinutes),
+            },
+            {
+              icon: CalendarClock,
+              label: "Estimated Finish",
+              value:
+                estimatedFinish.isAvailable && estimatedFinish.finishDate
+                  ? formatDateObjectForDisplay(estimatedFinish.finishDate)
+                  : "Not available",
+            },
+          ]
       : book.status === "Finished"
         ? [
             {
@@ -829,9 +835,14 @@ export default function BookDetails() {
             },
           ];
   const description = book.description?.trim() || "";
+  const detailBackgroundStyle = {
+    "--detail-image-color": dominantCoverColor,
+  } as CSSProperties;
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between gap-3">
+    <div className="relative isolate -mt-5 space-y-8 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
+      <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <BackButton fallbackTo="/library" />
 
         <DetailActionsMenu
@@ -848,10 +859,11 @@ export default function BookDetails() {
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this book?"
           deleteDescription="Are you sure you want to delete this book? This cannot be undone."
+          buttonClassName="hover:bg-background/20 hover:text-foreground aria-expanded:bg-background/25 aria-expanded:text-foreground"
         />
       </div>
 
-      <section className="grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
+      <section className="relative z-10 grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
         <div className="mx-auto w-full max-w-[240px]">
           <div
             className={cn(
@@ -898,7 +910,7 @@ export default function BookDetails() {
                 type="button"
                 onClick={toggleFavorite}
                 aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                className="mt-2 shrink-0 rounded p-1 transition-colors hover:bg-muted"
+                className="mt-2 shrink-0 rounded p-1 transition-colors hover:bg-background/20"
               >
                 <Heart
                   className={`h-5 w-5 ${
@@ -1102,109 +1114,95 @@ export default function BookDetails() {
             <AboutSection
               title={
                 <>
-                  <span className="font-serif italic">About</span> the Book
+                  <span className="font-serif italic">About</span> this book
                 </>
               }
-              text={description}
-              emptyText="No description yet."
-              clampClassName="line-clamp-6"
-            />
-
-            <div className="rounded-xl border bg-card p-5">
-              <div className="space-y-5">
-                <MetadataGroup title="Genres">
-                  {linkedGenres.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {linkedGenres.map(({ genre, slug }) => (
-                        <Badge key={genre.id} variant="outline" className="max-w-full font-normal" asChild>
-                          <Link to={`/genres/${slug}`}>{genre.name}</Link>
-                        </Badge>
-                      ))}
+              titleContent={
+                <div className="grid gap-4 pb-2 pt-1 sm:grid-cols-3">
+                  <div>
+                    <PrimaryMetadataHeading icon={Tags} title="Genres" />
+                    <div className="mt-1.5">
+                      {linkedGenres.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {linkedGenres.map(({ genre, slug }) => (
+                            <Badge key={genre.id} variant="outline" className="max-w-full font-normal" asChild>
+                              <Link to={`/genres/${slug}`}>{genre.name}</Link>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : book.genre_paths?.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {book.genre_paths.map((path) => (
+                            <Badge key={path} variant="outline" className="max-w-full font-normal">
+                              {formatGenrePathForDisplay(path)}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Not set</p>
+                      )}
                     </div>
-                  ) : book.genre_paths?.length ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {book.genre_paths.map((path) => (
-                        <Badge key={path} variant="outline" className="max-w-full font-normal">
-                          {formatGenrePathForDisplay(path)}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Not set</p>
-                  )}
-                </MetadataGroup>
+                  </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <MetadataItem
-                    label="Language"
-                    value={
-                      book.language ? (
+                  <div>
+                    <PrimaryMetadataHeading icon={Languages} title="Language" />
+                    <p className="mt-1.5 text-base">
+                      {book.language ? (
                         <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>
                           {book.language}
                         </MetadataLink>
                       ) : (
-                        "Not set"
-                      )
-                    }
-                  />
-                  <MetadataItem
-                    label="Format"
-                    value={
-                      book.format ? (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <PrimaryMetadataHeading icon={BookOpen} title="Format" />
+                    <p className="mt-1.5 text-base">
+                      {book.format ? (
                         <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>
                           {book.format}
                         </MetadataLink>
                       ) : (
-                        "Not set"
-                      )
-                    }
-                  />
-                  <MetadataItem
-                    label="Publication Date"
-                    value={
-                      publicationYear ? (
-                        <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
-                          {formatPublicationDateForDisplay(
-                            book.publication_date,
-                            book.publication_date_precision,
-                          )}
-                        </MetadataLink>
-                      ) : (
-                        formatPublicationDateForDisplay(
-                          book.publication_date,
-                          book.publication_date_precision,
-                        )
-                      )
-                    }
-                  />
-                  <MetadataItem
-                    label="Publisher"
-                    value={
-                      book.publisher ? (
-                        <MetadataLink to={buildBookLibraryFilterPath("publisher", book.publisher)}>
-                          {book.publisher}
-                        </MetadataLink>
-                      ) : (
-                        "Not set"
-                      )
-                    }
-                  />
-                  <MetadataItem
-                    label="Source"
-                    value={
-                      book.source ? (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              }
+              text={description}
+              emptyText=""
+              clampClassName="line-clamp-6"
+            />
+
+            {hasSecondaryMetadata && (
+              <div className="rounded-xl border p-5 lg:mt-12">
+                <div className="divide-y divide-border">
+                  {book.source && (
+                    <SecondaryMetadataRow
+                      label="Source"
+                      value={
                         <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>
                           {book.source}
                         </MetadataLink>
-                      ) : (
-                        "Not set"
-                      )
-                    }
-                  />
-                  <MetadataItem label="ISBN" value={book.isbn || "Not set"} />
+                      }
+                    />
+                  )}
+                  {publicationYear && (
+                    <SecondaryMetadataRow
+                      label="Publication Date"
+                      value={
+                        <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
+                          {formatPublicationDateForDisplay(book.publication_date)}
+                        </MetadataLink>
+                      }
+                    />
+                  )}
+                  {book.isbn && <SecondaryMetadataRow label="ISBN" value={book.isbn} />}
                 </div>
               </div>
-            </div>
+            )}
           </section>
 
           <section className="space-y-4">
@@ -1221,9 +1219,9 @@ export default function BookDetails() {
             </div>
             <ProgressStatsStrip stats={readingProgressStats} />
 
-            <div className="rounded-xl border bg-card p-5">
-              <AppHeading level={4} as="h3">Progress over time</AppHeading>
-              <div className="mt-4">
+            <div className="rounded-xl pt-2">
+              <p className="text-sm font-medium">Progress over time</p>
+              <div className="mt-3">
                 {logsLoading ? (
                   <div className="h-52 animate-pulse rounded-lg bg-muted" />
                 ) : logsError ? (
@@ -1312,7 +1310,7 @@ export default function BookDetails() {
                 }
                 books={relatedByGenre}
               />
-              <div className="rounded-xl border bg-card p-4">
+              <div className="rounded-xl border p-4">
                 <AppHeading level={4} as="h3">
                   You Might Also <span className="font-serif italic">Like</span>
                 </AppHeading>
@@ -1365,11 +1363,41 @@ function ProgressStatItem({
   );
 }
 
+function PrimaryMetadataHeading({
+  icon: Icon,
+  title,
+}: {
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
+      <Icon className="h-3.5 w-3.5 text-primary" />
+      {title}
+    </h3>
+  );
+}
+
+function SecondaryMetadataRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-baseline">
+      <p className="font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">{label}</p>
+      <p className="min-w-0 text-sm">{value}</p>
+    </div>
+  );
+}
+
 function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Book[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border p-4">
       <AppHeading level={4} as="h3">{title}</AppHeading>
       {books.length === 0 ? (
         <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
@@ -1405,8 +1433,6 @@ function EditDetailsForm({
   errors,
   series,
   watchedSeriesId,
-  publicationDatePrecision,
-  updatePublicationDatePrecision,
   clearPublicationDateError,
   uploadingCover,
   handleCoverChange,
@@ -1426,8 +1452,6 @@ function EditDetailsForm({
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
   series: { id: string; name: string }[];
   watchedSeriesId: string;
-  publicationDatePrecision: PublicationDatePrecision | "";
-  updatePublicationDatePrecision: (precision: PublicationDatePrecision | "") => void;
   clearPublicationDateError: () => void;
   uploadingCover: boolean;
   handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -1506,56 +1530,31 @@ function EditDetailsForm({
 
         <div className="md:col-span-2 grid gap-4 sm:grid-cols-2">
           <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
-          <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
-          <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
           <div className="space-y-1.5">
             <Label htmlFor="detail-total-pages">Total pages</Label>
             <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
           </div>
 
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="detail-publisher">Publisher</Label>
-            <Input id="detail-publisher" {...register("publisher")} />
-          </div>
+          <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
 
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="detail-publication-date">Publication date</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-publication-date">Publication year</Label>
             <Input
               id="detail-publication-date"
-              placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
+              placeholder="YYYY"
+              inputMode="numeric"
+              maxLength={4}
               aria-invalid={!!errors.publication_date}
               {...register("publication_date", { onChange: clearPublicationDateError })}
             />
-            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary"
-                  checked={!!publicationDatePrecision}
-                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "year" : "")}
-                />
-                Year
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary"
-                  checked={publicationDatePrecision === "month" || publicationDatePrecision === "day"}
-                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "month" : "year")}
-                />
-                Month
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary"
-                  checked={publicationDatePrecision === "day"}
-                  onChange={(event) => updatePublicationDatePrecision(event.target.checked ? "day" : "month")}
-                />
-                Day
-              </label>
-            </div>
             {errors.publication_date && <p className="text-xs text-destructive">{errors.publication_date.message}</p>}
+          </div>
+
+          <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
+
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-isbn">ISBN</Label>
+            <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
           </div>
 
           <div className="space-y-1.5">
@@ -1603,11 +1602,6 @@ function EditDetailsForm({
               )}
             </div>
           )}
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="detail-isbn">ISBN</Label>
-            <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
-          </div>
 
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-description">Description</Label>

@@ -32,7 +32,6 @@ import { mapGenreLabelsToIds } from "@/lib/genres";
 import {
   formatPublicationDateInput,
   parsePublicationDateInput,
-  trimPublicationDateInputForPrecision,
 } from "@/lib/publicationDate";
 import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import type {
@@ -42,7 +41,6 @@ import type {
   BookSource,
   BookFormat,
   BookMetadataSource,
-  PublicationDatePrecision,
 } from "@/types";
 
 interface FormValues {
@@ -55,9 +53,7 @@ interface FormValues {
   source: BookSource | "";
   total_pages: string;
   current_page: string;
-  publisher: string;
   publication_date: string;
-  publication_date_precision: PublicationDatePrecision | "";
   description: string;
   date_started: string;
   date_finished: string;
@@ -88,7 +84,6 @@ function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: nu
     status: "To Read",
     authors: [],
     genres: [],
-    publication_date_precision: "",
     series_id: initialSeriesId ?? "",
     volume_number: initialVolumeNumber ? String(initialVolumeNumber) : "",
   };
@@ -138,8 +133,6 @@ export default function AddBookDialog({
 
   const status = watch("status");
   const seriesId = watch("series_id");
-  const publicationDate = watch("publication_date") ?? "";
-  const publicationDatePrecision = watch("publication_date_precision") ?? "";
 
   // Revoke object URL on unmount / change
   useEffect(() => {
@@ -200,11 +193,8 @@ export default function AddBookDialog({
         shouldValidate: true,
       });
       if (bookData.totalPages) setValue("total_pages", String(bookData.totalPages));
-      if (bookData.publisher) setValue("publisher", bookData.publisher);
       if (bookData.publicationDate) {
-        const precision = bookData.publicationDatePrecision ?? "day";
-        setValue("publication_date", formatPublicationDateInput(bookData.publicationDate, precision));
-        setValue("publication_date_precision", precision);
+        setValue("publication_date", formatPublicationDateInput(bookData.publicationDate));
       }
       if (bookData.description) setValue("description", bookData.description);
       if (bookData.genres) {
@@ -291,17 +281,10 @@ export default function AddBookDialog({
         setError("authors", { message: "At least one author is required" });
         return;
       }
-      const parsedPublicationDate = parsePublicationDateInput(
-        values.publication_date,
-        values.publication_date_precision,
-      );
-      if (values.publication_date.trim() && !values.publication_date_precision) {
-        setError("publication_date", { message: "Select which parts of the date count." });
-        return;
-      }
+      const parsedPublicationDate = parsePublicationDateInput(values.publication_date);
       if (values.publication_date.trim() && !parsedPublicationDate) {
         setError("publication_date", {
-          message: "Use YYYY, YYYY-MM, or YYYY-MM-DD to match the selected boxes.",
+          message: "Use a four-digit year, like 2020.",
         });
         return;
       }
@@ -325,9 +308,7 @@ export default function AddBookDialog({
           source: (values.source as BookSource) || undefined,
           total_pages: values.total_pages ? Number(values.total_pages) : undefined,
           current_page: values.current_page ? Number(values.current_page) : undefined,
-          publisher: values.publisher.trim() || undefined,
           publication_date: parsedPublicationDate?.date,
-          publication_date_precision: parsedPublicationDate?.precision,
           description: values.description.trim() || undefined,
           date_started: values.date_started || undefined,
           date_finished: values.date_finished || undefined,
@@ -386,19 +367,6 @@ export default function AddBookDialog({
 
   const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
   const showDateFinished = ["Finished", "DNF"].includes(status);
-
-  function updatePublicationDatePrecision(nextPrecision: PublicationDatePrecision | "") {
-    setValue(
-      "publication_date",
-      trimPublicationDateInputForPrecision(publicationDate, nextPrecision),
-      { shouldDirty: true, shouldTouch: true },
-    );
-    setValue("publication_date_precision", nextPrecision, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    clearErrors("publication_date");
-  }
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -611,114 +579,79 @@ export default function AddBookDialog({
                 />
               </div>
 
-              {/* Format */}
-              <div className="space-y-1.5">
-                <Label>Format</Label>
-                <Controller
-                  name="format"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select format" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Not set</SelectItem>
-                        {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
-                          (f) => (
-                            <SelectItem key={f} value={f}>
-                              {f}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
+              {/* Secondary metadata */}
+              <div className="grid gap-4 rounded-lg border bg-muted/20 p-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="publication_date">Publication year</Label>
+                  <Input
+                    id="publication_date"
+                    placeholder="YYYY"
+                    inputMode="numeric"
+                    maxLength={4}
+                    aria-invalid={!!errors.publication_date}
+                    {...register("publication_date", {
+                      onChange: () => clearErrors("publication_date"),
+                    })}
+                  />
+                  {errors.publication_date && (
+                    <p className="text-xs text-destructive">
+                      {errors.publication_date.message}
+                    </p>
                   )}
-                />
-              </div>
-
-              {/* Source */}
-              <div className="space-y-1.5">
-                <Label>Source</Label>
-                <Controller
-                  name="source"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Not set</SelectItem>
-                        {SOURCE_OPTIONS.map((source) => (
-                          <SelectItem key={source} value={source}>
-                            {source}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              {/* Publication metadata */}
-              <div className="space-y-1.5">
-                <Label htmlFor="publisher">Publisher</Label>
-                <Input id="publisher" {...register("publisher")} />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="publication_date">Publication date</Label>
-                <Input
-                  id="publication_date"
-                  placeholder="YYYY, YYYY-MM, or YYYY-MM-DD"
-                  aria-invalid={!!errors.publication_date}
-                  {...register("publication_date", {
-                    onChange: () => clearErrors("publication_date"),
-                  })}
-                />
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 accent-primary"
-                      checked={!!publicationDatePrecision}
-                      onChange={(event) =>
-                        updatePublicationDatePrecision(event.target.checked ? "year" : "")
-                      }
-                    />
-                    Year
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 accent-primary"
-                      checked={
-                        publicationDatePrecision === "month" || publicationDatePrecision === "day"
-                      }
-                      onChange={(event) =>
-                        updatePublicationDatePrecision(event.target.checked ? "month" : "year")
-                      }
-                    />
-                    Month
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 accent-primary"
-                      checked={publicationDatePrecision === "day"}
-                      onChange={(event) =>
-                        updatePublicationDatePrecision(event.target.checked ? "day" : "month")
-                      }
-                    />
-                    Day
-                  </label>
                 </div>
-                {errors.publication_date && (
-                  <p className="text-xs text-destructive">
-                    {errors.publication_date.message}
-                  </p>
-                )}
+
+                <div className="space-y-1.5">
+                  <Label>Format</Label>
+                  <Controller
+                    name="format"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select format" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Not set</SelectItem>
+                          {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
+                            (f) => (
+                              <SelectItem key={f} value={f}>
+                                {f}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Source</Label>
+                  <Controller
+                    name="source"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Not set</SelectItem>
+                          {SOURCE_OPTIONS.map((source) => (
+                            <SelectItem key={source} value={source}>
+                              {source}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>ISBN</Label>
+                  <Input value={scannedIsbn ?? manualIsbn} readOnly placeholder="Scanned or looked up ISBN" />
+                </div>
               </div>
 
               <div className="space-y-1.5">
