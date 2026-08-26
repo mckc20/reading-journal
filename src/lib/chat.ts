@@ -329,9 +329,10 @@ export async function copyChatAttachmentImage(
   targetType: "book" | "author" | "series",
   targetId: string,
   sourceBookId?: string,
+  sourceAuthorName?: string,
 ): Promise<string> {
   const { data, error } = await supabase.functions.invoke("copy-chat-attachment-image", {
-    body: { messageId, targetType, targetId, sourceBookId },
+    body: { messageId, targetType, targetId, sourceBookId, sourceAuthorName },
   });
   if (error) {
     const response = (error as { context?: Response }).context;

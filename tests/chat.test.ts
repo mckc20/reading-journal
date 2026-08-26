@@ -15,7 +15,7 @@ import {
   buildSeriesAttachment,
   noteSnapshotToCreateInput,
 } from "../src/lib/chatAttachments";
-import type { Book, BookJournalEntryRecord, Group, GroupMembership, GroupMessage } from "../src/types";
+import type { Author, Book, BookJournalEntryRecord, Group, GroupMembership, GroupMessage } from "../src/types";
 
 type TestChatThread = {
   group: Group;
@@ -138,6 +138,24 @@ test("keeps a shared book cover in the attachment and imported library payload",
 
   assert.equal(attachment.book.cover_url, "https://example.com/shared-cover.jpg");
   assert.equal(payload.cover_url, "https://example.com/shared-cover.jpg");
+});
+
+test("includes matching author profile pictures in book and series attachments", () => {
+  const author = makeAuthor({ name: "Author One", photo_url: "https://example.com/author.jpg" });
+  const book = makeBook({ authors: ["AUTHOR ONE"] });
+
+  const bookAttachment = buildBookAttachment(book, [], [author]);
+  const seriesAttachment = buildSeriesAttachment({
+    seriesName: "Shared series",
+    books: [book],
+    authorProfiles: [author],
+    includedQuotes: [],
+  });
+
+  assert.deepEqual(bookAttachment.book.author_profiles, [
+    { name: "AUTHOR ONE", photo_url: "https://example.com/author.jpg" },
+  ]);
+  assert.deepEqual(seriesAttachment.series.books[0].author_profiles, bookAttachment.book.author_profiles);
 });
 
 test("maps note snapshots to a selected target book", () => {
@@ -301,6 +319,20 @@ function makeBook(overrides: Partial<Book> = {}): Book {
     metadata_source_url: "https://example.com",
     user_id: "current-user",
     created_at: "2026-06-20T08:00:00Z",
+    ...overrides,
+  };
+}
+
+function makeAuthor(overrides: Partial<Author> = {}): Author {
+  return {
+    id: "author-1",
+    user_id: "current-user",
+    name: "Author One",
+    photo_url: null,
+    bio: null,
+    is_favorite: false,
+    created_at: "2026-06-20T08:00:00Z",
+    updated_at: "2026-06-20T08:00:00Z",
     ...overrides,
   };
 }

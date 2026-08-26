@@ -7,6 +7,7 @@ type RequestBody = {
   targetType?: ImageTargetType;
   targetId?: string;
   sourceBookId?: string;
+  sourceAuthorName?: string;
 };
 
 type StorageLocation = {
@@ -39,6 +40,7 @@ function sourceUrlForTarget(
   attachmentType: string,
   targetType: ImageTargetType,
   sourceBookId?: string,
+  sourceAuthorName?: string,
 ): string | null {
   if (targetType === "book") {
     if (attachmentType === "book") {
@@ -56,9 +58,33 @@ function sourceUrlForTarget(
     return null;
   }
   if (targetType === "author") {
-    if (attachmentType !== "author") return null;
-    const author = payload.author as Record<string, unknown> | undefined;
-    return typeof author?.photo_url === "string" ? author.photo_url : null;
+    if (attachmentType === "author") {
+      const author = payload.author as Record<string, unknown> | undefined;
+      return typeof author?.photo_url === "string" ? author.photo_url : null;
+    }
+
+    const authorPhotoForBook = (book: Record<string, unknown> | undefined): string | null => {
+      if (!sourceAuthorName) return null;
+      const profiles = Array.isArray(book?.author_profiles) ? book.author_profiles : [];
+      const author = profiles.find((profile) => (
+        typeof profile === "object"
+        && profile !== null
+        && typeof (profile as Record<string, unknown>).name === "string"
+        && (profile as Record<string, unknown>).name.toLocaleLowerCase() === sourceAuthorName.trim().toLocaleLowerCase()
+      )) as Record<string, unknown> | undefined;
+      return typeof author?.photo_url === "string" ? author.photo_url : null;
+    };
+
+    if (attachmentType === "book") return authorPhotoForBook(payload.book as Record<string, unknown> | undefined);
+    if (attachmentType === "series" && sourceBookId) {
+      const series = payload.series as Record<string, unknown> | undefined;
+      const books = Array.isArray(series?.books) ? series.books : [];
+      const book = books.find((item) => (
+        typeof item === "object" && item !== null && (item as Record<string, unknown>).id === sourceBookId
+      )) as Record<string, unknown> | undefined;
+      return authorPhotoForBook(book);
+    }
+    return null;
   }
   if (attachmentType !== "series") return null;
   const series = payload.series as Record<string, unknown> | undefined;
@@ -161,6 +187,7 @@ Deno.serve(async (request) => {
       message.attachment_type,
       body.targetType,
       body.sourceBookId,
+      body.sourceAuthorName,
     );
     if (!sourceUrl) return json({ error: "This attachment has no image to copy." }, 404);
 

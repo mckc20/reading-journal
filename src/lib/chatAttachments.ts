@@ -1,5 +1,6 @@
 import type {
   AuthorJournalEntryRecord,
+  Author,
   Book,
   BookJournalEntryRecord,
   ChatAttachmentPayload,
@@ -54,7 +55,11 @@ export function buildSharedNoteSnapshot(
 export function buildSharedBookSnapshot(
   book: Book,
   includedJournalEntries: BookJournalEntryRecord[] = [],
+  authorProfiles: Author[] = [],
 ): ChatSharedBookSnapshot {
+  const authorPhotosByName = new Map(
+    authorProfiles.map((author) => [author.name.trim().toLocaleLowerCase(), author.photo_url ?? null]),
+  );
   return {
     id: book.id,
     title: book.title,
@@ -70,6 +75,10 @@ export function buildSharedBookSnapshot(
     metadata_source: book.metadata_source ?? null,
     metadata_source_url: book.metadata_source_url ?? null,
     volume_number: book.volume_number ?? null,
+    author_profiles: book.authors.map((name) => ({
+      name,
+      photo_url: authorPhotosByName.get(name.trim().toLocaleLowerCase()) ?? null,
+    })),
     included_journalEntries: includedJournalEntries
       .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
       .map((note) => buildSharedNoteSnapshot(note, {
@@ -85,10 +94,11 @@ export function buildSharedBookSnapshot(
 export function buildBookAttachment(
   book: Book,
   includedJournalEntries: BookJournalEntryRecord[] = [],
+  authorProfiles: Author[] = [],
 ): ChatBookAttachment {
   return {
     type: "book",
-    book: buildSharedBookSnapshot(book, includedJournalEntries),
+    book: buildSharedBookSnapshot(book, includedJournalEntries, authorProfiles),
   };
 }
 
@@ -150,6 +160,7 @@ export function buildSeriesAttachment({
   seriesCoverUrl,
   seriesDescription,
   books,
+  authorProfiles = [],
   includedQuotes,
 }: {
   seriesId?: string | null;
@@ -157,6 +168,7 @@ export function buildSeriesAttachment({
   seriesCoverUrl?: string | null;
   seriesDescription?: string | null;
   books: Book[];
+  authorProfiles?: Author[];
   includedQuotes: BookJournalEntryRecord[];
 }): ChatSeriesAttachment {
   return {
@@ -167,7 +179,7 @@ export function buildSeriesAttachment({
       cover_url: seriesCoverUrl ?? null,
       authors: Array.from(new Set(books.flatMap((book) => book.authors))),
       description: seriesDescription ?? null,
-      books: books.map((book) => buildSharedBookSnapshot(book)),
+      books: books.map((book) => buildSharedBookSnapshot(book, [], authorProfiles)),
       included_quotes: includedQuotes
         .slice(0, MAX_INCLUDED_ATTACHMENT_NOTES)
         .map((note) => {

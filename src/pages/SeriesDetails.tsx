@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -793,6 +794,7 @@ export default function SeriesDetails() {
   const navigate = useNavigate();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
+  const { authors: authorRecords } = useAuthorsContext();
   const {
     books,
     loading: booksLoading,
@@ -1332,6 +1334,7 @@ export default function SeriesDetails() {
           seriesCoverUrl: seriesRecord.cover_url,
           seriesDescription: seriesRecord.description,
           books: seriesBooks,
+          authorProfiles: authorRecords,
           includedQuotes: journalEntries
             .filter((note) => note.label === "quote" && seriesBookIds.has(note.book_id))
             .slice(0, 3),

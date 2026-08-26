@@ -303,6 +303,51 @@ function importPayloadForBookSnapshot(
   return payload;
 }
 
+async function importAuthorPhotosForBookSnapshot({
+  messageId,
+  attachmentType,
+  book,
+  sourceBookId,
+  addAuthor,
+  editAuthor,
+}: {
+  messageId: string;
+  attachmentType: "book" | "series";
+  book: ChatSharedBookSnapshot;
+  sourceBookId?: string;
+  addAuthor: ReturnType<typeof useAuthorsContext>["addAuthor"];
+  editAuthor: ReturnType<typeof useAuthorsContext>["editAuthor"];
+}): Promise<string | null> {
+  let imageCopyError: string | null = null;
+
+  for (const authorSnapshot of book.author_profiles ?? []) {
+    if (!authorSnapshot.photo_url) continue;
+
+    try {
+      const savedAuthor = await addAuthor({ name: authorSnapshot.name });
+      if (savedAuthor.photo_url) continue;
+
+      const photoUrl = await copyChatAttachmentImage(
+        messageId,
+        "author",
+        savedAuthor.id,
+        attachmentType === "series" ? sourceBookId : undefined,
+        authorSnapshot.name,
+      );
+      await editAuthor(savedAuthor.id, {
+        name: savedAuthor.name,
+        bio: savedAuthor.bio ?? null,
+        is_favorite: savedAuthor.is_favorite,
+        photo_url: photoUrl,
+      });
+    } catch (copyError) {
+      imageCopyError ??= imageCopyErrorMessage(copyError);
+    }
+  }
+
+  return imageCopyError;
+}
+
 function attachmentImage(attachment: ChatAttachmentPayload): string | null {
   if (attachment.type === "book") return attachment.book.cover_url ?? null;
   if (attachment.type === "author") return attachment.author.photo_url ?? null;
@@ -1184,7 +1229,7 @@ export function GroupsManager() {
                     <p className="truncate text-sm font-medium">{book.title}</p>
                     <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={() => chooseAttachment(buildBookAttachment(book))}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => chooseAttachment(buildBookAttachment(book, [], authorRecords))}>
                     Add
                   </Button>
                 </div>
@@ -1238,6 +1283,7 @@ export function GroupsManager() {
                         seriesCoverUrl: item.cover_url,
                         seriesDescription: item.description,
                         books: booksInSeries,
+                        authorProfiles: authorRecords,
                         includedQuotes: [],
                       }))}
                     >
@@ -1389,11 +1435,18 @@ export function GroupsManager() {
           imageCopyError = imageCopyErrorMessage(copyError);
         }
       }
+      imageCopyError ??= await importAuthorPhotosForBookSnapshot({
+        messageId,
+        attachmentType: "book",
+        book,
+        addAuthor,
+        editAuthor,
+      });
       await markAttachmentSaved(messageId);
       setStatusMessage(
         imageCopyError
-          ? `Book saved, but its cover could not be copied: ${imageCopyError}`
-          : "Book and cover saved to your library.",
+          ? `Book saved, but one or more images could not be copied: ${imageCopyError}`
+          : "Book, cover, and author profile pictures saved to your library.",
       );
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save book."));
@@ -1440,13 +1493,21 @@ export function GroupsManager() {
             imageCopyError ??= imageCopyErrorMessage(copyError);
           }
         }
+        imageCopyError ??= await importAuthorPhotosForBookSnapshot({
+          messageId,
+          attachmentType: "series",
+          book,
+          sourceBookId: book.id,
+          addAuthor,
+          editAuthor,
+        });
       }
 
       await markAttachmentSaved(messageId);
       setStatusMessage(
         imageCopyError
           ? `Series saved, but one or more images could not be copied: ${imageCopyError}`
-          : "Series, books, and images saved to your library.",
+          : "Series, books, covers, and author profile pictures saved to your library.",
       );
     } catch (importError) {
       setError(toChatErrorMessage(importError, "Could not save series."));
@@ -1475,6 +1536,7 @@ export function GroupsManager() {
           savedAuthor = await editAuthor(savedAuthor.id, {
             name: savedAuthor.name,
             bio: savedAuthor.bio ?? null,
+            is_favorite: savedAuthor.is_favorite,
             photo_url: photoUrl,
           });
         } catch (copyError) {

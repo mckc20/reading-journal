@@ -1101,7 +1101,7 @@ export default function BookDetails() {
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}
-        attachment={buildBookAttachment(book)}
+        attachment={buildBookAttachment(book, journalEntries, authors)}
         title={`Send "${book.title}" to chat`}
         description="Add a message, then pick the chat you want to send this book to."
         onSent={() => setShareStatus("Book sent to chat.")}

@@ -497,6 +497,12 @@ export interface ChatSharedBookSnapshot {
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
   volume_number?: number | null;
+  // The author names remain the source of truth for a book. These optional
+  // snapshots let recipients copy author photos into their own library.
+  author_profiles?: Array<{
+    name: string;
+    photo_url?: string | null;
+  }>;
   included_journalEntries?: ChatSharedNoteSnapshot[];
 }
 
