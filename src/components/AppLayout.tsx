@@ -742,11 +742,11 @@ function FloatingAddButtonMenu({
   menuRef: RefObject<HTMLDivElement>;
 }) {
   return (
-    <div className="fixed bottom-20 right-4 z-40 md:hidden">
+    <div className="fixed bottom-[env(safe-area-inset-bottom)] right-0 z-50 flex h-[4.25rem] w-1/4 items-start justify-center pt-1 md:hidden">
       {open && (
         <div
           ref={menuRef}
-          className="absolute bottom-full right-0 mb-3 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
+          className="absolute bottom-full right-3 mb-3 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
         >
           <AddMenuPanel onSelect={onSelect} />
         </div>
@@ -755,7 +755,7 @@ function FloatingAddButtonMenu({
         ref={buttonRef}
         type="button"
         size="icon-lg"
-        className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-[0_14px_30px_oklch(0.21_0_0_/_0.18)] hover:bg-primary/90"
+        className="h-14 w-14 -translate-y-4 rounded-full bg-primary text-primary-foreground shadow-[0_14px_30px_oklch(0.21_0_0_/_0.18)] hover:bg-primary/90"
         aria-label="Add"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -769,7 +769,7 @@ function FloatingAddButtonMenu({
 
 function MobileBottomNav({ pathname, search }: { pathname: string; search: string }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-border/80 bg-background/95 backdrop-blur md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {primaryNavLinks.map(({ to, label, icon: Icon }) => {
         const active = isActiveRoute(pathname, search, to);
         return (
@@ -786,6 +786,7 @@ function MobileBottomNav({ pathname, search }: { pathname: string; search: strin
           </Link>
         );
       })}
+      <div aria-hidden="true" />
     </nav>
   );
 }
