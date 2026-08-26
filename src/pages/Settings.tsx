@@ -12,7 +12,6 @@ import {
   ListTree,
   LogOut,
   Monitor,
-  Pencil,
   Save,
   Shield,
   Trash2,
@@ -43,7 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth, useProfile, useTheme, useUserSettings } from "@/context";
 import { useGenresContext } from "@/context/GenresContext";
 import { getErrorMessage } from "@/lib/profiles";
-import { flattenGenreTree, getGenrePathLabel, isGenreRoot } from "@/lib/genres";
+import { flattenGenreTree, isGenreRoot } from "@/lib/genres";
 import { RELEASE_NOTES_EVENT } from "@/components/ReleaseNotesDialog";
 import { supabase } from "@/lib/supabase";
 import {
@@ -1215,249 +1214,42 @@ function AboutSettings() {
 }
 
 function GenreSettings() {
-  const { genres, tree, loading, error, addGenre, editGenre, removeGenre } = useGenresContext();
-  const [newName, setNewName] = useState("");
-  const [newParentId, setNewParentId] = useState<string>("");
-  const [editingId, setEditingId] = useState<string>("");
-  const [editName, setEditName] = useState("");
-  const [editParentId, setEditParentId] = useState<string>("");
-  const [savingGenre, setSavingGenre] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const { tree, loading, error } = useGenresContext();
   const flatNodes = flattenGenreTree(tree);
-  const editingGenre = genres.find((genre) => genre.id === editingId) ?? null;
-
-  function startEditing(genreId: string) {
-    const genre = genres.find((item) => item.id === genreId);
-    if (!genre || genre.is_system) return;
-    setEditingId(genre.id);
-    setEditName(genre.name);
-    setEditParentId(genre.parent_id ?? "");
-    setMessage(null);
-  }
-
-  function getDescendantIds(genreId: string) {
-    const ids = new Set<string>();
-    let changed = true;
-
-    while (changed) {
-      changed = false;
-      for (const genre of genres) {
-        if (genre.parent_id && (genre.parent_id === genreId || ids.has(genre.parent_id)) && !ids.has(genre.id)) {
-          ids.add(genre.id);
-          changed = true;
-        }
-      }
-    }
-
-    return ids;
-  }
-
-  const parentOptions = flatNodes.filter((node) => {
-    if (!editingId) return true;
-    if (node.id === editingId) return false;
-    return !getDescendantIds(editingId).has(node.id);
-  });
-
-  async function handleCreateGenre(event: FormEvent) {
-    event.preventDefault();
-    setSavingGenre(true);
-    setMessage(null);
-
-    try {
-      await addGenre({ name: newName, parent_id: newParentId || null });
-      setNewName("");
-      setMessage("Genre added.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to add genre.");
-    } finally {
-      setSavingGenre(false);
-    }
-  }
-
-  async function handleSaveGenre(event: FormEvent) {
-    event.preventDefault();
-    if (!editingGenre) return;
-
-    setSavingGenre(true);
-    setMessage(null);
-
-    try {
-      await editGenre(editingGenre.id, { name: editName, parent_id: editParentId || null });
-      setEditingId("");
-      setEditName("");
-      setEditParentId("");
-      setMessage("Genre updated.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to update genre.");
-    } finally {
-      setSavingGenre(false);
-    }
-  }
-
-  async function handleDeleteGenre(genreId: string) {
-    const genre = genres.find((item) => item.id === genreId);
-    if (!genre || genre.is_system) return;
-
-    const confirmed = window.confirm(
-      `Delete "${genre.name}" and any custom subgenres below it? This also removes those genre assignments from books.`,
-    );
-    if (!confirmed) return;
-
-    setSavingGenre(true);
-    setMessage(null);
-
-    try {
-      await removeGenre(genre.id);
-      if (editingId === genre.id) {
-        setEditingId("");
-        setEditName("");
-        setEditParentId("");
-      }
-      setMessage("Genre deleted.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to delete genre.");
-    } finally {
-      setSavingGenre(false);
-    }
-  }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-      <SettingsSection
-        title="Genres"
-        description="System genres are shared. Custom genres are yours and can live anywhere in the same tree."
-        icon={ListTree}
-      >
-        {loading ? (
-          <div className="h-64 animate-pulse rounded-lg bg-muted" />
-        ) : error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : (
-          <div className="max-h-[34rem] overflow-y-auto rounded-lg border bg-background p-2">
-            {flatNodes.map((node) => (
-              <div
-                key={node.id}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
-                style={{ paddingLeft: `${8 + node.depth * 18}px` }}
-              >
-                <span className={cn("min-w-0 flex-1 truncate", isGenreRoot(node) && "font-medium")}>
-                  {node.name}
-                </span>
-                {node.is_system ? (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    System
-                  </span>
-                ) : (
-                  <div className="flex shrink-0 gap-1">
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`Edit ${node.name}`}
-                      onClick={() => startEditing(node.id)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`Delete ${node.name}`}
-                      onClick={() => void handleDeleteGenre(node.id)}
-                      disabled={savingGenre}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </SettingsSection>
-
-      <div className="space-y-5">
-        <SettingsSection title="Add Genre" description="Choose the parent where the new genre should appear.">
-          <form className="space-y-3" onSubmit={(event) => void handleCreateGenre(event)}>
-            <div className="space-y-1.5">
-              <Label htmlFor="new-genre-name">Name</Label>
-              <Input
-                id="new-genre-name"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                placeholder="Cozy Fantasy"
-              />
+    <SettingsSection
+      title="Genres"
+      description="Genres and subgenres are shared categories. You can assign them to books, but the genre list is no longer editable."
+      icon={ListTree}
+    >
+      {loading ? (
+        <div className="h-64 animate-pulse rounded-lg bg-muted" />
+      ) : error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : flatNodes.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+          No genres are available yet.
+        </p>
+      ) : (
+        <div className="max-h-[34rem] overflow-y-auto rounded-lg border bg-background p-2">
+          {flatNodes.map((node) => (
+            <div
+              key={node.id}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+              style={{ paddingLeft: `${8 + node.depth * 18}px` }}
+            >
+              <span className={cn("min-w-0 flex-1 truncate", isGenreRoot(node) && "font-medium")}>
+                {node.name}
+              </span>
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {node.is_system ? "System" : "Read only"}
+              </span>
             </div>
-            <div className="space-y-1.5">
-              <Label>Parent</Label>
-              <Select value={newParentId || "__root__"} onValueChange={(value) => setNewParentId(value === "__root__" ? "" : value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__root__">No parent</SelectItem>
-                  {flatNodes.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {getGenrePathLabel(node.id, genres)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" disabled={savingGenre || !newName.trim()}>
-              Add genre
-            </Button>
-          </form>
-        </SettingsSection>
-
-        <SettingsSection title="Edit Custom Genre" description="System genres cannot be renamed, moved, or deleted.">
-          {editingGenre ? (
-            <form className="space-y-3" onSubmit={(event) => void handleSaveGenre(event)}>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-genre-name">Name</Label>
-                <Input
-                  id="edit-genre-name"
-                  value={editName}
-                  onChange={(event) => setEditName(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Parent</Label>
-                <Select value={editParentId || "__root__"} onValueChange={(value) => setEditParentId(value === "__root__" ? "" : value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__root__">No parent</SelectItem>
-                    {parentOptions.map((node) => (
-                      <SelectItem key={node.id} value={node.id}>
-                        {getGenrePathLabel(node.id, genres)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={savingGenre || !editName.trim()}>
-                  Save
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setEditingId("")}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <p className="text-sm text-muted-foreground">Select a custom genre from the tree to edit it.</p>
-          )}
-        </SettingsSection>
-
-        {message && (
-          <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-            {message}
-          </div>
-        )}
-      </div>
-    </div>
+          ))}
+        </div>
+      )}
+    </SettingsSection>
   );
 }
 

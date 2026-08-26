@@ -147,8 +147,10 @@ export default function Genres() {
           {customRoots.length > 0 && (
             <section className="rounded-xl border bg-card p-4">
               <div className="mb-3 border-b pb-3">
-                <AppHeading level={4} as="h2">Custom Genres</AppHeading>
-                <HeadingDescription className="text-xs">Genres you created outside the system sections.</HeadingDescription>
+                <AppHeading level={4} as="h2">Read-Only Genres</AppHeading>
+                <HeadingDescription className="text-xs">
+                  Older library genres that are still available for your books.
+                </HeadingDescription>
               </div>
               <ul className="space-y-1">
                 {customRoots.map((node) => (

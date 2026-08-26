@@ -2,6 +2,15 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-08-26 - Read-only genres
+Version: `2026-08-26-read-only-genres`
+Summary: Genres are now shared read-only categories, with simpler picker dialogs for assigning them to books.
+
+- Read-only genre list
+  Genre creation and editing have been removed so the shared genre tree stays consistent.
+- Easier assignment
+  Genre and author selectors now open focused dialogs with search, checkboxes, and clearer selected-item controls.
+
 ## 2026-08-26 - Journal entry links
 Version: `2026-08-26-journal-entry-links`
 Summary: Journal entries can now reference other entries with simple internal links.

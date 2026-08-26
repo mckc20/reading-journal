@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-08-26-journal-entry-links");
-  assert.equal(entries[0].title, "Journal entry links");
-  assert.equal(entries[0].summary, "Journal entries can now reference other entries with simple internal links.");
+  assert.equal(entries[0].version, "2026-08-26-read-only-genres");
+  assert.equal(entries[0].title, "Read-only genres");
+  assert.equal(entries[0].summary, "Genres are now shared read-only categories, with simpler picker dialogs for assigning them to books.");
   assert.equal(entries[0].highlights.length, 2);
-  assert.equal(entries[0].highlights[0].title, "Internal journal links");
-  assert.equal(entries[0].highlights[0].description, "Insert links to other journal entries while writing, and open them through stable journal URLs.");
+  assert.equal(entries[0].highlights[0].title, "Read-only genre list");
+  assert.equal(entries[0].highlights[0].description, "Genre creation and editing have been removed so the shared genre tree stays consistent.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 

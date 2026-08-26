@@ -104,7 +104,7 @@ export default function GenreDetails() {
               <div className="flex flex-wrap items-center gap-3">
                 <AppHeading level={1}>{genre.name}</AppHeading>
                 <Badge variant={genre.is_system ? "secondary" : "outline"}>
-                  {genre.is_system ? "System" : "Custom"}
+                  {genre.is_system ? "System" : "Read only"}
                 </Badge>
               </div>
               <HeadingDescription className="max-w-2xl">{metadata.description}</HeadingDescription>

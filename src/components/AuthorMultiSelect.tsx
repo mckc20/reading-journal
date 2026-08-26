@@ -1,8 +1,16 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Plus, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthorsContext } from "@/context";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +25,10 @@ function authorKey(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+function normalizeAuthorName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 export default function AuthorMultiSelect({
   value,
   onChange,
@@ -26,15 +38,18 @@ export default function AuthorMultiSelect({
   const { authors, loading } = useAuthorsContext();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
   const selectedAuthors = value ?? [];
   const selectedAuthorSet = useMemo(() => new Set(selectedAuthors.map(authorKey)), [selectedAuthors]);
+  const normalizedQuery = normalizeAuthorName(query);
 
   const results = useMemo(() => {
     const search = query.trim().toLocaleLowerCase();
-    if (!search) return authors;
-    return authors.filter((author) => {
+    const sortedAuthors = [...authors].sort((first, second) =>
+      first.name.localeCompare(second.name, undefined, { sensitivity: "base", numeric: true }),
+    );
+
+    if (!search) return sortedAuthors;
+    return sortedAuthors.filter((author) => {
       const haystack = [
         author.name,
         author.bio,
@@ -50,27 +65,7 @@ export default function AuthorMultiSelect({
     () => authors.some((author) => authorKey(author.name) === authorKey(query)),
     [authors, query],
   );
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+  const canAddNewAuthor = Boolean(onCreateNew) && normalizedQuery.length > 0 && !queryMatchesExisting;
 
   function toggleAuthor(authorName: string) {
     const key = authorKey(authorName);
@@ -79,7 +74,7 @@ export default function AuthorMultiSelect({
       return;
     }
 
-    onChange([...selectedAuthors, authorName]);
+    onChange([...selectedAuthors, normalizeAuthorName(authorName)]);
   }
 
   function removeAuthor(authorName: string) {
@@ -88,59 +83,75 @@ export default function AuthorMultiSelect({
   }
 
   function openCreateDialog() {
-    const trimmed = query.trim();
-    onCreateNew?.(trimmed);
+    if (!canAddNewAuthor) return;
+    onCreateNew?.(normalizedQuery);
     setOpen(false);
   }
 
+  function clearAuthors() {
+    onChange([]);
+  }
+
   return (
-    <div ref={containerRef} className="relative">
-      <Button
-        type="button"
-        variant="outline"
-        className="h-auto min-h-9 w-full justify-between gap-2 px-3 py-2 text-left font-normal"
-        onClick={() => {
-          setOpen((current) => {
-            if (!current) setQuery("");
-            return !current;
-          });
-        }}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-controls={listId}
-      >
-        <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {selectedAuthors.length > 0 ? (
-            selectedAuthors.map((author) => (
-              <Badge key={author} variant="secondary" className="max-w-full gap-1">
-                <span className="truncate">{author}</span>
-              </Badge>
-            ))
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              {loading ? "Loading authors..." : "No authors selected"}
-            </span>
-          )}
-        </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </Button>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {selectedAuthors.map((author) => (
+          <Badge key={author} variant="secondary" className="max-w-full gap-1 px-2 py-1">
+            <span className="truncate">{author}</span>
+            <button
+              type="button"
+              className="rounded-sm text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={() => removeAuthor(author)}
+              disabled={disabled}
+              aria-label={`Remove ${author}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
 
-      {open && (
-        <div
-          id={listId}
-          className="absolute z-50 mt-1 w-full rounded-lg bg-popover p-2 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+        <Button
+          type="button"
+          size="sm"
+          variant={selectedAuthors.length > 0 ? "ghost" : "outline"}
+          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+          disabled={disabled}
+          onClick={() => {
+            setQuery("");
+            setOpen(true);
+          }}
         >
-          <div className="space-y-2">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search authors"
-              autoFocus
-            />
+          <Plus className="h-3.5 w-3.5" />
+          Add
+        </Button>
+      </div>
 
-            <div className="max-h-72 overflow-y-auto rounded-md border bg-background p-1">
+      {selectedAuthors.length === 0 && !loading && (
+        <p className="text-xs text-muted-foreground">No authors selected.</p>
+      )}
+      {loading && <p className="text-xs text-muted-foreground">Loading authors...</p>}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Add authors</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search authors..."
+                className="pl-9"
+                autoFocus
+              />
+            </div>
+
+            <ScrollArea className="h-[22rem] rounded-lg border bg-background">
               {results.length > 0 ? (
-                <div role="listbox" aria-label="Author search results" className="space-y-1">
+                <div role="listbox" aria-label="Author search results" className="space-y-0.5 p-2">
                   {results.map((author) => {
                     const selected = selectedAuthorSet.has(authorKey(author.name));
 
@@ -149,66 +160,72 @@ export default function AuthorMultiSelect({
                         key={author.id}
                         type="button"
                         className={cn(
-                          "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                          selected && "font-medium",
+                          "flex min-h-8 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                          selected && "bg-accent/60 font-medium",
                         )}
                         onClick={() => toggleAuthor(author.name)}
                         aria-pressed={selected}
                       >
-                        <span className="min-w-0 truncate">{author.name}</span>
-                        {selected && <span className="text-xs text-muted-foreground">Selected</span>}
+                        <span
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-input bg-background",
+                            selected && "border-primary bg-primary text-primary-foreground",
+                          )}
+                        >
+                          {selected && <Check className="h-3 w-3" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{author.name}</span>
                       </button>
                     );
                   })}
                 </div>
               ) : (
-                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-sm text-muted-foreground">
                   No matching authors.
-                </p>
+                </div>
               )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={openCreateDialog}
-                disabled={disabled || queryMatchesExisting || !onCreateNew}
-              >
-                + Add new author...
-              </Button>
-              {selectedAuthors.length > 0 && (
-                <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
-                  Clear
-                </Button>
-              )}
-            </div>
+            </ScrollArea>
 
             {selectedAuthors.length > 0 && (
-              <div className="border-t pt-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedAuthors.map((author) => (
-                    <Badge key={author} variant="secondary" className="gap-1">
-                      <span className="max-w-40 truncate" title={author}>
-                        {author}
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-sm hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        onClick={() => removeAuthor(author)}
-                        aria-label={`Remove ${author}`}
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-1.5 border-t pt-3">
+                {selectedAuthors.map((author) => (
+                  <Badge key={author} variant="secondary" className="max-w-full gap-1">
+                    <span className="truncate">{author}</span>
+                    <button
+                      type="button"
+                      className="rounded-sm text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      onClick={() => removeAuthor(author)}
+                      aria-label={`Remove ${author}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
               </div>
             )}
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canAddNewAuthor}
+              onClick={openCreateDialog}
+            >
+              <Plus className="h-4 w-4" />
+              Add next author
+            </Button>
+            {selectedAuthors.length > 0 && (
+              <Button type="button" variant="ghost" onClick={clearAuthors}>
+                Clear
+              </Button>
+            )}
+            <Button type="button" onClick={() => setOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

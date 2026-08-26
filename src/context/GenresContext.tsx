@@ -8,9 +8,6 @@ interface GenresContextValue {
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
-  addGenre: (input: { name: string; parent_id?: string | null; description?: string | null }) => Promise<Genre>;
-  editGenre: (id: string, input: { name: string; parent_id?: string | null; description?: string | null }) => Promise<Genre>;
-  removeGenre: (id: string) => Promise<void>;
 }
 
 const GenresContext = createContext<GenresContextValue | null>(null);
