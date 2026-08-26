@@ -1,4 +1,5 @@
 import { BookOpen, Heart, PauseCircle } from "lucide-react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn, statusVariant } from "@/lib/utils";
 import type { Book } from "@/types";
@@ -10,6 +11,9 @@ interface BookCardProps {
   variant?: "grid" | "shelf";
   textSize?: "default" | "compact";
   cornerLabel?: string;
+  showAuthor?: boolean;
+  footer?: ReactNode;
+  className?: string;
 }
 
 export default function BookCard({
@@ -18,22 +22,16 @@ export default function BookCard({
   onClick,
   variant = "grid",
   cornerLabel,
+  showAuthor = true,
+  footer,
+  className,
 }: BookCardProps) {
   const handleBook = onBook ?? onClick;
   const isShelf = variant === "shelf";
   const isPaused = book.status === "Paused";
 
-  return (
-    <button
-      type="button"
-      onClick={() => handleBook?.(book)}
-      className={cn(
-        "group block rounded-lg text-left transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        isShelf
-          ? "w-full space-y-2"
-          : "w-full overflow-hidden border bg-background shadow-sm dark:bg-card",
-      )}
-    >
+  const content = (
+    <>
       <div
         className={cn(
           "relative overflow-hidden bg-muted shadow-sm",
@@ -79,18 +77,38 @@ export default function BookCard({
         <div className="min-w-0 space-y-2 p-2">
           <div className="min-w-0">
             <p className="line-clamp-2 text-sm font-medium leading-tight">{book.title}</p>
-            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-              {book.authors.join(", ")}
-            </p>
+            {showAuthor && (
+              <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                {book.authors.join(", ")}
+              </p>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant={statusVariant(book.status)} className="text-[10px]">
-              {book.status}
-            </Badge>
-          </div>
+          {footer ?? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant={statusVariant(book.status)} className="text-[10px]">
+                {book.status}
+              </Badge>
+            </div>
+          )}
         </div>
       )}
+    </>
+  );
+
+  const classNames = cn(
+    "group block rounded-lg text-left transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    isShelf
+      ? "w-full space-y-2"
+      : "w-full overflow-hidden border bg-background shadow-sm dark:bg-card",
+    className,
+  );
+
+  if (!handleBook) return <div className={classNames}>{content}</div>;
+
+  return (
+    <button type="button" onClick={() => handleBook(book)} className={classNames}>
+      {content}
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Copy,
   FileSearchCorner,
-  Heart,
   LibraryBig,
   MessageCircle,
   MessageCirclePlus,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import AddChatDialog from "@/components/AddChatDialog";
+import BookCard from "@/components/BookCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,7 +74,6 @@ import {
   removeChatMember,
   sendChatMessage,
   saveChatAttachment,
-  toggleHeartReaction,
   toChatErrorMessage,
   type ChatMember,
   type ChatThread,
@@ -127,6 +126,11 @@ type MessageActionMenu = {
   messageId: string;
   x: number;
   y: number;
+};
+
+type AttachmentPreviewState = {
+  message: GroupMessage;
+  attachment: ChatAttachmentPayload;
 };
 
 function formatMessageTime(value: string): string {
@@ -194,7 +198,6 @@ function messageFromPayload(payload: unknown): GroupMessage {
     attachment_payload: row.attachment_payload ?? null,
     reply_to_message_id: row.reply_to_message_id ?? null,
     reply_snapshot: row.reply_snapshot ?? null,
-    reactions: row.reactions ?? [],
     created_at: row.created_at,
     updated_at: row.updated_at,
     edited_at: row.edited_at ?? null,
@@ -284,10 +287,6 @@ function ReplyPreview({
   );
 }
 
-function reactionNames(reaction: NonNullable<GroupMessage["reactions"]>[number]): string {
-  return reaction.participants.map((participant) => participant.display_name).join(", ");
-}
-
 function imageCopyErrorMessage(error: unknown): string {
   return toChatErrorMessage(error, "The image-copy function failed.");
 }
@@ -365,30 +364,89 @@ function attachmentSecondaryInfo(attachment: ChatAttachmentPayload): string | nu
 function AttachmentThumbnail({ attachment }: { attachment: ChatAttachmentPayload }) {
   const image = attachmentImage(attachment);
   const Icon = attachment.type === "author" ? UserRound : attachment.type === "note" ? StickyNote : BookOpen;
+  const isAuthor = attachment.type === "author";
 
   return image ? (
-    <img src={image} alt="" className="h-16 w-11 shrink-0 rounded-md object-cover" />
+    <img src={image} alt="" className={cn("shrink-0 object-cover", isAuthor ? "h-16 w-16 rounded-full" : "h-16 w-11 rounded-md")} />
   ) : (
-    <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded-md bg-muted">
+    <div className={cn("flex shrink-0 items-center justify-center bg-muted", isAuthor ? "h-16 w-16 rounded-full" : "h-16 w-11 rounded-md")}>
       <Icon className="h-5 w-5 text-muted-foreground" />
     </div>
   );
 }
 
-function AttachmentPreviewContent({ attachment }: { attachment: ChatAttachmentPayload }) {
+function AttachmentCardImage({ attachment }: { attachment: ChatAttachmentPayload }) {
+  const image = attachmentImage(attachment);
+  const Icon = attachment.type === "author" ? UserRound : BookOpen;
+  const isAuthor = attachment.type === "author";
+
+  return image ? (
+    <img
+      src={image}
+      alt=""
+      className={cn(
+        "object-cover",
+        isAuthor ? "mx-auto h-24 w-24 rounded-full" : "h-36 w-full rounded-md bg-muted object-contain",
+      )}
+    />
+  ) : (
+    <div className={cn(
+      "flex items-center justify-center bg-muted",
+      isAuthor ? "mx-auto h-24 w-24 rounded-full" : "h-36 w-full rounded-md",
+    )}>
+      <Icon className="h-7 w-7 text-muted-foreground" />
+    </div>
+  );
+}
+
+function sharedSnapshotToBook(book: ChatSharedBookSnapshot): Book {
+  return {
+    id: book.id ?? `shared-${book.title}`,
+    title: book.title,
+    authors: book.authors,
+    genres: book.genres ?? [],
+    status: "To Read",
+    cover_url: book.cover_url ?? undefined,
+    rating: null,
+    is_favorite: false,
+    total_pages: book.total_pages ?? undefined,
+    language: book.language ?? undefined,
+    format: book.format ?? undefined,
+    isbn: book.isbn ?? undefined,
+    publication_date: book.publication_date ?? null,
+    description: book.description ?? null,
+    metadata_source: book.metadata_source ?? null,
+    metadata_source_url: book.metadata_source_url ?? null,
+    volume_number: book.volume_number ?? undefined,
+    user_id: "",
+    created_at: "",
+  };
+}
+
+function AttachmentPreviewContent({
+  attachment,
+  onAddAuthorBookToLibrary,
+  isBookSaved,
+}: {
+  attachment: ChatAttachmentPayload;
+  onAddAuthorBookToLibrary?: (book: ChatSharedBookSnapshot) => void;
+  isBookSaved?: (book: ChatSharedBookSnapshot) => boolean;
+}) {
   const title = attachmentTitle(attachment);
   const secondaryInfo = attachmentSecondaryInfo(attachment);
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-4">
-        <AttachmentThumbnail attachment={attachment} />
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-muted-foreground">{attachmentTypeLabel(attachment)}</p>
-          <h3 className="mt-1 text-lg font-semibold leading-snug">{title}</h3>
-          {secondaryInfo && <p className="mt-1 text-sm text-muted-foreground">{secondaryInfo}</p>}
+      {attachment.type !== "note" && (
+        <div className="flex gap-4">
+          <AttachmentThumbnail attachment={attachment} />
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase text-muted-foreground">{attachmentTypeLabel(attachment)}</p>
+            <h3 className="mt-1 text-lg font-semibold leading-snug">{title}</h3>
+            {secondaryInfo && <p className="mt-1 text-sm text-muted-foreground">{secondaryInfo}</p>}
+          </div>
         </div>
-      </div>
+      )}
 
       {attachment.type === "book" && (
         <div className="space-y-3 text-sm">
@@ -420,24 +478,38 @@ function AttachmentPreviewContent({ attachment }: { attachment: ChatAttachmentPa
       {attachment.type === "author" && (
         <div className="space-y-3 text-sm">
           {attachment.author.bio && <p className="whitespace-pre-wrap text-muted-foreground">{attachment.author.bio}</p>}
-          {attachment.author.books.map((book, index) => (
-            <div key={`${book.id ?? book.title}-${index}`} className="flex items-center gap-3 rounded-md border p-2">
-              {book.cover_url ? <img src={book.cover_url} alt="" className="h-12 w-8 rounded object-cover" /> : <BookOpen className="h-5 w-5 text-muted-foreground" />}
-              <div className="min-w-0"><p className="truncate font-medium">{book.title}</p><p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p></div>
-            </div>
-          ))}
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            {attachment.author.books.map((book, index) => (
+              <BookCard
+                key={`${book.id ?? book.title}-${index}`}
+                book={sharedSnapshotToBook(book)}
+                showAuthor={false}
+                footer={onAddAuthorBookToLibrary && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isBookSaved?.(book)}
+                    onClick={() => onAddAuthorBookToLibrary(book)}
+                  >
+                    {isBookSaved?.(book) ? "Added" : "Add to Library"}
+                  </Button>
+                )}
+              />
+            ))}
+          </div>
         </div>
       )}
 
       {attachment.type === "series" && (
         <div className="space-y-3 text-sm">
           {attachment.series.description && <p className="whitespace-pre-wrap text-muted-foreground">{attachment.series.description}</p>}
-          {attachment.series.books.map((book, index) => (
-            <div key={`${book.id ?? book.title}-${index}`} className="flex items-center gap-3 rounded-md border p-2">
-              {book.cover_url ? <img src={book.cover_url} alt="" className="h-12 w-8 rounded object-cover" /> : <BookOpen className="h-5 w-5 text-muted-foreground" />}
-              <div className="min-w-0"><p className="truncate font-medium">{book.title}</p><p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p></div>
-            </div>
-          ))}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {attachment.series.books.map((book, index) => (
+              <BookCard key={`${book.id ?? book.title}-${index}`} book={sharedSnapshotToBook(book)} showAuthor={false} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -454,7 +526,7 @@ function AttachmentCard({
   message: GroupMessage;
   mine: boolean;
   saved: boolean;
-  onOpenDetails: (attachment: ChatAttachmentPayload) => void;
+  onOpenDetails: (preview: AttachmentPreviewState) => void;
   onAddToLibrary: () => void;
 }) {
   if (!message.attachment_payload) return null;
@@ -468,7 +540,7 @@ function AttachmentCard({
         size="sm"
         variant="ghost"
         className={cn("h-8 gap-1.5 px-2 text-xs", mine && "flex-row-reverse")}
-        onClick={() => onOpenDetails(attachment)}
+        onClick={() => onOpenDetails({ message, attachment })}
       >
         <FileSearchCorner className="h-3.5 w-3.5" />
         See details
@@ -495,7 +567,7 @@ function AttachmentCard({
       <button
         type="button"
         className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border bg-background p-2 text-left text-foreground shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => onOpenDetails(attachment)}
+        onClick={() => onOpenDetails({ message, attachment })}
         aria-label={`View ${attachmentTitle(attachment)} details`}
       >
         {attachment.type === "note" ? (
@@ -504,10 +576,13 @@ function AttachmentCard({
             <p className="mt-1 line-clamp-3 whitespace-pre-wrap">{attachment.note.content}</p>
           </div>
         ) : (
-          <>
-            <AttachmentThumbnail attachment={attachment} />
-            {secondaryInfo && <p className="min-w-0 truncate text-xs text-muted-foreground">{secondaryInfo}</p>}
-          </>
+          <div className="min-w-0 flex-1 space-y-2">
+            <AttachmentCardImage attachment={attachment} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{attachmentTitle(attachment)}</p>
+              {secondaryInfo && <p className="truncate text-xs text-muted-foreground">{secondaryInfo}</p>}
+            </div>
+          </div>
         )}
       </button>
       {!mine && actions}
@@ -544,8 +619,7 @@ export function GroupsManager() {
   const [selectedAttachment, setSelectedAttachment] = useState<ChatAttachmentPayload | null>(null);
   const [selectedReply, setSelectedReply] = useState<ChatReplySnapshot | null>(null);
   const [messageActionMenu, setMessageActionMenu] = useState<MessageActionMenu | null>(null);
-  const [reactionDetailsMessageId, setReactionDetailsMessageId] = useState<string | null>(null);
-  const [attachmentPreview, setAttachmentPreview] = useState<ChatAttachmentPayload | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreviewState | null>(null);
   const [noteImportMessage, setNoteImportMessage] = useState<GroupMessage | null>(null);
   const [noteImportTargetKind, setNoteImportTargetKind] = useState<JournalTargetKind>("book");
   const [noteImportTargetId, setNoteImportTargetId] = useState("");
@@ -555,6 +629,8 @@ export function GroupsManager() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToLatestRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
   const attachmentPickerRef = useRef<HTMLDivElement>(null);
   const attachmentAddButtonRef = useRef<HTMLButtonElement>(null);
@@ -787,7 +863,7 @@ export function GroupsManager() {
     setMessagesLoading(true);
     setError(null);
 
-    Promise.all([getChatMessages(selectedGroupId, user.id), getChatMembers(selectedGroupId)])
+    Promise.all([getChatMessages(selectedGroupId), getChatMembers(selectedGroupId)])
       .then(async ([nextMessages, nextMembers]) => {
         if (cancelled) return;
         const savedIds = await getSavedChatAttachmentMessageIds(
@@ -822,7 +898,6 @@ export function GroupsManager() {
 
   useEffect(() => {
     if (!selectedGroupId || !user) return;
-    const currentUserId = user.id;
 
     const channel = supabase
       .channel(`group-messages:${selectedGroupId}`)
@@ -842,7 +917,7 @@ export function GroupsManager() {
           }
 
           const nextMessage = messageFromPayload(payload.new);
-          void getChatMessages(selectedGroupId, currentUserId)
+          void getChatMessages(selectedGroupId)
             .then(async (nextMessages) => {
               const savedIds = await getSavedChatAttachmentMessageIds(
                 nextMessages
@@ -858,19 +933,6 @@ export function GroupsManager() {
           void markChatRead(selectedGroupId).catch(() => undefined);
         },
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "group_message_reactions",
-        },
-        () => {
-          void getChatMessages(selectedGroupId, currentUserId)
-            .then(setMessages)
-            .catch(() => undefined);
-        },
-      )
       .subscribe();
 
     return () => {
@@ -879,20 +941,27 @@ export function GroupsManager() {
   }, [selectedGroupId, user?.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, selectedGroupId]);
+    shouldScrollToLatestRef.current = true;
+  }, [selectedGroupId]);
+
+  useLayoutEffect(() => {
+    if (messagesLoading || !shouldScrollToLatestRef.current) return;
+    const scrollContainer = messagesScrollRef.current;
+    if (!scrollContainer) return;
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    shouldScrollToLatestRef.current = false;
+  }, [messages, messagesLoading, selectedGroupId]);
 
   useEffect(() => {
     setSelectedReply(null);
     setMessageActionMenu(null);
-    setReactionDetailsMessageId(null);
     setSettingsOpen(false);
   }, [selectedGroupId]);
 
   useEffect(() => {
     function closeFloatingMenus() {
       setMessageActionMenu(null);
-      setReactionDetailsMessageId(null);
     }
 
     window.addEventListener("click", closeFloatingMenus);
@@ -913,7 +982,6 @@ export function GroupsManager() {
   function openMessageActionMenu(message: GroupMessage, x: number, y: number) {
     if (message.deleted_at) return;
     setMessageActionMenu({ messageId: message.id, x, y });
-    setReactionDetailsMessageId(null);
   }
 
   function startReply(message: GroupMessage, senderProfile?: PublicProfile) {
@@ -934,17 +1002,6 @@ export function GroupsManager() {
       setStatusMessage("Message copied.");
     } catch {
       setError("Could not copy message.");
-    }
-  }
-
-  async function toggleMessageHeart(message: GroupMessage) {
-    if (!user || message.deleted_at) return;
-    setError(null);
-    try {
-      await toggleHeartReaction(message, user.id);
-      setMessages(await getChatMessages(selectedGroupId, user.id));
-    } catch (reactionError) {
-      setError(toChatErrorMessage(reactionError, "Could not update reaction."));
     }
   }
 
@@ -1172,6 +1229,7 @@ export function GroupsManager() {
             ref={attachmentPickerRef}
             className="absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[34rem]"
             style={{ height: `${attachmentPickerHeight}px` }}
+            onPointerDown={(event) => event.stopPropagation()}
           >
             <div className="flex min-h-0 flex-1 flex-col">
             <button
@@ -1293,34 +1351,44 @@ export function GroupsManager() {
                 );
               })}
 
-              {attachmentPicker === "note" && filteredJournalEntries.map((item) => {
-                const note = item.entry;
-                return (
-                  <div key={`${item.sourceType}-${note.id}`} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
-                    <StickyNote className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{note.content}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {noteLabel(note.label)} - {item.sourceTitle}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => chooseAttachment(buildNoteAttachment(note, {
-                        type: item.sourceType,
-                        id: item.sourceId,
-                        title: item.sourceTitle,
-                        authors: item.sourceAuthors,
-                        imageUrl: item.sourceImageUrl,
-                      }))}
+              {attachmentPicker === "note" && (
+                filteredJournalEntries.length > 0 ? filteredJournalEntries.map((item) => {
+                  const note = item.entry;
+                  return (
+                    <div
+                      key={`${item.sourceType}-${note.id}`}
+                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md p-2 hover:bg-muted"
                     >
-                      Add
-                    </Button>
-                  </div>
-                );
-              })}
+                      <StickyNote className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{note.content}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {noteLabel(note.label)} - {item.sourceTitle}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 whitespace-nowrap"
+                        onClick={() => chooseAttachment(buildNoteAttachment(note, {
+                          type: item.sourceType,
+                          id: item.sourceId,
+                          title: item.sourceTitle,
+                          authors: item.sourceAuthors,
+                          imageUrl: item.sourceImageUrl,
+                        }))}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }) : (
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    No journal entries found.
+                  </p>
+                )
+              )}
             </div>
             </div>
           </div>
@@ -1419,7 +1487,12 @@ export function GroupsManager() {
     setSavedAttachmentMessageIds((current) => new Set(current).add(messageId));
   }
 
-  async function importBookSnapshot(messageId: string, book: ChatSharedBookSnapshot) {
+  async function importBookSnapshot(
+    messageId: string,
+    book: ChatSharedBookSnapshot,
+    sourceBookId?: string,
+  ) {
+    if (saving) return;
     setSaving(true);
     setError(null);
     setStatusMessage(null);
@@ -1429,19 +1502,21 @@ export function GroupsManager() {
       const result = await addBook(importPayloadForBookSnapshot(book));
       if (book.cover_url) {
         try {
-          const coverUrl = await copyChatAttachmentImage(messageId, "book", result.book.id);
+          const coverUrl = await copyChatAttachmentImage(messageId, "book", result.book.id, sourceBookId);
           await updateBook(result.book.id, { cover_url: coverUrl });
         } catch (copyError) {
           imageCopyError = imageCopyErrorMessage(copyError);
         }
       }
-      imageCopyError ??= await importAuthorPhotosForBookSnapshot({
-        messageId,
-        attachmentType: "book",
-        book,
-        addAuthor,
-        editAuthor,
-      });
+      if (!sourceBookId) {
+        imageCopyError ??= await importAuthorPhotosForBookSnapshot({
+          messageId,
+          attachmentType: "book",
+          book,
+          addAuthor,
+          editAuthor,
+        });
+      }
       await markAttachmentSaved(messageId);
       setStatusMessage(
         imageCopyError
@@ -1574,6 +1649,20 @@ export function GroupsManager() {
     setNoteImportMessage(message);
     setNoteImportTargetKind("book");
     setNoteImportTargetId("");
+  }
+
+  function isBookSnapshotSaved(bookSnapshot: ChatSharedBookSnapshot): boolean {
+    const title = bookSnapshot.title.trim().toLocaleLowerCase();
+    const authors = bookSnapshot.authors
+      .map((author) => author.trim().toLocaleLowerCase())
+      .sort()
+      .join("|");
+
+    return books.some((book) => {
+      if (bookSnapshot.isbn && book.isbn === bookSnapshot.isbn) return true;
+      return book.title.trim().toLocaleLowerCase() === title
+        && book.authors.map((author) => author.trim().toLocaleLowerCase()).sort().join("|") === authors;
+    });
   }
 
   async function importNoteAttachment() {
@@ -1732,7 +1821,7 @@ export function GroupsManager() {
           className="fixed z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
           style={{
             left: Math.min(messageActionMenu.x, window.innerWidth - 190),
-            top: Math.min(messageActionMenu.y, window.innerHeight - 224),
+            top: Math.min(messageActionMenu.y, window.innerHeight - 176),
           }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -1743,17 +1832,6 @@ export function GroupsManager() {
           >
             <Reply className="h-4 w-4" />
             Note
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-            onClick={() => {
-              setMessageActionMenu(null);
-              void toggleMessageHeart(actionMenuMessage);
-            }}
-          >
-            <Heart className="h-4 w-4 fill-current" />
-            React
           </button>
           {actionMenuMessage.content.trim() && (
             <button
@@ -1920,7 +1998,7 @@ export function GroupsManager() {
 
               <div className={cn("min-h-0", settingsOpen ? "grid lg:grid-cols-[minmax(0,1fr)_19rem]" : "grid")}>
                 <div className={cn("min-h-0 min-w-0 flex-col", settingsOpen ? "hidden lg:flex" : "flex")}>
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6">
+                  <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6">
                     {messagesLoading ? (
                       <p className="text-sm text-muted-foreground">Loading messages...</p>
                     ) : messages.length === 0 ? (
@@ -1930,7 +2008,6 @@ export function GroupsManager() {
                         const mine = message.sender_id === user?.id;
                         const senderProfile = memberProfiles.get(message.sender_id);
                         const editing = editingMessageId === message.id;
-                        const heartReaction = message.reactions?.find((reaction) => reaction.reaction === "heart");
                         const canUseActions = !message.deleted_at;
                         const isGroupChat = selectedThread.group.kind === "group";
                         const showDate = index === 0 || messageDayKey(messages[index - 1].created_at) !== messageDayKey(message.created_at);
@@ -1938,10 +2015,8 @@ export function GroupsManager() {
                         return (
                           <div key={message.id}>
                             {showDate && (
-                              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground" aria-label={formatMessageDate(message.created_at)}>
-                                <span className="h-px flex-1 bg-border" />
-                                <span>{formatMessageDate(message.created_at)}</span>
-                                <span className="h-px flex-1 bg-border" />
+                              <div className="my-5 text-center text-xs text-muted-foreground" aria-label={formatMessageDate(message.created_at)}>
+                                {formatMessageDate(message.created_at)}
                               </div>
                             )}
                             <div className={cn("flex gap-3", mine && "justify-end")}>
@@ -1991,7 +2066,6 @@ export function GroupsManager() {
                                       event.preventDefault();
                                       openMessageActionMenu(message, event.clientX, event.clientY);
                                     }}
-                                    onDoubleClick={() => toggleMessageHeart(message)}
                                     onTouchStart={(event) => {
                                       if (!canUseActions) return;
                                       const touch = event.touches[0];
@@ -2010,43 +2084,16 @@ export function GroupsManager() {
                                       </p>
                                     )}
                                     {message.reply_snapshot && <ReplyPreview reply={message.reply_snapshot} compact />}
-                                    {message.deleted_at ? "Message deleted" : message.content}
-                                    <p className={cn("text-left text-[0.68rem]", mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
-                                      {formatMessageTime(message.created_at)}
-                                      {message.edited_at && !message.deleted_at ? " · edited" : ""}
-                                    </p>
-                                  </div>
-                                  {heartReaction && heartReaction.count > 0 && (
-                                    <div
-                                      className={cn(
-                                        "relative mt-1 flex",
-                                        mine ? "justify-end pr-2" : "justify-start pl-2",
-                                      )}
-                                    >
-                                      <button
-                                        type="button"
-                                        className={cn(
-                                          "flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs shadow-sm",
-                                          heartReaction.reacted_by_current_user && "border-primary text-primary",
-                                        )}
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          setReactionDetailsMessageId((current) =>
-                                            current === message.id ? null : message.id,
-                                          );
-                                        }}
-                                        onMouseEnter={() => setReactionDetailsMessageId(message.id)}
-                                      >
-                                        <Heart className="h-3 w-3 fill-current" />
-                                        {heartReaction.count}
-                                      </button>
-                                      {reactionDetailsMessageId === message.id && (
-                                        <div className="absolute bottom-7 z-30 max-w-56 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-[var(--shadow-popover)]">
-                                          {reactionNames(heartReaction)}
-                                        </div>
-                                      )}
+                                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                                      <p className="min-w-0">
+                                        {message.deleted_at ? "Message deleted" : message.content}
+                                      </p>
+                                      <span className={cn("shrink-0 whitespace-nowrap text-[0.68rem]", mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
+                                        {formatMessageTime(message.created_at)}
+                                        {message.edited_at && !message.deleted_at ? " · edited" : ""}
+                                      </span>
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
                               ) : null}
 
@@ -2057,7 +2104,6 @@ export function GroupsManager() {
                                     event.preventDefault();
                                     openMessageActionMenu(message, event.clientX, event.clientY);
                                   }}
-                                  onDoubleClick={() => toggleMessageHeart(message)}
                                   onTouchStart={(event) => {
                                     if (!canUseActions) return;
                                     const touch = event.touches[0];
@@ -2079,41 +2125,6 @@ export function GroupsManager() {
                                   />
                                 </div>
                               )}
-
-                              {heartReaction &&
-                                heartReaction.count > 0 &&
-                                !message.content.trim() &&
-                                !message.reply_snapshot && (
-                                  <div
-                                    className={cn(
-                                      "relative flex",
-                                      mine ? "justify-end pr-2" : "justify-start pl-2",
-                                    )}
-                                  >
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        "flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs shadow-sm",
-                                        heartReaction.reacted_by_current_user && "border-primary text-primary",
-                                      )}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        setReactionDetailsMessageId((current) =>
-                                          current === message.id ? null : message.id,
-                                        );
-                                      }}
-                                      onMouseEnter={() => setReactionDetailsMessageId(message.id)}
-                                    >
-                                      <Heart className="h-3 w-3 fill-current" />
-                                      {heartReaction.count}
-                                    </button>
-                                    {reactionDetailsMessageId === message.id && (
-                                      <div className="absolute bottom-7 z-30 max-w-56 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-[var(--shadow-popover)]">
-                                        {reactionNames(heartReaction)}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
 
                             </div>
                           </div>
@@ -2170,7 +2181,30 @@ export function GroupsManager() {
           <DialogHeader>
             <DialogTitle>Shared content</DialogTitle>
           </DialogHeader>
-          {attachmentPreview && <AttachmentPreviewContent attachment={attachmentPreview} />}
+          {attachmentPreview && (
+            <>
+              <AttachmentPreviewContent
+                attachment={attachmentPreview.attachment}
+                onAddAuthorBookToLibrary={
+                  attachmentPreview.attachment.type === "author"
+                    ? (book) => void importBookSnapshot(attachmentPreview.message.id, book, book.id)
+                    : undefined
+                }
+                isBookSaved={isBookSnapshotSaved}
+              />
+              {attachmentPreview.message.sender_id !== user?.id && (
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    disabled={saving || savedAttachmentMessageIds.has(attachmentPreview.message.id)}
+                    onClick={() => startAttachmentImport(attachmentPreview.message)}
+                  >
+                    {savedAttachmentMessageIds.has(attachmentPreview.message.id) ? "Added to Library" : "Add to Library"}
+                  </Button>
+                </DialogFooter>
+              )}
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

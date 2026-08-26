@@ -705,14 +705,6 @@ CREATE TABLE IF NOT EXISTS group_messages (
   )
 );
 
-CREATE TABLE IF NOT EXISTS group_message_reactions (
-  message_id uuid NOT NULL REFERENCES group_messages(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  reaction text NOT NULL CHECK (reaction = 'heart'),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (message_id, user_id, reaction)
-);
-
 -- ── INDEXES ───────────────────────────────────────────────
 -- All queries are scoped by user_id; compound index on status
 -- supports the "currently reading" dashboard card query.
@@ -775,9 +767,6 @@ CREATE INDEX IF NOT EXISTS group_messages_attachment_type_idx
 CREATE INDEX IF NOT EXISTS group_messages_reply_to_message_id_idx
   ON group_messages(reply_to_message_id)
   WHERE reply_to_message_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS group_message_reactions_user_id_idx
-  ON group_message_reactions(user_id);
-
 CREATE UNIQUE INDEX IF NOT EXISTS genres_unique_system_sibling_name_idx
   ON genres (COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name))
   WHERE is_system = true;
@@ -806,7 +795,6 @@ ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE group_message_reactions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS authors_select_own ON authors;
 CREATE POLICY authors_select_own
@@ -1819,42 +1807,6 @@ CREATE POLICY "group_messages: sender delete"
   USING (
     auth.uid() = sender_id
     AND is_active_group_member(group_id, auth.uid())
-  );
-
-CREATE POLICY "group_message_reactions: member select"
-  ON group_message_reactions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM group_messages
-      WHERE group_messages.id = group_message_reactions.message_id
-        AND is_active_group_member(group_messages.group_id, auth.uid())
-    )
-  );
-
-CREATE POLICY "group_message_reactions: member insert own"
-  ON group_message_reactions FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id
-    AND EXISTS (
-      SELECT 1
-      FROM group_messages
-      WHERE group_messages.id = group_message_reactions.message_id
-        AND group_messages.deleted_at IS NULL
-        AND is_active_group_member(group_messages.group_id, auth.uid())
-    )
-  );
-
-CREATE POLICY "group_message_reactions: member delete own"
-  ON group_message_reactions FOR DELETE
-  USING (
-    auth.uid() = user_id
-    AND EXISTS (
-      SELECT 1
-      FROM group_messages
-      WHERE group_messages.id = group_message_reactions.message_id
-        AND is_active_group_member(group_messages.group_id, auth.uid())
-    )
   );
 
 -- ── STORAGE ────────────────────────────────────────────────

@@ -5,7 +5,6 @@ import {
   getMessagePreview,
   normalizeChatMessageContent,
   normalizeMessageContent,
-  summarizeHeartReactions,
   sortChatThreads,
 } from "@/lib/chatLogic";
 import {
@@ -25,7 +24,6 @@ import type {
   PublicProfile,
   ChatAttachmentPayload,
   ChatAttachmentType,
-  ChatReaction,
   ChatReplySnapshot,
 } from "@/types";
 
@@ -51,8 +49,6 @@ type NullableMessageRow = Omit<GroupMessage, "edited_at" | "deleted_at"> & {
   reply_snapshot: ChatReplySnapshot | null;
 };
 
-type ReactionRow = ChatReaction;
-
 export type ChatMember = GroupMembership & {
   profile?: PublicProfile;
 };
@@ -74,7 +70,6 @@ export {
   getMessagePreview,
   normalizeChatMessageContent,
   normalizeMessageContent,
-  summarizeHeartReactions,
   sortChatThreads,
 };
 
@@ -112,7 +107,6 @@ function normalizeMessage(row: NullableMessageRow): GroupMessage {
     attachment_payload: row.attachment_payload,
     reply_to_message_id: row.reply_to_message_id,
     reply_snapshot: row.reply_snapshot,
-    reactions: row.reactions ?? [],
     created_at: row.created_at,
     updated_at: row.updated_at,
     edited_at: row.edited_at,
@@ -157,48 +151,6 @@ async function getProfilesById(userIds: string[]): Promise<Map<string, PublicPro
   );
 }
 
-async function getReactionsForMessages(
-  messageIds: string[],
-  currentUserId: string,
-): Promise<Map<string, GroupMessage["reactions"]>> {
-  const uniqueMessageIds = Array.from(new Set(messageIds));
-  if (uniqueMessageIds.length === 0) return new Map();
-
-  const { data, error } = await supabase
-    .from("group_message_reactions")
-    .select("*")
-    .in("message_id", uniqueMessageIds);
-
-  if (error) throw error;
-
-  const reactions = (data ?? []) as ReactionRow[];
-  const profiles = await getProfilesById(reactions.map((reaction) => reaction.user_id));
-  const byMessage = new Map<string, ReactionRow[]>();
-  reactions.forEach((reaction) => {
-    byMessage.set(reaction.message_id, [...(byMessage.get(reaction.message_id) ?? []), reaction]);
-  });
-
-  return new Map(
-    Array.from(byMessage.entries()).map(([messageId, messageReactions]) => [
-      messageId,
-      summarizeHeartReactions({
-        reactions: messageReactions,
-        profiles,
-        currentUserId,
-      }),
-    ]),
-  );
-}
-
-function attachReactionSummaries(
-  messages: GroupMessage[],
-  reactionsByMessageId: Map<string, GroupMessage["reactions"]>,
-): GroupMessage[] {
-  return messages.map((message) => ({
-    ...message,
-    reactions: reactionsByMessageId.get(message.id) ?? [],
-  }));
-}
 
 export async function searchPublicProfiles(
   query: string,
@@ -288,7 +240,7 @@ export async function getChatThreads(currentUserId: string): Promise<ChatThread[
   return sortChatThreads(threads);
 }
 
-export async function getChatMessages(groupId: string, currentUserId: string): Promise<GroupMessage[]> {
+export async function getChatMessages(groupId: string): Promise<GroupMessage[]> {
   const { data, error } = await supabase
     .from("group_messages")
     .select("*")
@@ -297,12 +249,7 @@ export async function getChatMessages(groupId: string, currentUserId: string): P
     .limit(50);
 
   if (error) throw error;
-  const messages = ((data ?? []) as NullableMessageRow[]).map(normalizeMessage).reverse();
-  const reactionsByMessageId = await getReactionsForMessages(
-    messages.map((message) => message.id),
-    currentUserId,
-  );
-  return attachReactionSummaries(messages, reactionsByMessageId);
+  return ((data ?? []) as NullableMessageRow[]).map(normalizeMessage).reverse();
 }
 
 export async function getSavedChatAttachmentMessageIds(messageIds: string[]): Promise<Set<string>> {
@@ -408,35 +355,6 @@ export async function sendChatMessage(
 
   if (error) throw error;
   return normalizeMessage(data as NullableMessageRow);
-}
-
-export async function toggleHeartReaction(
-  message: GroupMessage,
-  currentUserId: string,
-): Promise<void> {
-  const currentReaction = message.reactions?.find((reaction) => reaction.reaction === "heart");
-
-  if (currentReaction?.reacted_by_current_user) {
-    const { error } = await supabase
-      .from("group_message_reactions")
-      .delete()
-      .eq("message_id", message.id)
-      .eq("user_id", currentUserId)
-      .eq("reaction", "heart");
-
-    if (error) throw error;
-    return;
-  }
-
-  const { error } = await supabase
-    .from("group_message_reactions")
-    .insert({
-      message_id: message.id,
-      user_id: currentUserId,
-      reaction: "heart",
-    });
-
-  if (error) throw error;
 }
 
 export async function editChatMessage(messageId: string, content: string): Promise<GroupMessage> {

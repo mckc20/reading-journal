@@ -55,6 +55,14 @@ function sourceUrlForTarget(
       )) as Record<string, unknown> | undefined;
       return typeof sourceBook?.cover_url === "string" ? sourceBook.cover_url : null;
     }
+    if (attachmentType === "author" && sourceBookId) {
+      const author = payload.author as Record<string, unknown> | undefined;
+      const books = Array.isArray(author?.books) ? author.books : [];
+      const sourceBook = books.find((book) => (
+        typeof book === "object" && book !== null && (book as Record<string, unknown>).id === sourceBookId
+      )) as Record<string, unknown> | undefined;
+      return typeof sourceBook?.cover_url === "string" ? sourceBook.cover_url : null;
+    }
     return null;
   }
   if (targetType === "author") {

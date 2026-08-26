@@ -408,7 +408,6 @@ export interface GroupMessage {
   attachment_payload?: ChatAttachmentPayload | null;
   reply_to_message_id?: string | null;
   reply_snapshot?: ChatReplySnapshot | null;
-  reactions?: ChatReactionSummary[];
   created_at: string;
   updated_at: string;
   edited_at?: string | null;
@@ -425,27 +424,6 @@ export interface ChatMessageNotification {
   message_preview: string;
   created_at: string;
   read_at: string | null;
-}
-
-export type ChatReactionType = "heart";
-
-export interface ChatReaction {
-  message_id: string;
-  user_id: string;
-  reaction: ChatReactionType;
-  created_at: string;
-}
-
-export interface ChatReactionParticipant {
-  user_id: string;
-  display_name: string;
-}
-
-export interface ChatReactionSummary {
-  reaction: ChatReactionType;
-  count: number;
-  reacted_by_current_user: boolean;
-  participants: ChatReactionParticipant[];
 }
 
 export interface ChatReplySnapshot {
