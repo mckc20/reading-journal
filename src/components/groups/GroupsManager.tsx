@@ -1188,9 +1188,9 @@ export function GroupsManager() {
     };
   }, [selectedGroupId, user?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     shouldScrollToLatestRef.current = true;
-  }, [selectedGroupId]);
+  }, [mobileThreadOpen, selectedGroupId]);
 
   useLayoutEffect(() => {
     if (messagesLoading || !shouldScrollToLatestRef.current) return;
@@ -1199,7 +1199,7 @@ export function GroupsManager() {
 
     scrollContainer.scrollTop = scrollContainer.scrollHeight;
     shouldScrollToLatestRef.current = false;
-  }, [messages, messagesLoading, selectedGroupId]);
+  }, [messages, messagesLoading, mobileThreadOpen, selectedGroupId]);
 
   useEffect(() => {
     setSelectedReply(null);
@@ -2512,7 +2512,7 @@ export function GroupsManager() {
 
       <div
         ref={messagesLayoutRef}
-        className="grid h-[calc(100svh-8rem)] min-h-[38rem] lg:h-[calc(100svh-4rem)] lg:grid-cols-[var(--chat-list-width)_var(--panel-resize-handle-width)_minmax(0,1fr)]"
+        className="grid h-[calc(100svh-8rem)] min-h-0 overflow-hidden lg:h-[calc(100svh-4rem)] lg:grid-cols-[var(--chat-list-width)_var(--panel-resize-handle-width)_minmax(0,1fr)]"
         style={{
           "--chat-list-width": `${panelWidths.chats}px`,
           "--chat-details-width": `${panelWidths.details}px`,
@@ -2649,7 +2649,7 @@ export function GroupsManager() {
                 )}
               >
                 <div className={cn("min-h-0 min-w-0 flex-col", settingsOpen ? "hidden lg:flex" : "flex")}>
-                  <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6">
+                  <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto bg-background p-4 sm:p-6">
                     {messagesLoading ? (
                       <p className="text-sm text-muted-foreground">Loading messages...</p>
                     ) : messages.length === 0 ? (
@@ -2799,7 +2799,7 @@ export function GroupsManager() {
               </div>
             </div>
           ) : (
-            <div className="flex h-full min-h-[38rem] items-center justify-center">
+            <div className="flex h-full min-h-0 items-center justify-center">
               <div className="p-6 text-center">
                 <MessageCircle className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
                 <p className="font-medium">No chat selected</p>
