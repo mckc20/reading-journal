@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -109,6 +109,17 @@ import type {
 
 type AttachmentPickerMode = "book" | "note" | "author" | "series";
 type JournalTargetKind = "book" | "series" | "author";
+
+type SwipeReplyGesture = {
+  messageId: string;
+  startX: number;
+  startY: number;
+  direction: "pending" | "horizontal" | "vertical";
+};
+
+const SWIPE_REPLY_TRIGGER_DISTANCE = 80;
+const SWIPE_REPLY_MAX_DISTANCE = 104;
+const SWIPE_DIRECTION_LOCK_DISTANCE = 10;
 
 type JournalAttachmentPickerItem = {
   sourceType: JournalTargetKind;
@@ -384,7 +395,7 @@ function ReplyPreview({
   return (
     <div className={cn("flex gap-2 rounded-md border-l-4 border-primary/70 bg-background/70 px-3 py-2", compact && "py-1.5")}>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-primary">Note to {reply.sender_name}</p>
+        <p className="truncate text-xs font-medium text-primary">Reply to {reply.sender_name}</p>
         <p className="line-clamp-1 text-xs text-muted-foreground">
           {reply.attachment_title ? `${reply.attachment_title}: ` : ""}
           {reply.text}
@@ -749,6 +760,8 @@ export function GroupsManager() {
   const [selectedAttachment, setSelectedAttachment] = useState<ChatAttachmentPayload | null>(null);
   const [selectedReply, setSelectedReply] = useState<ChatReplySnapshot | null>(null);
   const [messageActionMenu, setMessageActionMenu] = useState<MessageActionMenu | null>(null);
+  const [swipeReplyMessageId, setSwipeReplyMessageId] = useState<string | null>(null);
+  const [swipeReplyOffset, setSwipeReplyOffset] = useState(0);
   const [attachmentSaveReceipts, setAttachmentSaveReceipts] = useState<ChatAttachmentSaveReceipt[]>([]);
   const [attachmentSaveReceiptsLoading, setAttachmentSaveReceiptsLoading] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreviewState | null>(null);
@@ -765,6 +778,7 @@ export function GroupsManager() {
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const shouldScrollToLatestRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
+  const swipeReplyGestureRef = useRef<SwipeReplyGesture | null>(null);
   const attachmentPickerRef = useRef<HTMLDivElement>(null);
   const attachmentAddButtonRef = useRef<HTMLButtonElement>(null);
   const messagesLayoutRef = useRef<HTMLDivElement>(null);
@@ -1190,6 +1204,9 @@ export function GroupsManager() {
   useEffect(() => {
     setSelectedReply(null);
     setMessageActionMenu(null);
+    setSwipeReplyMessageId(null);
+    setSwipeReplyOffset(0);
+    swipeReplyGestureRef.current = null;
     setSettingsOpen(false);
   }, [selectedGroupId]);
 
@@ -1211,6 +1228,69 @@ export function GroupsManager() {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  }
+
+  function resetSwipeReplyGesture() {
+    swipeReplyGestureRef.current = null;
+    setSwipeReplyMessageId(null);
+    setSwipeReplyOffset(0);
+  }
+
+  function startMessageTouch(message: GroupMessage, event: ReactTouchEvent<HTMLDivElement>) {
+    if (event.touches.length !== 1 || !window.matchMedia("(max-width: 1023px)").matches) return;
+
+    const touch = event.touches[0];
+    swipeReplyGestureRef.current = {
+      messageId: message.id,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      direction: "pending",
+    };
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      openMessageActionMenu(message, touch.clientX, touch.clientY);
+      resetSwipeReplyGesture();
+    }, 550);
+  }
+
+  function moveMessageTouch(event: ReactTouchEvent<HTMLDivElement>) {
+    const gesture = swipeReplyGestureRef.current;
+    if (!gesture || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - gesture.startX;
+    const deltaY = touch.clientY - gesture.startY;
+
+    if (gesture.direction === "pending") {
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < SWIPE_DIRECTION_LOCK_DISTANCE) return;
+      gesture.direction = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+    }
+
+    if (gesture.direction !== "horizontal") {
+      clearLongPressTimer();
+      return;
+    }
+
+    clearLongPressTimer();
+    if (event.cancelable) event.preventDefault();
+
+    const offset = -Math.min(Math.max(-deltaX, 0), SWIPE_REPLY_MAX_DISTANCE);
+    setSwipeReplyMessageId(gesture.messageId);
+    setSwipeReplyOffset(offset);
+  }
+
+  function endMessageTouch(message: GroupMessage, event: ReactTouchEvent<HTMLDivElement>) {
+    const gesture = swipeReplyGestureRef.current;
+    clearLongPressTimer();
+
+    if (!gesture || gesture.messageId !== message.id) return;
+
+    const touch = event.changedTouches[0];
+    const distance = touch ? gesture.startX - touch.clientX : 0;
+    const shouldReply = gesture.direction === "horizontal" && distance >= SWIPE_REPLY_TRIGGER_DISTANCE;
+    resetSwipeReplyGesture();
+
+    if (shouldReply) startReply(message, memberProfiles.get(message.sender_id));
   }
 
   function openMessageActionMenu(message: GroupMessage, x: number, y: number) {
@@ -2383,11 +2463,12 @@ export function GroupsManager() {
         >
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+            className="flex h-9 w-9 items-center justify-center rounded-sm hover:bg-muted"
+            aria-label="Reply"
+            title="Reply"
             onClick={() => startReply(actionMenuMessage, actionMenuSenderProfile)}
           >
             <Reply className="h-4 w-4" />
-            Note
           </button>
           {actionMenuMessage.content.trim() && (
             <button
@@ -2578,7 +2659,7 @@ export function GroupsManager() {
                         const mine = message.sender_id === user?.id;
                         const senderProfile = memberProfiles.get(message.sender_id);
                         const editing = editingMessageId === message.id;
-                        const canUseActions = !message.deleted_at;
+                        const canUseActions = !message.deleted_at && !editing;
                         const isGroupChat = selectedThread.group.kind === "group";
                         const showDate = index === 0 || messageDayKey(messages[index - 1].created_at) !== messageDayKey(message.created_at);
 
@@ -2591,7 +2672,38 @@ export function GroupsManager() {
                             )}
                             <div className={cn("flex gap-3", mine && "justify-end")}>
                             {isGroupChat && !mine && <MessageAvatar profile={senderProfile} fallback={message.sender_id} />}
-                            <div className={cn("max-w-[min(34rem,80%)] space-y-1", mine && "items-end")}>
+                            <div
+                              className={cn("relative max-w-[min(34rem,80%)] touch-pan-y", mine && "items-end")}
+                              onContextMenu={(event) => {
+                                if (!canUseActions) return;
+                                event.preventDefault();
+                                openMessageActionMenu(message, event.clientX, event.clientY);
+                              }}
+                              onTouchStart={(event) => {
+                                if (canUseActions) startMessageTouch(message, event);
+                              }}
+                              onTouchMove={moveMessageTouch}
+                              onTouchEnd={(event) => endMessageTouch(message, event)}
+                              onTouchCancel={() => {
+                                clearLongPressTimer();
+                                resetSwipeReplyGesture();
+                              }}
+                            >
+                              {canUseActions && (
+                                <div
+                                  className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-primary lg:hidden"
+                                  aria-hidden="true"
+                                >
+                                  <Reply className="h-5 w-5" />
+                                </div>
+                              )}
+                              <div
+                                className={cn(
+                                  "relative space-y-1",
+                                  swipeReplyMessageId === message.id ? "transition-none" : "transition-transform duration-200 ease-out",
+                                )}
+                                style={swipeReplyMessageId === message.id ? { transform: `translateX(${swipeReplyOffset}px)` } : undefined}
+                              >
                               {editing ? (
                                 <div className="space-y-2">
                                   <Textarea
@@ -2631,22 +2743,6 @@ export function GroupsManager() {
                                         : "rounded-bl-sm bg-muted text-foreground",
                                       message.deleted_at && "italic text-muted-foreground",
                                     )}
-                                    onContextMenu={(event) => {
-                                      if (!canUseActions) return;
-                                      event.preventDefault();
-                                      openMessageActionMenu(message, event.clientX, event.clientY);
-                                    }}
-                                    onTouchStart={(event) => {
-                                      if (!canUseActions) return;
-                                      const touch = event.touches[0];
-                                      clearLongPressTimer();
-                                      longPressTimerRef.current = window.setTimeout(() => {
-                                        openMessageActionMenu(message, touch.clientX, touch.clientY);
-                                      }, 550);
-                                    }}
-                                    onTouchMove={clearLongPressTimer}
-                                    onTouchEnd={clearLongPressTimer}
-                                    onTouchCancel={clearLongPressTimer}
                                   >
                                     {isGroupChat && (
                                       <p className={cn("text-xs font-medium", mine ? "text-primary-foreground/85" : "text-muted-foreground")}>
@@ -2668,24 +2764,7 @@ export function GroupsManager() {
                               ) : null}
 
                               {!message.deleted_at && (
-                                <div
-                                  onContextMenu={(event) => {
-                                    if (!canUseActions) return;
-                                    event.preventDefault();
-                                    openMessageActionMenu(message, event.clientX, event.clientY);
-                                  }}
-                                  onTouchStart={(event) => {
-                                    if (!canUseActions) return;
-                                    const touch = event.touches[0];
-                                    clearLongPressTimer();
-                                    longPressTimerRef.current = window.setTimeout(() => {
-                                      openMessageActionMenu(message, touch.clientX, touch.clientY);
-                                    }, 550);
-                                  }}
-                                  onTouchMove={clearLongPressTimer}
-                                  onTouchEnd={clearLongPressTimer}
-                                  onTouchCancel={clearLongPressTimer}
-                                >
+                                <div>
                                   <AttachmentCard
                                     message={message}
                                     mine={mine}
@@ -2696,7 +2775,7 @@ export function GroupsManager() {
                                   />
                                 </div>
                               )}
-
+                              </div>
                             </div>
                           </div>
                           </div>
