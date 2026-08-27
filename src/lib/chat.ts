@@ -289,7 +289,7 @@ export async function getChatNotificationPreferences(groupId: string): Promise<C
   if (error) throw error;
   return {
     isMuted: Boolean(data?.is_muted),
-    saveReceipts: Boolean(data?.save_receipts),
+    saveReceipts: data ? Boolean(data.save_receipts) : true,
   };
 }
 

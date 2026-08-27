@@ -737,7 +737,7 @@ export function GroupsManager() {
   const [chatSettingsMenuOpen, setChatSettingsMenuOpen] = useState(false);
   const [chatSettingsMenuPosition, setChatSettingsMenuPosition] = useState<ChatSettingsMenuPosition | null>(null);
   const [chatMuted, setChatMuted] = useState(false);
-  const [chatSaveReceipts, setChatSaveReceipts] = useState(false);
+  const [chatSaveReceipts, setChatSaveReceipts] = useState(true);
   const [savingChatPreference, setSavingChatPreference] = useState(false);
   const [panelWidths, setPanelWidths] = useState<ChatPanelWidths>(getStoredChatPanelWidths);
   const [savingAttachmentMessageIds, setSavingAttachmentMessageIds] = useState<Set<string>>(new Set());
@@ -1040,7 +1040,7 @@ export function GroupsManager() {
   useEffect(() => {
     if (!selectedGroupId || !user) {
       setChatMuted(false);
-      setChatSaveReceipts(false);
+      setChatSaveReceipts(true);
       return;
     }
 
