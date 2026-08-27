@@ -2672,7 +2672,7 @@ export function GroupsManager() {
                             )}
                             <div className={cn("relative flex gap-3", mine && "justify-end")}>
                             {isGroupChat && !mine && <MessageAvatar profile={senderProfile} fallback={message.sender_id} />}
-                            {canUseActions && (
+                            {canUseActions && swipeReplyMessageId === message.id && (
                               <div
                                 className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-primary lg:hidden"
                                 aria-hidden="true"
