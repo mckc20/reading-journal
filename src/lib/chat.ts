@@ -64,6 +64,21 @@ export type ChatThread = {
   unreadCount: number;
 };
 
+export type ChatNotificationPreferences = {
+  isMuted: boolean;
+  saveReceipts: boolean;
+};
+
+export type ChatAttachmentSaveReceipt = {
+  userId: string;
+  displayName: string;
+};
+
+type ChatAttachmentSaveReceiptRow = {
+  user_id: string;
+  display_name: string;
+};
+
 export {
   buildReplySnapshot,
   countUnreadMessages,
@@ -262,6 +277,50 @@ export async function getSavedChatAttachmentMessageIds(messageIds: string[]): Pr
   if (error) throw error;
 
   return new Set((data ?? []).map((row) => String(row.message_id)));
+}
+
+export async function getChatNotificationPreferences(groupId: string): Promise<ChatNotificationPreferences> {
+  const { data, error } = await supabase
+    .from("chat_notification_preferences")
+    .select("is_muted, save_receipts")
+    .eq("group_id", groupId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return {
+    isMuted: Boolean(data?.is_muted),
+    saveReceipts: Boolean(data?.save_receipts),
+  };
+}
+
+export async function setChatNotificationPreferences(
+  userId: string,
+  groupId: string,
+  preferences: ChatNotificationPreferences,
+): Promise<void> {
+  const { error } = await supabase
+    .from("chat_notification_preferences")
+    .upsert({
+      user_id: userId,
+      group_id: groupId,
+      is_muted: preferences.isMuted,
+      save_receipts: preferences.saveReceipts,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,group_id" });
+
+  if (error) throw error;
+}
+
+export async function getChatAttachmentSaveReceipts(messageId: string): Promise<ChatAttachmentSaveReceipt[]> {
+  const { data, error } = await supabase.rpc("get_chat_attachment_save_receipts", {
+    target_message_id: messageId,
+  });
+
+  if (error) throw error;
+  return ((data ?? []) as ChatAttachmentSaveReceiptRow[]).map((receipt) => ({
+    userId: String(receipt.user_id),
+    displayName: String(receipt.display_name),
+  }));
 }
 
 export async function saveChatAttachment(userId: string, messageId: string): Promise<void> {
