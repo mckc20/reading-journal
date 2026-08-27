@@ -2670,8 +2670,16 @@ export function GroupsManager() {
                                 {formatMessageDate(message.created_at)}
                               </div>
                             )}
-                            <div className={cn("flex gap-3", mine && "justify-end")}>
+                            <div className={cn("relative flex gap-3", mine && "justify-end")}>
                             {isGroupChat && !mine && <MessageAvatar profile={senderProfile} fallback={message.sender_id} />}
+                            {canUseActions && (
+                              <div
+                                className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-primary lg:hidden"
+                                aria-hidden="true"
+                              >
+                                <Reply className="h-5 w-5" />
+                              </div>
+                            )}
                             <div
                               className={cn("relative max-w-[min(34rem,80%)] touch-pan-y", mine && "items-end")}
                               onContextMenu={(event) => {
@@ -2689,14 +2697,6 @@ export function GroupsManager() {
                                 resetSwipeReplyGesture();
                               }}
                             >
-                              {canUseActions && (
-                                <div
-                                  className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-primary lg:hidden"
-                                  aria-hidden="true"
-                                >
-                                  <Reply className="h-5 w-5" />
-                                </div>
-                              )}
                               <div
                                 className={cn(
                                   "relative space-y-1",
