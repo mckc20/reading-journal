@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
 
-export function json(response: VercelResponse, status: number, body: Record<string, unknown>): void {
+export function json(response: VercelResponse, status: number, body: unknown): void {
   response.status(status).json(body);
 }
 
