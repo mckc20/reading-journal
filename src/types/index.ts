@@ -16,6 +16,14 @@ export type BookMetadataSource = "open_library" | "google_books";
 
 export type SeriesStatus = "ongoing" | "completed";
 
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  key_prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
 export interface Series {
   id: string;
   name: string;

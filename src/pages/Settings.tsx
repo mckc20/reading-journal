@@ -3,6 +3,8 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import {
   Bell,
   BookOpen,
+  Check,
+  Copy,
   Database,
   Download,
   ImagePlus,
@@ -12,6 +14,7 @@ import {
   ListTree,
   LogOut,
   Monitor,
+  Plus,
   Save,
   Shield,
   Trash2,
@@ -39,6 +42,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth, useProfile, useTheme, useUserSettings } from "@/context";
 import { useGenresContext } from "@/context/GenresContext";
 import { getErrorMessage } from "@/lib/profiles";
@@ -57,6 +68,7 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   AccentColor,
+  ApiKeySummary,
   AppearanceSettings as AppearanceSettingsValues,
   BackupFrequency,
   BookCoverStyle,
@@ -77,6 +89,7 @@ import type {
   ReadingSettings as ReadingSettingsValues,
 } from "@/types";
 import { getLatestReleaseNote, hasUnreadReleaseNote } from "@/lib/releaseNotes";
+import { createApiKey, listApiKeys, revokeApiKey, type CreatedApiKey } from "@/lib/apiKeys";
 
 type SettingsTab =
   | "profile"
@@ -85,6 +98,7 @@ type SettingsTab =
   | "genres"
   | "notifications"
   | "account"
+  | "api-keys"
   | "about";
 
 type ProfileSettingsForm = {
@@ -111,6 +125,7 @@ const settingsTabs: Array<{
   { value: "genres", label: "Genres", icon: ListTree },
   { value: "notifications", label: "Notifications", icon: Bell },
   { value: "account", label: "Account", icon: Shield },
+  { value: "api-keys", label: "API Keys", icon: KeyRound },
   { value: "about", label: "About", icon: Info },
 ];
 
@@ -960,6 +975,242 @@ function NotificationSettings() {
   );
 }
 
+function formatApiKeyDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function ApiKeysSettings() {
+  const { user } = useAuth();
+  const [keys, setKeys] = useState<ApiKeySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [keyName, setKeyName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [keyToRevoke, setKeyToRevoke] = useState<ApiKeySummary | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadKeys() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const nextKeys = await listApiKeys();
+        if (active) setKeys(nextKeys);
+      } catch (loadError) {
+        if (active) setError(getErrorMessage(loadError, "Could not load API keys."));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadKeys();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function handleCreateOpenChange(open: boolean) {
+    setCreateOpen(open);
+    if (!open) {
+      setKeyName("");
+      setCreateError(null);
+    }
+  }
+
+  function handleCreatedKeyOpenChange(open: boolean) {
+    if (!open) {
+      setCreatedKey(null);
+      setCopyMessage(null);
+    }
+  }
+
+  async function submitCreateKey(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) {
+      setCreateError("You must be signed in to create an API key.");
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      const newKey = await createApiKey(user.id, keyName);
+      setKeys((current) => [newKey.key, ...current]);
+      setCreateOpen(false);
+      setKeyName("");
+      setCreatedKey(newKey);
+    } catch (createKeyError) {
+      setCreateError(getErrorMessage(createKeyError, "Could not create API key."));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function copyCreatedKey() {
+    if (!createdKey) return;
+
+    setCopyMessage(null);
+    try {
+      await navigator.clipboard.writeText(createdKey.rawKey);
+      setCopyMessage("Copied to clipboard.");
+    } catch {
+      setCopyMessage("Could not copy automatically. Select the key and copy it manually.");
+    }
+  }
+
+  async function confirmRevoke() {
+    if (!keyToRevoke) return;
+
+    setRevoking(true);
+    setError(null);
+
+    try {
+      await revokeApiKey(keyToRevoke.id);
+      setKeys((current) => current.filter((key) => key.id !== keyToRevoke.id));
+      setKeyToRevoke(null);
+    } catch (revokeError) {
+      setError(getErrorMessage(revokeError, "Could not revoke API key."));
+    } finally {
+      setRevoking(false);
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection
+        title="API keys"
+        description="Create credentials for the Reading Journal programmatic API."
+        icon={KeyRound}
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              API keys work like passwords for apps and shortcuts. Keep them private and revoke a key if you no longer use it.
+            </p>
+            <Button type="button" onClick={() => setCreateOpen(true)} disabled={loading || !user}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create key
+            </Button>
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading API keys…</p>
+          ) : keys.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+              You have not created any API keys yet.
+            </div>
+          ) : (
+            <SettingsRows>
+              {keys.map((key) => (
+                <SettingRow
+                  key={key.id}
+                  title={key.name}
+                  description={`${key.key_prefix}… · Created ${formatApiKeyDate(key.created_at)} · ${key.last_used_at ? `Last used ${formatApiKeyDate(key.last_used_at)}` : "Never used"}`}
+                >
+                  <Button type="button" variant="outline" size="sm" onClick={() => setKeyToRevoke(key)}>
+                    Revoke
+                  </Button>
+                </SettingRow>
+              ))}
+            </SettingsRows>
+          )}
+        </div>
+      </SettingsSection>
+
+      <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create API key</DialogTitle>
+            <DialogDescription>
+              Give this key a recognizable name, such as “Phone shortcut” or “Desktop script”.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={submitCreateKey}>
+            <div className="space-y-2">
+              <Label htmlFor="api-key-name">Key name</Label>
+              <Input
+                id="api-key-name"
+                value={keyName}
+                onChange={(event) => setKeyName(event.target.value)}
+                placeholder="Phone shortcut"
+                autoFocus
+                disabled={creating}
+              />
+              {createError && <p className="text-sm text-destructive">{createError}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleCreateOpenChange(false)} disabled={creating}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating || !keyName.trim()}>
+                {creating ? "Creating…" : "Create key"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(createdKey)} onOpenChange={handleCreatedKeyOpenChange}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Copy your API key now</DialogTitle>
+            <DialogDescription>
+              Copy this now — you won’t be able to see it again after closing this dialog.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="created-api-key">API key</Label>
+            <Input id="created-api-key" value={createdKey?.rawKey ?? ""} readOnly onFocus={(event) => event.currentTarget.select()} />
+            {copyMessage && <p className="text-sm text-muted-foreground">{copyMessage}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => handleCreatedKeyOpenChange(false)}>
+              I copied it
+            </Button>
+            <Button type="button" onClick={() => void copyCreatedKey()}>
+              {copyMessage === "Copied to clipboard." ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              Copy key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(keyToRevoke)} onOpenChange={(open) => !open && setKeyToRevoke(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke API key?</DialogTitle>
+            <DialogDescription>
+              {keyToRevoke ? `“${keyToRevoke.name}” will stop working immediately. This cannot be undone.` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setKeyToRevoke(null)} disabled={revoking}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmRevoke()} disabled={revoking}>
+              {revoking ? "Revoking…" : "Revoke key"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function AccountSettings() {
   const { user, signOut } = useAuth();
   const { settings, loading, saving, error, saveSettingsSection } = useUserSettings();
@@ -1260,6 +1511,7 @@ function SettingsTabContent({ tab }: { tab: SettingsTab }) {
   if (tab === "genres") return <GenreSettings />;
   if (tab === "notifications") return <NotificationSettings />;
   if (tab === "account") return <AccountSettings />;
+  if (tab === "api-keys") return <ApiKeysSettings />;
   return <AboutSettings />;
 }
 
