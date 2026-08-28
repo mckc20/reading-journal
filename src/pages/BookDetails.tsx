@@ -720,6 +720,7 @@ export default function BookDetails() {
   const totalPages = book.total_pages ?? 0;
   const isPaused = book.status === "Paused";
   const isReading = book.status === "Reading";
+  const readingActionLabel = book.status === "Finished" ? "Reread" : "Start Reading";
   const hasSecondaryMetadata = Boolean(publicationYear || book.source || book.isbn);
   const readingProgressStats: ProgressStat[] =
     isReading
@@ -1073,7 +1074,7 @@ export default function BookDetails() {
                   setIsProgressDialogOpen(true);
                 }}
               >
-                Start Reading
+                {readingActionLabel}
               </Button>
             )}
             <Button asChild type="button" variant="outline">
