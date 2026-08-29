@@ -75,6 +75,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   reading_reminders: false,
   weekly_summary: false,
   daily_goal_reminders: false,
+  chat_notifications: true,
   goal_completion_notifications: true,
   friend_activity_notifications: false,
   new_follower_notifications: false,
@@ -85,6 +86,7 @@ export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   show_reading_activity: false,
   show_reading_statistics_publicly: false,
   show_reading_goals_publicly: false,
+  chat_save_receipts: true,
   allow_followers: false,
   blocked_users: [],
 };

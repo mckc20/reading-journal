@@ -1,13 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from "react";
-import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
   CircleCheck,
   CirclePlus,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   FileSearchCorner,
   LibraryBig,
@@ -17,11 +14,9 @@ import {
   Plus,
   Reply,
   Send,
-  Settings,
   Sticker,
   StickyNote,
   Trash2,
-  UserPlus,
   UserRound,
   Users,
   X,
@@ -62,8 +57,6 @@ import {
   noteSnapshotToCreateInput,
 } from "@/lib/chatAttachments";
 import {
-  addGroupMemberByUsername,
-  changeGroupMemberRole,
   copyChatAttachmentImage,
   deleteChatMessage,
   editChatMessage,
@@ -71,22 +64,19 @@ import {
   getChatAttachmentSaveReceipts,
   getChatMembers,
   getChatMessages,
-  getChatNotificationPreferences,
   getSavedChatAttachmentMessageIds,
   getChatThreads,
   getMessagePreview,
   markChatRead,
-  removeChatMember,
   sendChatMessage,
   saveChatAttachment,
-  setChatNotificationPreferences,
   toChatErrorMessage,
   type ChatAttachmentSaveReceipt,
   type ChatMember,
   type ChatThread,
 } from "@/lib/chat";
 import { supabase } from "@/lib/supabase";
-import { buildAuthorSummaries } from "@/lib/authorShelf";
+import { buildAuthorSummaries, getAuthorInitials } from "@/lib/authorShelf";
 import { createBookJournalEntryRecord, fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { createSeriesJournalEntryRecord, fetchAllSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import { createAuthorJournalEntryRecord, fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
@@ -102,7 +92,6 @@ import type {
   ChatSharedNoteSnapshot,
   GroupMessage,
   PublicProfile,
-  GroupMembershipRole,
   Series,
   SeriesJournalEntryRecord,
 } from "@/types";
@@ -135,10 +124,7 @@ type OpenAttachmentState =
   | { type: "author"; authorName: string }
   | { type: "series"; seriesId: string };
 
-type ConfirmAction =
-  | { type: "message"; messageId: string }
-  | { type: "member"; userId: string }
-  | { type: "leave"; userId: string };
+type ConfirmAction = { type: "message"; messageId: string };
 
 type MessageActionMenu = {
   messageId: string;
@@ -158,21 +144,17 @@ type AttachmentSaveFeedback = {
 
 type ChatPanelWidths = {
   chats: number;
-  details: number;
-};
-
-type ChatSettingsMenuPosition = {
-  top: number;
-  right: number;
 };
 
 const CHAT_PANEL_WIDTHS_STORAGE_KEY = "reading-journal:messages-panel-widths";
-const DEFAULT_CHAT_PANEL_WIDTHS: ChatPanelWidths = { chats: 352, details: 304 };
+const DEFAULT_CHAT_PANEL_WIDTHS: ChatPanelWidths = { chats: 352 };
 const CHAT_LIST_MIN_WIDTH = 256;
-const CHAT_DETAILS_MIN_WIDTH = 288;
 const CHAT_PANEL_MAX_WIDTH = 480;
 const CHAT_CONVERSATION_MIN_WIDTH = 360;
 const PANEL_RESIZE_HANDLE_WIDTH = 6;
+const ATTACHMENT_PICKER_DEFAULT_HEIGHT = 480;
+const ATTACHMENT_PICKER_MIN_HEIGHT = 280;
+const ATTACHMENT_PICKER_MAX_HEIGHT = 720;
 
 function getStoredChatPanelWidths(): ChatPanelWidths {
   if (typeof window === "undefined") return DEFAULT_CHAT_PANEL_WIDTHS;
@@ -181,7 +163,6 @@ function getStoredChatPanelWidths(): ChatPanelWidths {
     const stored = JSON.parse(window.localStorage.getItem(CHAT_PANEL_WIDTHS_STORAGE_KEY) ?? "null") as Partial<ChatPanelWidths> | null;
     return {
       chats: typeof stored?.chats === "number" ? stored.chats : DEFAULT_CHAT_PANEL_WIDTHS.chats,
-      details: typeof stored?.details === "number" ? stored.details : DEFAULT_CHAT_PANEL_WIDTHS.details,
     };
   } catch {
     return DEFAULT_CHAT_PANEL_WIDTHS;
@@ -189,71 +170,16 @@ function getStoredChatPanelWidths(): ChatPanelWidths {
 }
 
 function getChatPanelWidthBounds({
-  panel,
   containerWidth,
-  widths,
-  detailsVisible,
 }: {
-  panel: keyof ChatPanelWidths;
   containerWidth: number;
-  widths: ChatPanelWidths;
-  detailsVisible: boolean;
 }): { min: number; max: number } {
-  const min = panel === "chats" ? CHAT_LIST_MIN_WIDTH : CHAT_DETAILS_MIN_WIDTH;
-  const otherPanelWidth = panel === "chats" && detailsVisible
-    ? widths.details
-    : panel === "details"
-      ? widths.chats
-      : 0;
-  const handleCount = detailsVisible ? 2 : 1;
-  const availableMax = containerWidth - otherPanelWidth - CHAT_CONVERSATION_MIN_WIDTH - handleCount * PANEL_RESIZE_HANDLE_WIDTH;
+  const availableMax = containerWidth - CHAT_CONVERSATION_MIN_WIDTH - PANEL_RESIZE_HANDLE_WIDTH;
 
   return {
-    min,
-    max: Math.max(min, Math.min(CHAT_PANEL_MAX_WIDTH, availableMax)),
+    min: CHAT_LIST_MIN_WIDTH,
+    max: Math.max(CHAT_LIST_MIN_WIDTH, Math.min(CHAT_PANEL_MAX_WIDTH, availableMax)),
   };
-}
-
-function ChatSettingToggle({
-  label,
-  description,
-  checked,
-  disabled = false,
-  onCheckedChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  disabled?: boolean;
-  onCheckedChange?: (checked: boolean) => void;
-}) {
-  return (
-    <div className={cn("flex items-start gap-3 py-2", disabled && "opacity-55")}>
-      <button
-        type="button"
-        role="switch"
-        aria-label={label}
-        aria-checked={checked}
-        disabled={disabled}
-        className={cn(
-          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
-          checked ? "bg-primary" : "bg-muted-foreground/35",
-        )}
-        onClick={() => onCheckedChange?.(!checked)}
-      >
-        <span
-          className={cn(
-            "absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-background shadow-sm transition-transform",
-            checked ? "translate-x-4" : "translate-x-0",
-          )}
-        />
-      </button>
-      <div className="min-w-0">
-        <p className="text-sm font-medium leading-5">{label}</p>
-        {description && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>}
-      </div>
-    </div>
-  );
 }
 
 function formatMessageTime(value: string): string {
@@ -278,11 +204,6 @@ function messageDayKey(value: string): string {
 function profileLabel(profile?: PublicProfile): string {
   if (!profile) return "Unknown user";
   return profile.display_name?.trim() || profile.username?.trim() || "Unknown user";
-}
-
-function profileSubLabel(profile?: PublicProfile): string {
-  if (profile?.username) return `@${profile.username}`;
-  return "No username";
 }
 
 function initialsFor(profile?: PublicProfile, fallback = "?"): string {
@@ -347,19 +268,6 @@ function attachmentTypeLabel(attachment: ChatAttachmentPayload): string {
   if (attachment.type === "note") return noteLabel(attachment.note.label);
   if (attachment.type === "author") return "Author";
   return "Series";
-}
-
-function attachmentHref(attachment: ChatAttachmentPayload): string | null {
-  if (attachment.type === "book") return attachment.book.id ? `/books/${attachment.book.id}` : null;
-  if (attachment.type === "note") {
-    if (!attachment.note.book_id) return null;
-    return `/books/${attachment.note.book_id}/journal`;
-  }
-  if (attachment.type === "author") {
-    return `/authors/${encodeURIComponent(attachment.author.id ?? attachment.author.name)}`;
-  }
-  if (attachment.series.id) return `/series/${attachment.series.id}`;
-  return null;
 }
 
 function sortSeriesByName(series: Series[]): Series[] {
@@ -739,24 +647,17 @@ export function GroupsManager() {
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [seriesJournalEntries, setSeriesJournalEntries] = useState<SeriesJournalEntryRecord[]>([]);
   const [authorJournalEntries, setAuthorJournalEntries] = useState<AuthorJournalEntryRecord[]>([]);
-  const [memberUsername, setMemberUsername] = useState("");
   const [messageText, setMessageText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [chatSettingsMenuOpen, setChatSettingsMenuOpen] = useState(false);
-  const [chatSettingsMenuPosition, setChatSettingsMenuPosition] = useState<ChatSettingsMenuPosition | null>(null);
-  const [chatMuted, setChatMuted] = useState(false);
-  const [chatSaveReceipts, setChatSaveReceipts] = useState(true);
-  const [savingChatPreference, setSavingChatPreference] = useState(false);
   const [panelWidths, setPanelWidths] = useState<ChatPanelWidths>(getStoredChatPanelWidths);
   const [savingAttachmentMessageIds, setSavingAttachmentMessageIds] = useState<Set<string>>(new Set());
   const [addChatOpen, setAddChatOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [attachmentPicker, setAttachmentPicker] = useState<AttachmentPickerMode | null>(null);
   const [attachmentSearch, setAttachmentSearch] = useState("");
-  const [attachmentPickerHeight, setAttachmentPickerHeight] = useState(360);
+  const [attachmentPickerHeight, setAttachmentPickerHeight] = useState(ATTACHMENT_PICKER_DEFAULT_HEIGHT);
   const [selectedAttachment, setSelectedAttachment] = useState<ChatAttachmentPayload | null>(null);
   const [selectedReply, setSelectedReply] = useState<ChatReplySnapshot | null>(null);
   const [messageActionMenu, setMessageActionMenu] = useState<MessageActionMenu | null>(null);
@@ -784,8 +685,6 @@ export function GroupsManager() {
   const messagesLayoutRef = useRef<HTMLDivElement>(null);
   const attachmentSaveInFlightRef = useRef(new Set<string>());
   const attachmentSaveReceiptRequestRef = useRef(0);
-  const chatSettingsMenuRef = useRef<HTMLDivElement>(null);
-  const chatSettingsTriggerRef = useRef<HTMLButtonElement>(null);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.group.id === selectedGroupId) ?? null,
@@ -797,11 +696,6 @@ export function GroupsManager() {
     [members, user?.id],
   );
 
-  const sharedAttachments = useMemo(
-    () => messages.flatMap((message) => message.attachment_payload ? [{ id: message.id, attachment: message.attachment_payload }] : []),
-    [messages],
-  );
-
   const memberProfiles = useMemo(
     () =>
       new Map(
@@ -811,10 +705,6 @@ export function GroupsManager() {
       ),
     [members],
   );
-
-  const canManageSelectedGroup =
-    selectedThread?.group.kind === "group" &&
-    ["owner", "admin"].includes(selectedThread.currentMembership.role);
 
   const booksById = useMemo(
     () => new Map(books.map((book) => [book.id, book])),
@@ -979,41 +869,6 @@ export function GroupsManager() {
   }, [attachmentPicker]);
 
   useEffect(() => {
-    if (!chatSettingsMenuOpen) return;
-
-    function closeChatSettingsMenu(event: PointerEvent) {
-      const target = event.target as Node;
-      if (!chatSettingsMenuRef.current?.contains(target) && !chatSettingsTriggerRef.current?.contains(target)) {
-        setChatSettingsMenuOpen(false);
-        setChatSettingsMenuPosition(null);
-      }
-    }
-
-    function closeChatSettingsMenuWithKeyboard(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setChatSettingsMenuOpen(false);
-      setChatSettingsMenuPosition(null);
-      chatSettingsTriggerRef.current?.focus();
-    }
-
-    function closeChatSettingsMenuForViewportChange() {
-      setChatSettingsMenuOpen(false);
-      setChatSettingsMenuPosition(null);
-    }
-
-    document.addEventListener("pointerdown", closeChatSettingsMenu);
-    document.addEventListener("keydown", closeChatSettingsMenuWithKeyboard);
-    window.addEventListener("scroll", closeChatSettingsMenuForViewportChange, true);
-    window.addEventListener("resize", closeChatSettingsMenuForViewportChange);
-    return () => {
-      document.removeEventListener("pointerdown", closeChatSettingsMenu);
-      document.removeEventListener("keydown", closeChatSettingsMenuWithKeyboard);
-      window.removeEventListener("scroll", closeChatSettingsMenuForViewportChange, true);
-      window.removeEventListener("resize", closeChatSettingsMenuForViewportChange);
-    };
-  }, [chatSettingsMenuOpen]);
-
-  useEffect(() => {
     try {
       window.localStorage.setItem(CHAT_PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(panelWidths));
     } catch {
@@ -1028,51 +883,18 @@ export function GroupsManager() {
 
       setPanelWidths((current) => {
         const chatBounds = getChatPanelWidthBounds({
-          panel: "chats",
           containerWidth,
-          widths: current,
-          detailsVisible: settingsOpen,
         });
         const chats = Math.min(Math.max(current.chats, chatBounds.min), chatBounds.max);
-        const detailsBounds = getChatPanelWidthBounds({
-          panel: "details",
-          containerWidth,
-          widths: { ...current, chats },
-          detailsVisible: settingsOpen,
-        });
-        const details = Math.min(Math.max(current.details, detailsBounds.min), detailsBounds.max);
 
-        return chats === current.chats && details === current.details ? current : { chats, details };
+        return chats === current.chats ? current : { chats };
       });
     }
 
     clampPanelWidthsToViewport();
     window.addEventListener("resize", clampPanelWidthsToViewport);
     return () => window.removeEventListener("resize", clampPanelWidthsToViewport);
-  }, [settingsOpen]);
-
-  useEffect(() => {
-    if (!selectedGroupId || !user) {
-      setChatMuted(false);
-      setChatSaveReceipts(true);
-      return;
-    }
-
-    let cancelled = false;
-    void getChatNotificationPreferences(selectedGroupId)
-      .then((preferences) => {
-        if (cancelled) return;
-        setChatMuted(preferences.isMuted);
-        setChatSaveReceipts(preferences.saveReceipts);
-      })
-      .catch((loadError) => {
-        if (!cancelled) setError(toChatErrorMessage(loadError, "Could not load chat settings."));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedGroupId, user?.id]);
+  }, []);
 
   async function loadThreads(preferredGroupId?: string) {
     if (!user) return;
@@ -1207,7 +1029,6 @@ export function GroupsManager() {
     setSwipeReplyMessageId(null);
     setSwipeReplyOffset(0);
     swipeReplyGestureRef.current = null;
-    setSettingsOpen(false);
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -1335,39 +1156,13 @@ export function GroupsManager() {
     setMessageActionMenu(null);
   }
 
-  function closeChatDetails() {
-    setChatSettingsMenuOpen(false);
-    setChatSettingsMenuPosition(null);
-    setSettingsOpen(false);
-  }
-
-  function toggleChatSettingsMenu() {
-    if (chatSettingsMenuOpen) {
-      setChatSettingsMenuOpen(false);
-      setChatSettingsMenuPosition(null);
-      return;
-    }
-
-    const triggerBounds = chatSettingsTriggerRef.current?.getBoundingClientRect();
-    if (!triggerBounds) return;
-
-    setChatSettingsMenuPosition({
-      top: triggerBounds.bottom + 8,
-      right: Math.max(12, window.innerWidth - triggerBounds.right),
-    });
-    setChatSettingsMenuOpen(true);
-  }
-
   function adjustPanelWidth(panel: keyof ChatPanelWidths, delta: number) {
     const containerWidth = messagesLayoutRef.current?.clientWidth ?? 0;
     if (containerWidth === 0) return;
 
     setPanelWidths((current) => {
       const bounds = getChatPanelWidthBounds({
-        panel,
         containerWidth,
-        widths: current,
-        detailsVisible: settingsOpen,
       });
       const nextWidth = Math.min(Math.max(current[panel] + delta, bounds.min), bounds.max);
       return nextWidth === current[panel] ? current : { ...current, [panel]: nextWidth };
@@ -1387,13 +1182,10 @@ export function GroupsManager() {
 
     function resizePanel(moveEvent: PointerEvent) {
       const horizontalDelta = moveEvent.clientX - startX;
-      const delta = panel === "chats" ? horizontalDelta : -horizontalDelta;
+      const delta = horizontalDelta;
       setPanelWidths((current) => {
         const bounds = getChatPanelWidthBounds({
-          panel,
           containerWidth,
-          widths: current,
-          detailsVisible: settingsOpen,
         });
         const nextWidth = Math.min(Math.max(startWidth + delta, bounds.min), bounds.max);
         return nextWidth === current[panel] ? current : { ...current, [panel]: nextWidth };
@@ -1414,23 +1206,19 @@ export function GroupsManager() {
 
     event.preventDefault();
     const movesRight = event.key === "ArrowRight";
-    const delta = panel === "chats"
-      ? (movesRight ? 16 : -16)
-      : (movesRight ? -16 : 16);
+    const delta = movesRight ? 16 : -16;
     adjustPanelWidth(panel, delta);
   }
 
   function renderPanelResizeHandle(panel: keyof ChatPanelWidths) {
-    const label = panel === "chats" ? "Resize chats panel" : "Resize chat details panel";
     const value = panelWidths[panel];
-    const min = panel === "chats" ? CHAT_LIST_MIN_WIDTH : CHAT_DETAILS_MIN_WIDTH;
 
     return (
       <div
         role="separator"
-        aria-label={label}
+        aria-label="Resize chats panel"
         aria-orientation="vertical"
-        aria-valuemin={min}
+        aria-valuemin={CHAT_LIST_MIN_WIDTH}
         aria-valuemax={CHAT_PANEL_MAX_WIDTH}
         aria-valuenow={value}
         tabIndex={0}
@@ -1441,34 +1229,6 @@ export function GroupsManager() {
         <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-primary/60 group-focus-visible:bg-primary group-focus-visible:outline-none" />
       </div>
     );
-  }
-
-  async function updateChatPreferences(nextPreferences: { isMuted: boolean; saveReceipts: boolean }) {
-    if (!selectedGroupId || !user || savingChatPreference) return;
-
-    const previousPreferences = { isMuted: chatMuted, saveReceipts: chatSaveReceipts };
-    setChatMuted(nextPreferences.isMuted);
-    setChatSaveReceipts(nextPreferences.saveReceipts);
-    setSavingChatPreference(true);
-    setError(null);
-
-    try {
-      await setChatNotificationPreferences(user.id, selectedGroupId, nextPreferences);
-    } catch (saveError) {
-      setChatMuted(previousPreferences.isMuted);
-      setChatSaveReceipts(previousPreferences.saveReceipts);
-      setError(toChatErrorMessage(saveError, "Could not update chat settings."));
-    } finally {
-      setSavingChatPreference(false);
-    }
-  }
-
-  function updateChatMuted(isMuted: boolean) {
-    return updateChatPreferences({ isMuted, saveReceipts: chatSaveReceipts });
-  }
-
-  function updateChatSaveReceipts(saveReceipts: boolean) {
-    return updateChatPreferences({ isMuted: chatMuted, saveReceipts });
   }
 
   async function copyMessageText(message: GroupMessage) {
@@ -1482,239 +1242,18 @@ export function GroupsManager() {
     }
   }
 
-  function renderSettingsPanelContent({ showHeading = true }: { showHeading?: boolean } = {}) {
-    return (
-      <div className="space-y-4">
-        {showHeading && (
-          <div>
-            <AppHeading level={4} as="h2">Chat Settings</AppHeading>
-            <HeadingDescription>
-              {members.length} member{members.length === 1 ? "" : "s"}
-            </HeadingDescription>
-          </div>
-        )}
-
-        {canManageSelectedGroup && (
-          <form className="flex gap-2" onSubmit={submitMember}>
-            <Input
-              aria-label="Member username"
-              placeholder="username"
-              value={memberUsername}
-              onChange={(event) => setMemberUsername(event.target.value)}
-            />
-            <Button type="submit" size="icon" variant="outline" disabled={saving || !memberUsername.trim()}>
-              <UserPlus className="h-4 w-4" />
-            </Button>
-          </form>
-        )}
-
-        <div className="space-y-2">
-          {members.map((member) => {
-            const canEditMember =
-              canManageSelectedGroup && member.user_id !== user?.id && member.role !== "owner";
-            return (
-              <div key={member.user_id} className="space-y-2 rounded-md border p-3">
-                <div className="flex items-center gap-2">
-                  <MessageAvatar profile={member.profile} fallback={member.user_id} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {member.user_id === user?.id ? "You" : profileLabel(member.profile)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {profileSubLabel(member.profile)} · {member.role}
-                    </p>
-                  </div>
-                </div>
-
-                {canEditMember && (
-                  <div className="flex gap-2">
-                    <Select
-                      value={member.role}
-                      onValueChange={(value) => changeRole(member.user_id, value as GroupMembershipRole)}
-                    >
-                      <SelectTrigger className="h-8 flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="member">Member</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setConfirmAction({ type: "member", userId: member.user_id })}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {selectedThread?.group.kind === "group" && (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => user && setConfirmAction({ type: "leave", userId: user.id })}
-            disabled={saving}
-          >
-            Leave group
-          </Button>
-        )}
-      </div>
-    );
-  }
-
-  function renderChatDetails() {
-    const profileHref = directChatProfile ? `/profiles/${directChatProfile.id}` : null;
-    const chatPersonName = selectedThread?.title || "This person";
-    const settingsMenuPortalTarget = typeof document === "undefined" ? null : document.body;
-    const profileContent = (
-      <div className="flex min-w-0 items-center gap-3">
-        <MessageAvatar profile={selectedThread?.avatarProfile} fallback={selectedThread?.title} />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{selectedThread?.title}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {selectedThread?.group.kind === "direct" ? profileSubLabel(directChatProfile) : `${members.length} members`}
-          </p>
-        </div>
-      </div>
-    );
-
-    return (
-      <aside className="absolute inset-0 z-10 min-h-0 overflow-y-auto bg-background p-4 lg:static lg:z-auto lg:border-l">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 border-b border-border pb-3">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="lg:hidden"
-              aria-label="Back to messages"
-              onClick={closeChatDetails}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <AppHeading level={4} as="h2">Chat Details</AppHeading>
-            <div className="ml-auto flex items-center gap-1">
-              <Button
-                ref={chatSettingsTriggerRef}
-                type="button"
-                size="icon"
-                variant="ghost"
-                title="Chat settings"
-                aria-label="Chat settings"
-                aria-expanded={chatSettingsMenuOpen}
-                onClick={toggleChatSettingsMenu}
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                aria-label="Close chat details"
-                onClick={closeChatDetails}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              {chatSettingsMenuOpen && chatSettingsMenuPosition && settingsMenuPortalTarget && createPortal(
-                <div
-                  ref={chatSettingsMenuRef}
-                  className="fixed z-[70] w-[min(20rem,calc(100vw-1.5rem))] rounded-md border bg-popover p-3 text-popover-foreground shadow-[var(--shadow-popover)]"
-                  style={{ top: chatSettingsMenuPosition.top, right: chatSettingsMenuPosition.right }}
-                >
-                  <ChatSettingToggle
-                    label="Mute this chat"
-                    checked={chatMuted}
-                    disabled={savingChatPreference}
-                    onCheckedChange={(isMuted) => void updateChatMuted(isMuted)}
-                  />
-                  <ChatSettingToggle
-                    label={`Reading Activity visible for ${chatPersonName}`}
-                    description={`${chatPersonName} can see what you're reading when you have reading activity turned on.`}
-                    checked={false}
-                    disabled
-                  />
-                  <ChatSettingToggle
-                    label="Save receipts"
-                    description={`${chatPersonName} can see when you've saved something that they send you.`}
-                    checked={chatSaveReceipts}
-                    disabled={savingChatPreference}
-                    onCheckedChange={(saveReceipts) => void updateChatSaveReceipts(saveReceipts)}
-                  />
-                </div>,
-                settingsMenuPortalTarget,
-              )}
-            </div>
-          </div>
-
-          {profileHref ? (
-            <Link
-              to={profileHref}
-              className="block rounded-md p-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {profileContent}
-            </Link>
-          ) : (
-            <div className="rounded-md p-2">{profileContent}</div>
-          )}
-
-          <section className="space-y-2">
-            <div>
-              <AppHeading level={4} as="h3">Shared</AppHeading>
-              <HeadingDescription className="text-xs">
-                {sharedAttachments.length} item{sharedAttachments.length === 1 ? "" : "s"}
-              </HeadingDescription>
-            </div>
-            {sharedAttachments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No shared content yet.</p>
-            ) : (
-              <div className="space-y-1">
-                {sharedAttachments.map(({ id, attachment }) => {
-                  const href = attachmentHref(attachment);
-                  const item = (
-                    <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
-                      <Badge variant="outline" className="shrink-0">{attachmentTypeLabel(attachment)}</Badge>
-                      <span className="min-w-0 flex-1 truncate text-sm">{attachmentTitle(attachment)}</span>
-                      {href && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                    </div>
-                  );
-                  return href ? (
-                    <Link key={id} to={href} className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      {item}
-                    </Link>
-                  ) : (
-                    <div key={id}>{item}</div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {selectedThread?.group.kind === "group" && (
-            <section className="space-y-2">
-              <AppHeading level={4} as="h3">Members</AppHeading>
-              {renderSettingsPanelContent({ showHeading: false })}
-            </section>
-          )}
-        </div>
-      </aside>
-    );
-  }
-
   function startAttachmentPickerResize(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     const startY = event.clientY;
     const startHeight = attachmentPickerHeight;
 
     function resizePicker(moveEvent: PointerEvent) {
-      setAttachmentPickerHeight(Math.min(600, Math.max(240, startHeight + startY - moveEvent.clientY)));
+      setAttachmentPickerHeight(
+        Math.min(
+          ATTACHMENT_PICKER_MAX_HEIGHT,
+          Math.max(ATTACHMENT_PICKER_MIN_HEIGHT, startHeight + startY - moveEvent.clientY),
+        ),
+      );
     }
 
     function stopResizing() {
@@ -1757,8 +1296,8 @@ export function GroupsManager() {
         {attachmentPicker && (
           <div
             ref={attachmentPickerRef}
-            className="absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[34rem]"
-            style={{ height: `${attachmentPickerHeight}px` }}
+            className="absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[40rem]"
+            style={{ height: `min(${attachmentPickerHeight}px, calc(100dvh - 9rem))` }}
             onPointerDown={(event) => event.stopPropagation()}
           >
             <div className="flex min-h-0 flex-1 flex-col">
@@ -1805,7 +1344,10 @@ export function GroupsManager() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {attachmentPicker === "book" && filteredBooks.map((book) => (
-                <div key={book.id} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
+                <div
+                  key={book.id}
+                  className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-md p-2 hover:bg-muted"
+                >
                   {book.cover_url ? (
                     <img src={book.cover_url} alt="" className="h-12 w-8 shrink-0 rounded object-cover" />
                   ) : (
@@ -1817,15 +1359,29 @@ export function GroupsManager() {
                     <p className="truncate text-sm font-medium">{book.title}</p>
                     <p className="truncate text-xs text-muted-foreground">{book.authors.join(", ")}</p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={() => chooseAttachment(buildBookAttachment(book, [], authorRecords))}>
-                    Add
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    className="shrink-0"
+                    aria-label={`Attach ${book.title}`}
+                    title="Add"
+                    onClick={() => chooseAttachment(buildBookAttachment(book, [], authorRecords))}
+                  >
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
 
               {attachmentPicker === "author" && filteredAuthors.map((author) => (
                 <div key={author.name} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
-                  <UserRound className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground">
+                    {author.photo_url ? (
+                      <img src={author.photo_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-medium leading-none">{getAuthorInitials(author.name)}</span>
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{author.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -1834,18 +1390,21 @@ export function GroupsManager() {
                   </div>
                   <Button
                     type="button"
-                    size="sm"
+                    size="icon-sm"
                     variant="outline"
+                    className="shrink-0"
+                    aria-label={`Attach ${author.name}`}
+                    title="Add"
                     onClick={() => chooseAttachment(buildAuthorAttachment({
                       authorId: author.id,
                       authorName: author.name,
-                      authorPhotoUrl: authorRecords.find((item) => item.id === author.id)?.photo_url,
-                      authorBio: authorRecords.find((item) => item.id === author.id)?.bio,
+                      authorPhotoUrl: author.photo_url,
+                      authorBio: author.bio,
                       books: author.books,
                       includedQuotes: [],
                     }))}
                   >
-                    Add
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
@@ -1854,7 +1413,13 @@ export function GroupsManager() {
                 const booksInSeries = sortBooksByTitle(seriesBooksById.get(item.id) ?? []);
                 return (
                   <div key={item.id} className="flex items-center gap-3 rounded-md p-2 hover:bg-muted">
-                    <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                      {item.cover_url ? (
+                        <img src={item.cover_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <LibraryBig className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{item.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
@@ -1863,8 +1428,11 @@ export function GroupsManager() {
                     </div>
                     <Button
                       type="button"
-                      size="sm"
+                      size="icon-sm"
                       variant="outline"
+                      className="shrink-0"
+                      aria-label={`Attach ${item.name}`}
+                      title="Add"
                       onClick={() => chooseAttachment(buildSeriesAttachment({
                         seriesId: item.id,
                         seriesName: item.name,
@@ -1875,7 +1443,7 @@ export function GroupsManager() {
                         includedQuotes: [],
                       }))}
                     >
-                      Add
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                 );
@@ -1898,9 +1466,11 @@ export function GroupsManager() {
                       </div>
                       <Button
                         type="button"
-                        size="sm"
+                        size="icon-sm"
                         variant="outline"
-                        className="shrink-0 whitespace-nowrap"
+                        className="shrink-0"
+                        aria-label={`Attach ${noteLabel(note.label)} from ${item.sourceTitle}`}
+                        title="Add"
                         onClick={() => chooseAttachment(buildNoteAttachment(note, {
                           type: item.sourceType,
                           id: item.sourceId,
@@ -1909,7 +1479,7 @@ export function GroupsManager() {
                           imageUrl: item.sourceImageUrl,
                         }))}
                       >
-                        Add
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   );
@@ -1976,27 +1546,6 @@ export function GroupsManager() {
         </div>
       </form>
     );
-  }
-
-  async function submitMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedThread || !memberUsername.trim()) return;
-
-    setSaving(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      await addGroupMemberByUsername(selectedThread.group.id, memberUsername);
-      setMemberUsername("");
-      setStatusMessage("Member added.");
-      setMembers(await getChatMembers(selectedThread.group.id));
-      await loadThreads(selectedThread.group.id);
-    } catch (memberError) {
-      setError(toChatErrorMessage(memberError, "Could not add member."));
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function submitMessage(event: FormEvent<HTMLFormElement>) {
@@ -2379,54 +1928,13 @@ export function GroupsManager() {
     }
   }
 
-  async function changeRole(userId: string, role: GroupMembershipRole) {
-    if (!selectedThread) return;
-
-    setSaving(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      await changeGroupMemberRole(selectedThread.group.id, userId, role);
-      setMembers(await getChatMembers(selectedThread.group.id));
-      setStatusMessage("Member role updated.");
-    } catch (roleError) {
-      setError(toChatErrorMessage(roleError, "Could not update member role."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removeMember(userId: string) {
-    if (!selectedThread || !user) return;
-
-    setSaving(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      await removeChatMember(selectedThread.group.id, userId);
-      setStatusMessage(userId === user.id ? "You left the group." : "Member removed.");
-      await loadThreads(userId === user.id ? undefined : selectedThread.group.id);
-    } catch (removeError) {
-      setError(toChatErrorMessage(removeError, "Could not remove member."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function confirmDelete() {
     const action = confirmAction;
     setConfirmAction(null);
 
     if (!action) return;
 
-    if (action.type === "message") {
-      await removeMessage(action.messageId);
-      return;
-    }
-
-    await removeMember(action.userId);
+    await removeMessage(action.messageId);
   }
 
   const actionMenuMessage = messageActionMenu
@@ -2463,12 +1971,11 @@ export function GroupsManager() {
         >
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-sm hover:bg-muted"
-            aria-label="Reply"
-            title="Reply"
+            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
             onClick={() => startReply(actionMenuMessage, actionMenuSenderProfile)}
           >
             <Reply className="h-4 w-4" />
+            Reply
           </button>
           {actionMenuMessage.content.trim() && (
             <button
@@ -2515,7 +2022,6 @@ export function GroupsManager() {
         className="grid h-[calc(100svh-8rem)] min-h-0 overflow-hidden lg:h-[calc(100svh-4rem)] lg:grid-cols-[var(--chat-list-width)_var(--panel-resize-handle-width)_minmax(0,1fr)]"
         style={{
           "--chat-list-width": `${panelWidths.chats}px`,
-          "--chat-details-width": `${panelWidths.details}px`,
           "--panel-resize-handle-width": `${PANEL_RESIZE_HANDLE_WIDTH}px`,
         } as CSSProperties}
       >
@@ -2556,7 +2062,6 @@ export function GroupsManager() {
                     onClick={() => {
                       setSelectedGroupId(thread.group.id);
                       setMobileThreadOpen(true);
-                      setSettingsOpen(false);
                     }}
                   >
                     <MessageAvatar profile={thread.avatarProfile} fallback={thread.title} />
@@ -2616,39 +2121,34 @@ export function GroupsManager() {
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1">
-                  <button
-                    type="button"
-                    className="flex min-w-0 max-w-[min(18rem,calc(100vw-8rem))] items-center justify-center gap-3 rounded-md px-2 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <MessageAvatar profile={selectedThread.avatarProfile} fallback={selectedThread.title} />
-                    <span className="min-w-0">
-                      <AppHeading level={4} as="h1" className="truncate">
-                        {selectedThread.title}
-                      </AppHeading>
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    aria-label="Open chat details"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                <div className="absolute left-1/2 top-1/2 flex min-w-0 -translate-x-1/2 -translate-y-1/2 items-center">
+                  {selectedThread.group.kind === "direct" && directChatProfile ? (
+                    <Link
+                      to={`/profiles/${directChatProfile.id}`}
+                      className="flex min-w-0 max-w-[min(18rem,calc(100vw-8rem))] items-center justify-center gap-3 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <MessageAvatar profile={selectedThread.avatarProfile} fallback={selectedThread.title} />
+                      <span className="min-w-0">
+                        <AppHeading level={4} as="h1" className="truncate">
+                          {selectedThread.title}
+                        </AppHeading>
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex min-w-0 max-w-[min(18rem,calc(100vw-8rem))] items-center justify-center gap-3 px-2 py-1 text-left">
+                      <MessageAvatar profile={selectedThread.avatarProfile} fallback={selectedThread.title} />
+                      <span className="min-w-0">
+                        <AppHeading level={4} as="h1" className="truncate">
+                          {selectedThread.title}
+                        </AppHeading>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div
-                className={cn(
-                  "grid min-h-0",
-                  settingsOpen && "lg:grid-cols-[minmax(22.5rem,1fr)_var(--panel-resize-handle-width)_var(--chat-details-width)]",
-                )}
-              >
-                <div className={cn("min-h-0 min-w-0 flex-col", settingsOpen ? "hidden lg:flex" : "flex")}>
+              <div className="grid min-h-0">
+                <div className="flex min-h-0 min-w-0 flex-col">
                   <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto bg-background p-4 sm:p-6">
                     {messagesLoading ? (
                       <p className="text-sm text-muted-foreground">Loading messages...</p>
@@ -2786,15 +2286,9 @@ export function GroupsManager() {
                   </div>
                 </div>
 
-                {settingsOpen && (
-                  <>
-                    {renderPanelResizeHandle("details")}
-                    {renderChatDetails()}
-                  </>
-                )}
               </div>
 
-              <div className={cn("border-t bg-background", settingsOpen && "hidden lg:block")}>
+              <div className="border-t bg-background">
                 {renderChatComposer()}
               </div>
             </div>

@@ -454,6 +454,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "reading_reminders": false,
     "weekly_summary": false,
     "daily_goal_reminders": false,
+    "chat_notifications": true,
     "goal_completion_notifications": true,
     "friend_activity_notifications": false,
     "new_follower_notifications": false
@@ -463,6 +464,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "show_reading_activity": false,
     "show_reading_statistics_publicly": false,
     "show_reading_goals_publicly": false,
+    "chat_save_receipts": true,
     "allow_followers": false,
     "blocked_users": []
   }'::jsonb,

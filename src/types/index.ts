@@ -331,6 +331,7 @@ export interface NotificationSettings {
   reading_reminders: boolean;
   weekly_summary: boolean;
   daily_goal_reminders: boolean;
+  chat_notifications: boolean;
   goal_completion_notifications: boolean;
   friend_activity_notifications: boolean;
   new_follower_notifications: boolean;
@@ -341,6 +342,7 @@ export interface PrivacySettings {
   show_reading_activity: boolean;
   show_reading_statistics_publicly: boolean;
   show_reading_goals_publicly: boolean;
+  chat_save_receipts: boolean;
   allow_followers: boolean;
   blocked_users: string[];
 }

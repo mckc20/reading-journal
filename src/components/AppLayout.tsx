@@ -26,8 +26,9 @@ import { AuthorsProvider } from "@/context/AuthorsContext";
 import { BooksProvider } from "@/context/BooksContext";
 import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
-import { useAuth, useProfile } from "@/context";
+import { useAuth, useProfile, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
@@ -528,13 +529,15 @@ function TopNavLink({ link, active }: { link: NavLink; active: boolean }) {
 
 function NotificationsMenu() {
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<ChatMessageNotification[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const chatNotificationsEnabled = (settings?.notifications ?? DEFAULT_NOTIFICATION_SETTINGS).chat_notifications;
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !chatNotificationsEnabled) {
       setNotifications([]);
       return;
     }
@@ -571,7 +574,7 @@ function NotificationsMenu() {
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [chatNotificationsEnabled, user?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -636,7 +639,9 @@ function NotificationsMenu() {
           <div className="border-b px-3 py-2.5">
             <p className="text-sm font-medium">Notifications</p>
           </div>
-          {notifications.length === 0 ? (
+          {!chatNotificationsEnabled ? (
+            <p className="px-3 py-4 text-xs leading-5 text-muted-foreground">Chat notifications are off.</p>
+          ) : notifications.length === 0 ? (
             <p className="px-3 py-4 text-xs leading-5 text-muted-foreground">No new messages.</p>
           ) : (
             <div className="max-h-80 overflow-y-auto p-1.5">

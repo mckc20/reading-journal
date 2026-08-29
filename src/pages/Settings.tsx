@@ -97,6 +97,7 @@ type SettingsTab =
   | "reading"
   | "genres"
   | "notifications"
+  | "privacy"
   | "account"
   | "api-keys"
   | "about";
@@ -113,6 +114,7 @@ type SelectOption<TValue extends string> = {
 };
 
 const APP_VERSION = "0.0.0";
+const inactiveSettingDisabled = true;
 
 const settingsTabs: Array<{
   value: SettingsTab;
@@ -124,6 +126,7 @@ const settingsTabs: Array<{
   { value: "reading", label: "Reading", icon: BookOpen },
   { value: "genres", label: "Genres", icon: ListTree },
   { value: "notifications", label: "Notifications", icon: Bell },
+  { value: "privacy", label: "Privacy", icon: Lock },
   { value: "account", label: "Account", icon: Shield },
   { value: "api-keys", label: "API Keys", icon: KeyRound },
   { value: "about", label: "About", icon: Info },
@@ -610,21 +613,21 @@ function AppearanceSettings() {
             <SelectSetting
               value={appearance.accent_color}
               options={accentColorOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(accent_color) => void saveAppearance({ accent_color })}
             />
           </SettingRow>
           <SettingRow title="Compact mode">
             <ToggleSetting
               checked={appearance.compact_mode}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(compact_mode) => void saveAppearance({ compact_mode })}
             />
           </SettingRow>
           <SettingRow title="Reduced animations">
             <ToggleSetting
               checked={appearance.reduced_animations}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(reduced_animations) => void saveAppearance({ reduced_animations })}
             />
           </SettingRow>
@@ -632,7 +635,7 @@ function AppearanceSettings() {
             <SelectSetting
               value={appearance.book_cover_style}
               options={bookCoverStyleOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(book_cover_style) => void saveAppearance({ book_cover_style })}
             />
           </SettingRow>
@@ -640,7 +643,7 @@ function AppearanceSettings() {
             <SelectSetting
               value={appearance.corner_radius}
               options={cornerRadiusOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(corner_radius) => void saveAppearance({ corner_radius })}
             />
           </SettingRow>
@@ -648,7 +651,7 @@ function AppearanceSettings() {
             <SelectSetting
               value={appearance.font_size}
               options={fontSizeOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(font_size) => void saveAppearance({ font_size })}
             />
           </SettingRow>
@@ -656,7 +659,7 @@ function AppearanceSettings() {
             <SelectSetting
               value={appearance.density}
               options={densityOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(density) => void saveAppearance({ density })}
             />
           </SettingRow>
@@ -702,7 +705,7 @@ function ReadingSettings() {
             <SelectSetting
               value={reading.default_reading_status}
               options={statusOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(default_reading_status) => void saveReading({ default_reading_status })}
             />
           </SettingRow>
@@ -710,7 +713,7 @@ function ReadingSettings() {
             <SelectSetting
               value={reading.reading_pace_calculation}
               options={speedCalculationOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(reading_pace_calculation) =>
                 void saveReading({ reading_pace_calculation })
               }
@@ -720,7 +723,7 @@ function ReadingSettings() {
             <SelectSetting
               value={reading.progress_display}
               options={progressDisplayOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(progress_display) => void saveReading({ progress_display })}
             />
           </SettingRow>
@@ -728,14 +731,14 @@ function ReadingSettings() {
             <div className="flex gap-2">
               <ToggleSetting
                 checked={reading.reading_streak_enabled}
-                disabled={disabled}
+                disabled={disabled || inactiveSettingDisabled}
                 onChange={(reading_streak_enabled) =>
                   void saveReading({ reading_streak_enabled })
                 }
               />
               <NumberSetting
                 value={reading.reading_streak_goal_days}
-                disabled={disabled || !reading.reading_streak_enabled}
+                disabled={disabled || !reading.reading_streak_enabled || inactiveSettingDisabled}
                 onChange={(reading_streak_goal_days) =>
                   void saveReading({ reading_streak_goal_days })
                 }
@@ -745,14 +748,14 @@ function ReadingSettings() {
           <SettingRow title="Auto-finish books">
             <ToggleSetting
               checked={reading.auto_finish_books}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(auto_finish_books) => void saveReading({ auto_finish_books })}
             />
           </SettingRow>
           <SettingRow title="Estimated completion dates">
             <ToggleSetting
               checked={reading.estimated_completion_dates}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(estimated_completion_dates) =>
                 void saveReading({ estimated_completion_dates })
               }
@@ -767,7 +770,7 @@ function ReadingSettings() {
                 <span className="text-xs text-muted-foreground">Quotes</span>
                 <ToggleSetting
                   checked={reading.journal_filter_defaults.show_quotes}
-                  disabled={disabled}
+                  disabled={disabled || inactiveSettingDisabled}
                   onChange={(checked) => void saveJournalFilterDefault("show_quotes", checked)}
                 />
               </div>
@@ -775,7 +778,7 @@ function ReadingSettings() {
                 <span className="text-xs text-muted-foreground">Thoughts</span>
                 <ToggleSetting
                   checked={reading.journal_filter_defaults.show_thoughts}
-                  disabled={disabled}
+                  disabled={disabled || inactiveSettingDisabled}
                   onChange={(checked) => void saveJournalFilterDefault("show_thoughts", checked)}
                 />
               </div>
@@ -783,7 +786,7 @@ function ReadingSettings() {
                 <span className="text-xs text-muted-foreground">Automatic</span>
                 <ToggleSetting
                   checked={reading.journal_filter_defaults.show_automatic}
-                  disabled={disabled}
+                  disabled={disabled || inactiveSettingDisabled}
                   onChange={(checked) => void saveJournalFilterDefault("show_automatic", checked)}
                 />
               </div>
@@ -791,7 +794,7 @@ function ReadingSettings() {
                 <span className="text-xs text-muted-foreground">From books</span>
                 <ToggleSetting
                   checked={reading.journal_filter_defaults.show_from_books}
-                  disabled={disabled}
+                  disabled={disabled || inactiveSettingDisabled}
                   onChange={(checked) => void saveJournalFilterDefault("show_from_books", checked)}
                 />
               </div>
@@ -809,7 +812,7 @@ function ReadingSettings() {
             <SelectSetting
               value={library.default_sorting}
               options={librarySortingOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(default_sorting) => void saveLibrary({ default_sorting })}
             />
           </SettingRow>
@@ -817,7 +820,7 @@ function ReadingSettings() {
             <SelectSetting
               value={library.default_view}
               options={libraryViewOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(default_view) => void saveLibrary({ default_view })}
             />
           </SettingRow>
@@ -827,7 +830,7 @@ function ReadingSettings() {
           <SettingRow title="Show unfinished series first">
             <ToggleSetting
               checked={library.show_unfinished_series_first}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(show_unfinished_series_first) =>
                 void saveLibrary({ show_unfinished_series_first })
               }
@@ -836,14 +839,14 @@ function ReadingSettings() {
           <SettingRow title="Hide completed books">
             <ToggleSetting
               checked={library.hide_completed_books}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(hide_completed_books) => void saveLibrary({ hide_completed_books })}
             />
           </SettingRow>
           <SettingRow title="Show reading statistics">
             <ToggleSetting
               checked={library.show_reading_statistics}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(show_reading_statistics) =>
                 void saveLibrary({ show_reading_statistics })
               }
@@ -861,7 +864,7 @@ function ReadingSettings() {
             <SelectSetting
               value={collections.collection_visibility}
               options={collectionVisibilityOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(collection_visibility) =>
                 void saveCollections({ collection_visibility })
               }
@@ -870,7 +873,7 @@ function ReadingSettings() {
           <SettingRow title="Automatic collections">
             <ToggleSetting
               checked={collections.automatic_collections}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(automatic_collections) =>
                 void saveCollections({ automatic_collections })
               }
@@ -879,7 +882,7 @@ function ReadingSettings() {
           <SettingRow title="Smart collections">
             <ToggleSetting
               checked={collections.smart_collections}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(smart_collections) => void saveCollections({ smart_collections })}
             />
           </SettingRow>
@@ -887,7 +890,7 @@ function ReadingSettings() {
             <SelectSetting
               value={collections.collection_behavior}
               options={collectionBehaviorOptions}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(collection_behavior) =>
                 void saveCollections({ collection_behavior })
               }
@@ -917,10 +920,22 @@ function NotificationSettings() {
       <div className="space-y-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SettingsRows>
+          <SettingRow
+            title="Chat notifications"
+            description="Show notifications when someone sends a message in any chat."
+          >
+            <ToggleSetting
+              checked={notifications.chat_notifications}
+              disabled={disabled}
+              onChange={(chat_notifications) =>
+                void saveNotifications({ chat_notifications })
+              }
+            />
+          </SettingRow>
           <SettingRow title="Reading reminders">
             <ToggleSetting
               checked={notifications.reading_reminders}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(reading_reminders) =>
                 void saveNotifications({ reading_reminders })
               }
@@ -929,14 +944,14 @@ function NotificationSettings() {
           <SettingRow title="Weekly summary">
             <ToggleSetting
               checked={notifications.weekly_summary}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(weekly_summary) => void saveNotifications({ weekly_summary })}
             />
           </SettingRow>
           <SettingRow title="Daily goal reminders">
             <ToggleSetting
               checked={notifications.daily_goal_reminders}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(daily_goal_reminders) =>
                 void saveNotifications({ daily_goal_reminders })
               }
@@ -945,7 +960,7 @@ function NotificationSettings() {
           <SettingRow title="Goal completion notifications">
             <ToggleSetting
               checked={notifications.goal_completion_notifications}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(goal_completion_notifications) =>
                 void saveNotifications({ goal_completion_notifications })
               }
@@ -954,7 +969,7 @@ function NotificationSettings() {
           <SettingRow title="Friend activity notifications">
             <ToggleSetting
               checked={notifications.friend_activity_notifications}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(friend_activity_notifications) =>
                 void saveNotifications({ friend_activity_notifications })
               }
@@ -963,7 +978,7 @@ function NotificationSettings() {
           <SettingRow title="New follower notifications">
             <ToggleSetting
               checked={notifications.new_follower_notifications}
-              disabled={disabled}
+              disabled={disabled || inactiveSettingDisabled}
               onChange={(new_follower_notifications) =>
                 void saveNotifications({ new_follower_notifications })
               }
@@ -1211,6 +1226,88 @@ function ApiKeysSettings() {
   );
 }
 
+function PrivacySettings() {
+  const { settings, loading, saving, error, saveSettingsSection } = useUserSettings();
+  const privacy = settings?.privacy ?? DEFAULT_PRIVACY_SETTINGS;
+  const disabled = loading || saving;
+
+  function savePrivacy(update: Partial<PrivacySettingsValues>) {
+    return saveSettingsSection("privacy", update);
+  }
+
+  return (
+    <SettingsSection
+      title="Privacy"
+      description="Control what other readers can see."
+      icon={Lock}
+    >
+      <div className="space-y-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <SettingsRows>
+          <SettingRow
+            title="Save receipts"
+            description="Let people see when you save an attachment they sent you."
+          >
+            <ToggleSetting
+              checked={privacy.chat_save_receipts}
+              disabled={disabled}
+              onChange={(chat_save_receipts) =>
+                void savePrivacy({ chat_save_receipts })
+              }
+            />
+          </SettingRow>
+          <SettingRow title="Private account">
+            <ToggleSetting
+              checked={privacy.private_account}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(private_account) => void savePrivacy({ private_account })}
+            />
+          </SettingRow>
+          <SettingRow title="Show reading activity">
+            <ToggleSetting
+              checked={privacy.show_reading_activity}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(show_reading_activity) =>
+                void savePrivacy({ show_reading_activity })
+              }
+            />
+          </SettingRow>
+          <SettingRow title="Show reading statistics publicly">
+            <ToggleSetting
+              checked={privacy.show_reading_statistics_publicly}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(show_reading_statistics_publicly) =>
+                void savePrivacy({ show_reading_statistics_publicly })
+              }
+            />
+          </SettingRow>
+          <SettingRow title="Show reading goals publicly">
+            <ToggleSetting
+              checked={privacy.show_reading_goals_publicly}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(show_reading_goals_publicly) =>
+                void savePrivacy({ show_reading_goals_publicly })
+              }
+            />
+          </SettingRow>
+          <SettingRow title="Allow followers">
+            <ToggleSetting
+              checked={privacy.allow_followers}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(allow_followers) => void savePrivacy({ allow_followers })}
+            />
+          </SettingRow>
+          <SettingRow title="Blocked users" description="Blocking management will come with social features.">
+            <span className="text-xs text-muted-foreground">
+              {privacy.blocked_users.length} blocked
+            </span>
+          </SettingRow>
+        </SettingsRows>
+      </div>
+    </SettingsSection>
+  );
+}
+
 function AccountSettings() {
   const { user, signOut } = useAuth();
   const { settings, loading, saving, error, saveSettingsSection } = useUserSettings();
@@ -1219,17 +1316,12 @@ function AccountSettings() {
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const privacy = settings?.privacy ?? DEFAULT_PRIVACY_SETTINGS;
   const backup = settings?.backup ?? DEFAULT_BACKUP_SETTINGS;
   const disabled = loading || saving;
 
   useEffect(() => {
     setEmail(user?.email ?? "");
   }, [user?.email]);
-
-  function savePrivacy(update: Partial<PrivacySettingsValues>) {
-    return saveSettingsSection("privacy", update);
-  }
 
   function saveBackup(update: Partial<typeof backup>) {
     return saveSettingsSection("backup", update);
@@ -1292,59 +1384,13 @@ function AccountSettings() {
         </div>
       </SettingsSection>
 
-      <SettingsSection
-        title="Privacy"
-        description="Control what other readers can see."
-        icon={Lock}
-      >
-        <SettingsRows>
-          <SettingRow title="Private account">
-            <ToggleSetting
-              checked={privacy.private_account}
-              disabled={disabled}
-              onChange={(private_account) => void savePrivacy({ private_account })}
-            />
-          </SettingRow>
-          <SettingRow title="Show reading activity">
-            <ToggleSetting
-              checked={privacy.show_reading_activity}
-              disabled={disabled}
-              onChange={(show_reading_activity) =>
-                void savePrivacy({ show_reading_activity })
-              }
-            />
-          </SettingRow>
-          <SettingRow title="Show reading statistics publicly">
-            <ToggleSetting
-              checked={privacy.show_reading_statistics_publicly}
-              disabled={disabled}
-              onChange={(show_reading_statistics_publicly) =>
-                void savePrivacy({ show_reading_statistics_publicly })
-              }
-            />
-          </SettingRow>
-          <SettingRow title="Show reading goals publicly">
-            <ToggleSetting
-              checked={privacy.show_reading_goals_publicly}
-              disabled={disabled}
-              onChange={(show_reading_goals_publicly) =>
-                void savePrivacy({ show_reading_goals_publicly })
-              }
-            />
-          </SettingRow>
-          <SettingRow title="Allow followers">
-            <ToggleSetting
-              checked={privacy.allow_followers}
-              disabled={disabled}
-              onChange={(allow_followers) => void savePrivacy({ allow_followers })}
-            />
-          </SettingRow>
-          <SettingRow title="Blocked users" description="Blocking management will come with social features.">
-            <span className="text-xs text-muted-foreground">
-              {privacy.blocked_users.length} blocked
-            </span>
-          </SettingRow>
-        </SettingsRows>
+      <SettingsSection title="Account Actions">
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => void signOut()}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </Button>
+        </div>
       </SettingsSection>
 
       <SettingsSection
@@ -1357,7 +1403,7 @@ function AccountSettings() {
             <SettingRow title="Backup settings">
               <ToggleSetting
                 checked={backup.automatic_backups}
-                disabled={disabled}
+                disabled={disabled || inactiveSettingDisabled}
                 onChange={(automatic_backups) => void saveBackup({ automatic_backups })}
               />
             </SettingRow>
@@ -1365,7 +1411,7 @@ function AccountSettings() {
               <SelectSetting
                 value={backup.backup_frequency}
                 options={backupFrequencyOptions}
-                disabled={disabled || !backup.automatic_backups}
+                disabled={disabled || !backup.automatic_backups || inactiveSettingDisabled}
                 onChange={(backup_frequency) => void saveBackup({ backup_frequency })}
               />
             </SettingRow>
@@ -1381,17 +1427,11 @@ function AccountSettings() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Danger Zone" description="Account exit and deletion actions.">
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => void signOut()}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Log out
-          </Button>
-          <Button type="button" variant="destructive" disabled>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete account
-          </Button>
-        </div>
+      <SettingsSection title="Danger Zone" description="Permanent account actions.">
+        <Button type="button" variant="destructive" disabled>
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete account
+        </Button>
       </SettingsSection>
 
       <SetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
@@ -1510,6 +1550,7 @@ function SettingsTabContent({ tab }: { tab: SettingsTab }) {
   if (tab === "reading") return <ReadingSettings />;
   if (tab === "genres") return <GenreSettings />;
   if (tab === "notifications") return <NotificationSettings />;
+  if (tab === "privacy") return <PrivacySettings />;
   if (tab === "account") return <AccountSettings />;
   if (tab === "api-keys") return <ApiKeysSettings />;
   return <AboutSettings />;
@@ -1566,7 +1607,7 @@ export default function Settings() {
       <div className="space-y-2">
         <AppHeading level={1} as="h1">Settings</AppHeading>
         <HeadingDescription className="max-w-2xl">
-          Manage your profile, app preferences, reading defaults, notifications, and account.
+          Manage your profile, app preferences, reading defaults, notifications, privacy, and account.
         </HeadingDescription>
       </div>
 
