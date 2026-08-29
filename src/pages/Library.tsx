@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpen, ChevronRight, RefreshCw, SwatchBook } from "lucide-react";
+import {
+  BookOpen,
+  ChevronRight,
+  LibraryBig,
+  RefreshCw,
+  SwatchBook,
+  Tags,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -40,6 +49,13 @@ const libraryRedirectParamKeys = [
   "series",
   "author",
   "favorite",
+];
+
+const mobileLibraryCategories: Array<{ label: string; to: string; icon: LucideIcon }> = [
+  { label: "Books", to: "/library/books", icon: BookOpen },
+  { label: "Authors", to: "/library/authors", icon: UserRound },
+  { label: "Series", to: "/library/series", icon: LibraryBig },
+  { label: "Genres", to: "/library/genres", icon: Tags },
 ];
 
 function LoadingGrid() {
@@ -281,6 +297,24 @@ function LibrarySection({
   );
 }
 
+function MobileLibraryCategoryList() {
+  return (
+    <nav aria-label="Library categories" className="border-y">
+      {mobileLibraryCategories.map(({ label, to, icon: Icon }) => (
+        <Link
+          key={to}
+          to={to}
+          className="group flex min-h-18 items-center gap-3 border-b py-3.5 last:border-b-0"
+        >
+          <Icon className="h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex-1 text-lg font-medium group-hover:text-primary">{label}</span>
+          <ChevronRight className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export default function Library() {
   const { books, loading: booksLoading, error, reload } = useBooksContext();
   const { authors, loading: authorsLoading } = useAuthorsContext();
@@ -335,65 +369,70 @@ export default function Library() {
         </div>
       )}
 
-      <LibrarySection title="Shelves">
-        {loadingShelves ? (
-          <LoadingGrid />
-        ) : (
-          <div className="overflow-hidden rounded-lg border bg-card">
-            <BookShelf
-              title="Books"
-              books={sortedBooks}
-              onBook={openBook}
-              onViewAll={() => navigate("/library/books")}
-              emptyMessage="Books you add will appear here."
-            />
+      <div className="sm:hidden">
+        <MobileLibraryCategoryList />
+      </div>
 
-            <EntityShelf
-              title="Authors"
-              count={authorSummaries.length}
-              to="/library/authors"
-              emptyMessage="Authors will appear here after you add books or authors."
-            >
-              <HorizontalShelf ariaLabel="Authors shelf">
-                {authorSummaries.map((author) => (
-                  <AuthorShelfItem key={author.id} author={author} onOpen={openAuthor} />
-                ))}
-              </HorizontalShelf>
-            </EntityShelf>
+      <div className="hidden sm:block">
+        <LibrarySection title="Shelves">
+          {loadingShelves ? (
+            <LoadingGrid />
+          ) : (
+            <div className="overflow-hidden rounded-lg border bg-card">
+              <BookShelf
+                title="Books"
+                books={sortedBooks}
+                onBook={openBook}
+                onViewAll={() => navigate("/library/books")}
+                emptyMessage="Books you add will appear here."
+              />
 
-            <EntityShelf
-              title="Series"
-              count={seriesGroups.length}
-              to="/library/series"
-              emptyMessage="Series you add will appear here."
-            >
-              <HorizontalShelf ariaLabel="Series shelf">
-                {seriesGroups.map((group) => (
-                  <div key={group.seriesId} data-shelf-item className="w-[122px] shrink-0 sm:w-[148px]">
-                    <div className="[&_p]:sr-only">
-                      <SeriesStackCard group={group} onSeries={openSeries} />
+              <EntityShelf
+                title="Authors"
+                count={authorSummaries.length}
+                to="/library/authors"
+                emptyMessage="Authors will appear here after you add books or authors."
+              >
+                <HorizontalShelf ariaLabel="Authors shelf">
+                  {authorSummaries.map((author) => (
+                    <AuthorShelfItem key={author.id} author={author} onOpen={openAuthor} />
+                  ))}
+                </HorizontalShelf>
+              </EntityShelf>
+
+              <EntityShelf
+                title="Series"
+                count={seriesGroups.length}
+                to="/library/series"
+                emptyMessage="Series you add will appear here."
+              >
+                <HorizontalShelf ariaLabel="Series shelf">
+                  {seriesGroups.map((group) => (
+                    <div key={group.seriesId} data-shelf-item className="w-[122px] shrink-0 sm:w-[148px]">
+                      <div className="[&_p]:sr-only">
+                        <SeriesStackCard group={group} onSeries={openSeries} />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </HorizontalShelf>
-            </EntityShelf>
+                  ))}
+                </HorizontalShelf>
+              </EntityShelf>
 
-            <EntityShelf
-              title="Genres"
-              count={genres.length}
-              to="/library/genres"
-              emptyMessage="Genres will appear here after you add them."
-            >
-              <HorizontalShelf ariaLabel="Genres shelf">
-                {genres.map((genre) => (
-                  <GenreShelfItem key={genre.id} genre={genre} slug={slugById.get(genre.id) ?? genre.id} />
-                ))}
-              </HorizontalShelf>
-            </EntityShelf>
-
-          </div>
-        )}
-      </LibrarySection>
+              <EntityShelf
+                title="Genres"
+                count={genres.length}
+                to="/library/genres"
+                emptyMessage="Genres will appear here after you add them."
+              >
+                <HorizontalShelf ariaLabel="Genres shelf">
+                  {genres.map((genre) => (
+                    <GenreShelfItem key={genre.id} genre={genre} slug={slugById.get(genre.id) ?? genre.id} />
+                  ))}
+                </HorizontalShelf>
+              </EntityShelf>
+            </div>
+          )}
+        </LibrarySection>
+      </div>
 
       <LibrarySection
         title="Recently Added"
