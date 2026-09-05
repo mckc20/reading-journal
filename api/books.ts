@@ -1,10 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticate } from "./_lib/auth.js";
-import { parseBookListOptions, toApiBook } from "./_lib/books.js";
+import { API_BOOK_FIELDS, parseBookListOptions, toApiBook } from "./_lib/books.js";
 import { json, methodNotAllowed } from "./_lib/http.js";
 import { getSupabaseAdmin } from "./_lib/supabaseAdmin.js";
-
-const BOOK_FIELDS = "id, title, status, current_page, total_pages, book_authors(position, authors(name))";
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET") {
@@ -30,7 +28,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const admin = getSupabaseAdmin();
     let query = admin
       .from("books")
-      .select(BOOK_FIELDS)
+      .select(API_BOOK_FIELDS)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(options.limit);

@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS reading_logs (
   user_id              uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   book_id              uuid NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   current_page         integer NOT NULL CHECK (current_page >= 0),
-  reading_time_minutes integer CHECK (reading_time_minutes > 0),
+  reading_time_minutes integer CHECK (reading_time_minutes >= 0),
   logged_at            timestamptz NOT NULL DEFAULT now()
 );
 
