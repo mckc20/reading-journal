@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Grid2X2, Heart, List } from "lucide-react";
+import { Check, Grid2X2, Heart, List, ListFilter } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
+import BackButton from "@/components/BackButton";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -265,6 +273,7 @@ export default function AuthorsExplore() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const sort = normalizeSort(searchParams.get("sort"));
   const display = normalizeDisplay(searchParams.get("display"));
@@ -406,9 +415,12 @@ export default function AuthorsExplore() {
   if (authorsLoading || booksLoading || journalEntriesLoading) {
     return (
       <div className="space-y-6">
-        <div className="space-y-1">
-          <AppHeading level={1} as="h1">Explore Authors</AppHeading>
-          <HeadingDescription>Loading authors...</HeadingDescription>
+        <div className="flex items-start gap-2">
+          <BackButton fallbackTo="/library" className="mt-1" />
+          <div className="space-y-1">
+            <AppHeading level={1} as="h1">Authors</AppHeading>
+            <HeadingDescription>Loading authors...</HeadingDescription>
+          </div>
         </div>
         <LoadingAuthors />
       </div>
@@ -424,14 +436,18 @@ export default function AuthorsExplore() {
   }
 
   const hasFilters = hasActiveAuthorFilters(filters);
+  const activeFilterCount = filters.genre.length + filters.language.length;
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <AppHeading level={1} as="h1">Explore Authors</AppHeading>
-            <HeadingDescription>{authorCountLabel}</HeadingDescription>
+          <div className="flex min-w-0 items-start gap-2">
+            <BackButton fallbackTo="/library" className="mt-1" />
+            <div className="space-y-1">
+              <AppHeading level={1} as="h1">Authors</AppHeading>
+              <HeadingDescription>{authorCountLabel}</HeadingDescription>
+            </div>
           </div>
           <Button type="button" variant={isManageMode ? "secondary" : "outline"} onClick={toggleManageMode}>
             {isManageMode ? "Exit management" : "Management mode"}
@@ -447,7 +463,7 @@ export default function AuthorsExplore() {
       <div className="space-y-3">
         <div className="border-y border-border py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 lg:flex">
             <Select value={filters.genre[0] ?? allValue} onValueChange={(value) => updateFilter("genre", value)}>
               <SelectTrigger className="w-[9.75rem] justify-between gap-1.5" aria-label="Filter authors by genre">
                 <SelectValue placeholder="Genre" />
@@ -477,8 +493,24 @@ export default function AuthorsExplore() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="relative lg:hidden"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+              aria-label="Advanced filters and sorting"
+            >
+              <ListFilter className="h-5 w-5" />
+              {hasFilters && (
+                <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
             <Select value={sort} onValueChange={(value) => updateParam("sort", value)}>
-              <SelectTrigger className="w-[12.5rem] justify-between gap-1.5" aria-label="Sort authors">
+              <SelectTrigger className="hidden w-[12.5rem] justify-between gap-1.5 lg:flex" aria-label="Sort authors">
                 <span className="text-muted-foreground">Sort by:</span>
                 <SelectValue />
               </SelectTrigger>
@@ -515,6 +547,74 @@ export default function AuthorsExplore() {
           </div>
           </div>
         </div>
+
+        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DialogContent className="left-auto right-0 top-0 h-svh max-h-svh max-w-full translate-x-0 translate-y-0 content-start overflow-y-auto rounded-none border-l p-4 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-normal">Advanced Filters and Sorting</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h2 className="font-heading text-base font-medium">Filters</h2>
+                <Select value={filters.genre[0] ?? allValue} onValueChange={(value) => updateFilter("genre", value)}>
+                  <SelectTrigger aria-label="Filter authors by genre">
+                    <SelectValue placeholder="Genre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={allValue}>Genre</SelectItem>
+                    {filterOptions.genre.map((option) => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filters.language[0] ?? allValue} onValueChange={(value) => updateFilter("language", value)}>
+                  <SelectTrigger aria-label="Filter authors by language">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={allValue}>Language</SelectItem>
+                    {filterOptions.language.map((option) => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3 border-t pt-6">
+                <h2 className="font-heading text-base font-medium">Sort by</h2>
+                <div className="grid gap-2">
+                  {([
+                    ["name", "Name"],
+                    ["recently-added", "Recently added"],
+                    ["latest-read", "Latest read"],
+                    ["top-rated", "Top rated"],
+                    ["most-read", "Most read"],
+                  ] as const).map(([value, label]) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={sort === value ? "secondary" : "outline"}
+                      className="justify-start"
+                      onClick={() => updateParam("sort", value)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {hasFilters && (
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })}
+                >
+                  Clear filters
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <div className="flex flex-wrap items-center gap-2">
           {hasFilters && (

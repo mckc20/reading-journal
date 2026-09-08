@@ -8,12 +8,14 @@ import {
   Grid2X2,
   Heart,
   List,
+  ListFilter,
   MoreHorizontal,
   RefreshCw,
   Star,
   X,
 } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
+import BackButton from "@/components/BackButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -385,7 +387,7 @@ function BookTableRow({
               src={book.cover_url}
               alt={book.title}
               loading="lazy"
-              className="h-full w-full object-cover"
+              className="block h-full w-full object-cover object-top"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
@@ -1529,7 +1531,7 @@ function LibraryControlsBar({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 border-y py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden flex-wrap items-center gap-2 lg:flex">
           <FilterSelect
             label="Status"
             value={filters.status}
@@ -1576,8 +1578,24 @@ function LibraryControlsBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="relative lg:hidden"
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
+            aria-label="Advanced filters and sorting"
+          >
+            <ListFilter className="h-5 w-5" />
+            {hasActiveFilters && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">
+                {activeFilterChips.length}
+              </span>
+            )}
+          </Button>
           <Select value={sort} onValueChange={handleSortDropdownChange}>
-            <SelectTrigger className="w-[12.5rem] justify-start gap-1.5" aria-label="Sort books">
+            <SelectTrigger className="hidden w-[12.5rem] justify-start gap-1.5 lg:flex" aria-label="Sort books">
               <span className="text-muted-foreground">Sort by:</span>
               <SelectValue />
             </SelectTrigger>
@@ -1662,11 +1680,14 @@ function LibraryToolbar({
 }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0">
-        <AppHeading level={1}>{title}</AppHeading>
-        <HeadingDescription>
-          {title === "My Books" ? "Your library, your stories." : loading ? "..." : countLabel}
-        </HeadingDescription>
+      <div className="flex min-w-0 items-start gap-2">
+        <BackButton fallbackTo="/library" className="mt-1" />
+        <div className="min-w-0">
+          <AppHeading level={1}>{title}</AppHeading>
+          <HeadingDescription>
+            {title === "My Books" ? "Your library, your stories." : loading ? "..." : countLabel}
+          </HeadingDescription>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
@@ -2029,7 +2050,7 @@ export default function Library() {
   );
   const shouldLoadJournalEntries = isJournalEntriesView;
   const loading = booksLoading || seriesLoading || (isJournalEntriesView && journalEntriesLoading);
-  const pageTitle = "Your Library";
+  const pageTitle = "Books";
   const filterOptions = useMemo(() => buildLibraryFilterOptions(books, series), [books, series]);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(() => new Set());
   const [bulkStatus, setBulkStatus] = useState<BookStatus>("Reading");
@@ -2415,10 +2436,13 @@ export default function Library() {
       )}
 
       {!showLibraryToolbar && (
-        <div className="flex items-center justify-between">
-          <AppHeading level={1} as="h1">
-            {pageTitle}
-          </AppHeading>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <BackButton fallbackTo="/library" />
+            <AppHeading level={1} as="h1">
+              {pageTitle}
+            </AppHeading>
+          </div>
           <span className="text-sm text-muted-foreground">
             {loading ? "..." : displayedCountLabel}
           </span>
