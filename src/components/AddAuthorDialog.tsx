@@ -92,6 +92,7 @@ export default function AddAuthorDialog({
     setRemovePhoto(true);
   }
 
+
   async function onSubmit(values: AuthorFormValues) {
     const payload = {
       name: values.name,

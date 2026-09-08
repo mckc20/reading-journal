@@ -1117,7 +1117,7 @@ export function JournalEntryForm({
                 </div>
               </div>
             )}
-          </div>
+      </div>
     </form>
   );
 }
