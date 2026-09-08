@@ -10,7 +10,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { EmptyState, PageHeader, SectionHeader } from "@/components/reading-journal";
 import { Button } from "@/components/ui/button";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -69,12 +69,7 @@ function LoadingGrid() {
 }
 
 function EmptyLibraryView({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-      <p className="text-sm text-muted-foreground">{message}</p>
-    </div>
-  );
+  return <EmptyState icon={BookOpen} message={message} />;
 }
 
 function sortByDateAdded(books: Book[]): Book[] {
@@ -285,13 +280,7 @@ function LibrarySection({
 }) {
   return (
     <section className="min-w-0 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <AppHeading level={3} as="h2">{title}</AppHeading>
-          {countLabel && <HeadingDescription className="text-xs">{countLabel}</HeadingDescription>}
-        </div>
-        {action}
-      </div>
+      <SectionHeader title={title} description={countLabel} action={action} />
       {children}
     </section>
   );
@@ -352,21 +341,18 @@ export default function Library() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <AppHeading level={1}>Library</AppHeading>
-          <HeadingDescription>Your books, authors, series, genres, and journal.</HeadingDescription>
-        </div>
-      </div>
+      <PageHeader title="Library" description="Your books, authors, series, genres, and journal." />
 
       {error && (
-        <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => reload()}>
+        <EmptyState
+          compact
+          icon={RefreshCw}
+          message={<span className="text-destructive">{error}</span>}
+          action={<Button variant="outline" size="sm" onClick={() => reload()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Try again
-          </Button>
-        </div>
+          </Button>}
+        />
       )}
 
       <div className="sm:hidden">

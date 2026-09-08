@@ -12,6 +12,8 @@
     --font-sans: var(--font-body);
     --font-serif: var(--font-display);
     --color-surface: var(--surface);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-sunken: var(--surface-sunken);
     --color-surface-hover: var(--surface-hover);
     --color-text-primary: var(--text-primary);
     --color-text-secondary: var(--text-secondary);
@@ -69,9 +71,11 @@
     --font-display: 'Lora Variable', Georgia, serif;
     --font-body: 'Google Sans Flex Variable', ui-sans-serif, system-ui, sans-serif;
 
-    --background: #fafafa;
+    --background: #fafaf9;
     --surface: #ffffff;
-    --surface-hover: #f7f7f7;
+    --surface-raised: #ffffff;
+    --surface-sunken: #f5f5f3;
+    --surface-hover: #f6f7f4;
     --text-primary: oklch(0.21 0 0);
     --text-secondary: oklch(0.48 0 0);
     --border: oklch(0.86 0 0);
@@ -83,9 +87,17 @@
     --accent: var(--sage-moss);
     --accent-foreground: #ffffff;
     --radius: 0.5rem;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
     --space-page: clamp(1rem, 2.5vw, 2.5rem);
     --shadow-card: 0 1px 2px oklch(0.21 0 0 / 0.04);
-    --shadow-card-hover: var(--shadow-card);
+    --shadow-card-elevated: 0 8px 24px oklch(0.21 0 0 / 0.08);
+    --shadow-card-hover: 0 6px 16px oklch(0.21 0 0 / 0.08);
     --shadow-popover: 0 18px 40px oklch(0.21 0 0 / 0.12);
 
     --foreground: var(--text-primary);
@@ -130,6 +142,8 @@
 .dark {
     --background: oklch(0.18 0 0);
     --surface: oklch(0.222 0 0);
+    --surface-raised: oklch(0.242 0 0);
+    --surface-sunken: oklch(0.202 0 0);
     --surface-hover: oklch(0.27 0 0);
     --text-primary: oklch(0.922 0 0);
     --text-secondary: oklch(0.72 0 0);
@@ -142,7 +156,8 @@
     --accent: var(--sage);
     --accent-foreground: #102018;
     --shadow-card: 0 1px 2px oklch(0 0 0 / 0.22);
-    --shadow-card-hover: var(--shadow-card);
+    --shadow-card-elevated: 0 8px 24px oklch(0 0 0 / 0.32);
+    --shadow-card-hover: 0 6px 16px oklch(0 0 0 / 0.3);
     --shadow-popover: 0 18px 44px oklch(0 0 0 / 0.45);
 
     --foreground: var(--text-primary);

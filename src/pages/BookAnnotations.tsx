@@ -23,7 +23,7 @@ function compareEntryDateStable(left: JournalTimelineEntry, right: JournalTimeli
 
 export default function BookAnnotations() {
   const { bookId } = useParams<{ bookId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { books, loading: booksLoading, error: booksError, reload } = useBooksContext();
   const [journalEntryRecords, setJournalEntryRecords] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
@@ -33,6 +33,17 @@ export default function BookAnnotations() {
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
   const selectedEntryId = searchParams.get("entry");
+  const initialComposerTags = searchParams.get("tag") === "review" ? ["review"] : [];
+
+  function handleComposerOpenChange(open: boolean) {
+    setComposerOpen(open);
+    if (open || !searchParams.has("new")) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("new");
+    nextParams.delete("tag");
+    setSearchParams(nextParams, { replace: true });
+  }
 
   useEffect(() => {
     if (searchParams.get("new") === "1") setComposerOpen(true);
@@ -142,7 +153,8 @@ export default function BookAnnotations() {
             open: composerOpen,
             entity: { type: "Book", id: book.id },
             initialBookId: book.id,
-            onOpenChange: setComposerOpen,
+            initialTags: initialComposerTags,
+            onOpenChange: handleComposerOpenChange,
           }}
           emptyMessage="No journal entries yet."
           onEntryUpdated={(entry) => {

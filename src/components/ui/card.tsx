@@ -1,18 +1,38 @@
 import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+
+const cardVariants = cva(
+  "group/card flex flex-col gap-5 overflow-hidden rounded-lg border border-border bg-card py-5 text-sm text-card-foreground transition-[background-color,border-color,transform] duration-200 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
+  {
+    variants: {
+      variant: {
+        default: "shadow-[var(--shadow-card)]",
+        elevated: "shadow-[var(--shadow-card-elevated)]",
+        interactive:
+          "cursor-pointer shadow-[var(--shadow-card)] hover:-translate-y-0.5 hover:border-primary/20 hover:bg-surface-hover/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  },
+)
 
 function Card({
   className,
   size = "default",
+  variant,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> &
+  { size?: "default" | "sm" } &
+  VariantProps<typeof cardVariants>) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-variant={variant}
       className={cn(
-        "group/card flex flex-col gap-5 overflow-hidden rounded-lg border border-border bg-card py-5 text-sm text-card-foreground shadow-[var(--shadow-card)] transition-[background-color,border-color,transform] duration-200 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-surface-hover/45 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
+        cardVariants({ variant }),
         className
       )}
       {...props}
@@ -100,4 +120,5 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  cardVariants,
 }

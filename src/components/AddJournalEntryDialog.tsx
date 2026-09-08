@@ -54,6 +54,7 @@ interface AddJournalEntryDialogProps {
   parentEntryId?: string | null;
   initialPageStart?: string | number | null;
   initialNoteDate?: string | null;
+  initialTags?: string[];
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
@@ -69,6 +70,7 @@ interface JournalEntryFormProps {
   parentEntryId?: string | null;
   initialPageStart?: string | number | null;
   initialNoteDate?: string | null;
+  initialTags?: string[];
   preferInitialPageAndDate?: boolean;
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
@@ -273,6 +275,7 @@ export function JournalEntryForm({
   parentEntryId = null,
   initialPageStart = null,
   initialNoteDate = null,
+  initialTags = [],
   preferInitialPageAndDate = false,
   systemTags = EMPTY_SYSTEM_TAGS,
   replaceSystemTagPrefixes = EMPTY_SYSTEM_TAG_PREFIXES,
@@ -334,7 +337,7 @@ export function JournalEntryForm({
       pageStart: initialPageStart ? String(initialPageStart) : "",
       noteDate: initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
-      tags: [],
+      tags: normalizeJournalTags(initialTags),
     },
   });
 
@@ -361,6 +364,7 @@ export function JournalEntryForm({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const systemTagsKey = systemTags.join("\u0001");
+  const initialTagsKey = normalizeJournalTags(initialTags).join("\u0001");
   const replaceSystemTagPrefixesKey = replaceSystemTagPrefixes.join("\u0001");
   const initialEntryResetKey = initialEntry ? `${journalEntryDraftSource(initialEntry)}:${initialEntry.id}` : "new";
   const hiddenInitialTags = useMemo(
@@ -393,8 +397,9 @@ export function JournalEntryForm({
       entityId || initialBookId || "unselected",
       parentEntryId || "root",
       hiddenSystemTags.join(",") || "manual",
+      initialTagsKey || "untagged",
     ].join(":");
-  }, [entityId, entityType, hiddenSystemTags, initialBookId, initialEntry, parentEntryId, user?.id]);
+  }, [entityId, entityType, hiddenSystemTags, initialBookId, initialEntry, initialTagsKey, parentEntryId, user?.id]);
   const legacyDraftKey = useMemo(
     () => draftKey.replace(JOURNAL_ENTRY_DRAFT_PREFIX_V2, JOURNAL_ENTRY_DRAFT_PREFIX),
     [draftKey],
@@ -417,7 +422,7 @@ export function JournalEntryForm({
         ? initialNoteDate ?? getTodayLocalDate()
         : initialEntry?.entry_date ?? initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
-      tags: visibleJournalTags(initialEntry?.tags),
+      tags: initialEntry ? visibleJournalTags(initialEntry.tags) : normalizeJournalTags(initialTags),
     };
     const savedDraft = readJournalEntryDraft(draftKey) ?? readJournalEntryDraft(legacyDraftKey);
     const draft = initialEntry && savedDraft?.content.trim() === "" && initialEntry.content.trim() !== ""
@@ -437,7 +442,7 @@ export function JournalEntryForm({
       autosaveReadyRef.current = true;
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [active, draftKey, entityId, initialBookId, initialEntryResetKey, initialNoteDate, initialPageStart, legacyDraftKey, preferInitialPageAndDate, reset]);
+  }, [active, draftKey, entityId, initialBookId, initialEntryResetKey, initialNoteDate, initialPageStart, initialTagsKey, legacyDraftKey, preferInitialPageAndDate, reset]);
 
   useEffect(() => {
     if (!active || !draftSaveReadyRef.current || !draftKey) return;
@@ -457,7 +462,7 @@ export function JournalEntryForm({
       pageStart: initialPageStart ? String(initialPageStart) : "",
       noteDate: initialNoteDate ?? getTodayLocalDate(),
       tagDraft: "",
-      tags: [],
+      tags: normalizeJournalTags(initialTags),
     });
   }
 
@@ -1126,6 +1131,7 @@ export default function AddJournalEntryDialog({
   parentEntryId = null,
   initialPageStart = null,
   initialNoteDate = null,
+  initialTags = [],
   preferInitialPageAndDate = false,
   systemTags = [],
   replaceSystemTagPrefixes = [],
@@ -1151,6 +1157,7 @@ export default function AddJournalEntryDialog({
           parentEntryId={parentEntryId}
           initialPageStart={initialPageStart}
           initialNoteDate={initialNoteDate}
+          initialTags={initialTags}
           preferInitialPageAndDate={preferInitialPageAndDate}
           systemTags={systemTags}
           replaceSystemTagPrefixes={replaceSystemTagPrefixes}

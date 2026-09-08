@@ -104,6 +104,7 @@ interface JournalTimelineProps {
     open: boolean;
     entity: { type: "Book"; id: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
     initialBookId?: string;
+    initialTags?: string[];
     onOpenChange: (open: boolean) => void;
   };
   onEntryUpdated?: (entry: JournalTimelineEntry) => void;
@@ -1871,6 +1872,7 @@ function InlineJournalEntryComposer({
   open,
   entity,
   initialBookId = "",
+  initialTags = [],
   entryLinkTargets,
   onCancel,
   onSaved,
@@ -1878,6 +1880,7 @@ function InlineJournalEntryComposer({
   open: boolean;
   entity: { type: "Book"; id: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
   initialBookId?: string;
+  initialTags?: string[];
   entryLinkTargets: JournalLinkTarget[];
   onCancel: () => void;
   onSaved: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
@@ -1910,6 +1913,7 @@ function InlineJournalEntryComposer({
           autoFocus
           autoSave
           initialBookId={initialBookId}
+          initialTags={initialTags}
           entity={entity}
           initialEntry={null}
           entryLinkTargets={entryLinkTargets}
@@ -2855,6 +2859,7 @@ export default function JournalTimeline({
           open={inlineComposer.open}
           entity={inlineComposer.entity}
           initialBookId={inlineComposer.initialBookId}
+          initialTags={inlineComposer.initialTags}
           entryLinkTargets={journalLinkTargets}
           onCancel={() => inlineComposer.onOpenChange(false)}
           onSaved={handleInlineComposerSaved}
@@ -2884,6 +2889,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              initialTags={inlineComposer.initialTags}
               entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}
@@ -2997,6 +3003,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              initialTags={inlineComposer.initialTags}
               entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}
@@ -3220,6 +3227,7 @@ export default function JournalTimeline({
               open={inlineComposer.open}
               entity={inlineComposer.entity}
               initialBookId={inlineComposer.initialBookId}
+              initialTags={inlineComposer.initialTags}
               entryLinkTargets={journalLinkTargets}
               onCancel={() => inlineComposer.onOpenChange(false)}
               onSaved={handleInlineComposerSaved}

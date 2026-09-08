@@ -32,6 +32,7 @@ import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
+import BookFinishedCelebration from "./BookFinishedCelebration";
 import type { Book, ChatMessageNotification } from "@/types";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
@@ -318,6 +319,7 @@ function AppLayoutContent() {
       </Suspense>
 
       <ReleaseNotesDialog />
+      <BookFinishedCelebration />
     </>
   );
 }

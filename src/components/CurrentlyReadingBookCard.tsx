@@ -1,11 +1,9 @@
-import { BookOpen, Heart, PauseCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
+import { BookCover, BookProgress, BookStatus, getBookProgress } from "@/components/reading-journal";
 import { useBooksContext } from "@/context/BooksContext";
-import { cn, getTodayLocalDate, statusVariant } from "@/lib/utils";
+import { getTodayLocalDate } from "@/lib/utils";
 import type { Book } from "@/types";
 
 interface CurrentlyReadingBookCardProps {
@@ -32,22 +30,18 @@ export default function CurrentlyReadingBookCard({
   const totalPages = Math.max(0, book.total_pages ?? 0);
   const hasTotalPages = totalPages > 0;
   const isPaused = book.status === "Paused";
-  const progressPercent = hasTotalPages
-    ? Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)))
-    : 0;
+  const progressPercent = getBookProgress(currentPage, totalPages) ?? 0;
 
   const showDashboardQuickProgress = showQuickProgress && book.status === "Reading";
 
-  const progress =
-    book.status === "Reading" && book.current_page && book.total_pages
-      ? Math.round((book.current_page / book.total_pages) * 100)
-      : null;
+  const progress = book.status === "Reading" ? getBookProgress(book.current_page, book.total_pages) : null;
 
   return (
     <Card
       role="button"
       tabIndex={0}
-      className="cursor-pointer gap-0 overflow-hidden pb-2 pt-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      variant="interactive"
+      className="group gap-0 overflow-hidden pb-2 pt-0"
       onClick={() => handleBook?.(book)}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -57,41 +51,14 @@ export default function CurrentlyReadingBookCard({
         }
       }}
     >
-      <div
-        className={cn(
-          "relative aspect-[2/3] w-full flex-shrink-0 bg-muted",
-          isPaused && "opacity-70",
-        )}
-      >
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            loading="lazy"
-            className={cn("h-full w-full object-cover", isPaused && "grayscale")}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-          </div>
-        )}
-        {isPaused && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-            <PauseCircle className="h-8 w-8 text-muted-foreground" />
-          </div>
-        )}
-        {cornerLabel && (
-          <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
-            {cornerLabel}
-          </span>
-        )}
-        {book.is_favorite && (
-          <Heart
-            className="absolute right-1.5 top-1.5 h-4 w-4 fill-favorite text-favorite drop-shadow"
-            aria-label="Favorite"
-          />
-        )}
-      </div>
+      <BookCover
+        src={book.cover_url}
+        title={book.title}
+        paused={isPaused}
+        favorite={book.is_favorite}
+        cornerLabel={cornerLabel}
+        className="w-full rounded-none"
+      />
 
       <CardContent className="space-y-1 p-2">
         <p
@@ -112,17 +79,13 @@ export default function CurrentlyReadingBookCard({
         >
           {book.authors.join(", ")}
         </p>
-        <Badge variant={statusVariant(book.status)} className={textSize === "compact" ? "text-[10px]" : "text-xs"}>
-          {book.status}
-        </Badge>
-        {!showDashboardQuickProgress && progress !== null && (
-          <Progress value={progress} className="mt-1 h-1" />
-        )}
+        <BookStatus status={book.status} className={textSize === "compact" ? "text-[10px]" : "text-xs"} />
+        {!showDashboardQuickProgress && progress !== null && <BookProgress currentPage={book.current_page} totalPages={book.total_pages} className="mt-1" />}
       </CardContent>
 
       {showDashboardQuickProgress && (
         <div className="space-y-1.5 border-t px-2 pb-2 pt-1.5">
-          <Progress value={progressPercent} className="h-1" />
+          <BookProgress currentPage={currentPage} totalPages={totalPages} />
           <div className="grid grid-cols-[auto_auto] items-center gap-2 sm:grid-cols-[auto_1fr_auto]">
             <p className="text-[11px] text-muted-foreground">{progressPercent}%</p>
             <p className="hidden truncate text-center text-[11px] text-muted-foreground sm:block">
@@ -163,4 +126,3 @@ export default function CurrentlyReadingBookCard({
     </Card>
   );
 }
-

@@ -60,7 +60,7 @@ export default function ReadingProgressDialog({
             handleOpenChange(false);
 
             if (finishedBook) {
-              notifyBookFinished();
+              notifyBookFinished(book.id);
             }
           }}
         />

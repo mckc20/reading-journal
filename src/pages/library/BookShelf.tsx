@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type WheelEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyState, SectionHeader } from "@/components/reading-journal";
 import type { Book } from "@/types";
 import LibraryBookCard from "./LibraryBookCard";
 
@@ -82,20 +83,18 @@ export default function BookShelf({
 
   return (
     <section className="min-w-0 border-b px-4 py-3 last:border-b-0 sm:px-5">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-sm font-semibold leading-snug">{title}</h3>
-            <p className="text-xs text-muted-foreground">{books.length}</p>
-          </div>
-        </div>
-        {onViewAll && (
+      <SectionHeader
+        title={title}
+        level={4}
+        description={`${books.length}`}
+        className="mb-2"
+        action={onViewAll && (
           <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onViewAll}>
             View all
             <ChevronRight className="h-4 w-4" />
           </Button>
         )}
-      </div>
+      />
       {books.length > 0 ? (
         <div className="relative">
           {canScrollLeft && (
@@ -139,9 +138,7 @@ export default function BookShelf({
           )}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed bg-background/55 p-4 text-sm text-muted-foreground">
-          <span>{emptyMessage}</span>
-        </div>
+        <EmptyState compact message={emptyMessage} className="rounded-lg border border-dashed bg-background/55" />
       )}
     </section>
   );

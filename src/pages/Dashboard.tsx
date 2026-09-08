@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyState, PageHeader, SectionHeader } from "@/components/reading-journal";
 import { useBooksContext } from "@/context/BooksContext";
 import BookCard from "@/components/BookCard";
 import CurrentlyReadingBookCard from "@/components/CurrentlyReadingBookCard";
-import { AppHeading } from "@/components/design";
 import type { Book } from "@/types";
 
 const RECENTLY_FINISHED_DAYS = 28;
@@ -82,7 +82,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-8">
-        <AppHeading level={1} as="h1">Home</AppHeading>
+        <PageHeader title="Home" />
         <SkeletonGrid />
       </div>
     );
@@ -91,14 +91,12 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="space-y-8">
-        <AppHeading level={1} as="h1">Home</AppHeading>
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => reload()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try again
-          </Button>
-        </div>
+        <PageHeader title="Home" />
+        <EmptyState
+          icon={RefreshCw}
+          message={<span className="text-destructive">{error}</span>}
+          action={<Button variant="outline" size="sm" onClick={() => reload()}><RefreshCw />Try again</Button>}
+        />
       </div>
     );
   }
@@ -107,21 +105,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <AppHeading level={1} as="h1">Home</AppHeading>
+      <PageHeader title="Home" />
 
       {!hasActiveBooks && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <BookOpen className="h-12 w-12 text-muted-foreground/40" />
-          <p className="text-muted-foreground">No active books yet.</p>
-          <p className="text-sm text-muted-foreground">
-            Tap <span className="font-medium">+</span> to add your first book.
-          </p>
-        </div>
+        <EmptyState
+          icon={BookOpen}
+          title="No active books yet."
+          message={<>Tap <span className="font-medium">+</span> to add your first book.</>}
+        />
       )}
 
       {currentlyReading.length > 0 && (
         <section className="space-y-3">
-          <AppHeading level={4} as="h2">Currently Reading</AppHeading>
+          <SectionHeader title="Currently Reading" level={4} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {currentlyReading.map((book) => (
               <CurrentlyReadingBookCard
@@ -137,7 +133,7 @@ export default function Dashboard() {
 
       {pausedBooks.length > 0 && (
         <section className="space-y-3">
-          <AppHeading level={4} as="h2">Paused</AppHeading>
+          <SectionHeader title="Paused" level={4} />
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {pausedBooks.map((book) => (
               <BookCard
@@ -153,7 +149,7 @@ export default function Dashboard() {
 
       {upNext.length > 0 && (
         <section className="space-y-3">
-          <AppHeading level={4} as="h2">Up Next</AppHeading>
+          <SectionHeader title="Up Next" level={4} />
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {upNext.map((book) => (
               <BookCard
@@ -168,7 +164,7 @@ export default function Dashboard() {
       )}
 
       <section className="space-y-3">
-        <AppHeading level={4} as="h2">Recently Finished</AppHeading>
+        <SectionHeader title="Recently Finished" level={4} />
         {recentlyFinished.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {recentlyFinished.map((book) => (
@@ -181,9 +177,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            No books finished in the last 4 weeks.
-          </p>
+          <EmptyState compact message="No books finished in the last 4 weeks." />
         )}
       </section>
     </div>

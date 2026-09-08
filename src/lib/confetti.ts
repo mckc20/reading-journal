@@ -2,8 +2,8 @@ import confetti from "canvas-confetti";
 
 export const BOOK_FINISHED_EVENT = "reading-journal:book-finished";
 
-export function notifyBookFinished() {
-  window.dispatchEvent(new Event(BOOK_FINISHED_EVENT));
+export function notifyBookFinished(bookId: string) {
+  window.dispatchEvent(new CustomEvent<{ bookId: string }>(BOOK_FINISHED_EVENT, { detail: { bookId } }));
 }
 
 export function launchBookFinishedConfetti() {
