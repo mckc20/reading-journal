@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BookOpen, ChevronRight, ListTree } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,10 @@ export default function Genres() {
           <ListTree className="h-4 w-4" />
           Genre discovery
         </div>
-        <AppHeading level={1}>Browse Genres</AppHeading>
+        <div className="flex items-center gap-2">
+          <BackButton fallbackTo="/library" />
+          <AppHeading level={1}>Browse Genres</AppHeading>
+        </div>
         <HeadingDescription className="max-w-2xl">
           Explore your genre tree from broad categories down to specific subgenres. Counts include books tagged directly on a genre and books tagged on any of its descendants.
         </HeadingDescription>

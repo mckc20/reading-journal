@@ -51,11 +51,11 @@ const libraryRedirectParamKeys = [
   "favorite",
 ];
 
-const mobileLibraryCategories: Array<{ label: string; to: string; icon: LucideIcon }> = [
-  { label: "Books", to: "/library/books", icon: BookOpen },
-  { label: "Authors", to: "/library/authors", icon: UserRound },
-  { label: "Series", to: "/library/series", icon: LibraryBig },
-  { label: "Genres", to: "/library/genres", icon: Tags },
+const mobileLibraryCategories: Array<{ key: "books" | "authors" | "series" | "genres"; label: string; to: string; icon: LucideIcon }> = [
+  { key: "books", label: "Books", to: "/library/books", icon: BookOpen },
+  { key: "authors", label: "Authors", to: "/library/authors", icon: UserRound },
+  { key: "series", label: "Series", to: "/library/series", icon: LibraryBig },
+  { key: "genres", label: "Genres", to: "/library/genres", icon: Tags },
 ];
 
 function LoadingGrid() {
@@ -286,17 +286,24 @@ function LibrarySection({
   );
 }
 
-function MobileLibraryCategoryList() {
+function MobileLibraryCategoryList({
+  counts,
+}: {
+  counts: Record<(typeof mobileLibraryCategories)[number]["key"], number | string>;
+}) {
   return (
     <nav aria-label="Library categories" className="border-y">
-      {mobileLibraryCategories.map(({ label, to, icon: Icon }) => (
+      {mobileLibraryCategories.map(({ key, label, to, icon: Icon }) => (
         <Link
           key={to}
           to={to}
           className="group flex min-h-18 items-center gap-3 border-b py-3.5 last:border-b-0"
         >
           <Icon className="h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
-          <span className="flex-1 text-lg font-medium group-hover:text-primary">{label}</span>
+          <span className="flex flex-1 items-baseline gap-2">
+            <span className="text-lg font-medium group-hover:text-primary">{label}</span>
+            <span className="text-xs text-muted-foreground">{counts[key]}</span>
+          </span>
           <ChevronRight className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
       ))}
@@ -356,7 +363,14 @@ export default function Library() {
       )}
 
       <div className="sm:hidden">
-        <MobileLibraryCategoryList />
+        <MobileLibraryCategoryList
+          counts={{
+            books: loadingShelves ? "..." : books.length,
+            authors: loadingShelves ? "..." : authorSummaries.length,
+            series: loadingShelves ? "..." : seriesGroups.length,
+            genres: loadingShelves ? "..." : genres.length,
+          }}
+        />
       </div>
 
       <div className="hidden sm:block">

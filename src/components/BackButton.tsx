@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,15 @@ export default function BackButton({ fallbackTo, className }: BackButtonProps) {
   }
 
   return (
-    <Button type="button" variant="ghost" size="sm" className={cn("px-2", className)} onClick={handleBack}>
-      <ArrowLeft className="mr-1.5 h-4 w-4" />
-      Back
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-lg"
+      className={cn("size-7", className)}
+      onClick={handleBack}
+      aria-label="Back"
+    >
+      <ChevronLeft className="size-7" strokeWidth={1.5} />
     </Button>
   );
 }

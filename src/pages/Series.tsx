@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Heart } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -69,11 +70,14 @@ export default function Series() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-1">
-        <AppHeading level={1} as="h1">Series</AppHeading>
-        <HeadingDescription>
-          Browse the series in your library.
-        </HeadingDescription>
+      <div className="flex items-start gap-2">
+        <BackButton fallbackTo="/library" className="mt-1" />
+        <div className="space-y-1">
+          <AppHeading level={1} as="h1">Series</AppHeading>
+          <HeadingDescription>
+            {loading ? "..." : `${groups.length} series`}
+          </HeadingDescription>
+        </div>
       </div>
 
       {error ? (

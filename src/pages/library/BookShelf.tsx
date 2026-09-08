@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type WheelEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
-import { EmptyState, SectionHeader } from "@/components/reading-journal";
+import { EmptyState } from "@/components/reading-journal";
 import type { Book } from "@/types";
 import LibraryBookCard from "./LibraryBookCard";
 
@@ -83,18 +84,18 @@ export default function BookShelf({
 
   return (
     <section className="min-w-0 border-b px-4 py-3 last:border-b-0 sm:px-5">
-      <SectionHeader
-        title={title}
-        level={4}
-        description={`${books.length}`}
-        className="mb-2"
-        action={onViewAll && (
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <AppHeading level={4} as="h2">{title}</AppHeading>
+          <p className="text-xs text-muted-foreground">{books.length}</p>
+        </div>
+        {onViewAll && (
           <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onViewAll}>
             View all
             <ChevronRight className="h-4 w-4" />
           </Button>
         )}
-      />
+      </div>
       {books.length > 0 ? (
         <div className="relative">
           {canScrollLeft && (
