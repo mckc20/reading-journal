@@ -6,6 +6,7 @@ import type {
   QuaggaJSStatic,
 } from "@ericblade/quagga2";
 import { Button } from "@/components/ui/button";
+import { Flashlight, ZoomIn } from "lucide-react";
 import { normalizeScannedIsbn } from "@/lib/isbnScan";
 
 interface BarcodeScannerProps {
@@ -17,6 +18,24 @@ type ScannerStatus = "starting" | "scanning" | "detected" | "hint";
 
 const NO_DETECTION_HINT_DELAY_MS = 7000;
 
+type CameraCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[];
+  torch?: boolean;
+  zoom?: { min: number; max: number; step?: number };
+};
+
+type CameraTrack = MediaStreamTrack & {
+  getCapabilities?: () => CameraCapabilities;
+};
+
+function getCameraTrack(target: HTMLDivElement): CameraTrack | null {
+  const video = target.querySelector("video");
+  const stream = video?.srcObject;
+  return stream instanceof MediaStream
+    ? (stream.getVideoTracks()[0] as CameraTrack | undefined) ?? null
+    : null;
+}
+
 function buildScannerConfig(
   target: HTMLDivElement,
   constraints: MediaTrackConstraints,
@@ -27,9 +46,9 @@ function buildScannerConfig(
       target,
       constraints,
       area: {
-        top: "25%",
+        top: "34%",
         right: "5%",
-        bottom: "25%",
+        bottom: "34%",
         left: "5%",
       },
       willReadFrequently: true,
@@ -49,6 +68,38 @@ function buildScannerConfig(
       willReadFrequently: true,
     },
   };
+}
+
+function getHighQualityConstraints(
+  facingMode: MediaTrackConstraints["facingMode"],
+): MediaTrackConstraints {
+  return {
+    facingMode,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30, max: 30 },
+  };
+}
+
+async function configureCameraTrack(
+  target: HTMLDivElement,
+  setCapabilities: (capabilities: CameraCapabilities | null) => void,
+): Promise<void> {
+  const track = getCameraTrack(target);
+  const capabilities = track?.getCapabilities
+    ? (track.getCapabilities() as CameraCapabilities)
+    : null;
+  setCapabilities(capabilities);
+
+  if (!track || !capabilities?.focusMode?.includes("continuous")) return;
+
+  try {
+    await track.applyConstraints({
+      advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+    });
+  } catch {
+    // Autofocus is optional and some browsers expose the capability but reject the constraint.
+  }
 }
 
 async function stopScanner(
@@ -88,6 +139,10 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ScannerStatus>("starting");
   const [scanMessage, setScanMessage] = useState("Starting camera...");
+  const [cameraCapabilities, setCameraCapabilities] =
+    useState<CameraCapabilities | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [torchEnabled, setTorchEnabled] = useState(false);
 
   onScanRef.current = onScan;
 
@@ -149,17 +204,19 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
 
       try {
         await Quagga.start(
-          buildScannerConfig(containerRef.current, {
-            facingMode: { exact: "environment" },
-          }),
+          buildScannerConfig(
+            containerRef.current,
+            getHighQualityConstraints({ exact: "environment" }),
+          ),
         );
       } catch {
         try {
           if (stopped() || !containerRef.current) return;
           await Quagga.start(
-            buildScannerConfig(containerRef.current, {
-              facingMode: "environment",
-            }),
+            buildScannerConfig(
+              containerRef.current,
+              getHighQualityConstraints("environment"),
+            ),
           );
         } catch (err) {
           if (!stopped()) {
@@ -167,6 +224,20 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           }
           return;
         }
+      }
+
+      if (stopped() || !containerRef.current) return;
+      await configureCameraTrack(containerRef.current, setCameraCapabilities);
+
+      const track = getCameraTrack(containerRef.current);
+      const capabilities = track?.getCapabilities
+        ? (track.getCapabilities() as CameraCapabilities)
+        : null;
+      if (capabilities?.zoom) {
+        const currentZoom = (track?.getSettings() as MediaTrackSettings & {
+          zoom?: number;
+        })?.zoom;
+        setZoom(currentZoom ?? capabilities.zoom.min);
       }
 
       if (stopped()) {
@@ -195,19 +266,84 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
     return () => {
       isStopped = true;
       clearHintTimer();
+      setCameraCapabilities(null);
+      setZoom(null);
+      setTorchEnabled(false);
       void stopScanner(quaggaRef.current, detectedCallbackRef.current);
     };
   }, [clearHintTimer, startScanner]);
+
+  const applyCameraConstraint = useCallback(
+    async (constraint: MediaTrackConstraintSet) => {
+      const target = containerRef.current;
+      const track = target ? getCameraTrack(target) : null;
+      if (!track) return;
+
+      try {
+        await track.applyConstraints({ advanced: [constraint] });
+      } catch {
+        // Camera controls are progressive enhancements and may not be supported by the browser.
+      }
+    },
+    [],
+  );
+
+  const handleZoomChange = useCallback(
+    (value: number) => {
+      setZoom(value);
+      void applyCameraConstraint({ zoom: value } as MediaTrackConstraintSet);
+    },
+    [applyCameraConstraint],
+  );
+
+  const handleTorchToggle = useCallback(() => {
+    const nextEnabled = !torchEnabled;
+    setTorchEnabled(nextEnabled);
+    void applyCameraConstraint({ torch: nextEnabled } as MediaTrackConstraintSet);
+  }, [applyCameraConstraint, torchEnabled]);
+
+  const zoomRange = cameraCapabilities?.zoom;
 
   return (
     <div className="space-y-3">
       <div className="relative w-full aspect-[4/3] bg-foreground rounded-lg overflow-hidden">
         <div
           ref={containerRef}
-          className="absolute inset-0 [&_canvas]:hidden [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+          className="absolute inset-0 [&_canvas]:hidden [&_video]:h-full [&_video]:w-full [&_video]:object-contain"
         />
-        <div className="scanner-mask pointer-events-none absolute inset-x-[8%] top-1/2 h-32 -translate-y-1/2 rounded-md border-2 border-primary/80" />
+        <div className="scanner-mask pointer-events-none absolute inset-x-[5%] top-1/2 h-24 -translate-y-1/2 rounded-md border-2 border-primary/80" />
       </div>
+
+      {(zoomRange || cameraCapabilities?.torch) && (
+        <div className="flex items-center gap-3">
+          {zoomRange && zoom !== null && (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <ZoomIn className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <input
+                aria-label="Camera zoom"
+                className="min-w-0 flex-1 accent-primary"
+                type="range"
+                min={zoomRange.min}
+                max={zoomRange.max}
+                step={zoomRange.step ?? 0.1}
+                value={zoom}
+                onChange={(event) => handleZoomChange(Number(event.target.value))}
+              />
+            </div>
+          )}
+          {cameraCapabilities?.torch && (
+            <Button
+              type="button"
+              variant={torchEnabled ? "default" : "outline"}
+              size="icon"
+              aria-label={torchEnabled ? "Turn off light" : "Turn on light"}
+              onClick={handleTorchToggle}
+            >
+              <Flashlight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {error ? (
         <p className="text-sm text-destructive text-center">{error}</p>
