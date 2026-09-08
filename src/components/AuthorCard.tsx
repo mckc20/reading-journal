@@ -91,7 +91,7 @@ export default function AuthorCard({ author, onClick, compact = false, interacti
                         src={book.cover_url}
                         alt={book.title}
                         loading="lazy"
-                        className="h-full w-full object-cover"
+                        className="block h-full w-full object-cover object-top"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">

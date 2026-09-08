@@ -37,7 +37,7 @@ export default function CompactBookCard({ book, onBook }: CompactBookCardProps) 
             alt={book.title}
             loading="lazy"
             className={cn(
-              "h-full w-full object-cover transition duration-200 ease-out group-hover:scale-[1.015]",
+              "block h-full w-full object-cover object-top transition duration-200 ease-out group-hover:scale-[1.015]",
               isPaused && "grayscale opacity-70",
             )}
           />

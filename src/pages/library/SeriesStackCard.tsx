@@ -36,7 +36,7 @@ function SeriesCoverLayer({
           src={book.cover_url}
           alt={index === 0 ? book.title : ""}
           loading="lazy"
-          className={cn("block h-full w-full scale-[1.035] object-cover", book.status === "Paused" && "grayscale")}
+          className={cn("block h-full w-full scale-[1.035] object-cover object-top", book.status === "Paused" && "grayscale")}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">

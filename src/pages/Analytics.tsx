@@ -585,7 +585,7 @@ function HallOfFameCard({
       <div className="flex gap-3 p-4">
         <div className="flex h-14 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
           {record?.book?.cover_url ? (
-            <img src={record.book.cover_url} alt="" className="h-full w-full object-cover" />
+            <img src={record.book.cover_url} alt="" className="block h-full w-full object-cover object-top" />
           ) : (
             <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
           )}

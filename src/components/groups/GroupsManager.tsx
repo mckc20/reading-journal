@@ -1349,7 +1349,7 @@ export function GroupsManager() {
                   className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-md p-2 hover:bg-muted"
                 >
                   {book.cover_url ? (
-                    <img src={book.cover_url} alt="" className="h-12 w-8 shrink-0 rounded object-cover" />
+                    <img src={book.cover_url} alt="" className="block h-12 w-8 shrink-0 rounded object-cover object-top" />
                   ) : (
                     <div className="flex h-12 w-8 shrink-0 items-center justify-center rounded bg-muted">
                       <BookOpen className="h-4 w-4 text-muted-foreground" />
