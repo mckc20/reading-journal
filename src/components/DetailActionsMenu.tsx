@@ -24,6 +24,8 @@ interface DetailActionsMenuProps {
   shareLinkLabel?: string;
   shareAttachmentLabel: string;
   onPause?: () => void;
+  pauseTitle?: string;
+  pauseDescription?: string;
   onResume?: () => void;
   onEdit?: () => void;
   onDelete: () => void | Promise<void>;
@@ -47,6 +49,8 @@ export default function DetailActionsMenu({
   shareLinkLabel = "Copy link to this page",
   shareAttachmentLabel,
   onPause,
+  pauseTitle = "Pause this book?",
+  pauseDescription = "Are you sure you want to pause this book? Reading time will stop until you resume it.",
   onResume,
   onEdit,
   onDelete,
@@ -62,6 +66,7 @@ export default function DetailActionsMenu({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
@@ -125,6 +130,11 @@ export default function DetailActionsMenu({
     await onDelete();
   }
 
+  async function runPause() {
+    setPauseOpen(false);
+    onPause?.();
+  }
+
   return (
     <div className={cn("relative", className)}>
       <Button
@@ -167,7 +177,7 @@ export default function DetailActionsMenu({
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
                 setMenuOpen(false);
-                onPause();
+                setPauseOpen(true);
               }}
             >
               <PauseCircle className="h-4 w-4" />
@@ -235,6 +245,25 @@ export default function DetailActionsMenu({
           </div>
         </DialogContent>
       </Dialog>
+
+      {onPause && (
+        <Dialog open={pauseOpen} onOpenChange={setPauseOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{pauseTitle}</DialogTitle>
+              <DialogDescription>{pauseDescription}</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setPauseOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void runPause()}>
+                Pause
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-md">
