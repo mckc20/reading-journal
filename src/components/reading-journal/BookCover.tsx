@@ -47,7 +47,7 @@ export function BookCover({
           alt={title}
           loading="lazy"
           className={cn(
-            "h-full w-full object-cover object-top transition-transform duration-200 ease-out group-hover:scale-[1.02]",
+            "block h-full w-full object-cover object-top transition-transform duration-200 ease-out group-hover:scale-[1.02]",
             paused && "grayscale",
             imageClassName,
           )}

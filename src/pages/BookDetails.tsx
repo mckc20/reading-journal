@@ -876,7 +876,7 @@ export default function BookDetails() {
               <img
                 src={book.cover_url}
                 alt={book.title}
-                className={cn("h-full w-full object-cover", isPaused && "grayscale")}
+                className={cn("block h-full w-full object-cover object-top", isPaused && "grayscale")}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
@@ -1469,7 +1469,7 @@ function EditDetailsForm({
             className="group relative block w-[min(7rem,38vw)] aspect-[2/3] cursor-pointer overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
           >
             {activeCoverUrl ? (
-              <img src={activeCoverUrl} alt={bookTitle} className="h-full w-full object-cover" />
+              <img src={activeCoverUrl} alt={bookTitle} className="block h-full w-full object-cover object-top" />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <ImagePlus className="h-8 w-8 text-muted-foreground/40" />

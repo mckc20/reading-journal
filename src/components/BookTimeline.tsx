@@ -68,7 +68,7 @@ function BookTimelineRow({
       <div className="flex min-w-0 gap-3">
         <div className="h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm sm:h-[86px] sm:w-14">
           {book.cover_url ? (
-            <img src={book.cover_url} alt={book.title} loading="lazy" className="h-full w-full object-cover" />
+            <img src={book.cover_url} alt={book.title} loading="lazy" className="block h-full w-full object-cover object-top" />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <BookOpen className="h-4 w-4 text-muted-foreground/40" />

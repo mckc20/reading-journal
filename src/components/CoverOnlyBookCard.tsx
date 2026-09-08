@@ -28,7 +28,7 @@ export default function CoverOnlyBookCard({ book, onBook, className }: CoverOnly
             alt=""
             loading="lazy"
             className={cn(
-              "h-full w-full object-cover transition-transform group-hover:scale-[1.02]",
+              "block h-full w-full object-cover object-top transition-transform group-hover:scale-[1.02]",
               isPaused && "grayscale",
             )}
           />
@@ -52,4 +52,3 @@ export default function CoverOnlyBookCard({ book, onBook, className }: CoverOnly
     </button>
   );
 }
-

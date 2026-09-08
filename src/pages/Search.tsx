@@ -429,7 +429,7 @@ function BookCover({ book }: { book: Book }) {
       )}
     >
       {book.cover_url ? (
-        <img src={book.cover_url} alt="" className="h-full w-full object-cover" />
+        <img src={book.cover_url} alt="" className="block h-full w-full object-cover object-top" />
       ) : (
         <BookOpen className="h-5 w-5 text-muted-foreground/50" />
       )}

@@ -173,7 +173,7 @@ function BookThumbnail({ book }: { book: Book }) {
         <img
           src={book.cover_url}
           alt=""
-          className={cn("h-full w-full object-cover", isPaused && "grayscale")}
+          className={cn("block h-full w-full object-cover object-top", isPaused && "grayscale")}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
