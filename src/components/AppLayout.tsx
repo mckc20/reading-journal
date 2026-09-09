@@ -663,18 +663,28 @@ function NotificationsMenu() {
   );
 }
 
-function AddMenuPanel({ onSelect }: { onSelect: (action: AddAction) => void }) {
+function AddMenuPanel({
+  onSelect,
+  animateOptions = false,
+}: {
+  onSelect: (action: AddAction) => void;
+  animateOptions?: boolean;
+}) {
   return (
     <>
       <div className="mb-1 px-2 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Add
       </div>
       <div className="space-y-1">
-        {addActions.map(({ key, label, icon: Icon }) => (
+        {addActions.map(({ key, label, icon: Icon }, index) => (
           <button
             key={key}
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover"
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover",
+              animateOptions && "animate-mobile-add-option",
+            )}
+            style={animateOptions ? { animationDelay: `${300 + index * 60}ms` } : undefined}
             onClick={() => onSelect(key)}
           >
             <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -772,7 +782,7 @@ function MobileBottomNav({
             addMenuOpen ? "animate-mobile-add-dropup" : "pointer-events-none hidden",
           )}
         >
-          <AddMenuPanel onSelect={onSelectAddAction} />
+          <AddMenuPanel onSelect={onSelectAddAction} animateOptions={addMenuOpen} />
         </div>
         <button
           ref={addButtonRef}
