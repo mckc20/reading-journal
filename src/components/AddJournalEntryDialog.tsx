@@ -20,6 +20,7 @@ import { useForm, Controller } from "react-hook-form";
 import { AlignJustify, ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import InlineMarkdownEditor from "@/components/InlineMarkdownEditor";
@@ -1105,17 +1106,16 @@ export function JournalEntryForm({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col-reverse gap-2 border-t bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>{footerStart}</div>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button type="button" variant="outline" onClick={handleCancel}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting || !content.trim()}>
-                    {isSubmitting ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </div>
+              <SaveCancelBar
+                mode={isInline ? "page" : "dialog"}
+                onCancel={handleCancel}
+                saving={isSubmitting}
+                saveDisabled={!content.trim()}
+                saveLabel="Save"
+                savingLabel="Saving..."
+              >
+                {footerStart}
+              </SaveCancelBar>
             )}
       </div>
     </form>
@@ -1144,7 +1144,7 @@ export default function AddJournalEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="sr-only">Add journal entry</DialogTitle>
         </DialogHeader>

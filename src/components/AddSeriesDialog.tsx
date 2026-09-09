@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { ImagePlus, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import type { AddBookDialogLaunchOptions } from "@/components/AppLayout";
 import SeriesBooksEditor, {
   parseVolumeInput,
   type EditableSeriesBook,
 } from "@/components/series/SeriesBooksEditor";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -197,7 +197,7 @@ export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSav
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Series</DialogTitle>
           <DialogDescription>
@@ -205,62 +205,70 @@ export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSav
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <label
-                htmlFor="series-cover"
-                className="flex h-24 w-40 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
-              >
-                {coverPreview ? (
-                  <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
-                ) : (
-                  <ImagePlus className="h-6 w-6 text-muted-foreground/50" />
-                )}
-              </label>
-              <input
-                ref={fileInputRef}
-                id="series-cover"
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Banner image</p>
-                <p className="text-xs text-muted-foreground">
-                  {coverFile ? coverFile.name : "Click to upload"}
-                </p>
+        <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 pb-24">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="series-cover">Banner image</Label>
+                <label
+                  htmlFor="series-cover"
+                  className="group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
+                >
+                  {coverPreview ? (
+                    <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <ImagePlus className="h-6 w-6" />
+                      <span className="text-xs">Click to upload</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                    <ImagePlus className="h-5 w-5 text-white" />
+                  </div>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  id="series-cover"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleFileChange}
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-xs text-muted-foreground">
+                    {coverFile ? coverFile.name : "PNG, JPG, WEBP, or AVIF."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="series-name">Series name *</Label>
+                <Input
+                  id="series-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Series name"
+                  aria-invalid={!name.trim() && saving ? true : undefined}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="series-description">Description</Label>
+                <Textarea
+                  id="series-description"
+                  rows={6}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What is this series about?"
+                />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="series-name">Series name *</Label>
-              <Input
-                id="series-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Series name"
-                aria-invalid={!name.trim() && saving ? true : undefined}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="series-description">Description</Label>
-              <Textarea
-                id="series-description"
-                rows={5}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="What is this series about?"
-              />
-            </div>
-
-            <div className="space-y-3">
+            <section className="space-y-3">
               <div>
-                <Label>Books</Label>
+                <h2 className="text-base font-semibold">Books in this series</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Search for existing books or create a new book for this series.
+                  Search for books, drag by the handle, edit volume numbers, or remove books from this series.
                 </p>
               </div>
               <SeriesBooksEditor
@@ -275,26 +283,17 @@ export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSav
                 onRowsChange={setRows}
                 onCreateBook={handleCreateBook}
               />
-            </div>
-
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            </section>
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                "Add Series"
-              )}
-            </Button>
-          </DialogFooter>
+          <SaveCancelBar
+            mode="dialog"
+            onCancel={() => handleOpenChange(false)}
+            saving={saving}
+            saveDisabled={!name.trim()}
+            saveLabel="Add Series"
+          />
         </form>
       </DialogContent>
     </Dialog>

@@ -74,7 +74,7 @@ export interface Book {
   genre_paths?: string[];
   genres?: string[];
   status: BookStatus;
-  cover_url?: string;
+  cover_url?: string | null;
   rating?: number | null; // 1-5, or null when unrated
   is_favorite: boolean;
   current_page?: number;

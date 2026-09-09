@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -130,7 +130,7 @@ export default function AddChatDialog({ open, onOpenChange, onCreated }: AddChat
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Add Chat</DialogTitle>
           <DialogDescription>
@@ -221,14 +221,13 @@ export default function AddChatDialog({ open, onOpenChange, onCreated }: AddChat
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
-        <DialogFooter className="mt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={() => void handleSubmit()} disabled={saving}>
-            {saving ? "Creating…" : "Add Chat"}
-          </Button>
-        </DialogFooter>
+        <SaveCancelBar
+          mode="dialog"
+          onCancel={() => onOpenChange(false)}
+          onSave={() => void handleSubmit()}
+          saving={saving}
+          saveLabel="Add Chat"
+        />
       </DialogContent>
     </Dialog>
   );

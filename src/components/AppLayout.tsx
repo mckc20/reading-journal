@@ -10,7 +10,6 @@ import {
   LibraryBig,
   Menu,
   MessageSquare,
-  NotebookPen,
   Plus,
   Search,
   Settings,
@@ -39,7 +38,7 @@ const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
 
-type AddAction = "book" | "author" | "series" | "note";
+type AddAction = "book" | "author" | "series";
 
 const addActions: Array<{
   key: AddAction;
@@ -49,7 +48,6 @@ const addActions: Array<{
   { key: "book", label: "Book", icon: BookOpen },
   { key: "author", label: "Author", icon: UserRound },
   { key: "series", label: "Series", icon: LibraryBig },
-  { key: "note", label: "Entry", icon: NotebookPen },
 ];
 
 export interface AppLayoutOutletContext {
@@ -198,31 +196,18 @@ function AppLayoutContent() {
     if (!open) setAddBookOptions(undefined);
   }
 
+  function handleAddedBook(book: Book) {
+    const launchOptions = addBookOptions;
+    launchOptions?.onSaved?.(book);
+    if (!launchOptions?.onSaved) {
+      navigate(`/books/${book.id}`);
+    }
+  }
+
   function openAddDialog(action: AddAction) {
     setAddMenuOpen(false);
     if (action === "book") {
       openAddBook();
-      return;
-    }
-    if (action === "note") {
-      const bookMatch = location.pathname.match(/^\/books\/([^/]+)/);
-      const seriesMatch = location.pathname.match(/^\/series\/([^/]+)/);
-      const authorMatch = location.pathname.match(/^\/authors\/([^/]+)/);
-
-      if (bookMatch) {
-        navigate(`/books/${bookMatch[1]}/journal?new=1`);
-        return;
-      }
-      if (seriesMatch) {
-        navigate(`/series/${seriesMatch[1]}/journal?new=1`);
-        return;
-      }
-      if (authorMatch) {
-        navigate(`/authors/${authorMatch[1]}/journal?new=1`);
-        return;
-      }
-
-      navigate("/library/journal");
       return;
     }
     setActiveAddAction(action);
@@ -299,13 +284,14 @@ function AppLayoutContent() {
             onOpenChange={closeAddBook}
             initialSeriesId={addBookOptions?.initialSeriesId}
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
-            onSaved={addBookOptions?.onSaved}
+            onSaved={handleAddedBook}
           />
         )}
         {activeAddAction === "author" && (
           <AddAuthorDialog
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
+            onSaved={(author) => navigate(`/authors/${author.id}`)}
           />
         )}
         {activeAddAction === "series" && (

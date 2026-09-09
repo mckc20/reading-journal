@@ -26,12 +26,14 @@ import {
   Languages,
   Tags,
   TrendingUp,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BackButton from "@/components/BackButton";
 import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
@@ -73,7 +75,7 @@ import {
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
-import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
+import { deleteCover, fetchReadingLogsForBook, uploadCover } from "@/lib/books";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
@@ -209,6 +211,9 @@ export default function BookDetails() {
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
   const dominantCoverColor = useDominantImageColor(book?.cover_url);
+  const detailBackgroundStyle = {
+    "--detail-image-color": dominantCoverColor,
+  } as CSSProperties;
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const linkedGenres = useMemo(() => {
     if (!book?.selected_genres?.length) return [];
@@ -231,6 +236,7 @@ export default function BookDetails() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [removeCover, setRemoveCover] = useState(false);
   const coverPreviewUrlRef = useRef<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
@@ -410,6 +416,7 @@ export default function BookDetails() {
     }
     setCoverFile(null);
     setCoverPreviewUrl(null);
+    setRemoveCover(false);
   }
 
   async function toggleFavorite() {
@@ -476,10 +483,16 @@ export default function BookDetails() {
     if (!file) return;
     if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
     setCoverFile(file);
+    setRemoveCover(false);
     const nextPreviewUrl = URL.createObjectURL(file);
     coverPreviewUrlRef.current = nextPreviewUrl;
     setCoverPreviewUrl(nextPreviewUrl);
     event.currentTarget.value = "";
+  }
+
+  function handleRemoveCover() {
+    clearCoverDraft();
+    setRemoveCover(Boolean(book?.cover_url));
   }
 
   function handleCreateAuthor(initialName: string) {
@@ -567,7 +580,7 @@ export default function BookDetails() {
       payload.volume_number = parsedVolumeNumber ?? undefined;
     }
 
-    if (Object.keys(payload).length === 0 && !coverFile) return;
+    if (Object.keys(payload).length === 0 && !coverFile && !removeCover) return;
 
     try {
       setSaving(true);
@@ -576,9 +589,12 @@ export default function BookDetails() {
 
       if (coverFile) {
         payload.cover_url = await uploadCover(user.id, book.id, coverFile);
+      } else if (removeCover) {
+        payload.cover_url = null;
       }
 
       await updateBook(book.id, payload);
+      if (removeCover) await deleteCover(user.id, book.id).catch(() => {});
       clearCoverDraft();
       reset(values);
       setIsEditMode(false);
@@ -679,38 +695,49 @@ export default function BookDetails() {
 
   if (isEditMode) {
     return (
-      <div className="space-y-6">
+      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
+        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
         <BackButton
           fallbackTo="/library"
-          className="hover:bg-background/20 hover:text-foreground"
+          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
+          onClick={exitEditMode}
         />
 
+        <div className="relative z-10 space-y-2">
+          <AppHeading level={1} as="h1">Edit book</AppHeading>
+          <p className="text-sm text-muted-foreground">Update the book details shown in your library.</p>
+        </div>
+
         {errorMsg && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="relative z-10 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {errorMsg}
           </div>
         )}
 
-        <EditDetailsForm
-          bookTitle={book.title}
-          coverUrl={book.cover_url}
-          coverPreviewUrl={coverPreviewUrl}
-          control={control}
-          register={register}
-          handleSubmit={handleSubmit}
-          onSubmit={onSubmit}
-          onCancel={exitEditMode}
-          saving={saving}
-          isDirty={isDirty}
-          hasStagedCover={Boolean(coverFile)}
-          errors={errors}
-          series={series}
-          watchedSeriesId={watchedSeriesId}
-          clearPublicationDateError={() => clearErrors("publication_date")}
-          uploadingCover={uploadingCover}
-          handleCoverChange={handleCoverChange}
-          onCreateAuthor={handleCreateAuthor}
-        />
+        <div className="relative z-10">
+          <EditDetailsForm
+            bookTitle={book.title}
+            coverUrl={book.cover_url}
+            coverPreviewUrl={coverPreviewUrl}
+            control={control}
+            register={register}
+            handleSubmit={handleSubmit}
+            onSubmit={onSubmit}
+            onCancel={exitEditMode}
+            saving={saving}
+            isDirty={isDirty}
+            hasStagedCover={Boolean(coverFile)}
+            hasCoverRemoval={removeCover}
+            errors={errors}
+            series={series}
+            watchedSeriesId={watchedSeriesId}
+            clearPublicationDateError={() => clearErrors("publication_date")}
+            uploadingCover={uploadingCover}
+            handleCoverChange={handleCoverChange}
+            onRemoveCover={handleRemoveCover}
+            onCreateAuthor={handleCreateAuthor}
+          />
+        </div>
         {authorDialog}
       </div>
     );
@@ -836,10 +863,6 @@ export default function BookDetails() {
             },
           ];
   const description = book.description?.trim() || "";
-  const detailBackgroundStyle = {
-    "--detail-image-color": dominantCoverColor,
-  } as CSSProperties;
-
   return (
     <div className="relative isolate -mt-5 space-y-8 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
       <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
@@ -1431,12 +1454,14 @@ function EditDetailsForm({
   saving,
   isDirty,
   hasStagedCover,
+  hasCoverRemoval,
   errors,
   series,
   watchedSeriesId,
   clearPublicationDateError,
   uploadingCover,
   handleCoverChange,
+  onRemoveCover,
   onCreateAuthor,
 }: {
   bookTitle: string;
@@ -1450,15 +1475,17 @@ function EditDetailsForm({
   saving: boolean;
   isDirty: boolean;
   hasStagedCover: boolean;
+  hasCoverRemoval: boolean;
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
   series: { id: string; name: string }[];
   watchedSeriesId: string;
   clearPublicationDateError: () => void;
   uploadingCover: boolean;
   handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onRemoveCover: () => void;
   onCreateAuthor: (initialName: string) => void;
 }) {
-  const activeCoverUrl = coverPreviewUrl ?? coverUrl;
+  const activeCoverUrl = coverPreviewUrl ?? (hasCoverRemoval ? null : coverUrl);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28 md:pb-24">
@@ -1492,6 +1519,19 @@ function EditDetailsForm({
             />
           </label>
           {coverPreviewUrl && <p className="mt-2 text-xs text-muted-foreground">New cover staged for save.</p>}
+          {activeCoverUrl && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="mt-1 h-8 w-8 text-destructive hover:text-destructive"
+              aria-label="Remove cover"
+              disabled={saving || uploadingCover}
+              onClick={onRemoveCover}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         <div className="min-w-0 space-y-4">
@@ -1595,7 +1635,7 @@ function EditDetailsForm({
           </div>
 
           {watchedSeriesId && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:max-w-[10rem]">
               <Label htmlFor="detail-volume-number">Volume number</Label>
               <Input id="detail-volume-number" type="number" min={0.01} step="0.01" {...register("volume_number")} />
               {errors.volume_number && (
@@ -1611,16 +1651,13 @@ function EditDetailsForm({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border-t bg-card/95 px-5 py-4 shadow-[0_-8px_24px_oklch(0.21_0_0_/_0.08)] backdrop-blur supports-[backdrop-filter]:bg-card/85 md:bottom-0 md:px-10 lg:px-12">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" size="sm" disabled={saving || (!isDirty && !hasStagedCover)}>
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      </div>
+      <SaveCancelBar
+        onCancel={onCancel}
+        saving={saving}
+        saveDisabled={!isDirty && !hasStagedCover && !hasCoverRemoval}
+        saveLabel="Save Changes"
+        savingLabel="Saving..."
+      />
     </form>
   );
 }

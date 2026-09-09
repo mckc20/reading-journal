@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -26,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import BookCard from "@/components/BookCard";
 import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import { AboutSection, AppHeading } from "@/components/design";
@@ -56,6 +58,7 @@ import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
+import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
@@ -666,16 +669,14 @@ function SeriesEditPage({
 
   return (
     <div className="space-y-6">
-      <BackButton fallbackTo="/library/series" />
-
-      <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5">
+      <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 pb-24">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="series-banner">Banner image</Label>
               <label
                 htmlFor="series-banner"
-                className="flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
+                className="group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
               >
                 {shownBannerUrl ? (
                   <img src={shownBannerUrl} alt="Series banner preview" className="h-full w-full object-cover" />
@@ -685,6 +686,9 @@ function SeriesEditPage({
                     <span className="text-xs">Click to upload</span>
                   </div>
                 )}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                  <ImagePlus className="h-5 w-5 text-white" />
+                </div>
               </label>
               <input
                 id="series-banner"
@@ -699,9 +703,16 @@ function SeriesEditPage({
                   {bannerFile ? bannerFile.name : "PNG, JPG, WEBP, or AVIF."}
                 </p>
                 {shownBannerUrl && (
-                  <Button type="button" variant="outline" size="sm" disabled={saving} onClick={handleRemoveBanner}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                    aria-label="Remove banner"
+                    disabled={saving}
+                    onClick={handleRemoveBanner}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -767,23 +778,13 @@ function SeriesEditPage({
 
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-        <div className="mt-5 border-t pt-4">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={saving || !name.trim()}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Series"
-              )}
-            </Button>
-          </div>
-        </div>
+        <SaveCancelBar
+          onCancel={onCancel}
+          saving={saving}
+          saveDisabled={!name.trim()}
+          saveLabel="Save Series"
+          savingLabel="Saving..."
+        />
       </form>
     </div>
   );
@@ -818,6 +819,10 @@ export default function SeriesDetails() {
   const progressCardRef = useRef<HTMLDivElement>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
+  const dominantCoverColor = useDominantImageColor(seriesRecord?.cover_url);
+  const detailBackgroundStyle = {
+    "--detail-image-color": dominantCoverColor,
+  } as CSSProperties;
   const seriesBooks = useMemo(
     () => sortSeriesBooks(books.filter((book) => book.series_id === seriesId)),
     [books, seriesId],
@@ -1093,28 +1098,45 @@ export default function SeriesDetails() {
 
   if (isEditMode) {
     return (
-      <div className="space-y-6">
-        {actionError && <p className="text-sm text-destructive">{actionError}</p>}
-        <SeriesEditPage
-          series={seriesRecord}
-          seriesBooks={seriesBooks}
-          allBooks={books}
-          userId={user?.id}
-          saving={savingSeries}
-          onCancel={() => {
+      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
+        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
+        <BackButton
+          fallbackTo="/library/series"
+          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
+          onClick={() => {
             setActionError(null);
             setIsEditMode(false);
           }}
-          onSave={handleSaveSeriesEdit}
-          onCreateBook={(rows, onSaved) => {
-            const nextVolume = getNextEditableVolume(rows);
-            openAddBook({
-              initialSeriesId: seriesRecord.id,
-              initialVolumeNumber: nextVolume,
-              onSaved: (book) => onSaved(book, nextVolume),
-            });
-          }}
         />
+
+        <div className="relative z-10 space-y-2">
+          <AppHeading level={1} as="h1">Edit series</AppHeading>
+          <p className="text-sm text-muted-foreground">Update the series details shown in your library.</p>
+        </div>
+
+        {actionError && <p className="relative z-10 text-sm text-destructive">{actionError}</p>}
+        <div className="relative z-10">
+          <SeriesEditPage
+            series={seriesRecord}
+            seriesBooks={seriesBooks}
+            allBooks={books}
+            userId={user?.id}
+            saving={savingSeries}
+            onCancel={() => {
+              setActionError(null);
+              setIsEditMode(false);
+            }}
+            onSave={handleSaveSeriesEdit}
+            onCreateBook={(rows, onSaved) => {
+              const nextVolume = getNextEditableVolume(rows);
+              openAddBook({
+                initialSeriesId: seriesRecord.id,
+                initialVolumeNumber: nextVolume,
+                onSaved: (book) => onSaved(book, nextVolume),
+              });
+            }}
+          />
+        </div>
       </div>
     );
   }

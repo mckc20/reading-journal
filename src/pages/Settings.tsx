@@ -15,7 +15,6 @@ import {
   LogOut,
   Monitor,
   Plus,
-  Save,
   Shield,
   Trash2,
   Upload,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import SetPasswordDialog from "@/components/SetPasswordDialog";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -493,13 +493,23 @@ function ProfileSettings() {
     }
   }
 
+  function cancelProfileEdit() {
+    if (profile) setForm(profileToSettingsForm(profile));
+    setAvatarFile(null);
+    setAvatarPreviewUrl(null);
+    setRemoveAvatar(false);
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+    setError(null);
+    setMessage(null);
+  }
+
   return (
     <SettingsSection
       title="Profile"
       description="Personal information shown around your reading journal."
       icon={UserRound}
     >
-      <form className="space-y-4" onSubmit={submitProfile}>
+      <form className="space-y-4 pb-24" onSubmit={submitProfile}>
         {profileError && <p className="text-sm text-destructive">{profileError}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
@@ -572,10 +582,13 @@ function ProfileSettings() {
           </div>
         </div>
 
-        <Button type="submit" disabled={saving || loading}>
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? "Saving..." : "Save profile"}
-        </Button>
+        <SaveCancelBar
+          onCancel={cancelProfileEdit}
+          saving={saving}
+          saveDisabled={loading}
+          saveLabel="Save profile"
+          savingLabel="Saving..."
+        />
       </form>
     </SettingsSection>
   );

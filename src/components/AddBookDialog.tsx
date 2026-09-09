@@ -11,8 +11,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import SaveCancelBar from "@/components/SaveCancelBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -392,12 +392,12 @@ export default function AddBookDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-hidden sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Book</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28">
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-1">
               {/* ISBN Scanner */}
@@ -453,11 +453,12 @@ export default function AddBookDialog({
                 <p className="text-sm text-destructive text-center">{isbnError}</p>
               )}
 
-              {/* Cover upload */}
-              <div className="flex items-center gap-4">
+              {/* Cover, title, authors, and genres match the Edit book layout. */}
+              <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
+                <div className="md:row-span-3 md:self-start">
                 <label
                   htmlFor="cover-upload"
-                  className="flex h-24 w-16 shrink-0 cursor-pointer items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30 hover:border-primary/60 transition-colors overflow-hidden bg-muted"
+                  className="group relative flex aspect-[2/3] w-[min(7rem,38vw)] cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
                 >
                   {coverPreview ? (
                     <img
@@ -468,6 +469,9 @@ export default function AddBookDialog({
                   ) : (
                     <ImagePlus className="h-6 w-6 text-muted-foreground/50" />
                   )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                    <ImagePlus className="h-5 w-5 text-white" />
+                  </div>
                 </label>
                 <input
                   id="cover-upload"
@@ -477,86 +481,84 @@ export default function AddBookDialog({
                   ref={fileInputRef}
                   onChange={handleFileChange}
                 />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Cover image</p>
-                  <p className="text-xs text-muted-foreground">
-                    {coverFile ? coverFile.name : "Click to upload"}
-                  </p>
+                {coverFile && <p className="mt-2 truncate text-xs text-muted-foreground">{coverFile.name}</p>}
+                </div>
+
+                <div className="min-w-0 space-y-4">
+                  {/* Title */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title">Title *</Label>
+                    <Input
+                      id="title"
+                      {...register("title", { required: "Title is required" })}
+                      aria-invalid={!!errors.title}
+                    />
+                    {errors.title && (
+                      <p className="text-xs text-destructive">{errors.title.message}</p>
+                    )}
+                  </div>
+
+                  {/* Authors */}
+                  <div className="space-y-1.5">
+                    <Label>Authors *</Label>
+                    <Controller
+                      name="authors"
+                      control={control}
+                      rules={{
+                        validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
+                      }}
+                      render={({ field }) => (
+                        <AuthorMultiSelect
+                          value={field.value ?? []}
+                          onChange={field.onChange}
+                          onCreateNew={handleCreateAuthor}
+                        />
+                      )}
+                    />
+                  {errors.authors && (
+                      <p className="text-xs text-destructive">{errors.authors.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Genres</Label>
+                    <Controller
+                      name="genres"
+                      control={control}
+                      render={({ field }) => (
+                        <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Title */}
-              <div className="space-y-1.5">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  {...register("title", { required: "Title is required" })}
-                  aria-invalid={!!errors.title}
-                />
-                {errors.title && (
-                  <p className="text-xs text-destructive">{errors.title.message}</p>
-                )}
-              </div>
-
-              {/* Authors */}
-              <div className="space-y-1.5">
-                <Label>Authors *</Label>
-                <Controller
-                  name="authors"
-                  control={control}
-                  rules={{
-                    validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
-                  }}
-                  render={({ field }) => (
-                    <AuthorMultiSelect
-                      value={field.value ?? []}
-                      onChange={field.onChange}
-                      onCreateNew={handleCreateAuthor}
-                    />
-                  )}
-                />
-                {errors.authors && (
-                  <p className="text-xs text-destructive">{errors.authors.message}</p>
-                )}
-              </div>
-
-              {/* Status */}
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Controller
-                  name="status"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              {/* Genres */}
-              <div className="space-y-1.5">
-                <Label>Genres</Label>
-                <Controller
-                  name="genres"
-                  control={control}
-                  render={({ field }) => (
-                    <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
-                  )}
-                />
-              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Status is Add-only, but follows the same Edit metadata grid. */}
+                <div className="order-0 space-y-1.5">
+                  <Label>Status</Label>
+                  <Controller
+                    name="status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
 
               {/* Language */}
-              <div className="space-y-1.5">
+              <div className="order-1 space-y-1.5">
                 <Label>Language</Label>
                 <Controller
                   name="language"
@@ -580,8 +582,8 @@ export default function AddBookDialog({
               </div>
 
               {/* Secondary metadata */}
-              <div className="grid gap-4 rounded-lg border bg-muted/20 p-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
+              <div className="contents">
+                <div className="order-3 space-y-1.5">
                   <Label htmlFor="publication_date">Publication year</Label>
                   <Input
                     id="publication_date"
@@ -600,7 +602,7 @@ export default function AddBookDialog({
                   )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="order-4 space-y-1.5">
                   <Label>Format</Label>
                   <Controller
                     name="format"
@@ -625,7 +627,7 @@ export default function AddBookDialog({
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="order-5 space-y-1.5">
                   <Label>Source</Label>
                   <Controller
                     name="source"
@@ -648,19 +650,19 @@ export default function AddBookDialog({
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="order-6 space-y-1.5">
                   <Label>ISBN</Label>
                   <Input value={scannedIsbn ?? manualIsbn} readOnly placeholder="Scanned or looked up ISBN" />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="order-12 space-y-1.5 sm:col-span-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" rows={5} {...register("description")} />
               </div>
 
               {/* Pages */}
-              <div className="space-y-1.5">
+              <div className="order-2 space-y-1.5">
                 <Label htmlFor="total_pages">Total pages</Label>
                 <Input
                   id="total_pages"
@@ -672,7 +674,7 @@ export default function AddBookDialog({
 
               {/* Current progress (Reading only) */}
               {status === "Reading" && (
-                <div className="space-y-1.5">
+                <div className="order-7 space-y-1.5">
                   <Label htmlFor="current_page">Current page</Label>
                   <Input
                     id="current_page"
@@ -685,20 +687,20 @@ export default function AddBookDialog({
 
               {/* Dates (conditional) */}
               {showDateStarted && (
-                <div className="space-y-1.5">
+                <div className="order-8 space-y-1.5">
                   <Label htmlFor="date_started">Date started</Label>
                   <Input id="date_started" type="date" {...register("date_started")} />
                 </div>
               )}
               {showDateFinished && (
-                <div className="space-y-1.5">
+                <div className="order-9 space-y-1.5">
                   <Label htmlFor="date_finished">Date finished</Label>
                   <Input id="date_finished" type="date" {...register("date_finished")} />
                 </div>
               )}
 
               {/* Series */}
-              <div className="space-y-1.5">
+              <div className="order-10 space-y-1.5">
                 <Label>Series</Label>
                 <Controller
                   name="series_id"
@@ -762,7 +764,7 @@ export default function AddBookDialog({
 
               {/* Volume number (conditional) */}
               {seriesId && seriesId !== "__new__" && (
-                <div className="space-y-1.5">
+                <div className="order-11 space-y-1.5 sm:max-w-[10rem]">
                   <Label htmlFor="volume_number">Volume number</Label>
                   <Input
                     id="volume_number"
@@ -779,19 +781,18 @@ export default function AddBookDialog({
 
               {/* Root error */}
               {errors.root && (
-                <p className="text-sm text-destructive">{errors.root.message}</p>
+                <p className="order-[13] text-sm text-destructive">{errors.root.message}</p>
               )}
+              </div>
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Add Book"}
-            </Button>
-          </DialogFooter>
+          <SaveCancelBar
+            mode="dialog"
+            onCancel={() => onOpenChange(false)}
+            saving={isSubmitting}
+            saveLabel="Add Book"
+          />
         </form>
       </DialogContent>
       <AddAuthorDialog

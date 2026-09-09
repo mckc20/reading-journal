@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, ChevronRight, FileText, Heart, Languages, Star, Tags } from "lucide-react";
-import AddAuthorDialog from "@/components/AddAuthorDialog";
+import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import { AboutSection, AppHeading } from "@/components/design";
@@ -252,7 +252,7 @@ export default function AuthorDetails() {
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
-  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -333,6 +333,10 @@ export default function AuthorDetails() {
     }
   }
 
+  async function handleSaveAuthor(authorId: string, payload: AuthorFormPayload) {
+    return editAuthor(authorId, payload);
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -378,6 +382,33 @@ export default function AuthorDetails() {
     "--detail-image-color": dominantPhotoColor,
   } as CSSProperties;
 
+  if (isEditMode) {
+    return (
+      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
+        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(11.5rem,26vh,14rem)] w-screen md:h-[clamp(17.5rem,31vh,19.5rem)]" />
+        <BackButton
+          fallbackTo="/authors"
+          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
+          onClick={() => setIsEditMode(false)}
+        />
+        <div className="relative z-10 space-y-2">
+          <AppHeading level={1} as="h1">Edit author</AppHeading>
+          <p className="text-sm text-muted-foreground">Update the author details shown in your library.</p>
+        </div>
+        <div className="relative z-10">
+          <AuthorForm
+            initialAuthor={author}
+            mode="page"
+            submitLabel="Save author"
+            onCancel={() => setIsEditMode(false)}
+            onSave={(payload) => handleSaveAuthor(author.id, payload)}
+            onSaved={() => setIsEditMode(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative isolate -mt-5 space-y-10 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
       <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(11.5rem,26vh,14rem)] w-screen md:h-[clamp(17.5rem,31vh,19.5rem)]" />
@@ -391,7 +422,7 @@ export default function AuthorDetails() {
           kind="author"
           label={author.name}
           shareAttachmentLabel="Send the author as attachment in a chat"
-          onEdit={() => setAuthorDialogOpen(true)}
+          onEdit={() => setIsEditMode(true)}
           onDelete={() => void handleDeleteAuthor()}
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this author?"
@@ -553,7 +584,6 @@ export default function AuthorDetails() {
         description="Add a message, then pick the chat you want to send this author to."
         onSent={() => setShareStatus("Author sent to chat.")}
       />
-      <AddAuthorDialog open={authorDialogOpen} onOpenChange={setAuthorDialogOpen} initialAuthor={author} />
     </div>
   );
 }
