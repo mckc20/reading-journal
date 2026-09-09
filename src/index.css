@@ -5,6 +5,47 @@
 @import "@fontsource-variable/lora";
 @import "@fontsource-variable/lora/wght-italic.css";
 
+@keyframes mobile-add-spin-open {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes mobile-add-spin-close {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes mobile-add-dropup {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-mobile-add-spin-open {
+  animation: mobile-add-spin-open 300ms ease-in-out 1;
+}
+
+.animate-mobile-add-spin-close {
+  animation: mobile-add-spin-close 300ms ease-in-out 1;
+}
+
+.animate-mobile-add-dropup {
+  animation: mobile-add-dropup 220ms ease-out 300ms both;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

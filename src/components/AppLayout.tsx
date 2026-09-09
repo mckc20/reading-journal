@@ -128,15 +128,15 @@ function AppLayoutContent() {
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [addMenuHasBeenInteracted, setAddMenuHasBeenInteracted] = useState(false);
   const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
-  const [detailEditingOpen, setDetailEditingOpen] = useState(false);
+  const [, setDetailEditingOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const desktopAddButtonRef = useRef<HTMLButtonElement>(null);
   const desktopAddMenuRef = useRef<HTMLDivElement>(null);
-  const floatingAddButtonRef = useRef<HTMLButtonElement>(null);
-  const floatingAddMenuRef = useRef<HTMLDivElement>(null);
+  const mobileAddButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileAddMenuRef = useRef<HTMLDivElement>(null);
   const displayName = getDisplayName(profile, user?.email);
-  const hideFloatingAddButton = detailEditingOpen;
   const isMessagesPage = location.pathname === "/messages";
 
   useEffect(() => {
@@ -164,8 +164,8 @@ function AppLayoutContent() {
       const clickedInsideAddMenu = [
         desktopAddButtonRef,
         desktopAddMenuRef,
-        floatingAddButtonRef,
-        floatingAddMenuRef,
+        mobileAddButtonRef,
+        mobileAddMenuRef,
       ].some((ref) => ref.current?.contains(target));
 
       if (clickedInsideAddMenu) {
@@ -189,6 +189,11 @@ function AppLayoutContent() {
   function openAddBook(options?: AddBookDialogLaunchOptions) {
     setAddBookOptions(options);
     setAddBookOpen(true);
+  }
+
+  function toggleAddMenu() {
+    setAddMenuHasBeenInteracted(true);
+    setAddMenuOpen((current) => !current);
   }
 
   function closeAddBook(open: boolean) {
@@ -265,16 +270,16 @@ function AppLayoutContent() {
           />
         </main>
 
-        {!hideFloatingAddButton && (
-          <FloatingAddButtonMenu
-            buttonRef={floatingAddButtonRef}
-            menuRef={floatingAddMenuRef}
-            open={addMenuOpen}
-            onToggleOpen={() => setAddMenuOpen((current) => !current)}
-            onSelect={openAddDialog}
-          />
-        )}
-        <MobileBottomNav pathname={location.pathname} search={location.search} />
+        <MobileBottomNav
+          pathname={location.pathname}
+          search={location.search}
+          addMenuOpen={addMenuOpen}
+          addMenuHasBeenInteracted={addMenuHasBeenInteracted}
+          addButtonRef={mobileAddButtonRef}
+          addMenuRef={mobileAddMenuRef}
+          onToggleAddMenu={toggleAddMenu}
+          onSelectAddAction={openAddDialog}
+        />
       </div>
 
       <Suspense fallback={null}>
@@ -721,46 +726,25 @@ function DesktopAddButtonMenu({
   );
 }
 
-function FloatingAddButtonMenu({
-  open,
-  onToggleOpen,
-  onSelect,
-  buttonRef,
-  menuRef,
+function MobileBottomNav({
+  pathname,
+  search,
+  addMenuOpen,
+  addMenuHasBeenInteracted,
+  addButtonRef,
+  addMenuRef,
+  onToggleAddMenu,
+  onSelectAddAction,
 }: {
-  open: boolean;
-  onToggleOpen: () => void;
-  onSelect: (action: AddAction) => void;
-  buttonRef: RefObject<HTMLButtonElement>;
-  menuRef: RefObject<HTMLDivElement>;
+  pathname: string;
+  search: string;
+  addMenuOpen: boolean;
+  addMenuHasBeenInteracted: boolean;
+  addButtonRef: RefObject<HTMLButtonElement>;
+  addMenuRef: RefObject<HTMLDivElement>;
+  onToggleAddMenu: () => void;
+  onSelectAddAction: (action: AddAction) => void;
 }) {
-  return (
-    <div className="fixed bottom-[env(safe-area-inset-bottom)] right-0 z-50 flex h-[4.25rem] w-1/4 items-start justify-center pt-1 md:hidden">
-      {open && (
-        <div
-          ref={menuRef}
-          className="absolute bottom-full right-3 mb-3 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
-        >
-          <AddMenuPanel onSelect={onSelect} />
-        </div>
-      )}
-      <Button
-        ref={buttonRef}
-        type="button"
-        size="icon-lg"
-        className="h-14 w-14 -translate-y-4 rounded-full bg-primary text-primary-foreground shadow-[0_14px_30px_oklch(0.21_0_0_/_0.18)] hover:bg-primary/90"
-        aria-label="Add"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={onToggleOpen}
-      >
-        <Plus className="h-7 w-7" />
-      </Button>
-    </div>
-  );
-}
-
-function MobileBottomNav({ pathname, search }: { pathname: string; search: string }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {primaryNavLinks.map(({ to, label, icon: Icon }) => {
@@ -779,7 +763,42 @@ function MobileBottomNav({ pathname, search }: { pathname: string; search: strin
           </Link>
         );
       })}
-      <div aria-hidden="true" />
+      <div className="relative flex flex-1 justify-center">
+        <div
+          ref={addMenuRef}
+          aria-hidden={!addMenuOpen}
+          className={cn(
+            "absolute bottom-[calc(100%+0.5rem)] right-2 w-52 origin-bottom-right rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-[var(--shadow-popover)]",
+            addMenuOpen ? "animate-mobile-add-dropup" : "pointer-events-none hidden",
+          )}
+        >
+          <AddMenuPanel onSelect={onSelectAddAction} />
+        </div>
+        <button
+          ref={addButtonRef}
+          type="button"
+          className={cn(
+            "flex w-full flex-col items-center gap-1 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] transition-colors",
+            addMenuOpen ? "text-primary" : "text-muted-foreground hover:text-foreground",
+          )}
+          aria-label="Add"
+          aria-haspopup="menu"
+          aria-expanded={addMenuOpen}
+          onClick={onToggleAddMenu}
+        >
+          <Plus
+            className={cn(
+              "h-5 w-5",
+              addMenuOpen
+                ? "animate-mobile-add-spin-open"
+                : addMenuHasBeenInteracted
+                  ? "animate-mobile-add-spin-close"
+                  : undefined,
+            )}
+          />
+          Add
+        </button>
+      </div>
     </nav>
   );
 }
