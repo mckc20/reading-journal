@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { BookCover, BookStatus } from "@/components/reading-journal";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 
@@ -31,21 +32,14 @@ export default function BookCard({
 
   const content = (
     <>
-      <div
-        className={cn(
-          "w-full",
-          !isShelf && "overflow-hidden",
-        )}
-      >
-        <BookCover
-          src={book.cover_url}
-          title={book.title}
-          paused={isPaused}
-          favorite={book.is_favorite}
-          cornerLabel={cornerLabel}
-          className={cn(!isShelf && "rounded-none")}
-        />
-      </div>
+      <BookCover
+        src={book.cover_url}
+        title={book.title}
+        paused={isPaused}
+        favorite={book.is_favorite}
+        cornerLabel={cornerLabel}
+        className={cn("w-full", !isShelf && "rounded-none")}
+      />
 
       {!isShelf && (
         <div className="min-w-0 space-y-2 p-2">
@@ -69,18 +63,41 @@ export default function BookCard({
   );
 
   const classNames = cn(
-    "group block rounded-lg text-left transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "group text-left",
     isShelf
-      ? "w-full space-y-2"
-      : "w-full overflow-hidden border bg-background shadow-sm dark:bg-card",
+      ? "block w-full space-y-2 transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      : "w-full gap-0 overflow-hidden pb-2 pt-0",
     className,
   );
 
-  if (!handleBook) return <div className={classNames}>{content}</div>;
+  if (isShelf) {
+    if (!handleBook) return <div className={classNames}>{content}</div>;
+
+    return (
+      <button type="button" onClick={() => handleBook(book)} className={classNames}>
+        {content}
+      </button>
+    );
+  }
+
+  if (!handleBook) return <Card className={classNames}>{content}</Card>;
 
   return (
-    <button type="button" onClick={() => handleBook(book)} className={classNames}>
+    <Card
+      role="button"
+      tabIndex={0}
+      variant="interactive"
+      className={classNames}
+      onClick={() => handleBook(book)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleBook(book);
+        }
+      }}
+    >
       {content}
-    </button>
+    </Card>
   );
 }
