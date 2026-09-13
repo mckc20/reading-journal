@@ -15,6 +15,10 @@ The Reading Journal Web App is a dedicated platform designed to store, document,
 ## 📱 Platform & Compatibility
 The app is designed to be fully usable on **mobile and tablet browsers**, in addition to desktop. All UI layouts must be responsive, with touch-friendly interactions. The barcode scanner feature is primarily intended for mobile use (device camera access).
 
+## 🤖 AI agent access
+
+Codex and Claude Code can connect to Reading Journal through its remote MCP endpoint. See [MCP access for AI agents](doc/mcp-access.md) for secure setup, local development, and key revocation.
+
 ## 🚀 Core Features & Requirements
 
 ### 1. Authentication & Multi-User Support
