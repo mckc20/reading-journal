@@ -19,6 +19,7 @@ import {
   createLucideIcon,
   type LucideIcon,
 } from "lucide-react";
+import readingJournalLogo from "@/assets/rj-logo-transparent.png";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
 import { AuthorsProvider } from "@/context/AuthorsContext";
@@ -372,7 +373,12 @@ function AppHeader({
             aria-label="Reading Journal home"
             onClick={onCloseDrawer}
           >
-            <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <img
+              src={readingJournalLogo}
+              alt=""
+              className="h-8 w-8 shrink-0 object-contain"
+              aria-hidden="true"
+            />
             <span className="sr-only truncate text-sm md:not-sr-only">Reading Journal</span>
           </Link>
         </div>
@@ -472,7 +478,12 @@ function SideDrawer({
               aria-label="Reading Journal home"
               onClick={onClose}
             >
-              <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <img
+                src={readingJournalLogo}
+                alt=""
+                className="h-8 w-8 shrink-0 object-contain"
+                aria-hidden="true"
+              />
               <span className="truncate text-sm">Reading Journal</span>
             </Link>
           )}
