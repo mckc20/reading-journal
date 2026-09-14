@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Grid2X2, Heart, List, ListFilter } from "lucide-react";
+import { Download, Grid2X2, Heart, ListFilter, Trash2, X } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
 import BackButton from "@/components/BackButton";
+import OverflowMenu from "@/components/OverflowMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ import {
   uniqueSortedValues,
 } from "@/lib/authorsView";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { pruneSelectedIds, runBulkOperation, toggleAllVisibleIds } from "@/lib/bulkManagement";
 import type { AuthorSummary } from "@/lib/authorShelf";
 import type { BookJournalEntryRecord } from "@/types";
 
@@ -235,15 +237,6 @@ function authorMatchesSort(authors: AuthorSummary[], sort: AuthorSort): AuthorSu
   return sortAuthorsByName(authors);
 }
 
-function authorToUpdatePayload(author: AuthorSummary, favorite: boolean) {
-  return {
-    name: author.name,
-    photo_url: author.photo_url,
-    bio: author.bio,
-    is_favorite: favorite,
-  };
-}
-
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false;
   for (const value of a) {
@@ -262,7 +255,7 @@ function clearAuthorFilters(searchParams: URLSearchParams): URLSearchParams {
 }
 
 export default function AuthorsExplore() {
-  const { authors: authorRecords, loading: authorsLoading, error: authorsError, editAuthor } =
+  const { authors: authorRecords, loading: authorsLoading, error: authorsError, removeAuthor } =
     useAuthorsContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const navigate = useNavigate();
@@ -273,6 +266,7 @@ export default function AuthorsExplore() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const sort = normalizeSort(searchParams.get("sort"));
@@ -322,8 +316,7 @@ export default function AuthorsExplore() {
 
   useEffect(() => {
     setSelectedIds((current) => {
-      const visibleIds = new Set(visibleAuthors.map((author) => author.id));
-      const next = new Set(Array.from(current).filter((authorId) => visibleIds.has(authorId)));
+      const next = pruneSelectedIds(current, visibleAuthors.map((author) => author.id));
       return setsEqual(next, current) ? current : next;
     });
   }, [visibleAuthors]);
@@ -379,21 +372,21 @@ export default function AuthorsExplore() {
     setSearchParams(nextParams, { replace: true });
   }
 
-  async function applyBulkFavorite(favorite: boolean) {
+  async function deleteSelected() {
     const selectedAuthors = visibleAuthors.filter((author) => selectedIds.has(author.id));
     if (selectedAuthors.length === 0) return;
 
     setSaving(true);
     setBulkError(null);
-
-    try {
-      for (const author of selectedAuthors) {
-        await editAuthor(author.id, authorToUpdatePayload(author, favorite));
-      }
-    } catch (error) {
-      setBulkError(error instanceof Error ? error.message : "One of the selected authors could not be updated.");
-    } finally {
-      setSaving(false);
+    const result = await runBulkOperation(
+      selectedAuthors,
+      (author) => ({ id: author.id, label: author.name }),
+      (author) => removeAuthor(author.id),
+    );
+    setSaving(false);
+    setSelectedIds((current) => new Set([...current].filter((id) => result.failures.some((failure) => failure.id === id))));
+    if (result.failures.length > 0) {
+      setBulkError(`Could not delete: ${result.failures.map((failure) => failure.label).join(", ")}.`);
     }
   }
 
@@ -402,15 +395,6 @@ export default function AuthorsExplore() {
     if (selectedAuthors.length === 0) return;
     downloadAuthorsCsv(selectedAuthors);
   }
-
-  useEffect(() => {
-    if (!isManageMode) return;
-    const visibleIds = new Set(visibleAuthors.map((author) => author.id));
-    setSelectedIds((current) => {
-      const next = new Set(Array.from(current).filter((authorId) => visibleIds.has(authorId)));
-      return next.size === current.size ? current : next;
-    });
-  }, [isManageMode, visibleAuthors]);
 
   if (authorsLoading || booksLoading || journalEntriesLoading) {
     return (
@@ -449,9 +433,33 @@ export default function AuthorsExplore() {
               <HeadingDescription>{authorCountLabel}</HeadingDescription>
             </div>
           </div>
-          <Button type="button" variant={isManageMode ? "secondary" : "outline"} onClick={toggleManageMode}>
-            {isManageMode ? "Exit management" : "Management mode"}
-          </Button>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {isManageMode && selectedIds.size > 0 && <>
+              <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={exportSelected}>
+                <Download className="mr-1 h-4 w-4" />Export CSV
+              </Button>
+              <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected authors" disabled={saving} onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>}
+            {isManageMode && <>
+              <Button type="button" size="sm" variant="ghost" disabled={visibleAuthors.length === 0 || saving} onClick={() => setSelectedIds((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, visibleAuthors.map((author) => author.id)))}>
+                {selectedIds.size > 0 ? "Deselect all" : "Select all"}
+              </Button>
+              <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
+              <Button type="button" size="icon-sm" variant="ghost" aria-label="Exit Select mode" disabled={saving} onClick={toggleManageMode}>
+                <X className="h-4 w-4" />
+              </Button>
+            </>}
+            <div className="ml-3"><OverflowMenu label="Author options">{(close) => <>
+              <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
+              {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { updateParam("display", value); close(); }}>
+                {value === "grid" ? "Grid" : "List"}{display === value ? " ✓" : ""}
+              </button>)}
+              <div className="my-1 border-t" />
+              <button role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { toggleManageMode(); close(); }}>{isManageMode ? "Done selecting" : "Select"}</button>
+            </>}</OverflowMenu></div>
+          </div>
         </div>
         {journalEntriesError && (
           <p className="text-xs text-muted-foreground">
@@ -522,28 +530,6 @@ export default function AuthorsExplore() {
                 <SelectItem value="most-read">Most read</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
-              <Button
-                type="button"
-                size="icon-sm"
-                variant={display === "grid" ? "secondary" : "ghost"}
-                aria-label="Grid view"
-                aria-pressed={display === "grid"}
-                onClick={() => updateParam("display", "grid")}
-              >
-                <Grid2X2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant={display === "table" ? "secondary" : "ghost"}
-                aria-label="Table view"
-                aria-pressed={display === "table"}
-                onClick={() => updateParam("display", "table")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
           </div>
         </div>
@@ -630,56 +616,23 @@ export default function AuthorsExplore() {
         </div>
       </div>
 
-      {isManageMode ? (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-muted/20 p-4">
-            <div>
-              <AppHeading level={4} as="h2">Management Mode</AppHeading>
-              <HeadingDescription>
-                {selectedIds.size} selected from {visibleAuthors.length} visible authors
-              </HeadingDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" disabled={selectedIds.size === 0 || saving} onClick={() => void applyBulkFavorite(true)}>
-                <Check className="h-4 w-4" />
-                Mark favorite
-              </Button>
-              <Button type="button" variant="outline" disabled={selectedIds.size === 0 || saving} onClick={() => void applyBulkFavorite(false)}>
-                <Heart className="h-4 w-4" />
-                Remove favorite
-              </Button>
-              <Button type="button" variant="outline" disabled={selectedIds.size === 0} onClick={exportSelected}>
-                Export CSV
-              </Button>
-              <Button type="button" variant="ghost" onClick={toggleManageMode}>
-                Close
-              </Button>
-            </div>
-          </div>
-
-          {bulkError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {bulkError}
-            </div>
-          )}
-
-          {displayAuthors.length === 0 ? (
-            <EmptyState message="No authors match the current filters." />
-          ) : (
-            <AuthorTable
-              authors={displayAuthors}
-              selectedIds={selectedIds}
-              onToggleAuthor={toggleSelected}
-              onOpenAuthor={openAuthor}
-              interactive={false}
-            />
-          )}
+      {bulkError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {bulkError}
         </div>
-      ) : display === "table" ? (
+      )}
+
+      {display === "table" ? (
         displayAuthors.length === 0 ? (
           <EmptyState message="No authors match the current filters." />
         ) : (
-          <AuthorTable authors={displayAuthors} onOpenAuthor={openAuthor} />
+          <AuthorTable
+            authors={displayAuthors}
+            selectedIds={isManageMode ? selectedIds : undefined}
+            onToggleAuthor={isManageMode ? toggleSelected : undefined}
+            onOpenAuthor={openAuthor}
+            interactive={!isManageMode}
+          />
         )
       ) : displayAuthors.length === 0 ? (
         <EmptyState message="No authors match the current filters." />
@@ -692,10 +645,24 @@ export default function AuthorsExplore() {
               onClick={() => openAuthor(author.id)}
               compact
               interactive={!isManageMode}
+              selected={selectedIds.has(author.id)}
+              onSelect={isManageMode ? () => toggleSelected(author.id) : undefined}
             />
           ))}
         </div>
       )}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete selected authors?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently deletes the selected authors. Their books remain in your library.</p>
+          <DialogFooter>
+            <Button variant="destructive" onClick={() => { setDeleteOpen(false); void deleteSelected(); }}>
+              Delete {selectedIds.size === 1 ? "author" : "authors"}
+            </Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

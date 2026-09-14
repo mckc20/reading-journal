@@ -13,29 +13,32 @@ interface AuthorCardProps {
   onClick: (author: AuthorSummary) => void;
   compact?: boolean;
   interactive?: boolean;
+  selected?: boolean;
+  onSelect?: (author: AuthorSummary) => void;
 }
 
-export default function AuthorCard({ author, onClick, compact = false, interactive = true }: AuthorCardProps) {
+export default function AuthorCard({ author, onClick, compact = false, interactive = true, selected = false, onSelect }: AuthorCardProps) {
   const mostRecentBook = author.books[0];
   const previewBooks = author.coverBooks.slice(0, 3);
 
   return (
     <Card
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
+      role={interactive || onSelect ? "button" : undefined}
+      tabIndex={interactive || onSelect ? 0 : undefined}
       className={cn(
         "relative overflow-hidden pt-0 gap-0 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        interactive && "cursor-pointer",
+        (interactive || onSelect) && "cursor-pointer",
+        selected && "ring-2 ring-primary ring-offset-2",
         compact ? "rounded-xl" : "rounded-2xl",
       )}
-      onClick={interactive ? () => onClick(author) : undefined}
+      onClick={interactive ? () => onClick(author) : onSelect ? () => onSelect(author) : undefined}
       onKeyDown={
-        interactive
+        (interactive || onSelect)
           ? (event) => {
               if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                onClick(author);
+                if (interactive) onClick(author); else onSelect?.(author);
               }
             }
           : undefined
