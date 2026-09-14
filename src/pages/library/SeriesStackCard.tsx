@@ -61,18 +61,25 @@ function SeriesCoverLayer({
 export default function SeriesStackCard({
   group,
   onSeries,
+  interactive = true,
+  selected = false,
+  showBookCount = true,
 }: {
   group: SeriesBookGroup;
   onSeries: (seriesId: string) => void;
+  interactive?: boolean;
+  selected?: boolean;
+  showBookCount?: boolean;
 }) {
   const visibleBooks = group.books.slice(0, 3);
 
   return (
     <button
       type="button"
-      onClick={() => onSeries(group.seriesId)}
-      className="group block w-[122px] shrink-0 rounded-lg text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-[148px]"
+      onClick={interactive ? () => onSeries(group.seriesId) : undefined}
+      className={cn("group block w-[122px] shrink-0 rounded-xl text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-[148px]", selected && "bg-muted")}
       data-shelf-item
+      aria-disabled={!interactive}
     >
       <div className="relative h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
         {[...visibleBooks].reverse().map((book, reversedIndex) => {
@@ -89,12 +96,14 @@ export default function SeriesStackCard({
         })}
       </div>
       <div className="mt-2 min-w-0">
-        <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">
-          {group.name}
-        </p>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {bookCountLabel(group.books.length)}
-        </p>
+        {selected ? (
+          <div className="inline-block max-w-full rounded bg-primary px-1.5 py-0.5 text-primary-foreground">
+            <p className="line-clamp-2 text-xs font-medium leading-tight">{group.name}</p>
+          </div>
+        ) : (
+          <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">{group.name}</p>
+        )}
+        {showBookCount && <p className="mt-1 text-[11px] text-muted-foreground">{bookCountLabel(group.books.length)}</p>}
       </div>
     </button>
   );
