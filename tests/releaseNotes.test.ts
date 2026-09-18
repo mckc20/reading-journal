@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-09-18-password-reset");
-  assert.equal(entries[0].title, "Password reset");
-  assert.equal(entries[0].summary, "You can now reset a forgotten password securely through an email link.");
-  assert.equal(entries[0].highlights.length, 1);
-  assert.equal(entries[0].highlights[0].title, "Password recovery by email");
-  assert.equal(entries[0].highlights[0].description, "Request a reset link from the sign-in screen, choose a new password, then sign in again.");
+  assert.equal(entries[0].version, "2026-09-18-library-select-mode");
+  assert.equal(entries[0].title, "Library Select mode");
+  assert.equal(entries[0].summary, "Books, authors, and series now share a focused Select mode for managing multiple library items at once.");
+  assert.equal(entries[0].highlights.length, 3);
+  assert.equal(entries[0].highlights[0].title, "Consistent multi-select controls");
+  assert.equal(entries[0].highlights[0].description, "Open Select mode from each library's three-dot menu, select items directly from the grid or list, and clearly see how many are selected.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 

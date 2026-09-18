@@ -425,7 +425,7 @@ export default function AuthorsExplore() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex flex-wrap items-start gap-3 pr-10">
           <div className="flex min-w-0 items-start gap-2">
             <BackButton fallbackTo="/library" className="mt-1" />
             <div className="space-y-1">
@@ -433,33 +433,33 @@ export default function AuthorsExplore() {
               <HeadingDescription>{authorCountLabel}</HeadingDescription>
             </div>
           </div>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {isManageMode && selectedIds.size > 0 && <>
-              <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={exportSelected}>
-                <Download className="mr-1 h-4 w-4" />Export CSV
-              </Button>
-              <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected authors" disabled={saving} onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>}
+          <div className="flex w-[calc(100%+2.5rem)] shrink-0 flex-row-reverse flex-wrap items-center justify-start gap-1 sm:gap-2">
             {isManageMode && <>
-              <Button type="button" size="sm" variant="ghost" disabled={visibleAuthors.length === 0 || saving} onClick={() => setSelectedIds((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, visibleAuthors.map((author) => author.id)))}>
-                {selectedIds.size > 0 ? "Deselect all" : "Select all"}
-              </Button>
-              <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
               <Button type="button" size="icon-sm" variant="ghost" aria-label="Exit Select mode" disabled={saving} onClick={toggleManageMode}>
                 <X className="h-4 w-4" />
               </Button>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">{selectedIds.size} selected</span>
+              <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={visibleAuthors.length === 0 || saving} onClick={() => setSelectedIds((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, visibleAuthors.map((author) => author.id)))}>
+                {selectedIds.size > 0 ? "Deselect all" : "Select all"}
+              </Button>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={selectedIds.size === 0 || saving} onClick={exportSelected}>
+                  <Download className="mr-1 h-4 w-4" />Export CSV
+                </Button>
+                <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected authors" disabled={selectedIds.size === 0 || saving} onClick={() => setDeleteOpen(true)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </>}
-            <div className="ml-3"><OverflowMenu label="Author options">{(close) => <>
+          </div>
+          <div className="absolute right-0 top-0"><OverflowMenu label="Author options">{(close) => <>
               <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
               {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { updateParam("display", value); close(); }}>
                 {value === "grid" ? "Grid" : "List"}{display === value ? " ✓" : ""}
               </button>)}
               <div className="my-1 border-t" />
               <button role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { toggleManageMode(); close(); }}>{isManageMode ? "Done selecting" : "Select"}</button>
-            </>}</OverflowMenu></div>
-          </div>
+          </>}</OverflowMenu></div>
         </div>
         {journalEntriesError && (
           <p className="text-xs text-muted-foreground">

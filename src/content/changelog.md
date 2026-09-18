@@ -2,6 +2,17 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-09-18 - Library Select mode
+Version: `2026-09-18-library-select-mode`
+Summary: Books, authors, and series now share a focused Select mode for managing multiple library items at once.
+
+- Consistent multi-select controls
+  Open Select mode from each library's three-dot menu, select items directly from the grid or list, and clearly see how many are selected.
+- Faster bulk actions
+  Export selected items, delete them with confirmation, and for books update the status or add genres in focused dialogs.
+- Responsive action layout
+  Select controls stay easy to use across screen sizes, with the close button and library menu kept in predictable positions.
+
 ## 2026-09-18 - Password reset
 Version: `2026-09-18-password-reset`
 Summary: You can now reset a forgotten password securely through an email link.
