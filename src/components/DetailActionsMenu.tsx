@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { MoreVertical, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import OverflowMenu from "@/components/OverflowMenu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,11 +12,6 @@ import {
 import { cn } from "@/lib/utils";
 
 type DetailKind = "book" | "author" | "series";
-
-type MenuPosition = {
-  top: number;
-  left: number;
-};
 
 interface DetailActionsMenuProps {
   kind: DetailKind;
@@ -61,46 +56,12 @@ export default function DetailActionsMenu({
   className,
   buttonClassName,
 }: DetailActionsMenuProps) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const currentUrl = useMemo(() => window.location.href, []);
-  const menuPortalTarget = typeof document === "undefined" ? null : document.body;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    function handlePointerDown(event: Event) {
-      const target = event.target as Node | null;
-      if (
-        target &&
-        (buttonRef.current?.contains(target) || menuRef.current?.contains(target))
-      ) {
-        return;
-      }
-      setMenuOpen(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
-    }
-
-    window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("scroll", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("scroll", handlePointerDown, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [menuOpen]);
-
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
   }, [shareOpen]);
@@ -112,17 +73,6 @@ export default function DetailActionsMenu({
     } catch {
       setCopyStatus("Could not copy link.");
     }
-  }
-
-  function openMenu() {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const panelWidth = 200;
-    const panelHeight = (onEdit ? 42 : 0) + ((onPause || onResume) ? 42 : 0) + 92;
-    const left = Math.max(8, Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8));
-    const top = Math.min(rect.bottom + 8, window.innerHeight - panelHeight - 8);
-    setMenuPosition({ top, left });
-    setMenuOpen(true);
   }
 
   async function runDelete() {
@@ -137,34 +87,15 @@ export default function DetailActionsMenu({
 
   return (
     <div className={cn("relative", className)}>
-      <Button
-        ref={buttonRef}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="More actions"
-        aria-expanded={menuOpen}
-        onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
-        className={cn(
+      <OverflowMenu label="More actions" className={cn(
           "h-8 w-8 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-transparent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
           buttonClassName,
-        )}
-      >
-        <MoreVertical className="h-5 w-5" />
-      </Button>
-
-      {menuOpen && menuPosition && menuPortalTarget && createPortal(
-        <div
-          ref={menuRef}
-          className="fixed z-[70] w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
-          style={{ top: menuPosition.top, left: menuPosition.left }}
-          onClick={(event) => event.stopPropagation()}
-        >
+        )}>{(close) => <>
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
             onClick={() => {
-              setMenuOpen(false);
+              close();
               setShareOpen(true);
             }}
           >
@@ -176,7 +107,7 @@ export default function DetailActionsMenu({
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
-                setMenuOpen(false);
+                close();
                 setPauseOpen(true);
               }}
             >
@@ -189,7 +120,7 @@ export default function DetailActionsMenu({
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
-                setMenuOpen(false);
+                close();
                 onResume();
               }}
             >
@@ -202,7 +133,7 @@ export default function DetailActionsMenu({
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
-                setMenuOpen(false);
+                close();
                 onEdit();
               }}
             >
@@ -214,16 +145,14 @@ export default function DetailActionsMenu({
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
             onClick={() => {
-              setMenuOpen(false);
+              close();
               setDeleteOpen(true);
             }}
           >
             <Trash2 className="h-4 w-4" />
             Delete
           </button>
-        </div>,
-        menuPortalTarget,
-      )}
+        </>}</OverflowMenu>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-md">
@@ -272,11 +201,11 @@ export default function DetailActionsMenu({
             <DialogDescription>{deleteDescription}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
             <Button type="button" variant="destructive" onClick={() => void runDelete()}>
               {deleteConfirmLabel}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
             </Button>
           </div>
         </DialogContent>
