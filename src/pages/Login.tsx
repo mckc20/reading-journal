@@ -274,11 +274,13 @@ interface LoginFormValues {
 }
 
 export default function Login() {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, requestPasswordReset } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { register, handleSubmit, formState, setError } = useForm<LoginFormValues>();
+  const { register, handleSubmit, formState, setError, reset } = useForm<LoginFormValues>();
   const [isMobile, setIsMobile] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [allCovers, setAllCovers] = useState<LoginCoverWithSource[]>([]);
   const [currentCoverId, setCurrentCoverId] = useState<string | null>(null);
   const [previousCoverId, setPreviousCoverId] = useState<string | null>(null);
@@ -416,6 +418,23 @@ export default function Login() {
     // Redirect is handled by the useEffect above when user state updates
   };
 
+  const onRequestPasswordReset = async ({ email }: LoginFormValues) => {
+    const { error } = await requestPasswordReset(email);
+    if (error) {
+      setError("root", { message: error.message });
+      return;
+    }
+
+    // Supabase deliberately does not reveal whether this email has an account.
+    setResetEmailSent(true);
+  };
+
+  const returnToSignIn = () => {
+    reset();
+    setResetEmailSent(false);
+    setShowForgotPassword(false);
+  };
+
   return (
     <main className="relative min-h-svh overflow-hidden bg-foreground">
       <div className="absolute inset-0" aria-hidden="true">
@@ -476,9 +495,48 @@ export default function Login() {
         <div className="pointer-events-auto w-full max-w-sm space-y-6 rounded-lg border border-border/70 bg-background/95 p-6 shadow-[var(--shadow-popover)] backdrop-blur-md sm:p-7">
           <div className="space-y-1">
             <AppHeading level={1} as="h1" className="tracking-tight">Reading Journal</AppHeading>
-            <HeadingDescription>Sign in to your account</HeadingDescription>
+            <HeadingDescription>{showForgotPassword ? "Reset your password" : "Sign in to your account"}</HeadingDescription>
           </div>
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+          {showForgotPassword ? (
+            resetEmailSent ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  If an account exists for this email, we’ve sent a password reset link. Check your inbox and spam folder.
+                </p>
+                <Button type="button" variant="outline" onClick={returnToSignIn} className="w-full">
+                  Back to sign in
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit(onRequestPasswordReset)} noValidate className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    {...register("email", {
+                      required: "Email is required",
+                      pattern: { value: /^\S+@\S+\.\S+$/, message: "Enter a valid email address" },
+                    })}
+                  />
+                  {formState.errors.email && (
+                    <p className="text-sm text-destructive">{formState.errors.email.message}</p>
+                  )}
+                </div>
+                {formState.errors.root && (
+                  <p className="text-sm text-destructive">{formState.errors.root.message}</p>
+                )}
+                <Button type="submit" disabled={formState.isSubmitting} className="w-full">
+                  {formState.isSubmitting ? "Sending…" : "Send reset link"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={returnToSignIn} className="w-full">
+                  Back to sign in
+                </Button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -509,7 +567,19 @@ export default function Login() {
             <Button type="submit" disabled={formState.isSubmitting} className="w-full">
               {formState.isSubmitting ? "Signing in…" : "Sign in"}
             </Button>
-          </form>
+            <Button
+              type="button"
+              variant="link"
+              className="w-full"
+              onClick={() => {
+                reset();
+                setShowForgotPassword(true);
+              }}
+            >
+              Forgot password?
+            </Button>
+            </form>
+          )}
         </div>
       </div>
     </main>

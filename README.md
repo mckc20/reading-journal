@@ -177,6 +177,15 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+#### Password reset emails
+
+The login page sends password reset emails through Supabase Auth. In Supabase Dashboard → **Authentication** → **URL Configuration**, add the URLs that may receive reset links:
+
+- `http://localhost:5173/reset-password` for local development
+- `https://my-reading-journal.vercel.app/reset-password` for production
+
+Supabase requires an email provider to deliver reset links. Its built-in sender is suitable for testing but rate-limited; configure custom SMTP before relying on reset emails in production.
+
 #### Manual Database Backup (Schema + Data)
 
 You can create a local SQL backup (structure + data) from the project root:

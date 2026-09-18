@@ -4,6 +4,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 
 const Login = lazy(() => import("@/pages/Login"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
 const Series = lazy(() => import("@/pages/Series"));
@@ -59,6 +60,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: lazyRoute(<Login />),
+  },
+  {
+    path: "/reset-password",
+    element: lazyRoute(<ResetPassword />),
   },
 
   // Protected layout: ProtectedRoute → AppLayout → page

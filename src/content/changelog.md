@@ -2,6 +2,13 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-09-18 - Password reset
+Version: `2026-09-18-password-reset`
+Summary: You can now reset a forgotten password securely through an email link.
+
+- Password recovery by email
+  Request a reset link from the sign-in screen, choose a new password, then sign in again.
+
 ## 2026-08-26 - Read-only genres
 Version: `2026-08-26-read-only-genres`
 Summary: Genres are now shared read-only categories, with simpler picker dialogs for assigning them to books.
