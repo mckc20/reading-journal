@@ -12,10 +12,12 @@ import {
   MoreHorizontal,
   RefreshCw,
   Star,
+  Trash2,
   X,
 } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import BackButton from "@/components/BackButton";
+import OverflowMenu from "@/components/OverflowMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +43,7 @@ import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchReadingLogs } from "@/lib/books";
 import { fetchAllBookJournalEntryRecords, formatBookJournalEntryRecordPageRange } from "@/lib/bookJournal";
+import { runBulkOperation } from "@/lib/bulkManagement";
 import {
   buildMultiValueGroups,
   buildNoteGroups,
@@ -303,12 +306,29 @@ function EmptyLibraryView({ message }: { message: string }) {
   );
 }
 
-function BooksGrid({ books, onBook }: { books: Book[]; onBook: (b: Book) => void }) {
+function BooksGrid({
+  books,
+  onBook,
+  selectedIds,
+  onToggleBook,
+}: {
+  books: Book[];
+  onBook: (book: Book) => void;
+  selectedIds?: Set<string>;
+  onToggleBook?: (bookId: string) => void;
+}) {
   if (books.length === 0) return null;
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
       {books.map((book) => (
-        <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" />
+        <BookCard
+          key={book.id}
+          book={book}
+          onClick={onBook}
+          textSize="compact"
+          selected={selectedIds?.has(book.id)}
+          onSelect={onToggleBook ? () => onToggleBook(book.id) : undefined}
+        />
       ))}
     </div>
   );
@@ -327,9 +347,15 @@ function LoadingGrid() {
 function BooksTable({
   books,
   onBook,
+  selectedIds,
+  onToggleBook,
+  saving = false,
 }: {
   books: Book[];
   onBook: (b: Book) => void;
+  selectedIds?: Set<string>;
+  onToggleBook?: (bookId: string) => void;
+  saving?: boolean;
 }) {
   if (books.length === 0) return null;
 
@@ -338,6 +364,7 @@ function BooksTable({
       <table className="w-full min-w-[60rem] text-left text-sm">
         <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
           <tr>
+            {selectedIds ? <th className="w-10 px-3 py-2" /> : null}
             <th className="w-16 px-3 py-2">Cover</th>
             <th className="px-3 py-2">Title</th>
             <th className="px-3 py-2">Author</th>
@@ -352,6 +379,9 @@ function BooksTable({
               key={book.id}
               book={book}
               onBook={onBook}
+              selected={selectedIds?.has(book.id)}
+              onToggleBook={onToggleBook}
+              saving={saving}
             />
           ))}
         </tbody>
@@ -363,23 +393,58 @@ function BooksTable({
 function BookTableRow({
   book,
   onBook,
+  selected = false,
+  onToggleBook,
+  saving = false,
 }: {
   book: Book;
   onBook: (b: Book) => void;
+  selected?: boolean;
+  onToggleBook?: (bookId: string) => void;
+  saving?: boolean;
 }) {
+  const isSelecting = Boolean(onToggleBook);
+
   return (
     <tr
       tabIndex={0}
       role="button"
-      onClick={() => onBook(book)}
+      aria-pressed={isSelecting ? selected : undefined}
+      onClick={() => {
+        if (isSelecting) {
+          if (!saving) onToggleBook?.(book.id);
+          return;
+        }
+        onBook(book);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onBook(book);
+          if (isSelecting) {
+            if (!saving) onToggleBook?.(book.id);
+          } else {
+            onBook(book);
+          }
         }
       }}
-      className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+      className={cn(
+        "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+        selected && "bg-muted",
+      )}
     >
+      {isSelecting ? (
+        <td className="px-3 py-2">
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={saving}
+            onClick={(event) => event.stopPropagation()}
+            onChange={() => onToggleBook?.(book.id)}
+            aria-label={`Select ${book.title}`}
+            className="h-4 w-4 rounded border-border"
+          />
+        </td>
+      ) : null}
       <td className="px-3 py-2">
         <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
           {book.cover_url ? (
@@ -431,15 +496,21 @@ function BooksView({
   books,
   display,
   onBook,
+  selectedIds,
+  onToggleBook,
+  saving,
 }: {
   books: Book[];
   display: LibraryDisplay;
   onBook: (b: Book) => void;
+  selectedIds?: Set<string>;
+  onToggleBook?: (bookId: string) => void;
+  saving?: boolean;
 }) {
   if (display === "table") {
-    return <BooksTable books={books} onBook={onBook} />;
+    return <BooksTable books={books} onBook={onBook} selectedIds={selectedIds} onToggleBook={onToggleBook} saving={saving} />;
   }
-  return <BooksGrid books={books} onBook={onBook} />;
+  return <BooksGrid books={books} onBook={onBook} selectedIds={selectedIds} onToggleBook={onToggleBook} />;
 }
 
 function csvCell(value: unknown): string {
@@ -493,194 +564,6 @@ function downloadBooksCsv(books: Book[]) {
   link.download = "selected-library-books.csv";
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function ManagementTable({
-  books,
-  selectedIds,
-  saving,
-  onToggleBook,
-  onToggleAll,
-}: {
-  books: Book[];
-  selectedIds: Set<string>;
-  saving: boolean;
-  onToggleBook: (bookId: string) => void;
-  onToggleAll: () => void;
-}) {
-  const allSelected = books.length > 0 && books.every((book) => selectedIds.has(book.id));
-
-  return (
-    <div className="overflow-x-auto rounded-lg border bg-background dark:bg-card">
-      <table className="w-full min-w-[56rem] text-left text-sm">
-        <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-          <tr>
-            <th className="w-10 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                disabled={books.length === 0 || saving}
-                onChange={onToggleAll}
-                aria-label={allSelected ? "Deselect all books" : "Select all books"}
-                className="h-4 w-4 rounded border-border"
-              />
-            </th>
-            <th className="px-3 py-2">Book</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Genres</th>
-            <th className="px-3 py-2">Rating</th>
-            <th className="px-3 py-2">Progress</th>
-            <th className="px-3 py-2">Format</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {books.map((book) => (
-            <tr key={book.id} className="transition-colors hover:bg-muted/50">
-              <td className="px-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(book.id)}
-                  disabled={saving}
-                  onChange={() => onToggleBook(book.id)}
-                  aria-label={`Select ${book.title}`}
-                  className="h-4 w-4 rounded border-border"
-                />
-              </td>
-              <td className="px-3 py-2">
-                <div className="min-w-0">
-                  <p className="max-w-72 truncate font-medium leading-snug">{book.title}</p>
-                  <p className="max-w-72 truncate text-xs text-muted-foreground">
-                    {book.authors.join(", ")}
-                  </p>
-                </div>
-              </td>
-              <td className="px-3 py-2">
-                <Badge variant={statusVariant(book.status)} className="text-[10px]">
-                  {book.status}
-                </Badge>
-              </td>
-              <td className="max-w-56 px-3 py-2 text-muted-foreground">
-                <span className="line-clamp-2">{book.genres?.join(", ") || "-"}</span>
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">{book.rating ?? "-"}</td>
-              <td className="px-3 py-2 text-muted-foreground">{getBookProgress(book)}%</td>
-              <td className="px-3 py-2 text-muted-foreground">{book.format ?? "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ManagementMode({
-  books,
-  selectedIds,
-  saving,
-  bulkError,
-  genreInput,
-  bulkStatus,
-  onGenreInputChange,
-  onBulkStatusChange,
-  onToggleBook,
-  onToggleAll,
-  onClose,
-  onExport,
-  onApplyStatus,
-  onAddGenres,
-}: {
-  books: Book[];
-  selectedIds: Set<string>;
-  saving: boolean;
-  bulkError: string | null;
-  genreInput: string[];
-  bulkStatus: BookStatus;
-  onGenreInputChange: (value: string[]) => void;
-  onBulkStatusChange: (value: BookStatus) => void;
-  onToggleBook: (bookId: string) => void;
-  onToggleAll: () => void;
-  onClose: () => void;
-  onExport: () => void;
-  onApplyStatus: () => void;
-  onAddGenres: () => void;
-}) {
-  const selectedCount = selectedIds.size;
-  const hasSelection = selectedCount > 0;
-  const hasGenreInput = genreInput.length > 0;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <AppHeading level={4} as="h2">Management Mode</AppHeading>
-          <HeadingDescription>
-            {selectedCount} selected from {books.length} visible books
-          </HeadingDescription>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-44">
-            <Label className="text-xs text-muted-foreground">Bulk status</Label>
-            <Select value={bulkStatus} onValueChange={(value) => onBulkStatusChange(value as BookStatus)}>
-              <SelectTrigger aria-label="Bulk status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {bulkEditableBookStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="button" disabled={!hasSelection || saving} onClick={onApplyStatus}>
-            {saving ? "Saving..." : "Update status"}
-          </Button>
-          <div className="w-56">
-            <Label className="text-xs text-muted-foreground">Add genres</Label>
-            <GenreMultiSelect
-              value={genreInput}
-              onChange={onGenreInputChange}
-              disabled={saving}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!hasSelection || !hasGenreInput || saving}
-            onClick={onAddGenres}
-          >
-            Add genres
-          </Button>
-          <Button type="button" variant="outline" disabled={!hasSelection} onClick={onExport}>
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
-
-      {bulkError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {bulkError}
-        </div>
-      )}
-
-      {books.length === 0 ? (
-        <EmptyLibraryView message="No books match the current filters." />
-      ) : (
-        <ManagementTable
-          books={books}
-          selectedIds={selectedIds}
-          saving={saving}
-          onToggleBook={onToggleBook}
-          onToggleAll={onToggleAll}
-        />
-      )}
-    </div>
-  );
 }
 
 function LibraryViewModeSwitcher({
@@ -1496,23 +1379,19 @@ function AllSortingFields({
 
 function LibraryControlsBar({
   sort,
-  display,
   filters,
   filterOptions,
   activeFilterChips,
   onSortChange,
-  onDisplayChange,
   onFilterChange,
   onRemoveFilter,
   onClearFilters,
 }: {
   sort: LibrarySort;
-  display: LibraryDisplay;
   filters: LibraryFilters;
   filterOptions: LibraryFilterOptions;
   activeFilterChips: ActiveFilterChip[];
   onSortChange: (sort: LibrarySort) => void;
-  onDisplayChange: (display: LibraryDisplay) => void;
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
   onRemoveFilter: (keys: LibraryFilterKey[]) => void;
   onClearFilters: () => void;
@@ -1610,10 +1489,6 @@ function LibraryControlsBar({
               </SelectItem>
             </SelectContent>
           </Select>
-          <LibraryViewModeSwitcher
-            display={display}
-            onDisplayChange={onDisplayChange}
-          />
         </div>
       </div>
 
@@ -1671,15 +1546,37 @@ function LibraryToolbar({
   title,
   countLabel,
   loading,
-  onManageLibrary,
+  display,
+  isManageMode,
+  selectedCount,
+  visibleCount,
+  saving,
+  onDisplayChange,
+  onToggleManageMode,
+  onToggleAll,
+  onExport,
+  onDelete,
+  onOpenStatus,
+  onOpenGenres,
 }: {
   title: string;
   countLabel: string;
   loading: boolean;
-  onManageLibrary?: () => void;
+  display: LibraryDisplay;
+  isManageMode: boolean;
+  selectedCount: number;
+  visibleCount: number;
+  saving: boolean;
+  onDisplayChange: (display: LibraryDisplay) => void;
+  onToggleManageMode: () => void;
+  onToggleAll: () => void;
+  onExport: () => void;
+  onDelete: () => void;
+  onOpenStatus: () => void;
+  onOpenGenres: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="relative flex flex-col gap-4 pr-10">
       <div className="flex min-w-0 items-start gap-2">
         <BackButton fallbackTo="/library" className="mt-1" />
         <div className="min-w-0">
@@ -1690,17 +1587,94 @@ function LibraryToolbar({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
-        {onManageLibrary && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onManageLibrary}
-            className="text-muted-foreground sm:w-auto"
-          >
-            Manage Library
-          </Button>
+      <div className="w-[calc(100%+2.5rem)] shrink-0 space-y-1">
+        {isManageMode && (
+          <>
+            <div className="flex flex-row-reverse flex-wrap items-center justify-start gap-1 sm:gap-2">
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Exit Select mode"
+                disabled={saving}
+                onClick={onToggleManageMode}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">{selectedCount} selected</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="px-1.5 sm:px-2.5"
+                disabled={visibleCount === 0 || saving}
+                onClick={onToggleAll}
+              >
+                {selectedCount > 0 ? "Deselect all" : "Select all"}
+              </Button>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={selectedCount === 0 || saving} onClick={onExport}>
+                  <Download className="mr-1 h-4 w-4" />
+                  Export CSV
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="text-destructive hover:bg-transparent hover:text-destructive"
+                  aria-label="Delete selected books"
+                  disabled={selectedCount === 0 || saving}
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-1 sm:gap-2">
+              <Button type="button" size="sm" variant="ghost" disabled={selectedCount === 0 || saving} onClick={onOpenStatus}>
+                Update status
+              </Button>
+              <Button type="button" size="sm" variant="ghost" disabled={selectedCount === 0 || saving} onClick={onOpenGenres}>
+                Add genres
+              </Button>
+            </div>
+          </>
         )}
+      </div>
+      <div className="absolute right-0 top-0">
+        <OverflowMenu label="Book options">
+            {(close) => (
+              <>
+                <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
+                {(["grid", "table"] as const).map((value) => (
+                  <button
+                    key={value}
+                    role="menuitem"
+                    type="button"
+                    className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    onClick={() => {
+                      onDisplayChange(value);
+                      close();
+                    }}
+                  >
+                    {value === "grid" ? "Grid" : "List"}{display === value ? " ✓" : ""}
+                  </button>
+                ))}
+                <div className="my-1 border-t" />
+                <button
+                  role="menuitem"
+                  type="button"
+                  className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    onToggleManageMode();
+                    close();
+                  }}
+                >
+                  {isManageMode ? "Done selecting" : "Select"}
+                </button>
+              </>
+            )}
+        </OverflowMenu>
       </div>
     </div>
   );
@@ -1709,9 +1683,13 @@ function LibraryToolbar({
 function GroupedBooksView({
   groups,
   onBook,
+  selectedIds,
+  onToggleBook,
 }: {
   groups: BookGroup[];
   onBook: (book: Book) => void;
+  selectedIds?: Set<string>;
+  onToggleBook?: (bookId: string) => void;
 }) {
   if (groups.length === 0) {
     return <EmptyLibraryView message="No books yet." />;
@@ -1726,7 +1704,7 @@ function GroupedBooksView({
             <HeadingDescription className="text-xs">{groupCountLabel(group.books.length)}</HeadingDescription>
           </div>
           <Separator />
-          <BooksGrid books={group.books} onBook={onBook} />
+          <BooksGrid books={group.books} onBook={onBook} selectedIds={selectedIds} onToggleBook={onToggleBook} />
         </section>
       ))}
     </div>
@@ -2015,7 +1993,7 @@ function MyBooksOverview({
 }
 
 export default function Library() {
-  const { books, loading: booksLoading, error, reload, updateBook } = useBooksContext();
+  const { books, loading: booksLoading, error, reload, updateBook, deleteBook } = useBooksContext();
   const { series, loading: seriesLoading } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
@@ -2057,6 +2035,9 @@ export default function Library() {
   const [genreInput, setGenreInput] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
+  const [bulkGenresOpen, setBulkGenresOpen] = useState(false);
 
   useEffect(() => {
     if (viewParam && !isLibraryView(viewParam)) {
@@ -2206,13 +2187,15 @@ export default function Library() {
   function openManageMode() {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("mode", "manage");
-    setSearchParams(nextParams);
+    setSearchParams(nextParams, { replace: true });
+    setSelectedBookIds(new Set());
+    setBulkError(null);
   }
 
   function closeManageMode() {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete("mode");
-    setSearchParams(nextParams);
+    setSearchParams(nextParams, { replace: true });
     setSelectedBookIds(new Set());
     setBulkError(null);
   }
@@ -2291,6 +2274,24 @@ export default function Library() {
     const selectedBooks = managementBooks.filter((book) => selectedBookIds.has(book.id));
     if (selectedBooks.length === 0) return;
     downloadBooksCsv(selectedBooks);
+  }
+
+  async function deleteSelectedBooks() {
+    const selectedBooks = managementBooks.filter((book) => selectedBookIds.has(book.id));
+    if (selectedBooks.length === 0) return;
+
+    setBulkSaving(true);
+    setBulkError(null);
+    const result = await runBulkOperation(
+      selectedBooks,
+      (book) => ({ id: book.id, label: book.title }),
+      (book) => deleteBook(book.id),
+    );
+    setBulkSaving(false);
+    setSelectedBookIds((current) => new Set([...current].filter((id) => result.failures.some((failure) => failure.id === id))));
+    if (result.failures.length > 0) {
+      setBulkError(`Could not delete: ${result.failures.map((failure) => failure.label).join(", ")}.`);
+    }
   }
 
   const latestReadTimesByBook = useMemo(
@@ -2412,12 +2413,10 @@ export default function Library() {
   const controlsBar = (
     <LibraryControlsBar
       sort={librarySort}
-      display={libraryDisplay}
       filters={libraryFilters}
       filterOptions={filterOptions}
       activeFilterChips={activeFilterChips}
       onSortChange={(sort) => updateLibraryParam("sort", sort)}
-      onDisplayChange={(display) => updateLibraryParam("display", display)}
       onFilterChange={updateLibraryFilter}
       onRemoveFilter={removeLibraryFilters}
       onClearFilters={clearLibraryFilters}
@@ -2431,7 +2430,18 @@ export default function Library() {
           title={pageTitle}
           countLabel={displayedCountLabel}
           loading={loading}
-          onManageLibrary={isManageMode ? undefined : openManageMode}
+          display={libraryDisplay}
+          isManageMode={isManageMode}
+          selectedCount={selectedBookIds.size}
+          visibleCount={managementBooks.length}
+          saving={bulkSaving}
+          onDisplayChange={(display) => updateLibraryParam("display", display)}
+          onToggleManageMode={isManageMode ? closeManageMode : openManageMode}
+          onToggleAll={() => toggleAllVisibleBooks(managementBooks)}
+          onExport={exportSelectedBooks}
+          onDelete={() => setDeleteOpen(true)}
+          onOpenStatus={() => setBulkStatusOpen(true)}
+          onOpenGenres={() => setBulkGenresOpen(true)}
         />
       )}
 
@@ -2487,70 +2497,142 @@ export default function Library() {
       ) : (
         <>
           {showLibraryToolbar && controlsBar}
-          {isManageMode ? (
-            <ManagementMode
-              books={managementBooks}
-              selectedIds={selectedBookIds}
-              saving={bulkSaving}
-              bulkError={bulkError}
-              genreInput={genreInput}
-              bulkStatus={bulkStatus}
-              onGenreInputChange={setGenreInput}
-              onBulkStatusChange={setBulkStatus}
-              onToggleBook={toggleSelectedBook}
-              onToggleAll={() => toggleAllVisibleBooks(managementBooks)}
-              onClose={closeManageMode}
-              onExport={exportSelectedBooks}
-              onApplyStatus={applyBulkStatus}
-              onAddGenres={addBulkGenres}
-            />
-          ) : (
-            <section className="min-w-0">
-              {loading ? (
-                <LoadingGrid />
-              ) : activePrimaryShelf ? (
-                visibleBooks.length === 0 ? (
-                  <EmptyLibraryView
-                    message={libraryResultsEmptyMessage({
-                      hasSearch: Boolean(normalizeSearchText(libraryQuery)),
-                      hasActiveFilters,
-                      fallback: activePrimaryShelf.emptyMessage,
-                    })}
-                  />
-                ) : (
-                  <BooksView
-                    books={visibleBooks}
-                    display={libraryDisplay}
-                    onBook={openBook}
-                  />
-                )
-              ) : selectedValue && activeValueShelf && activeValueShelf !== "journalEntries" ? (
-                filteredBooks.length === 0 ? (
-                  <EmptyLibraryView
-                    message={
-                      normalizeSearchText(libraryQuery)
-                        ? `No books match your search in ${selectedValue}.`
-                        : hasActiveFilters
-                          ? `No books match your filters in ${selectedValue}.`
-                        : `No books found for ${selectedValue}.`
-                    }
-                  />
-                ) : (
-                  <BooksView
-                    books={filteredBooks}
-                    display={libraryDisplay}
-                    onBook={openBook}
-                  />
-                )
-              ) : isJournalEntriesView ? (
-                journalEntriesError ? null : <GroupedJournalEntriesView groups={groupedJournalEntries} onBook={openBook} />
-              ) : (
-                <GroupedBooksView groups={groupedBooks} onBook={openBook} />
-              )}
-            </section>
+          {isManageMode && bulkError && (
+            <p className="text-sm text-destructive">{bulkError}</p>
           )}
+          <section className="min-w-0">
+            {loading ? (
+              <LoadingGrid />
+            ) : activePrimaryShelf ? (
+              visibleBooks.length === 0 ? (
+                <EmptyLibraryView
+                  message={libraryResultsEmptyMessage({
+                    hasSearch: Boolean(normalizeSearchText(libraryQuery)),
+                    hasActiveFilters,
+                    fallback: activePrimaryShelf.emptyMessage,
+                  })}
+                />
+              ) : (
+                <BooksView
+                  books={visibleBooks}
+                  display={libraryDisplay}
+                  onBook={openBook}
+                  selectedIds={isManageMode ? selectedBookIds : undefined}
+                  onToggleBook={isManageMode ? toggleSelectedBook : undefined}
+                  saving={bulkSaving}
+                />
+              )
+            ) : selectedValue && activeValueShelf && activeValueShelf !== "journalEntries" ? (
+              filteredBooks.length === 0 ? (
+                <EmptyLibraryView
+                  message={
+                    normalizeSearchText(libraryQuery)
+                      ? `No books match your search in ${selectedValue}.`
+                      : hasActiveFilters
+                        ? `No books match your filters in ${selectedValue}.`
+                        : `No books found for ${selectedValue}.`
+                  }
+                />
+              ) : (
+                <BooksView
+                  books={filteredBooks}
+                  display={libraryDisplay}
+                  onBook={openBook}
+                  selectedIds={isManageMode ? selectedBookIds : undefined}
+                  onToggleBook={isManageMode ? toggleSelectedBook : undefined}
+                  saving={bulkSaving}
+                />
+              )
+            ) : isJournalEntriesView ? (
+              journalEntriesError ? null : <GroupedJournalEntriesView groups={groupedJournalEntries} onBook={openBook} />
+            ) : (
+              <GroupedBooksView
+                groups={groupedBooks}
+                onBook={openBook}
+                selectedIds={isManageMode ? selectedBookIds : undefined}
+                onToggleBook={isManageMode ? toggleSelectedBook : undefined}
+              />
+            )}
+          </section>
         </>
       )}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete selected books?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently deletes the selected books. This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="destructive"
+              disabled={bulkSaving}
+              onClick={() => {
+                setDeleteOpen(false);
+                void deleteSelectedBooks();
+              }}
+            >
+              Delete {selectedBookIds.size === 1 ? "book" : "books"}
+            </Button>
+            <Button variant="outline" disabled={bulkSaving} onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={bulkStatusOpen} onOpenChange={setBulkStatusOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-status">New status</Label>
+            <Select value={bulkStatus} onValueChange={(value) => setBulkStatus(value as BookStatus)}>
+              <SelectTrigger id="bulk-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {bulkEditableBookStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={bulkSaving} onClick={() => setBulkStatusOpen(false)}>Cancel</Button>
+            <Button
+              disabled={selectedBookIds.size === 0 || bulkSaving}
+              onClick={() => {
+                setBulkStatusOpen(false);
+                applyBulkStatus();
+              }}
+            >
+              {bulkSaving ? "Saving..." : "Update status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={bulkGenresOpen} onOpenChange={setBulkGenresOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add genres</DialogTitle>
+          </DialogHeader>
+          <GenreMultiSelect value={genreInput} onChange={setGenreInput} disabled={bulkSaving} />
+          <DialogFooter>
+            <Button variant="outline" disabled={bulkSaving} onClick={() => setBulkGenresOpen(false)}>Cancel</Button>
+            <Button
+              disabled={selectedBookIds.size === 0 || genreInput.length === 0 || bulkSaving}
+              onClick={() => {
+                setBulkGenresOpen(false);
+                addBulkGenres();
+              }}
+            >
+              {bulkSaving ? "Saving..." : "Add genres"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

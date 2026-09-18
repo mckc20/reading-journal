@@ -105,7 +105,7 @@ export default function Series() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start gap-2">
+      <div className="relative flex flex-wrap items-start gap-2 pr-10">
         <BackButton fallbackTo="/library" className="mt-1" />
         <div className="space-y-1">
           <AppHeading level={1} as="h1">Series</AppHeading>
@@ -113,25 +113,25 @@ export default function Series() {
             {loading ? "..." : `${groups.length} series`}
           </HeadingDescription>
         </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {managing && selected.size > 0 && <>
-            <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => downloadSeriesCsv(selectedGroups)}><Download className="mr-1 h-4 w-4" />Export CSV</Button>
-            <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected series" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
-          </>}
+        <div className="flex w-[calc(100%+2.5rem)] shrink-0 flex-row-reverse flex-wrap items-center justify-start gap-1 sm:gap-2">
           {managing && <>
-            <Button type="button" size="sm" variant="ghost" disabled={groups.length === 0 || saving} onClick={() => setSelected((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, groups.map((group) => group.seriesId)))}>
+            <Button type="button" size="icon-sm" variant="ghost" aria-label="Exit Select mode" disabled={saving} onClick={() => { setManaging(false); setSelected(new Set()); }}><X className="h-4 w-4" /></Button>
+            <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">{selected.size} selected</span>
+            <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={groups.length === 0 || saving} onClick={() => setSelected((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, groups.map((group) => group.seriesId)))}>
               {selected.size > 0 ? "Deselect all" : "Select all"}
             </Button>
-            <span className="text-sm text-muted-foreground">{selected.size} selected</span>
-            <Button type="button" size="icon-sm" variant="ghost" aria-label="Exit Select mode" disabled={saving} onClick={() => { setManaging(false); setSelected(new Set()); }}><X className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={selected.size === 0 || saving} onClick={() => downloadSeriesCsv(selectedGroups)}><Download className="mr-1 h-4 w-4" />Export CSV</Button>
+              <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected series" disabled={selected.size === 0 || saving} onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
           </>}
-          <div className="ml-3"><OverflowMenu label="Series options">{(close) => <>
+        </div>
+        <div className="absolute right-0 top-0"><OverflowMenu label="Series options">{(close) => <>
             <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Filter series</p>
             {(["all", "ongoing", "completed"] as const).map((value) => <button key={value} role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setStatusFilter(value); close(); }}>{value === "all" ? "All series" : value === "ongoing" ? "Ongoing" : "Completed"}{statusFilter === value ? " ✓" : ""}</button>)}
             <div className="my-1 border-t" />
             <button role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setManaging((value) => !value); setSelected(new Set()); close(); }}>{managing ? "Done selecting" : "Select"}</button>
-          </>}</OverflowMenu></div>
-        </div>
+        </>}</OverflowMenu></div>
       </div>
 
       {error ? (

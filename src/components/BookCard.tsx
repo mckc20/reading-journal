@@ -14,6 +14,8 @@ interface BookCardProps {
   showAuthor?: boolean;
   footer?: ReactNode;
   className?: string;
+  selected?: boolean;
+  onSelect?: (book: Book) => void;
 }
 
 export default function BookCard({
@@ -25,8 +27,11 @@ export default function BookCard({
   showAuthor = true,
   footer,
   className,
+  selected = false,
+  onSelect,
 }: BookCardProps) {
   const handleBook = onBook ?? onClick;
+  const handleClick = onSelect ?? handleBook;
   const isShelf = variant === "shelf";
   const isPaused = book.status === "Paused";
 
@@ -67,6 +72,7 @@ export default function BookCard({
     isShelf
       ? "block w-full space-y-2 transition-transform duration-150 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       : "w-full gap-0 overflow-hidden pb-2 pt-0",
+    selected && "ring-2 ring-primary ring-offset-2",
     className,
   );
 
@@ -80,7 +86,7 @@ export default function BookCard({
     );
   }
 
-  if (!handleBook) return <Card className={classNames}>{content}</Card>;
+  if (!handleClick) return <Card className={classNames}>{content}</Card>;
 
   return (
     <Card
@@ -88,12 +94,12 @@ export default function BookCard({
       tabIndex={0}
       variant="interactive"
       className={classNames}
-      onClick={() => handleBook(book)}
+      onClick={() => handleClick(book)}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          handleBook(book);
+          handleClick(book);
         }
       }}
     >
