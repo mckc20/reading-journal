@@ -2315,11 +2315,11 @@ export function GroupsManager() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setConfirmAction(null)}>
-              Cancel
-            </Button>
             <Button type="button" variant="destructive" onClick={confirmDelete} disabled={saving}>
               Yes
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setConfirmAction(null)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
