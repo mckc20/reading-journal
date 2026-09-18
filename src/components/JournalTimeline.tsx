@@ -3351,9 +3351,6 @@ export default function JournalTimeline({
               : "This will permanently delete this journal entry and any notes attached to it. This cannot be undone."}
           </DialogDescription>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </Button>
             <Button
               type="button"
               variant="destructive"
@@ -3361,6 +3358,9 @@ export default function JournalTimeline({
               onClick={() => void confirmPendingDelete()}
             >
               Delete
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1226,11 +1226,11 @@ function ApiKeysSettings() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setKeyToRevoke(null)} disabled={revoking}>
-              Cancel
-            </Button>
             <Button type="button" variant="destructive" onClick={() => void confirmRevoke()} disabled={revoking}>
               {revoking ? "Revoking…" : "Revoke key"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setKeyToRevoke(null)} disabled={revoking}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
