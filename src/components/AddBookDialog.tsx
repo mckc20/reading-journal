@@ -515,7 +515,7 @@ export default function AddBookDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-hidden sm:max-w-4xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Book</DialogTitle>
         </DialogHeader>
