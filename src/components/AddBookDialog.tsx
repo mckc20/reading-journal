@@ -5,13 +5,18 @@ import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
-import { fetchBookByISBN } from "@/lib/bookLookup";
+import {
+  fetchBookByISBN,
+  searchBooksByTitle,
+  type BookTitleSearchResult,
+} from "@/lib/bookLookup";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +74,8 @@ interface AddBookDialogProps {
   onSaved?: (book: Book) => void;
 }
 
+type ImportMethod = "isbn" | "title";
+
 const STATUS_OPTIONS: BookStatus[] = [
   "To Read",
   "Up Next",
@@ -111,12 +118,20 @@ export default function AddBookDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showScanner, setShowScanner] = useState(false);
+  const [importMethod, setImportMethod] = useState<ImportMethod>("isbn");
   const [manualIsbn, setManualIsbn] = useState("");
   const [isbnStatus, setIsbnStatus] = useState<"idle" | "looking-up" | "error">("idle");
   const [isbnError, setIsbnError] = useState<string | null>(null);
   const [scannedIsbn, setScannedIsbn] = useState<string | null>(null);
   const [metadataSource, setMetadataSource] = useState<BookMetadataSource | null>(null);
   const [metadataSourceUrl, setMetadataSourceUrl] = useState<string | null>(null);
+  const [titleQuery, setTitleQuery] = useState("");
+  const [titleSearchResults, setTitleSearchResults] = useState<BookTitleSearchResult[]>([]);
+  const [titleSearchStatus, setTitleSearchStatus] = useState<"idle" | "searching" | "error">("idle");
+  const [titleSearchError, setTitleSearchError] = useState<string | null>(null);
+  const [titleSearchHasSearched, setTitleSearchHasSearched] = useState(false);
+  const [isApplyingTitleResult, setIsApplyingTitleResult] = useState(false);
+  const titleSearchRequestIdRef = useRef(0);
   const {
     register,
     control,
@@ -168,6 +183,47 @@ export default function AddBookDialog({
     setCoverPreview(URL.createObjectURL(file));
   }
 
+  function clearCoverSelection() {
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverFile(null);
+    setCoverPreview(null);
+  }
+
+  function handleImportMethodChange(value: string) {
+    if (value !== "isbn" && value !== "title") return;
+    setImportMethod(value);
+    setShowScanner(false);
+    setIsbnError(null);
+    setTitleSearchError(null);
+  }
+
+  async function applyCoverFromUrl(
+    coverUrl: string | undefined,
+    fileLabel: string,
+    clearWhenMissing: boolean,
+  ) {
+    if (!coverUrl) {
+      if (clearWhenMissing) clearCoverSelection();
+      return;
+    }
+
+    try {
+      const res = await fetch(coverUrl);
+      if (!res.ok) throw new Error("Cover request failed");
+      const blob = await res.blob();
+      if (blob.size <= 1000) throw new Error("Cover response was empty");
+
+      const file = new File([blob], `cover-${fileLabel}.jpg`, {
+        type: blob.type || "image/jpeg",
+      });
+      clearCoverSelection();
+      setCoverFile(file);
+      setCoverPreview(URL.createObjectURL(file));
+    } catch {
+      if (clearWhenMissing) clearCoverSelection();
+    }
+  }
+
   async function handleIsbnLookup(isbn: string) {
     setShowScanner(false);
     setIsbnStatus("looking-up");
@@ -209,21 +265,7 @@ export default function AddBookDialog({
 
       // Download cover image as a File for the existing upload flow
       if (bookData.coverUrl) {
-        try {
-          const res = await fetch(bookData.coverUrl);
-          if (res.ok) {
-            const blob = await res.blob();
-            // Only use the cover if it's a real image (not a 1x1 placeholder)
-            if (blob.size > 1000) {
-              const file = new File([blob], `cover-${isbn}.jpg`, { type: "image/jpeg" });
-              if (coverPreview) URL.revokeObjectURL(coverPreview);
-              setCoverFile(file);
-              setCoverPreview(URL.createObjectURL(file));
-            }
-          }
-        } catch {
-          // Non-critical — text fields are still filled
-        }
+        await applyCoverFromUrl(bookData.coverUrl, isbn.trim(), false);
       }
 
       setIsbnStatus("idle");
@@ -231,6 +273,62 @@ export default function AddBookDialog({
       setIsbnStatus("error");
       setIsbnError("Failed to look up book. Please try again or enter details manually.");
     }
+  }
+
+  async function handleTitleSearch() {
+    const query = titleQuery.trim();
+    if (!query || titleSearchStatus === "searching" || isApplyingTitleResult) return;
+
+    const requestId = ++titleSearchRequestIdRef.current;
+    setTitleSearchResults([]);
+    setTitleSearchError(null);
+    setTitleSearchHasSearched(true);
+    setTitleSearchStatus("searching");
+
+    try {
+      const results = await searchBooksByTitle(query);
+      if (requestId !== titleSearchRequestIdRef.current) return;
+      setTitleSearchResults(results);
+      setTitleSearchStatus("idle");
+    } catch {
+      if (requestId !== titleSearchRequestIdRef.current) return;
+      setTitleSearchStatus("error");
+      setTitleSearchError("Failed to search books. Please try again or enter details manually.");
+    }
+  }
+
+  async function handleTitleResultSelect(result: BookTitleSearchResult) {
+    titleSearchRequestIdRef.current += 1;
+    setIsApplyingTitleResult(true);
+    setTitleSearchResults([]);
+    setTitleSearchHasSearched(false);
+    setTitleSearchError(null);
+
+    setValue("title", result.title);
+    setValue("authors", result.authors, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setValue("total_pages", result.totalPages ? String(result.totalPages) : "");
+    setValue(
+      "publication_date",
+      result.publicationDate ? formatPublicationDateInput(result.publicationDate) : "",
+    );
+    setValue("description", result.description ?? "");
+    setValue("genres", mapGenreLabelsToIds(result.genres ?? [], genres), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setValue("language", (result.language as BookLanguage) || "");
+    setScannedIsbn(result.isbn ?? null);
+    setManualIsbn("");
+    setMetadataSource(result.metadataSource);
+    setMetadataSourceUrl(result.metadataSourceUrl);
+
+    await applyCoverFromUrl(result.coverUrl, "google-books", true);
+    setIsApplyingTitleResult(false);
   }
 
   async function handleAddNewSeries() {
@@ -328,12 +426,20 @@ export default function AddBookDialog({
         setCoverFile(null);
         setCoverPreview(null);
         setShowScanner(false);
+        setImportMethod("isbn");
         setManualIsbn("");
         setIsbnStatus("idle");
         setIsbnError(null);
         setScannedIsbn(null);
         setMetadataSource(null);
         setMetadataSourceUrl(null);
+        titleSearchRequestIdRef.current += 1;
+        setTitleQuery("");
+        setTitleSearchResults([]);
+        setTitleSearchStatus("idle");
+        setTitleSearchError(null);
+        setTitleSearchHasSearched(false);
+        setIsApplyingTitleResult(false);
         setAddingNewSeries(false);
         setNewSeriesName("");
         setIsCreatingSeries(false);
@@ -347,12 +453,20 @@ export default function AddBookDialog({
       setCoverFile(null);
       setCoverPreview(null);
       setShowScanner(false);
+      setImportMethod("isbn");
       setManualIsbn("");
       setIsbnStatus("idle");
       setIsbnError(null);
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
+      titleSearchRequestIdRef.current += 1;
+      setTitleQuery("");
+      setTitleSearchResults([]);
+      setTitleSearchStatus("idle");
+      setTitleSearchError(null);
+      setTitleSearchHasSearched(false);
+      setIsApplyingTitleResult(false);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -370,18 +484,27 @@ export default function AddBookDialog({
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
+      titleSearchRequestIdRef.current += 1;
       reset({
         ...getInitialFormValues(initialSeriesId, initialVolumeNumber),
       });
       setCoverFile(null);
       setCoverPreview(null);
       setShowScanner(false);
+      setImportMethod("isbn");
       setManualIsbn("");
       setIsbnStatus("idle");
       setIsbnError(null);
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
+      titleSearchRequestIdRef.current += 1;
+      setTitleQuery("");
+      setTitleSearchResults([]);
+      setTitleSearchStatus("idle");
+      setTitleSearchError(null);
+      setTitleSearchHasSearched(false);
+      setIsApplyingTitleResult(false);
       setAddingNewSeries(false);
       setNewSeriesName("");
       setIsCreatingSeries(false);
@@ -397,60 +520,171 @@ export default function AddBookDialog({
           <DialogTitle>Add Book</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28">
+        <form onSubmit={handleSubmit(onSubmit)} className="min-h-0 rounded-xl border bg-card p-5">
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-1">
-              {/* ISBN Scanner */}
-              {showScanner ? (
-                <BarcodeScanner
-                  onScan={handleIsbnLookup}
-                  onClose={() => setShowScanner(false)}
-                />
+              <div className="flex items-center gap-3">
+                <p className="shrink-0 text-sm font-medium text-foreground">Search by</p>
+                <Tabs
+                  value={importMethod}
+                  onValueChange={handleImportMethodChange}
+                  className="min-w-0 flex-1"
+                >
+                  <TabsList className="w-full">
+                    <TabsTrigger
+                      value="isbn"
+                      disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
+                    >
+                      ISBN
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="title"
+                      disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
+                    >
+                      Book title
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {importMethod === "isbn" ? (
+                <>
+                  {/* ISBN Scanner */}
+                  {showScanner ? (
+                    <BarcodeScanner
+                      onScan={handleIsbnLookup}
+                      onClose={() => setShowScanner(false)}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => { setShowScanner(true); setIsbnError(null); }}
+                        disabled={isbnStatus === "looking-up"}
+                      >
+                        <ScanBarcode className="h-4 w-4" />
+                        Scan ISBN barcode
+                      </Button>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter ISBN"
+                          value={manualIsbn}
+                          onChange={(e) => setManualIsbn(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-9"
+                          disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
+                          onClick={() => handleIsbnLookup(manualIsbn)}
+                        >
+                          Look up
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isbnStatus === "looking-up" && (
+                    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Looking up book…
+                    </p>
+                  )}
+
+                  {isbnError && (
+                    <p className="text-sm text-destructive text-center">{isbnError}</p>
+                  )}
+                </>
               ) : (
                 <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={() => { setShowScanner(true); setIsbnError(null); }}
-                    disabled={isbnStatus === "looking-up"}
-                  >
-                    <ScanBarcode className="h-4 w-4" />
-                    Scan ISBN barcode
-                  </Button>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Or enter ISBN manually"
-                      value={manualIsbn}
-                      onChange={(e) => setManualIsbn(e.target.value)}
+                      id="title-search"
+                      placeholder="Enter book title"
+                      value={titleQuery}
+                      onChange={(e) => setTitleQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
+                          void handleTitleSearch();
                         }
                       }}
+                      disabled={isApplyingTitleResult}
                     />
                     <Button
                       type="button"
                       size="sm"
-                      disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
-                      onClick={() => handleIsbnLookup(manualIsbn)}
+                      className="h-9"
+                      disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
+                      onClick={() => void handleTitleSearch()}
                     >
-                      Look up
+                      {titleSearchStatus === "searching" ? "Looking up…" : "Look up"}
                     </Button>
                   </div>
+
+                  {titleSearchStatus === "searching" && (
+                    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Searching book catalogs…
+                    </p>
+                  )}
+
+                  {titleSearchError && (
+                    <p className="text-sm text-destructive text-center">{titleSearchError}</p>
+                  )}
+
+                  {titleSearchHasSearched &&
+                    titleSearchStatus === "idle" &&
+                    titleSearchResults.length === 0 && (
+                      <p className="text-sm text-center text-muted-foreground">
+                        No matching editions found.
+                      </p>
+                    )}
+
+                  {titleSearchResults.length > 0 && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {titleSearchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          type="button"
+                          className="flex min-w-0 items-center gap-3 rounded-lg border bg-surface p-2 text-left transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-60"
+                          onClick={() => void handleTitleResultSelect(result)}
+                          disabled={isApplyingTitleResult}
+                        >
+                          <div className="flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                            {result.coverUrl ? (
+                              <img
+                                src={result.coverUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <ImagePlus className="h-4 w-4 text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <span className="min-w-0 space-y-0.5">
+                            <span className="block truncate text-sm font-medium">{result.title}</span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {result.authors.join(", ")}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ") ||
+                                "Edition details unavailable"}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {isbnStatus === "looking-up" && (
-                <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Looking up book…
-                </p>
-              )}
-
-              {isbnError && (
-                <p className="text-sm text-destructive text-center">{isbnError}</p>
               )}
 
               {/* Cover, title, authors, and genres match the Edit book layout. */}
@@ -788,7 +1022,7 @@ export default function AddBookDialog({
           </ScrollArea>
 
           <SaveCancelBar
-            mode="dialog"
+            mode="inline"
             onCancel={() => onOpenChange(false)}
             saving={isSubmitting}
             saveLabel="Add Book"
