@@ -7,6 +7,7 @@ const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
+const Wishlist = lazy(() => import("@/pages/Wishlist"));
 const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
 const SeriesJournal = lazy(() => import("@/pages/SeriesJournal"));
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: lazyRoute(<Dashboard />) },
           { path: "/library", element: lazyRoute(<Library />) },
+          { path: "/library/wishlist", element: lazyRoute(<Wishlist />) },
           { path: "/library/books", element: lazyRoute(<ExploreLibrary />) },
           { path: "/library/authors", element: lazyRoute(<AuthorsExplore />) },
           { path: "/library/series", element: lazyRoute(<Series />) },
@@ -85,6 +87,7 @@ export const router = createBrowserRouter([
           { path: "/reading-history", element: lazyRoute(<ReadingHistory />) },
           { path: "/wrap-ups", element: lazyRoute(<WrapUps />) },
           { path: "/messages", element: lazyRoute(<Groups />) },
+          { path: "/discover/recommendations", element: lazyRoute(<Discover />) },
           { path: "/discover", element: lazyRoute(<Discover />) },
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },

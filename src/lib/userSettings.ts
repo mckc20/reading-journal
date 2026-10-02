@@ -3,6 +3,7 @@ import type {
   AppearanceSettings,
   BackupSettings,
   CollectionSettings,
+  DiscoverSettings,
   LibrarySettings,
   NotificationSettings,
   PrivacySettings,
@@ -23,6 +24,7 @@ type UserSettingsRow = {
   notifications: unknown;
   privacy: unknown;
   backup: unknown;
+  discover: unknown;
   last_seen_release_note_version: string | null;
   created_at: string;
   updated_at: string;
@@ -47,6 +49,7 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   reading_streak_goal_days: 7,
   auto_finish_books: true,
   estimated_completion_dates: true,
+  acquired_wishlist_book_deletion: "return_to_pending",
   journal_filter_defaults: {
     show_quotes: true,
     show_thoughts: true,
@@ -97,6 +100,13 @@ export const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
   last_backup_at: null,
 };
 
+export const DEFAULT_DISCOVER_SETTINGS: DiscoverSettings = {
+  reload_interval_number: 2,
+  reload_interval_unit: "day",
+  hide_disliked_recommendations: false,
+  recommendation_count: 6,
+};
+
 export const DEFAULT_SETTINGS_SECTIONS: UserSettingsSections = {
   appearance: DEFAULT_APPEARANCE_SETTINGS,
   reading: DEFAULT_READING_SETTINGS,
@@ -105,6 +115,7 @@ export const DEFAULT_SETTINGS_SECTIONS: UserSettingsSections = {
   notifications: DEFAULT_NOTIFICATION_SETTINGS,
   privacy: DEFAULT_PRIVACY_SETTINGS,
   backup: DEFAULT_BACKUP_SETTINGS,
+  discover: DEFAULT_DISCOVER_SETTINGS,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -148,6 +159,26 @@ function normalizeLibrarySettings(settings: LibrarySettings): LibrarySettings {
   return settings;
 }
 
+export function normalizeDiscoverSettings(settings: DiscoverSettings): DiscoverSettings {
+  const unit = ["day", "week", "month"].includes(settings.reload_interval_unit)
+    ? settings.reload_interval_unit
+    : DEFAULT_DISCOVER_SETTINGS.reload_interval_unit;
+  const inputNumber = Number(settings.reload_interval_number);
+  const maxForUnit = unit === "day" ? 30 : unit === "week" ? 4 : 1;
+  const intervalNumber = Number.isFinite(inputNumber)
+    ? Math.min(maxForUnit, Math.max(1, Math.round(inputNumber)))
+    : Math.min(maxForUnit, DEFAULT_DISCOVER_SETTINGS.reload_interval_number);
+  const count = Number(settings.recommendation_count);
+  return {
+    reload_interval_number: intervalNumber,
+    reload_interval_unit: unit,
+    hide_disliked_recommendations: Boolean(settings.hide_disliked_recommendations),
+    recommendation_count: Number.isFinite(count)
+      ? Math.min(12, Math.max(3, Math.round(count)))
+      : DEFAULT_DISCOVER_SETTINGS.recommendation_count,
+  };
+}
+
 async function getCurrentUserId(): Promise<string> {
   const {
     data: { user },
@@ -169,6 +200,7 @@ function normalizeSettings(row: UserSettingsRow): UserSettings {
     notifications: mergeSection(DEFAULT_NOTIFICATION_SETTINGS, row.notifications),
     privacy: mergeSection(DEFAULT_PRIVACY_SETTINGS, row.privacy),
     backup: mergeSection(DEFAULT_BACKUP_SETTINGS, row.backup),
+    discover: normalizeDiscoverSettings(mergeSection(DEFAULT_DISCOVER_SETTINGS, row.discover)),
     last_seen_release_note_version: row.last_seen_release_note_version ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -185,6 +217,7 @@ function toSettingsPayload(settings: UserSettings): UserSettingsSections & { use
     notifications: settings.notifications,
     privacy: settings.privacy,
     backup: settings.backup,
+    discover: settings.discover,
   };
 }
 
@@ -207,6 +240,7 @@ export function mergeUserSettings(
     ),
     privacy: mergeSection(DEFAULT_PRIVACY_SETTINGS, settings.privacy, update.privacy),
     backup: mergeSection(DEFAULT_BACKUP_SETTINGS, settings.backup, update.backup),
+    discover: normalizeDiscoverSettings(mergeSection(DEFAULT_DISCOVER_SETTINGS, settings.discover, update.discover)),
   };
 }
 

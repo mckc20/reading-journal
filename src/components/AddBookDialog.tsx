@@ -31,6 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
+import { useAuth } from "@/context";
+import { createWishlistItem } from "@/lib/wishlist";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import { mapGenreLabelsToIds } from "@/lib/genres";
@@ -47,6 +49,7 @@ import type {
   BookFormat,
   BookMetadataSource,
 } from "@/types";
+import type { RecommendationItem } from "@/types/recommendations";
 
 interface FormValues {
   title: string;
@@ -64,6 +67,8 @@ interface FormValues {
   date_finished: string;
   series_id: string;
   volume_number: string;
+  price: string;
+  purchase_url: string;
 }
 
 interface AddBookDialogProps {
@@ -71,7 +76,11 @@ interface AddBookDialogProps {
   onOpenChange: (open: boolean) => void;
   initialSeriesId?: string;
   initialVolumeNumber?: number;
+  initialRecommendation?: RecommendationItem;
+  initialCatalogBook?: BookTitleSearchResult;
+  initiallyAddToWishlist?: boolean;
   onSaved?: (book: Book) => void;
+  onWishlistSaved?: () => void;
 }
 
 type ImportMethod = "isbn" | "title";
@@ -93,6 +102,8 @@ function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: nu
     genres: [],
     series_id: initialSeriesId ?? "",
     volume_number: initialVolumeNumber ? String(initialVolumeNumber) : "",
+    price: "",
+    purchase_url: "",
   };
 }
 
@@ -101,13 +112,19 @@ export default function AddBookDialog({
   onOpenChange,
   initialSeriesId,
   initialVolumeNumber,
+  initialRecommendation,
+  initialCatalogBook,
+  initiallyAddToWishlist = false,
   onSaved,
+  onWishlistSaved,
 }: AddBookDialogProps) {
   const { addBook } = useBooksContext();
+  const { user } = useAuth();
   const { genres } = useGenresContext();
   const { series, addSeries } = useSeries();
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [addToWishlist, setAddToWishlist] = useState(initiallyAddToWishlist);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [newSeriesName, setNewSeriesName] = useState("");
   const [addingNewSeries, setAddingNewSeries] = useState(false);
@@ -116,6 +133,9 @@ export default function AddBookDialog({
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recommendationPrefillRef = useRef<string | null>(null);
+  const recommendationGenresPrefillRef = useRef<string | null>(null);
+  const catalogPrefillRef = useRef<string | null>(null);
 
   const [showScanner, setShowScanner] = useState(false);
   const [importMethod, setImportMethod] = useState<ImportMethod>("isbn");
@@ -174,6 +194,46 @@ export default function AddBookDialog({
     setValue("series_id", initialSeriesId ?? "");
     setValue("volume_number", initialVolumeNumber ? String(initialVolumeNumber) : "");
   }, [initialSeriesId, initialVolumeNumber, open, setValue]);
+
+  useEffect(() => {
+    if (!open || !initialRecommendation) return;
+    if (recommendationPrefillRef.current === initialRecommendation.id) return;
+    recommendationPrefillRef.current = initialRecommendation.id;
+    setValue("title", initialRecommendation.title);
+    setValue("authors", initialRecommendation.authors);
+    setValue("description", initialRecommendation.description ?? "");
+    setValue("total_pages", initialRecommendation.pageCount ? String(initialRecommendation.pageCount) : "");
+    setValue("publication_date", initialRecommendation.publicationDate ? formatPublicationDateInput(initialRecommendation.publicationDate) : "");
+    setValue("language", (initialRecommendation.language as BookLanguage) || "");
+    setScannedIsbn(initialRecommendation.isbn ?? null);
+    setMetadataSource(initialRecommendation.source);
+    setMetadataSourceUrl(initialRecommendation.sourceUrl);
+    void applyCoverFromUrl(initialRecommendation.coverUrl, initialRecommendation.id, true);
+  }, [initialRecommendation, open, setValue]);
+
+  useEffect(() => {
+    if (!open || !initialRecommendation || !genres.length) return;
+    if (recommendationGenresPrefillRef.current === initialRecommendation.id) return;
+    recommendationGenresPrefillRef.current = initialRecommendation.id;
+    setValue("genres", mapGenreLabelsToIds(initialRecommendation.genres, genres));
+  }, [initialRecommendation, genres, open, setValue]);
+
+  useEffect(() => {
+    if (!open || !initialCatalogBook || !genres.length) return;
+    if (catalogPrefillRef.current === initialCatalogBook.id) return;
+    catalogPrefillRef.current = initialCatalogBook.id;
+    setValue("title", initialCatalogBook.title);
+    setValue("authors", initialCatalogBook.authors);
+    setValue("genres", mapGenreLabelsToIds(initialCatalogBook.genres ?? [], genres));
+    setValue("description", initialCatalogBook.description ?? "");
+    setValue("total_pages", initialCatalogBook.totalPages ? String(initialCatalogBook.totalPages) : "");
+    setValue("publication_date", initialCatalogBook.publicationDate ? formatPublicationDateInput(initialCatalogBook.publicationDate) : "");
+    setValue("language", (initialCatalogBook.language as BookLanguage) || "");
+    setScannedIsbn(initialCatalogBook.isbn ?? null);
+    setMetadataSource(initialCatalogBook.metadataSource);
+    setMetadataSourceUrl(initialCatalogBook.metadataSourceUrl);
+    void applyCoverFromUrl(initialCatalogBook.coverUrl, initialCatalogBook.id, true);
+  }, [initialCatalogBook, genres, open, setValue]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -395,6 +455,44 @@ export default function AddBookDialog({
         });
         return;
       }
+      const parsedPrice = values.price.trim() ? Number(values.price) : null;
+      if (values.price.trim() && (!Number.isFinite(parsedPrice) || parsedPrice! < 0)) {
+        setError("price", { message: "Enter a price of zero or more." });
+        return;
+      }
+      if (values.purchase_url.trim()) {
+        try {
+          const url = new URL(values.purchase_url.trim());
+          if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
+        } catch {
+          setError("purchase_url", { message: "Enter a valid web link, including https://." });
+          return;
+        }
+      }
+      if (addToWishlist) {
+        if (!user) throw new Error("Not authenticated");
+        try {
+          await createWishlistItem(user.id, {
+            title: values.title, authors, genre_ids: values.genres,
+            genres: values.genres.map((id) => genres.find((genre) => genre.id === id)?.name ?? "").filter(Boolean),
+            language: (values.language as BookLanguage) || null, format: (values.format as BookFormat) || null,
+            total_pages: values.total_pages ? Number(values.total_pages) : null,
+            publication_date: parsedPublicationDate?.date ?? null, description: values.description.trim() || null,
+            isbn: scannedIsbn || null, metadata_source: metadataSource || null, metadata_source_url: metadataSourceUrl || null,
+            series_id: values.series_id || null, volume_number: parsedVolumeNumber,
+            price: parsedPrice, purchase_url: values.purchase_url.trim() || null,
+            cover_url: null, cover_entity_id: null,
+          }, coverFile ?? undefined);
+        } catch (error) {
+          if (error && typeof error === "object" && "item" in error) onWishlistSaved?.();
+          throw error;
+        }
+        onWishlistSaved?.();
+        reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
+        setAddToWishlist(false);
+        onOpenChange(false);
+        return;
+      }
       const result = await addBook(
         {
           title: values.title,
@@ -523,6 +621,10 @@ export default function AddBookDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="min-h-0 rounded-xl border bg-card p-5">
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 py-1">
+              <label className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2 text-sm font-medium">
+                Add to Wishlist
+                <input type="checkbox" checked={addToWishlist} onChange={(event) => setAddToWishlist(event.target.checked)} className="h-4 w-4" />
+              </label>
               <div className="flex items-center gap-3">
                 <p className="shrink-0 text-sm font-medium text-foreground">Search by</p>
                 <Tabs
@@ -768,8 +870,7 @@ export default function AddBookDialog({
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                {/* Status is Add-only, but follows the same Edit metadata grid. */}
-                <div className="order-0 space-y-1.5">
+                {!addToWishlist && <div className="order-0 space-y-1.5">
                   <Label>Status</Label>
                   <Controller
                     name="status"
@@ -789,7 +890,7 @@ export default function AddBookDialog({
                       </Select>
                     )}
                   />
-                </div>
+                </div>}
 
               {/* Language */}
               <div className="order-1 space-y-1.5">
@@ -907,7 +1008,7 @@ export default function AddBookDialog({
               </div>
 
               {/* Current progress (Reading only) */}
-              {status === "Reading" && (
+              {!addToWishlist && status === "Reading" && (
                 <div className="order-7 space-y-1.5">
                   <Label htmlFor="current_page">Current page</Label>
                   <Input
@@ -920,13 +1021,13 @@ export default function AddBookDialog({
               )}
 
               {/* Dates (conditional) */}
-              {showDateStarted && (
+              {!addToWishlist && showDateStarted && (
                 <div className="order-8 space-y-1.5">
                   <Label htmlFor="date_started">Date started</Label>
                   <Input id="date_started" type="date" {...register("date_started")} />
                 </div>
               )}
-              {showDateFinished && (
+              {!addToWishlist && showDateFinished && (
                 <div className="order-9 space-y-1.5">
                   <Label htmlFor="date_finished">Date finished</Label>
                   <Input id="date_finished" type="date" {...register("date_finished")} />
@@ -1013,6 +1114,19 @@ export default function AddBookDialog({
                 </div>
               )}
 
+              {addToWishlist && <>
+                <div className="order-12 space-y-1.5 sm:max-w-[12rem]">
+                  <Label htmlFor="price">Price</Label>
+                  <Input id="price" type="number" min="0" step="0.01" inputMode="decimal" {...register("price")} />
+                  {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+                </div>
+                <div className="order-12 space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="purchase_url">Purchase link</Label>
+                  <Input id="purchase_url" type="url" placeholder="https://…" {...register("purchase_url")} />
+                  {errors.purchase_url && <p className="text-xs text-destructive">{errors.purchase_url.message}</p>}
+                </div>
+              </>}
+
               {/* Root error */}
               {errors.root && (
                 <p className="order-[13] text-sm text-destructive">{errors.root.message}</p>
@@ -1025,7 +1139,7 @@ export default function AddBookDialog({
             mode="inline"
             onCancel={() => onOpenChange(false)}
             saving={isSubmitting}
-            saveLabel="Add Book"
+            saveLabel={addToWishlist ? "Add to Wishlist" : "Add Book"}
           />
         </form>
       </DialogContent>
