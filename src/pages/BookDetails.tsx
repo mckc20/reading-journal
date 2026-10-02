@@ -76,6 +76,7 @@ import {
 } from "@/lib/bookAnalytics";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteCover, fetchReadingLogsForBook, uploadCover } from "@/lib/books";
+import { addBookToWishlist } from "@/lib/wishlist";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
@@ -613,7 +614,12 @@ export default function BookDetails() {
       await deleteBook(book.id);
       navigate("/library", { replace: true });
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to delete book");
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Failed to delete book";
+      setErrorMsg(message);
     }
   }
 
@@ -879,6 +885,7 @@ export default function BookDetails() {
             setErrorMsg(null);
             setIsEditMode(true);
           }}
+          onWishlist={() => { if (user) void addBookToWishlist(user.id, book).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not add to wishlist")); }}
           onDelete={handleDelete}
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this book?"

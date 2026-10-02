@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import {
   Bell,
   BookOpen,
+  Compass,
   Check,
   Copy,
   Database,
@@ -60,6 +61,7 @@ import {
   DEFAULT_APPEARANCE_SETTINGS,
   DEFAULT_BACKUP_SETTINGS,
   DEFAULT_COLLECTION_SETTINGS,
+  DEFAULT_DISCOVER_SETTINGS,
   DEFAULT_LIBRARY_SETTINGS,
   DEFAULT_NOTIFICATION_SETTINGS,
   DEFAULT_PRIVACY_SETTINGS,
@@ -75,6 +77,7 @@ import type {
   BookStatus,
   CollectionBehavior,
   CollectionSettings as CollectionSettingsValues,
+  RecommendationIntervalUnit,
   CollectionVisibility,
   CornerRadiusStyle,
   DensityPreference,
@@ -95,6 +98,7 @@ type SettingsTab =
   | "profile"
   | "appearance"
   | "reading"
+  | "discover"
   | "genres"
   | "notifications"
   | "privacy"
@@ -124,6 +128,7 @@ const settingsTabs: Array<{
   { value: "profile", label: "Profile", icon: UserRound },
   { value: "appearance", label: "Appearance", icon: Monitor },
   { value: "reading", label: "Reading", icon: BookOpen },
+  { value: "discover", label: "Discover", icon: Compass },
   { value: "genres", label: "Genres", icon: ListTree },
   { value: "notifications", label: "Notifications", icon: Bell },
   { value: "privacy", label: "Privacy", icon: Lock },
@@ -774,6 +779,17 @@ function ReadingSettings() {
               }
             />
           </SettingRow>
+          <SettingRow title="Wishlist when deleting an acquired book" description="Choose what happens to its linked wishlist item.">
+            <SelectSetting
+              value={reading.acquired_wishlist_book_deletion}
+              options={[
+                { value: "return_to_pending", label: "Return to pending wishlist" },
+                { value: "remove_from_wishlist", label: "Remove from wishlist" },
+              ]}
+              disabled={disabled || inactiveSettingDisabled}
+              onChange={(acquired_wishlist_book_deletion) => void saveReading({ acquired_wishlist_book_deletion })}
+            />
+          </SettingRow>
           <SettingRow
             title="Journal filter defaults"
             description="Choose which journal filters start turned on when you open a journal."
@@ -995,6 +1011,100 @@ function NotificationSettings() {
               onChange={(new_follower_notifications) =>
                 void saveNotifications({ new_follower_notifications })
               }
+            />
+          </SettingRow>
+        </SettingsRows>
+      </div>
+    </SettingsSection>
+  );
+}
+
+function DiscoverSettings() {
+  const { settings, loading, saving, error, saveSettingsSection } = useUserSettings();
+  const discover = settings?.discover ?? DEFAULT_DISCOVER_SETTINGS;
+  const disabled = loading || saving;
+  const [intervalInput, setIntervalInput] = useState(String(discover.reload_interval_number));
+  const [countInput, setCountInput] = useState(String(discover.recommendation_count));
+
+  useEffect(() => {
+    setIntervalInput(String(discover.reload_interval_number));
+    setCountInput(String(discover.recommendation_count));
+  }, [discover.reload_interval_number, discover.recommendation_count]);
+
+  function intervalMaximum(unit: RecommendationIntervalUnit) {
+    return unit === "day" ? 30 : unit === "week" ? 4 : 1;
+  }
+
+  async function saveInterval(number = Number(intervalInput), unit = discover.reload_interval_unit) {
+    const value = Math.max(1, Math.min(intervalMaximum(unit), Math.round(number || 1)));
+    setIntervalInput(String(value));
+    await saveSettingsSection("discover", {
+      reload_interval_number: value,
+      reload_interval_unit: unit,
+    });
+  }
+
+  async function saveCount() {
+    const value = Math.max(3, Math.min(12, Math.round(Number(countInput) || 6)));
+    setCountInput(String(value));
+    await saveSettingsSection("discover", { recommendation_count: value });
+  }
+
+  return (
+    <SettingsSection title="Discover" description="Control recommendation updates and feedback." icon={Compass}>
+      <div className="space-y-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <SettingsRows>
+          <SettingRow title="Reload interval" description="Refresh recommendations when you open Discover after this amount of time.">
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label="Reload interval number"
+                type="number"
+                min={1}
+                max={intervalMaximum(discover.reload_interval_unit)}
+                className="w-20"
+                value={intervalInput}
+                disabled={disabled}
+                onChange={(event) => setIntervalInput(event.target.value)}
+                onBlur={() => void saveInterval()}
+              />
+              <Select
+                value={discover.reload_interval_unit}
+                disabled={disabled}
+                onValueChange={(unit) => void saveInterval(Number(intervalInput), unit as RecommendationIntervalUnit)}
+              >
+                <SelectTrigger className="w-28" aria-label="Reload interval unit"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">day</SelectItem>
+                  <SelectItem value="week">week</SelectItem>
+                  <SelectItem value="month">month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SettingRow>
+          <SettingRow
+            title="Hide disliked"
+            description="When on, a thumbs-down removes that book from the page and fills its place with another suggestion when available. When off, it stays marked so you can undo the feedback."
+          >
+            <ToggleSetting
+              checked={discover.hide_disliked_recommendations}
+              disabled={disabled}
+              onChange={(hide_disliked_recommendations) =>
+                void saveSettingsSection("discover", { hide_disliked_recommendations })
+              }
+            />
+          </SettingRow>
+          <SettingRow title="Recommendations at once" description="Choose how many books to show when Discover loads.">
+            <Input
+              aria-label="Number of recommendations"
+              type="number"
+              min={3}
+              max={12}
+              className="w-20"
+              value={countInput}
+              disabled={disabled}
+              onChange={(event) => setCountInput(event.target.value)}
+              onBlur={() => void saveCount()}
             />
           </SettingRow>
         </SettingsRows>
@@ -1561,6 +1671,7 @@ function SettingsTabContent({ tab }: { tab: SettingsTab }) {
   if (tab === "profile") return <ProfileSettings />;
   if (tab === "appearance") return <AppearanceSettings />;
   if (tab === "reading") return <ReadingSettings />;
+  if (tab === "discover") return <DiscoverSettings />;
   if (tab === "genres") return <GenreSettings />;
   if (tab === "notifications") return <NotificationSettings />;
   if (tab === "privacy") return <PrivacySettings />;

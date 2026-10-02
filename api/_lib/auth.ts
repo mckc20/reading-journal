@@ -44,3 +44,17 @@ export async function authenticate(request: VercelRequest): Promise<string | nul
 
   return data.user_id;
 }
+
+/** Verify a short-lived Supabase web session token. Kept separate from API-key auth. */
+export async function authenticateUserSession(
+  request: VercelRequest,
+  verify: (accessToken: string) => Promise<{ data: { user: { id: string } | null }; error: unknown }>
+    = (accessToken) => getSupabaseAdmin().auth.getUser(accessToken),
+): Promise<string | null> {
+  const accessToken = getBearerToken(request.headers.authorization);
+  if (!accessToken) return null;
+
+  const { data, error } = await verify(accessToken);
+  if (error || !data.user) return null;
+  return data.user.id;
+}

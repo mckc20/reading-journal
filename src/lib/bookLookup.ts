@@ -89,6 +89,7 @@ const languageMap: Record<string, string> = {
 };
 
 const OPEN_LIBRARY_TIMEOUT_MS = 1500;
+const GOOGLE_BOOKS_SEARCH_TIMEOUT_MS = 5000;
 
 function uniqueClean(values: string[] | undefined): string[] {
   return Array.from(new Set((values ?? []).map((value) => value.trim()).filter(Boolean)));
@@ -231,14 +232,15 @@ async function fetchGoogleBooksMetadata(isbn: string): Promise<BookLookupResult 
   };
 }
 
-async function searchGoogleBooksByTitle(title: string): Promise<BookTitleSearchResult[]> {
+async function searchGoogleBooksByTitle(title: string, broadSearch = false): Promise<BookTitleSearchResult[]> {
   const query = title.trim();
   if (!query) return [];
 
   const url = apiUrl(
-    `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=10`,
+    `https://www.googleapis.com/books/v1/volumes?q=${broadSearch ? encodeURIComponent(query) : `intitle:${encodeURIComponent(query)}`}&maxResults=10`,
   );
-  const res = await fetch(url);
+  const { signal, cleanup } = withTimeoutSignal(GOOGLE_BOOKS_SEARCH_TIMEOUT_MS);
+  const res = await fetch(url, { signal }).finally(cleanup);
   if (!res.ok) throw new Error(`Google Books title search failed with status ${res.status}`);
 
   const data: GoogleBooksVolume = await res.json();
@@ -266,7 +268,7 @@ async function searchGoogleBooksByTitle(title: string): Promise<BookTitleSearchR
   });
 }
 
-async function searchOpenLibraryByTitle(title: string): Promise<BookTitleSearchResult[]> {
+async function searchOpenLibraryByTitle(title: string, broadSearch = false): Promise<BookTitleSearchResult[]> {
   const query = title.trim();
   if (!query) return [];
 
@@ -282,10 +284,12 @@ async function searchOpenLibraryByTitle(title: string): Promise<BookTitleSearchR
     "cover_edition_key",
     "isbn",
   ].join(",");
+  const queryField = broadSearch ? "q" : "title";
   const url = apiUrl(
-    `https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&limit=10&fields=${encodeURIComponent(fields)}`,
+    `https://openlibrary.org/search.json?${queryField}=${encodeURIComponent(query)}&limit=10&fields=${encodeURIComponent(fields)}`,
   );
-  const res = await fetch(url);
+  const { signal, cleanup } = withTimeoutSignal(OPEN_LIBRARY_TIMEOUT_MS);
+  const res = await fetch(url, { signal }).finally(cleanup);
   if (!res.ok) throw new Error(`Open Library title search failed with status ${res.status}`);
 
   const data: OpenLibraryTitleSearchResponse = await res.json();
@@ -330,6 +334,31 @@ export async function searchBooksByTitle(title: string): Promise<BookTitleSearch
   }
 
   return searchOpenLibraryByTitle(query);
+}
+
+export async function searchBooksAcrossCatalogs(query: string): Promise<BookTitleSearchResult[]> {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return [];
+
+  const [googleResult, openLibraryResult] = await Promise.allSettled([
+    searchGoogleBooksByTitle(cleanQuery, true),
+    searchOpenLibraryByTitle(cleanQuery, true),
+  ]);
+  const candidates = [
+    ...(googleResult.status === "fulfilled" ? googleResult.value : []),
+    ...(openLibraryResult.status === "fulfilled" ? openLibraryResult.value : []),
+  ];
+  if (candidates.length === 0 && googleResult.status === "rejected" && openLibraryResult.status === "rejected") {
+    throw new Error("Both book catalogs failed to return search results.");
+  }
+
+  const unique = new Map<string, BookTitleSearchResult>();
+  for (const candidate of candidates) {
+    const isbn = candidate.isbn?.replace(/[^\dXx]/g, "").toUpperCase();
+    const identity = isbn || `${candidate.title.trim().toLocaleLowerCase()}|${candidate.authors.map((author) => author.trim().toLocaleLowerCase()).sort().join("|")}`;
+    if (!unique.has(identity)) unique.set(identity, candidate);
+  }
+  return [...unique.values()];
 }
 
 async function fetchBookcoverUrl(isbn: string): Promise<string | null> {

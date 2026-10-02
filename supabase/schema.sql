@@ -417,6 +417,12 @@ CREATE TRIGGER on_auth_user_created_create_profile
 -- ── USER SETTINGS ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  discover jsonb NOT NULL DEFAULT '{
+    "reload_interval_number": 2,
+    "reload_interval_unit": "day",
+    "hide_disliked_recommendations": false,
+    "recommendation_count": 6
+  }'::jsonb,
   appearance jsonb NOT NULL DEFAULT '{
     "theme": "system",
     "accent_color": "default",
@@ -435,6 +441,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "reading_streak_goal_days": 7,
     "auto_finish_books": true,
     "estimated_completion_dates": true
+    ,"acquired_wishlist_book_deletion": "return_to_pending"
   }'::jsonb,
   library jsonb NOT NULL DEFAULT '{
     "default_sorting": "recently_added",
@@ -1693,6 +1700,24 @@ CREATE POLICY "user_settings: owner insert" ON user_settings FOR INSERT WITH CHE
 CREATE POLICY "user_settings: owner update" ON user_settings FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "user_settings: owner delete" ON user_settings FOR DELETE USING (auth.uid() = user_id);
 
+-- wishlist_items is deliberately separate from books: pending wishes are not library books.
+CREATE TABLE IF NOT EXISTS wishlist_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  book_id uuid REFERENCES books(id) ON DELETE SET NULL, title text NOT NULL, authors text[] NOT NULL DEFAULT '{}',
+  genre_ids uuid[] NOT NULL DEFAULT '{}', genres text[] NOT NULL DEFAULT '{}', cover_url text, cover_entity_id uuid,
+  total_pages integer CHECK (total_pages > 0), language text CHECK (language IN ('German','Spanish','English')),
+  format text CHECK (format IN ('eBook','Audiobook','Paperback','Hardcover')), isbn text, publication_date date,
+  description text, metadata_source text CHECK (metadata_source IN ('open_library','google_books')), metadata_source_url text,
+  series_id uuid REFERENCES series(id) ON DELETE SET NULL, volume_number numeric CHECK (volume_number > 0),
+  price numeric(10,2) CHECK (price >= 0), purchase_url text,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE wishlist_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY wishlist_items_select_own ON wishlist_items FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY wishlist_items_insert_own ON wishlist_items FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY wishlist_items_update_own ON wishlist_items FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY wishlist_items_delete_own ON wishlist_items FOR DELETE USING (auth.uid() = user_id);
+
 -- groups
 CREATE POLICY "groups: member select" ON groups FOR SELECT USING (is_active_group_member(id, auth.uid()));
 CREATE POLICY "groups: owner insert" ON groups FOR INSERT WITH CHECK (auth.uid() = created_by);
@@ -2003,3 +2028,128 @@ CREATE POLICY profile_avatars_delete_own
     AND auth.uid() IS NOT NULL
     AND split_part(name, '/', 1) = auth.uid()::text
   );
+
+-- ── SHARED DISCOVER RECOMMENDATIONS ───────────────────────
+CREATE TABLE IF NOT EXISTS recommendation_sets (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  items jsonb NOT NULL DEFAULT '[]'::jsonb,
+  generated_at timestamptz,
+  expires_at timestamptz,
+  strategy_version text,
+  taste_fingerprint text,
+  refresh_started_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE recommendation_sets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS recommendation_sets_select_own ON recommendation_sets;
+CREATE POLICY recommendation_sets_select_own
+  ON recommendation_sets FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+REVOKE ALL ON recommendation_sets FROM anon, authenticated;
+GRANT SELECT ON recommendation_sets TO authenticated;
+GRANT ALL ON recommendation_sets TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.recommendation_feedback (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  candidate_key text NOT NULL,
+  title text NOT NULL,
+  authors jsonb NOT NULL DEFAULT '[]'::jsonb,
+  genres jsonb NOT NULL DEFAULT '[]'::jsonb,
+  item jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, candidate_key)
+);
+
+-- Exact recommendation removals are neutral: they do not change taste ranking.
+CREATE TABLE IF NOT EXISTS public.recommendation_dismissals (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  candidate_key text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, candidate_key)
+);
+ALTER TABLE public.recommendation_dismissals ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.recommendation_dismissals FROM anon, authenticated;
+GRANT ALL ON public.recommendation_dismissals TO service_role;
+ALTER TABLE public.recommendation_feedback ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.recommendation_feedback FROM anon, authenticated;
+GRANT ALL ON public.recommendation_feedback TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.recommendation_history (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  candidate_key text NOT NULL,
+  item jsonb NOT NULL,
+  first_seen_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, candidate_key)
+);
+ALTER TABLE public.recommendation_history ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.recommendation_history FROM anon, authenticated;
+GRANT ALL ON public.recommendation_history TO service_role;
+
+CREATE OR REPLACE FUNCTION claim_recommendation_refresh(
+  p_user_id uuid,
+  p_force boolean,
+  p_taste_fingerprint text,
+  p_strategy_version text,
+  p_now timestamptz DEFAULT now(),
+  p_lease_seconds integer DEFAULT 90,
+  p_cooldown_seconds integer DEFAULT 900
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE did_claim boolean;
+BEGIN
+  INSERT INTO recommendation_sets (
+    user_id, items, strategy_version, taste_fingerprint, refresh_started_at, updated_at
+  ) VALUES (
+    p_user_id, '[]'::jsonb, p_strategy_version, p_taste_fingerprint, p_now, p_now
+  )
+  ON CONFLICT (user_id) DO UPDATE SET refresh_started_at = p_now, updated_at = p_now
+  WHERE (recommendation_sets.refresh_started_at IS NULL
+         OR recommendation_sets.refresh_started_at < p_now - make_interval(secs => p_lease_seconds))
+    AND (p_force OR recommendation_sets.generated_at IS NULL
+         OR recommendation_sets.expires_at <= p_now
+         OR recommendation_sets.strategy_version IS DISTINCT FROM p_strategy_version
+         OR recommendation_sets.taste_fingerprint IS DISTINCT FROM p_taste_fingerprint)
+    AND (NOT p_force OR recommendation_sets.generated_at IS NULL
+         OR recommendation_sets.generated_at < p_now - make_interval(secs => p_cooldown_seconds));
+  did_claim := FOUND;
+  RETURN did_claim;
+END;
+$$;
+REVOKE ALL ON FUNCTION claim_recommendation_refresh(uuid, boolean, text, text, timestamptz, integer, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION claim_recommendation_refresh(uuid, boolean, text, text, timestamptz, integer, integer) TO service_role;
+
+-- ── SERIES VOLUME REJECTIONS ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.series_volume_rejections (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  series_id uuid NOT NULL REFERENCES public.series(id) ON DELETE CASCADE,
+  candidate_key text NOT NULL,
+  title text NOT NULL,
+  source text NOT NULL CHECK (source IN ('google_books', 'open_library')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, series_id, candidate_key)
+);
+
+ALTER TABLE public.series_volume_rejections ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS series_volume_rejections_select_own ON public.series_volume_rejections;
+CREATE POLICY series_volume_rejections_select_own
+  ON public.series_volume_rejections FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS series_volume_rejections_insert_own ON public.series_volume_rejections;
+CREATE POLICY series_volume_rejections_insert_own
+  ON public.series_volume_rejections FOR INSERT TO authenticated
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1 FROM public.series
+      WHERE series.id = series_id AND series.user_id = auth.uid()
+    )
+  );
+REVOKE ALL ON public.series_volume_rejections FROM anon, authenticated;
+GRANT SELECT, INSERT ON public.series_volume_rejections TO authenticated;

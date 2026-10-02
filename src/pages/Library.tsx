@@ -19,11 +19,12 @@ import { useSeries } from "@/hooks/useSeries";
 import { buildAuthorSummaries, getAuthorInitials } from "@/lib/authorShelf";
 import { buildGenreSlugLookup } from "@/lib/genres";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
+import { fetchWishlist } from "@/lib/wishlist";
 import BookShelf from "@/pages/library/BookShelf";
 import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorSummary } from "@/lib/authorShelf";
-import type { Book, Genre } from "@/types";
+import type { Book, Genre, WishlistItem } from "@/types";
 
 const recentlyAddedPreviewRows = 2;
 const recentlyAddedPreviewGap = 12;
@@ -51,11 +52,12 @@ const libraryRedirectParamKeys = [
   "favorite",
 ];
 
-const mobileLibraryCategories: Array<{ key: "books" | "authors" | "series" | "genres"; label: string; to: string; icon: LucideIcon }> = [
+const mobileLibraryCategories: Array<{ key: "books" | "authors" | "series" | "genres" | "wishlist"; label: string; to: string; icon: LucideIcon }> = [
   { key: "books", label: "Books", to: "/library/books", icon: BookOpen },
   { key: "authors", label: "Authors", to: "/library/authors", icon: UserRound },
   { key: "series", label: "Series", to: "/library/series", icon: LibraryBig },
   { key: "genres", label: "Genres", to: "/library/genres", icon: Tags },
+  { key: "wishlist", label: "Wishlist", to: "/library/wishlist", icon: BookOpen },
 ];
 
 function LoadingGrid() {
@@ -318,6 +320,8 @@ export default function Library() {
   const { series, loading: seriesLoading } = useSeries();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  useEffect(() => { void fetchWishlist().then(setWishlist).catch(() => {}); }, []);
   const viewParam = searchParams.get("view");
   const sortedBooks = useMemo(() => sortByDateAdded(books), [books]);
   const authorSummaries = useMemo(() => buildAuthorSummaries(authors, sortedBooks), [authors, sortedBooks]);
@@ -369,6 +373,7 @@ export default function Library() {
             authors: loadingShelves ? "..." : authorSummaries.length,
             series: loadingShelves ? "..." : seriesGroups.length,
             genres: loadingShelves ? "..." : genres.length,
+            wishlist: loadingShelves ? "..." : wishlist.filter((item) => !item.book_id).length,
           }}
         />
       </div>
@@ -426,6 +431,15 @@ export default function Library() {
                 <HorizontalShelf ariaLabel="Genres shelf">
                   {genres.map((genre) => (
                     <GenreShelfItem key={genre.id} genre={genre} slug={slugById.get(genre.id) ?? genre.id} />
+                  ))}
+                </HorizontalShelf>
+              </EntityShelf>
+              <EntityShelf title="Wishlist" count={wishlist.filter((item) => !item.book_id).length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
+                <HorizontalShelf ariaLabel="Wishlist shelf">
+                  {wishlist.filter((item) => !item.book_id).map((item) => (
+                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-20 shrink-0 overflow-hidden rounded-md border bg-muted sm:w-24">
+                      {item.cover_url ? <img src={item.cover_url} alt={item.title} className="aspect-[2/3] w-full object-cover" /> : <div className="flex aspect-[2/3] items-center justify-center"><BookOpen className="h-6 w-6 text-muted-foreground" /></div>}
+                    </Link>
                   ))}
                 </HorizontalShelf>
               </EntityShelf>

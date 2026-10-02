@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { Bookmark, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import OverflowMenu from "@/components/OverflowMenu";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ interface DetailActionsMenuProps {
   pauseDescription?: string;
   onResume?: () => void;
   onEdit?: () => void;
+  onWishlist?: () => void;
   onDelete: () => void | Promise<void>;
   onSendAttachment: () => void;
   deleteTitle: string;
@@ -48,6 +49,7 @@ export default function DetailActionsMenu({
   pauseDescription = "Are you sure you want to pause this book? Reading time will stop until you resume it.",
   onResume,
   onEdit,
+  onWishlist,
   onDelete,
   onSendAttachment,
   deleteTitle,
@@ -141,6 +143,7 @@ export default function DetailActionsMenu({
               Edit
             </button>
           )}
+          {onWishlist && <button type="button" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { close(); onWishlist(); }}><Bookmark className="h-4 w-4" />Add to Wishlist</button>}
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"

@@ -31,9 +31,11 @@ import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifi
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import type { BookTitleSearchResult } from "@/lib/bookLookup";
 import ReleaseNotesDialog from "./ReleaseNotesDialog";
 import BookFinishedCelebration from "./BookFinishedCelebration";
 import type { Book, ChatMessageNotification } from "@/types";
+import type { RecommendationItem } from "@/types/recommendations";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
@@ -60,7 +62,11 @@ export interface AppLayoutOutletContext {
 export interface AddBookDialogLaunchOptions {
   initialSeriesId?: string;
   initialVolumeNumber?: number;
+  initialRecommendation?: RecommendationItem;
+  initialCatalogBook?: BookTitleSearchResult;
+  initiallyAddToWishlist?: boolean;
   onSaved?: (book: Book) => void;
+  onWishlistSaved?: () => void;
 }
 
 type NavLink = {
@@ -288,9 +294,13 @@ function AppLayoutContent() {
           <AddBookDialog
             open={addBookOpen}
             onOpenChange={closeAddBook}
+            initialRecommendation={addBookOptions?.initialRecommendation}
+            initialCatalogBook={addBookOptions?.initialCatalogBook}
+            initiallyAddToWishlist={addBookOptions?.initiallyAddToWishlist}
             initialSeriesId={addBookOptions?.initialSeriesId}
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
             onSaved={handleAddedBook}
+            onWishlistSaved={addBookOptions?.onWishlistSaved}
           />
         )}
         {activeAddAction === "author" && (

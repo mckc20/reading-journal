@@ -107,6 +107,33 @@ export interface BookPausePeriod {
 
 export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at">>;
 
+/** A catalogue entry saved for later. A linked item has already been acquired. */
+export interface WishlistItem {
+  id: string;
+  user_id: string;
+  book_id?: string | null;
+  title: string;
+  authors: string[];
+  genre_ids?: string[];
+  genres?: string[];
+  cover_url?: string | null;
+  cover_entity_id?: string | null;
+  total_pages?: number | null;
+  language?: BookLanguage | null;
+  format?: BookFormat | null;
+  isbn?: string | null;
+  publication_date?: string | null;
+  description?: string | null;
+  metadata_source?: BookMetadataSource | null;
+  metadata_source_url?: string | null;
+  series_id?: string | null;
+  volume_number?: number | null;
+  price?: number | null;
+  purchase_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type JournalEntryLabel = "quote" | "review" | "note";
 
 export interface BookJournalEntryRecord {
@@ -300,6 +327,7 @@ export interface ReadingSettings {
   reading_streak_goal_days: number;
   auto_finish_books: boolean;
   estimated_completion_dates: boolean;
+  acquired_wishlist_book_deletion: "return_to_pending" | "remove_from_wishlist";
   journal_filter_defaults: JournalFilterDefaults;
 }
 
@@ -355,6 +383,15 @@ export interface BackupSettings {
   last_backup_at: string | null;
 }
 
+export type RecommendationIntervalUnit = "day" | "week" | "month";
+
+export interface DiscoverSettings {
+  reload_interval_number: number;
+  reload_interval_unit: RecommendationIntervalUnit;
+  hide_disliked_recommendations: boolean;
+  recommendation_count: number;
+}
+
 export interface UserSettings {
   user_id: string;
   appearance: AppearanceSettings;
@@ -364,6 +401,7 @@ export interface UserSettings {
   notifications: NotificationSettings;
   privacy: PrivacySettings;
   backup: BackupSettings;
+  discover: DiscoverSettings;
   last_seen_release_note_version: string | null;
   created_at: string;
   updated_at: string;
@@ -371,7 +409,7 @@ export interface UserSettings {
 
 export type UserSettingsSections = Pick<
   UserSettings,
-  "appearance" | "reading" | "library" | "collections" | "notifications" | "privacy" | "backup"
+  "appearance" | "reading" | "library" | "collections" | "notifications" | "privacy" | "backup" | "discover"
 >;
 
 export type UserSettingsUpdate = {

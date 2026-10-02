@@ -137,8 +137,8 @@ export function useBooks() {
   const deleteBook = useCallback(
     async (id: string): Promise<void> => {
       if (!user) throw new Error("Not authenticated");
-      // Best-effort cover deletion
-      await deleteCover(user.id, id).catch(() => {});
+      // The database trigger may return a linked wish to pending state. Do not
+      // delete its cover first: a retained wish must never point at a removed file.
       await deleteBookDb(id);
       setBooks((prev) => prev.filter((b) => b.id !== id));
     },
