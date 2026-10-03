@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { BookStatus as BookStatusType } from "@/types";
 
 const statusStyles: Record<BookStatusType, { variant: "default" | "secondary" | "outline" | "destructive"; className?: string }> = {
+  Wishlist: { variant: "outline" },
   "To Read": { variant: "outline" },
   "Up Next": { variant: "secondary", className: "border-primary/15 bg-primary/8 text-primary" },
   Reading: { variant: "default" },

@@ -7,13 +7,14 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, ChevronRight, FileText, Heart, Languages, Star, Tags } from "lucide-react";
 import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
+import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import JournalTimeline from "@/components/JournalTimeline";
 import {
   buildBookLibraryFilterPath,
@@ -22,6 +23,7 @@ import {
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -43,6 +45,8 @@ import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
 import { authorJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
+import { duplicateAuthorRecord } from "@/lib/duplication";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import { cn } from "@/lib/utils";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord } from "@/types";
@@ -238,20 +242,25 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
 
 export default function AuthorDetails() {
   const { authorId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { settings } = useUserSettings();
   const {
     authors: authorRecords,
     loading: authorsLoading,
     error: authorsError,
     editAuthor,
     removeAuthor,
+    reload: reloadAuthors,
   } = useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { books, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
   const { genres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -279,6 +288,11 @@ export default function AuthorDetails() {
 
   const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
+  useEffect(() => {
+    if (!author || location.state?.openEdit !== true) return;
+    setIsEditMode(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [author, location.pathname, location.state, navigate]);
   const dominantPhotoColor = useDominantImageColor(author?.photo_url);
   const authorBooks = author?.books ?? [];
   const previewBooks = authorBooks.slice(0, 4);
@@ -303,6 +317,30 @@ export default function AuthorDetails() {
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
+  }
+
+  async function duplicateCurrentAuthor(options: DuplicateOptions) {
+    if (!author || !user) return;
+    try {
+      setActionError(null);
+      const duplicate = await duplicateAuthorRecord(author, books, user.id, options);
+      setDuplicateOpen(false);
+      await Promise.all([reloadAuthors(), reloadBooks()]);
+      navigate(`/authors/${encodeURIComponent(duplicate.id)}`, { state: { openEdit: true } });
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Failed to duplicate author"));
+    }
+  }
+
+  function openDuplicateDialog() {
+    if (!author || !user) return;
+    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
+    const resolved = resolveDuplicateOptions("author", library.duplicate_journal_entries, library.duplicate_books, authorBooks.length);
+    if (resolved.needsDialog) {
+      setDuplicateOpen(true);
+      return;
+    }
+    void duplicateCurrentAuthor(resolved.options);
   }
 
   async function handleDeleteAuthor() {
@@ -423,6 +461,7 @@ export default function AuthorDetails() {
           label={author.name}
           shareAttachmentLabel="Send the author as attachment in a chat"
           onEdit={() => setIsEditMode(true)}
+          onDuplicate={openDuplicateDialog}
           onDelete={() => void handleDeleteAuthor()}
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this author?"
@@ -583,6 +622,15 @@ export default function AuthorDetails() {
         title={`Send "${author.name}" to chat`}
         description="Add a message, then pick the chat you want to send this author to."
         onSent={() => setShareStatus("Author sent to chat.")}
+      />
+      <DuplicateOptionsDialog
+        open={duplicateOpen}
+        kind="author"
+        linkedBookCount={authorBooks.length}
+        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
+        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
+        onOpenChange={setDuplicateOpen}
+        onConfirm={duplicateCurrentAuthor}
       />
     </div>
   );

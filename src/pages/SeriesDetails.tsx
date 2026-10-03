@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   BookOpen,
   CalendarDays,
@@ -32,6 +32,7 @@ import BookCard from "@/components/BookCard";
 import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
+import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import JournalTimeline from "@/components/JournalTimeline";
 import {
   buildAuthorDetailPath,
@@ -53,7 +54,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -62,6 +63,7 @@ import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
+import { duplicateSeriesRecord } from "@/lib/duplication";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
 import {
@@ -86,6 +88,7 @@ import {
 import { seriesJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
 import { bookHasGenreName, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { cn, getTodayLocalDate } from "@/lib/utils";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import type { Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
 
 function bookCountLabel(count: number): string {
@@ -792,6 +795,7 @@ function SeriesEditPage({
 
 export default function SeriesDetails() {
   const { seriesId } = useParams<{ seriesId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
@@ -803,15 +807,18 @@ export default function SeriesDetails() {
     updateBook,
     updateBookSeriesPlacement,
     updateBookVolumeNumber,
+    reload: reloadBooks,
   } = useBooksContext();
   const { genres: availableGenres } = useGenresContext();
-  const { series, loading: seriesLoading, error: seriesError, editSeries, removeSeries } = useSeries();
+  const { series, loading: seriesLoading, error: seriesError, editSeries, removeSeries, reload: reloadSeries } = useSeries();
+  const { settings } = useUserSettings();
   const [logs, setLogs] = useState<ReadingLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [savingSeries, setSavingSeries] = useState(false);
   const [startingBookId, setStartingBookId] = useState<string | null>(null);
@@ -819,6 +826,11 @@ export default function SeriesDetails() {
   const progressCardRef = useRef<HTMLDivElement>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
+  useEffect(() => {
+    if (!seriesRecord || location.state?.openEdit !== true) return;
+    setIsEditMode(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate, seriesRecord]);
   const dominantCoverColor = useDominantImageColor(seriesRecord?.cover_url);
   const detailBackgroundStyle = {
     "--detail-image-color": dominantCoverColor,
@@ -997,15 +1009,40 @@ export default function SeriesDetails() {
     }
   }
 
-  async function handleDeleteSeries() {
+  async function handleDeleteSeries(deleteLinkedBooks = false) {
     if (!seriesRecord) return;
     try {
       setActionError(null);
-      await removeSeries(seriesRecord.id);
+      await removeSeries(seriesRecord.id, deleteLinkedBooks);
+      await reloadBooks();
       navigate("/library/series", { replace: true });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Failed to delete series");
+      setActionError(getErrorMessage(error, "Failed to delete series"));
     }
+  }
+
+  async function duplicateCurrentSeries(options: DuplicateOptions) {
+    if (!seriesRecord || !user) return;
+    try {
+      setActionError(null);
+      const duplicate = await duplicateSeriesRecord(seriesRecord, seriesBooks, user.id, options);
+      setDuplicateOpen(false);
+      await Promise.all([reloadSeries(), reloadBooks()]);
+      navigate(`/series/${duplicate.id}`, { state: { openEdit: true } });
+    } catch (error) {
+      setActionError(getErrorMessage(error, "Failed to duplicate series"));
+    }
+  }
+
+  function openDuplicateDialog() {
+    if (!seriesRecord || !user) return;
+    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
+    const resolved = resolveDuplicateOptions("series", library.duplicate_journal_entries, library.duplicate_books, seriesBooks.length);
+    if (resolved.needsDialog) {
+      setDuplicateOpen(true);
+      return;
+    }
+    void duplicateCurrentSeries(resolved.options);
   }
 
   async function handleToggleFavorite() {
@@ -1176,10 +1213,11 @@ export default function SeriesDetails() {
             label={seriesRecord.name}
             shareAttachmentLabel="Send the series as attachment in a chat"
             onEdit={() => setIsEditMode(true)}
+            onDuplicate={openDuplicateDialog}
             onDelete={handleDeleteSeries}
             onSendAttachment={openAttachmentPicker}
             deleteTitle="Delete this series?"
-            deleteDescription="Are you sure you want to delete this series? The books will stay in your library and be detached from this series."
+            deleteDescription="This permanently deletes the series. Choose whether its linked books should be deleted too."
             buttonClassName="text-white hover:bg-white/10 hover:text-white aria-expanded:bg-white/15 aria-expanded:text-white"
           />
         </div>
@@ -1364,6 +1402,15 @@ export default function SeriesDetails() {
         title={`Send "${seriesRecord.name}" to chat`}
         description="Add a message, then pick the chat you want to send this series to."
         onSent={() => setShareStatus("Series sent to chat.")}
+      />
+      <DuplicateOptionsDialog
+        open={duplicateOpen}
+        kind="series"
+        linkedBookCount={seriesBooks.length}
+        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
+        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
+        onOpenChange={setDuplicateOpen}
+        onConfirm={duplicateCurrentSeries}
       />
     </div>
   );

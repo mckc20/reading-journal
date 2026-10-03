@@ -65,6 +65,7 @@ export interface AddBookDialogLaunchOptions {
   initialRecommendation?: RecommendationItem;
   initialCatalogBook?: BookTitleSearchResult;
   initiallyAddToWishlist?: boolean;
+  initialBook?: Book;
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
 }
@@ -297,6 +298,7 @@ function AppLayoutContent() {
             initialRecommendation={addBookOptions?.initialRecommendation}
             initialCatalogBook={addBookOptions?.initialCatalogBook}
             initiallyAddToWishlist={addBookOptions?.initiallyAddToWishlist}
+            initialBook={addBookOptions?.initialBook}
             initialSeriesId={addBookOptions?.initialSeriesId}
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
             onSaved={handleAddedBook}

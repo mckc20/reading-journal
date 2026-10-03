@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticate } from "../_lib/auth.js";
-import { parseBookSearchQuery, toApiBook } from "../_lib/books.js";
+import { parseBookSearchQuery, parseBookListOptions, toApiBook } from "../_lib/books.js";
 import { json, methodNotAllowed } from "../_lib/http.js";
 import { getSupabaseAdmin } from "../_lib/supabaseAdmin.js";
 
@@ -20,21 +20,25 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     let searchQuery;
+    let options;
     try {
       searchQuery = parseBookSearchQuery(request);
+      options = parseBookListOptions(request);
     } catch (error) {
       json(response, 400, { error: error instanceof Error ? error.message : "Invalid search query." });
       return;
     }
 
     const admin = getSupabaseAdmin();
-    const { data, error } = await admin
+    let query = admin
       .from("books")
       .select(BOOK_FIELDS)
       .eq("user_id", userId)
       .ilike("title", `%${searchQuery}%`)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(options.limit);
+    query = options.status ? query.eq("status", options.status) : query.neq("status", "Wishlist");
+    const { data, error } = await query;
 
     if (error) throw error;
 

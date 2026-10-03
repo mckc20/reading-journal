@@ -49,7 +49,6 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   reading_streak_goal_days: 7,
   auto_finish_books: true,
   estimated_completion_dates: true,
-  acquired_wishlist_book_deletion: "return_to_pending",
   journal_filter_defaults: {
     show_quotes: true,
     show_thoughts: true,
@@ -65,6 +64,8 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   show_unfinished_series_first: true,
   hide_completed_books: false,
   show_reading_statistics: true,
+  duplicate_journal_entries: "ask",
+  duplicate_books: "ask",
 };
 
 export const DEFAULT_COLLECTION_SETTINGS: CollectionSettings = {
@@ -136,8 +137,11 @@ function mergeSection<TSection extends object>(
 }
 
 function normalizeReadingSettings(settings: ReadingSettings): ReadingSettings {
+  const clean = { ...settings } as ReadingSettings & Record<string, unknown>;
+  delete clean.acquired_wishlist_book_deletion;
   return {
-    ...settings,
+    ...clean,
+    default_reading_status: settings.default_reading_status === "Wishlist" ? "To Read" : settings.default_reading_status,
     journal_filter_defaults: {
       ...DEFAULT_READING_SETTINGS.journal_filter_defaults,
       ...(isRecord(settings.journal_filter_defaults) ? settings.journal_filter_defaults : {}),
@@ -147,16 +151,22 @@ function normalizeReadingSettings(settings: ReadingSettings): ReadingSettings {
 
 function normalizeLibrarySettings(settings: LibrarySettings): LibrarySettings {
   const storedDefaultView = String(settings.default_view);
+  const duplicateJournalEntries = ["ask", "always", "never"].includes(settings.duplicate_journal_entries)
+    ? settings.duplicate_journal_entries
+    : DEFAULT_LIBRARY_SETTINGS.duplicate_journal_entries;
+  const duplicateBooks = ["ask", "always", "never"].includes(settings.duplicate_books)
+    ? settings.duplicate_books
+    : DEFAULT_LIBRARY_SETTINGS.duplicate_books;
 
   if (storedDefaultView === "compact") {
-    return { ...settings, default_view: "grid" };
+    return { ...settings, default_view: "grid", duplicate_journal_entries: duplicateJournalEntries, duplicate_books: duplicateBooks };
   }
 
   if (!["grid", "list"].includes(storedDefaultView)) {
-    return { ...settings, default_view: DEFAULT_LIBRARY_SETTINGS.default_view };
+    return { ...settings, default_view: DEFAULT_LIBRARY_SETTINGS.default_view, duplicate_journal_entries: duplicateJournalEntries, duplicate_books: duplicateBooks };
   }
 
-  return settings;
+  return { ...settings, duplicate_journal_entries: duplicateJournalEntries, duplicate_books: duplicateBooks };
 }
 
 export function normalizeDiscoverSettings(settings: DiscoverSettings): DiscoverSettings {

@@ -103,6 +103,18 @@ test("rejects invalid MCP input before the REST client is called", async () => {
   await Promise.all([mcpClient.close(), server.close()]);
 });
 
+test("MCP can explicitly list and search wishlist books", async () => {
+  const { client, calls } = recordingClient();
+  const { server, mcpClient } = await connectServer(client);
+  await mcpClient.callTool({ name: "list_books", arguments: { status: "Wishlist" } });
+  await mcpClient.callTool({ name: "search_books", arguments: { query: "A wish", status: "Wishlist" } });
+  assert.deepEqual(calls, [
+    { method: "GET", path: "/api/books?status=Wishlist" },
+    { method: "GET", path: "/api/books/search?q=A%20wish&status=Wishlist" },
+  ]);
+  await Promise.all([mcpClient.close(), server.close()]);
+});
+
 test("forwards the bearer token only to the configured trusted origin", async () => {
   const requests: Array<{ url: string; authorization: string | null; body: string | undefined }> = [];
   const fetchMock: typeof fetch = async (input, init) => {

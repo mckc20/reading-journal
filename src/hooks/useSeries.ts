@@ -27,8 +27,8 @@ export function useSeries() {
     return created;
   }, [user]);
 
-  const removeSeries = useCallback(async (seriesId: string): Promise<void> => {
-    await deleteSeries(seriesId);
+  const removeSeries = useCallback(async (seriesId: string, deleteLinkedBooks = false): Promise<void> => {
+    await deleteSeries(seriesId, deleteLinkedBooks);
     setSeries((prev) => prev.filter((item) => item.id !== seriesId));
   }, []);
 
@@ -38,5 +38,11 @@ export function useSeries() {
     return updated;
   }, []);
 
-  return { series, loading, error, addSeries, editSeries, removeSeries };
+  const reload = useCallback(async () => {
+    if (!user) return;
+    const data = await fetchSeries();
+    setSeries(data);
+  }, [user]);
+
+  return { series, loading, error, addSeries, editSeries, removeSeries, reload };
 }

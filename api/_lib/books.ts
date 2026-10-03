@@ -1,6 +1,6 @@
 import type { VercelRequest } from "@vercel/node";
 
-export const API_BOOK_STATUSES = ["To Read", "Up Next", "Reading", "Paused", "Finished", "DNF"] as const;
+export const API_BOOK_STATUSES = ["Wishlist", "To Read", "Up Next", "Reading", "Paused", "Finished", "DNF"] as const;
 
 export type ApiBookStatus = (typeof API_BOOK_STATUSES)[number];
 

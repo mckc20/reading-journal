@@ -25,13 +25,6 @@ type RecommendationRow = {
 };
 
 type FeedbackRow = RecommendationFeedback & { item: unknown };
-type WishlistSignalRow = {
-  title: string;
-  authors: string[] | null;
-  genre_ids: string[] | null;
-  genres: string[] | null;
-  isbn: string | null;
-};
 
 type DiscoverPreference = {
   reload_interval_number?: number;
@@ -50,9 +43,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     const admin = getSupabaseAdmin();
-    const [booksResult, wishlistResult, setResult, settingsResult, feedbackResult, historyResult, dismissalsResult] = await Promise.all([
+    const [booksResult, setResult, settingsResult, feedbackResult, historyResult, dismissalsResult] = await Promise.all([
       admin.from("books").select("title,genres,isbn,status,rating,is_favorite,book_genres(genres(name)),book_authors(position,authors(name))").eq("user_id", userId),
-      admin.from("wishlist_items").select("title,authors,genre_ids,genres,isbn").eq("user_id", userId).is("book_id", null),
       admin.from("recommendation_sets").select("items,generated_at,expires_at,strategy_version,taste_fingerprint,refresh_started_at").eq("user_id", userId).maybeSingle<RecommendationRow>(),
       admin.from("user_settings").select("discover").eq("user_id", userId).maybeSingle<{ discover: DiscoverPreference | null }>(),
       admin.from("recommendation_feedback").select("candidate_key,title,authors,genres,item").eq("user_id", userId).order("created_at", { ascending: false }),
@@ -60,7 +52,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
       admin.from("recommendation_dismissals").select("candidate_key").eq("user_id", userId),
     ]);
     if (booksResult.error) throw booksResult.error;
-    if (wishlistResult.error) throw wishlistResult.error;
     if (setResult.error) throw setResult.error;
     if (settingsResult.error) throw settingsResult.error;
     if (feedbackResult.error) throw feedbackResult.error;
@@ -71,18 +62,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const feedback = (feedbackResult.data ?? []) as FeedbackRow[];
     const history = (historyResult.data ?? []) as RecommendationHistoryEntry[];
     const feedbackSignals = feedback.map(({ candidate_key, title, authors, genres }) => ({ candidate_key, title, authors, genres }));
-    const wishlistRows = (wishlistResult.data ?? []) as WishlistSignalRow[];
-    const wishlistGenreIds = [...new Set(wishlistRows.flatMap((item) => item.genre_ids ?? []))];
-    const wishlistGenreNames = new Map<string, string>();
-    if (wishlistGenreIds.length > 0) {
-      const { data: genreRows, error } = await admin.from("genres")
-        .select("id,name")
-        .in("id", wishlistGenreIds)
-        .or(`is_system.eq.true,user_id.eq.${userId}`);
-      if (error) throw error;
-      for (const genre of genreRows ?? []) wishlistGenreNames.set(genre.id, genre.name);
-    }
-    const libraryBooks = (booksResult.data ?? []).map((book) => ({
+    const books = (booksResult.data ?? []).map((book) => ({
       title: book.title,
       authors: (book.book_authors ?? [])
         .sort((a, b) => a.position - b.position)
@@ -98,16 +78,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       is_favorite: book.is_favorite,
       book_genres: book.book_genres,
     })) as LibraryBook[];
-    const wishlistBooks = wishlistRows.map((item) => ({
-      title: item.title,
-      authors: item.authors ?? [],
-      genres: [...new Set([...(item.genres ?? []), ...(item.genre_ids ?? []).map((id) => wishlistGenreNames.get(id) ?? "")])].filter(Boolean),
-      isbn: item.isbn,
-      status: "Wishlist",
-      rating: null,
-      is_favorite: false,
-    })) satisfies LibraryBook[];
-    const books = [...libraryBooks, ...wishlistBooks];
+
     const fingerprint = recommendationFingerprint(books, feedbackSignals);
     let row = setResult.data;
     const storedExpiresAt = row?.expires_at;

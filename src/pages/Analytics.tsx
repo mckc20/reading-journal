@@ -611,7 +611,11 @@ export default function Analytics() {
   const { category } = useParams();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
-  const [logs, setLogs] = useState<ReadingLog[]>([]);
+  const [allLogs, setLogs] = useState<ReadingLog[]>([]);
+  const logs = useMemo(() => {
+    const libraryIds = new Set(books.map((book) => book.id));
+    return allLogs.filter((log) => libraryIds.has(log.book_id));
+  }, [allLogs, books]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [monthlyTrendMetric, setMonthlyTrendMetric] = useState<MonthlyTrendMetric>("books");

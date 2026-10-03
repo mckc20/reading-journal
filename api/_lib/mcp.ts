@@ -95,7 +95,7 @@ export function createMcpServer(client: McpRestClient): McpServer {
     "list_books",
     {
       title: "List books",
-      description: "List the user's books. Filter by status, especially Reading for a currently reading book.",
+      description: "List library books by default. Use status Wishlist for wishes, or Reading for a currently reading book.",
       inputSchema: {
         status: z.enum(API_BOOK_STATUSES).optional(),
         limit: z.number().int().min(1).max(100).optional(),
@@ -115,11 +115,11 @@ export function createMcpServer(client: McpRestClient): McpServer {
     "search_books",
     {
       title: "Search books",
-      description: "Find books by full or partial title. This search currently matches titles only; inspect authors in results too.",
-      inputSchema: { query: z.string().trim().min(1) },
+      description: "Find library books by full or partial title. Use status Wishlist to search wishes. This search currently matches titles only; inspect authors in results too.",
+      inputSchema: { query: z.string().trim().min(1), status: z.enum(API_BOOK_STATUSES).optional() },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
-    ({ query }) => client.get(`/api/books/search?q=${encodeURIComponent(query)}`),
+    ({ query, status }) => client.get(`/api/books/search?q=${encodeURIComponent(query)}${status ? `&status=${encodeURIComponent(status)}` : ""}`),
   );
 
   server.registerTool(

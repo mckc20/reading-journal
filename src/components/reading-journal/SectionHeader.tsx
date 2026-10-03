@@ -14,7 +14,7 @@ export function SectionHeader({ title, description, action, level = 3, className
   return (
     <div className={cn("flex items-center justify-between gap-3", className)}>
       <div className="min-w-0">
-        <AppHeading level={level} as="h2">{title}</AppHeading>
+        <AppHeading level={level} as={`h${level}`}>{title}</AppHeading>
         {description && <HeadingDescription className="text-xs">{description}</HeadingDescription>}
       </div>
       {action && <div className="shrink-0">{action}</div>}

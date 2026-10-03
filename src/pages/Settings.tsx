@@ -81,6 +81,7 @@ import type {
   CollectionVisibility,
   CornerRadiusStyle,
   DensityPreference,
+  DuplicationPreference,
   FontSizePreference,
   LibrarySettings as LibrarySettingsValues,
   LibrarySorting,
@@ -213,6 +214,12 @@ const libraryViewOptions = [
   { value: "grid", label: "Grid" },
   { value: "list", label: "List" },
 ] satisfies Array<SelectOption<LibraryView>>;
+
+const duplicationPreferenceOptions = [
+  { value: "ask", label: "Ask every time" },
+  { value: "always", label: "Always duplicate" },
+  { value: "never", label: "Never duplicate" },
+] satisfies Array<SelectOption<DuplicationPreference>>;
 
 const collectionVisibilityOptions = [
   { value: "private", label: "Private" },
@@ -779,17 +786,6 @@ function ReadingSettings() {
               }
             />
           </SettingRow>
-          <SettingRow title="Wishlist when deleting an acquired book" description="Choose what happens to its linked wishlist item.">
-            <SelectSetting
-              value={reading.acquired_wishlist_book_deletion}
-              options={[
-                { value: "return_to_pending", label: "Return to pending wishlist" },
-                { value: "remove_from_wishlist", label: "Remove from wishlist" },
-              ]}
-              disabled={disabled || inactiveSettingDisabled}
-              onChange={(acquired_wishlist_book_deletion) => void saveReading({ acquired_wishlist_book_deletion })}
-            />
-          </SettingRow>
           <SettingRow
             title="Journal filter defaults"
             description="Choose which journal filters start turned on when you open a journal."
@@ -879,6 +875,22 @@ function ReadingSettings() {
               onChange={(show_reading_statistics) =>
                 void saveLibrary({ show_reading_statistics })
               }
+            />
+          </SettingRow>
+          <SettingRow title="Duplicate journal entries">
+            <SelectSetting
+              value={library.duplicate_journal_entries}
+              options={duplicationPreferenceOptions}
+              disabled={disabled}
+              onChange={(duplicate_journal_entries) => void saveLibrary({ duplicate_journal_entries })}
+            />
+          </SettingRow>
+          <SettingRow title="Duplicate linked books">
+            <SelectSetting
+              value={library.duplicate_books}
+              options={duplicationPreferenceOptions}
+              disabled={disabled}
+              onChange={(duplicate_books) => void saveLibrary({ duplicate_books })}
             />
           </SettingRow>
         </SettingsRows>

@@ -34,6 +34,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       .limit(options.limit);
 
     if (options.status) query = query.eq("status", options.status);
+    else query = query.neq("status", "Wishlist");
 
     const { data, error } = await query;
     if (error) throw error;

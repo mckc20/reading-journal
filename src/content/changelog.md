@@ -2,6 +2,21 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
+## 2026-10-03 - Discover, Wishlist, and library management
+Version: `2026-10-03-discover-wishlist-library-management`
+Summary: Discover your next read, keep a simpler Wishlist, and manage books, authors, and series with more flexible actions.
+
+- Personalized book discovery
+  Discover recommendations with feedback, recommendation history, and suggestions for the next volumes in your series.
+- A simpler Wishlist
+  Save recommendations, add wishes manually, or move existing books to your Wishlist. Acquiring a wish moves the same book into your library without an acquired section or acquisition history. Price and purchase links appear only for Wishlist books.
+- Duplicate individual or selected items
+  Duplicate books, authors, series, and Wishlist items. Choose whether to copy linked books and journal entries, with reusable preferences in Settings under Reading, Library, and links from the confirmation dialogs.
+- Clearer library controls
+  Library menus share consistent checkmarks and Select icons. Series now support Grid and List views, confirmation buttons reflect the selected count, and deleting a series optionally deletes its linked books with an unchecked-by-default checkbox.
+- More complete book editing
+  Change a book's status in Edit mode and find publication year, format, source, and ISBN in the collapsible Secondary Information section.
+
 ## 2026-09-18 - Library Select mode
 Version: `2026-09-18-library-select-mode`
 Summary: Books, authors, and series now share a focused Select mode for managing multiple library items at once.

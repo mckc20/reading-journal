@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { BookOpen, Download, Heart, Trash2, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { BookOpen, Copy, Download, Heart, SquareMousePointer, Trash2, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
+import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
+import { selectionLabel } from "@/lib/selectionLabels";
 import OverflowMenu from "@/components/OverflowMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth, useUserSettings } from "@/context";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { pruneSelectedIds, runBulkOperation, toggleAllVisibleIds } from "@/lib/bulkManagement";
 import { buildSeriesGroups, type SeriesBookGroup } from "@/lib/libraryShelves";
 import { getDerivedSeriesStatus } from "@/lib/seriesDetails";
+import { duplicateSeriesRecord } from "@/lib/duplication";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 
 function downloadSeriesCsv(groups: SeriesBookGroup[]) {
@@ -75,16 +81,24 @@ function EmptySeriesCard({
 }
 
 export default function Series() {
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
-  const { series, loading: seriesLoading, error: seriesError, removeSeries } = useSeries();
+  const { user } = useAuth();
+  const { settings } = useUserSettings();
+  const { books, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
+  const { series, loading: seriesLoading, error: seriesError, removeSeries, reload: reloadSeries } = useSeries();
   const navigate = useNavigate();
-  const allGroups = useMemo(() => buildSeriesGroups(books, series, { includeEmpty: true }), [books, series]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const display = searchParams.get("display") === "table" ? "table" : "grid";
+  const librarySeries = useMemo(() => series.filter((item) => !item.is_wishlist_only), [series]);
+  const allGroups = useMemo(() => buildSeriesGroups(books, librarySeries, { includeEmpty: true }), [books, librarySeries]);
   const loading = booksLoading || seriesLoading;
-  const error = booksError || seriesError;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError || booksError || seriesError;
   const [managing, setManaging] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ongoing" | "completed" | "all">("all");
   const groups = useMemo(
     () => statusFilter === "all" ? allGroups : allGroups.filter((group) => getDerivedSeriesStatus(group.books).toLocaleLowerCase() === statusFilter),
@@ -93,10 +107,59 @@ export default function Series() {
   useEffect(() => setSelected((current) => pruneSelectedIds(current, groups.map((group) => group.seriesId))), [groups]);
   const selectedGroups = groups.filter((group) => selected.has(group.seriesId));
   function toggle(id: string) { setSelected((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; }); }
-  async function apply(operation: (group: SeriesBookGroup) => Promise<void>, deleting = false) {
-    if (!selectedGroups.length) return; setSaving(true);
-    const result = await runBulkOperation(selectedGroups, (group) => ({ id: group.seriesId, label: group.name }), operation);
-    setSaving(false); if (deleting) setSelected((current) => new Set([...current].filter((id) => !selectedGroups.some((group) => group.seriesId === id && !result.failures.some((failure) => failure.id === id)))));
+  async function deleteSelectedSeries() {
+    if (!selectedGroups.length) return;
+    setSaving(true);
+    setActionError(null);
+    try {
+      const result = await runBulkOperation(
+        selectedGroups,
+        (group) => ({ id: group.seriesId, label: group.name }),
+        (group) => removeSeries(group.seriesId, deleteLinkedBooks),
+      );
+      await Promise.all([reloadSeries(), reloadBooks()]);
+      setSelected(new Set(result.failures.map((failure) => failure.id)));
+      if (result.failures.length) setActionError(`Could not delete: ${result.failures.map((failure) => failure.label).join(", ")}.`);
+    } catch (deleteError) {
+      setActionError(deleteError instanceof Error ? deleteError.message : "Could not refresh after deleting series. Please reload.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function duplicateSelected(options: DuplicateOptions) {
+    if (!user || selectedGroups.length === 0) return;
+    setSaving(true);
+    const result = await runBulkOperation(
+      selectedGroups,
+      (group) => ({ id: group.seriesId, label: group.name }),
+      (group) => {
+        const source = series.find((item) => item.id === group.seriesId);
+        if (!source) throw new Error("Series not found");
+        return duplicateSeriesRecord(source, group.books, user.id, options).then(() => undefined);
+      },
+    );
+    setSaving(false);
+    setDuplicateOpen(false);
+    await Promise.all([reloadSeries(), reloadBooks()]);
+    if (result.failures.length > 0) {
+      // Keep the existing selection so failed items can be retried.
+      setSelected((current) => new Set([...current].filter((id) => result.failures.some((failure) => failure.id === id))));
+    } else {
+      setSelected(new Set());
+    }
+  }
+
+  function openDuplicateDialog() {
+    if (!selectedGroups.length) return;
+    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
+    const linkedBookCount = selectedGroups.reduce((count, group) => count + group.books.length, 0);
+    const resolved = resolveDuplicateOptions("series", library.duplicate_journal_entries, library.duplicate_books, linkedBookCount);
+    if (resolved.needsDialog) {
+      setDuplicateOpen(true);
+      return;
+    }
+    void duplicateSelected(resolved.options);
   }
 
   function openSeries(seriesId: string) {
@@ -120,17 +183,33 @@ export default function Series() {
             <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={groups.length === 0 || saving} onClick={() => setSelected((current) => current.size > 0 ? new Set() : toggleAllVisibleIds(current, groups.map((group) => group.seriesId)))}>
               {selected.size > 0 ? "Deselect all" : "Select all"}
             </Button>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={selected.size === 0 || saving} onClick={() => downloadSeriesCsv(selectedGroups)}><Download className="mr-1 h-4 w-4" />Export CSV</Button>
-              <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected series" disabled={selected.size === 0 || saving} onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4" /></Button>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2.5" disabled={selected.size === 0 || saving} onClick={() => downloadSeriesCsv(selectedGroups)}><Download className="mr-1 h-4 w-4" />Export CSV</Button>
+                <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected series" disabled={selected.size === 0 || saving} onClick={() => { setDeleteLinkedBooks(false); setDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Duplicate selected series" title="Duplicate selected series" disabled={selected.size === 0 || saving} onClick={openDuplicateDialog}><Copy className="h-4 w-4" aria-hidden="true" /></Button>
             </div>
           </>}
         </div>
         <div className="absolute right-0 top-0"><OverflowMenu label="Series options">{(close) => <>
-            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Filter series</p>
-            {(["all", "ongoing", "completed"] as const).map((value) => <button key={value} role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setStatusFilter(value); close(); }}>{value === "all" ? "All series" : value === "ongoing" ? "Ongoing" : "Completed"}{statusFilter === value ? " ✓" : ""}</button>)}
+            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
+            {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => {
+              setSearchParams((current) => { const next = new URLSearchParams(current); next.set("display", value); return next; }, { replace: true });
+              close();
+            }}>
+              <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">{display === value ? "✓" : ""}</span>
+              <span>{value === "grid" ? "Grid" : "List"}</span>
+            </button>)}
             <div className="my-1 border-t" />
-            <button role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setManaging((value) => !value); setSelected(new Set()); close(); }}>{managing ? "Done selecting" : "Select"}</button>
+            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Filter series</p>
+            {(["all", "ongoing", "completed"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setStatusFilter(value); close(); }}>
+              <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">{statusFilter === value ? "✓" : ""}</span>
+              <span>{value === "all" ? "All series" : value === "ongoing" ? "Ongoing" : "Completed"}</span>
+            </button>)}
+            <div className="my-1 border-t" />
+            <button role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setManaging((value) => !value); setSelected(new Set()); close(); }}>
+              <SquareMousePointer className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{managing ? "Done selecting" : "Select"}</span>
+            </button>
         </>}</OverflowMenu></div>
       </div>
 
@@ -144,6 +223,36 @@ export default function Series() {
           <p className="text-sm text-muted-foreground">
             Series you add will appear here.
           </p>
+        </div>
+      ) : display === "table" ? (
+        <div aria-label="Series collection" className="overflow-x-auto rounded-xl border bg-background dark:bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+              <tr>
+                {managing && <th className="w-10 px-3 py-2"><span className="sr-only">Selection</span></th>}
+                <th className="px-3 py-2">Series</th>
+                <th className="px-3 py-2">Books</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {groups.map((group) => (
+                <tr key={group.seriesId} className={selected.has(group.seriesId) ? "bg-muted/50" : "hover:bg-muted/50"}>
+                  {managing && <td className="px-3 py-2">
+                    <input type="checkbox" checked={selected.has(group.seriesId)} disabled={saving} onChange={() => toggle(group.seriesId)} aria-label={`Select ${group.name}`} className="h-4 w-4 rounded border-border" />
+                  </td>}
+                  <td className="px-3 py-2">
+                    <button type="button" className="flex items-center gap-2 text-left font-medium hover:underline" disabled={managing && saving} onClick={() => managing ? toggle(group.seriesId) : openSeries(group.seriesId)}>
+                      {group.name}
+                      {group.isFavorite && <><Heart className="h-4 w-4 shrink-0 fill-favorite text-favorite" aria-hidden="true" /><span className="sr-only">Favorite series</span></>}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2">{group.books.length}</td>
+                  <td className="px-3 py-2">{getDerivedSeriesStatus(group.books)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div
@@ -161,7 +270,29 @@ export default function Series() {
           ))}
         </div>
       )}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>Delete selected series?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">This permanently deletes the series. Linked books remain in your library and are detached from the series.</p><DialogFooter><Button variant="destructive" onClick={() => { setDeleteOpen(false); void apply((group) => removeSeries(group.seriesId), true); }}>Delete series</Button><Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete {selectionLabel("series", selected.size)}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently deletes the selected series. Choose whether their linked books should be deleted too.</p>
+          <DeleteSeriesBooksOption checked={deleteLinkedBooks} onChange={setDeleteLinkedBooks} disabled={saving} />
+          <DialogFooter>
+            <Button variant="destructive" disabled={saving} onClick={() => { setDeleteOpen(false); void deleteSelectedSeries(); }}>
+              Delete {selectionLabel("series", selected.size)}{deleteLinkedBooks ? " and books" : ""}
+            </Button>
+            <Button variant="outline" disabled={saving} onClick={() => setDeleteOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <DuplicateOptionsDialog
+        open={duplicateOpen}
+        kind="series"
+        selectedCount={selected.size}
+        linkedBookCount={selectedGroups.reduce((count, group) => count + group.books.length, 0)}
+        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
+        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
+        onOpenChange={setDuplicateOpen}
+        onConfirm={duplicateSelected}
+      />
     </div>
   );
 }

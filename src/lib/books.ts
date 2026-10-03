@@ -254,6 +254,7 @@ export type SeriesInput = {
   description?: string | null;
   status?: SeriesStatus;
   is_favorite?: boolean;
+  is_wishlist_only?: boolean;
   cover_url?: string | null;
   journal_content?: string | null;
 };
@@ -272,7 +273,8 @@ function isMissingSeriesOptionalColumnError(error: unknown): boolean {
       combined.includes("status") ||
       combined.includes("is_favorite") ||
       combined.includes("cover_url") ||
-      combined.includes("journal_content")
+      combined.includes("journal_content") ||
+      combined.includes("is_wishlist_only")
     )
   );
 }
@@ -326,15 +328,24 @@ export async function updateBook(
   id: string,
   payload: BookUpdate,
 ): Promise<Book> {
+  const previous = "cover_url" in payload
+    ? await supabase.from("books").select("cover_url,user_id").eq("id", id).single()
+    : null;
+  if (previous?.error) throw previous.error;
+  let updated: Book;
   try {
-    return await updateBookPayload(id, payload);
+    updated = await updateBookPayload(id, payload);
   } catch (error) {
     if (!isMissingMetadataSourceColumnError(error)) throw error;
-    return updateBookPayload(
+    updated = await updateBookPayload(
       id,
       withoutMetadataSourcePayload(payload) as BookUpdate,
     );
   }
+  if (previous?.data?.cover_url && previous.data.cover_url !== updated.cover_url) {
+    await deleteUnreferencedCover(previous.data.user_id, previous.data.cover_url).catch(() => {});
+  }
+  return updated;
 }
 
 export async function updateBookSeriesPlacement(
@@ -491,11 +502,29 @@ async function replaceBookGenres(bookId: string, genreIds: string[]): Promise<vo
 }
 
 export async function deleteBook(id: string): Promise<void> {
+  const { data: book, error: readError } = await supabase.from("books").select("user_id,cover_url").eq("id", id).single();
+  if (readError) throw readError;
   const { error } = await supabase.from("books").delete().eq("id", id);
   if (error) throw error;
+  if (book.cover_url) await deleteUnreferencedCover(book.user_id, book.cover_url).catch(() => {});
 }
 
 // ── Cover Storage ──────────────────────────────────────────────────────────
+
+/** Delete only owned uploads with no remaining references, including wishlist copies. */
+async function deleteUnreferencedCover(userId: string, coverUrl: string): Promise<void> {
+  let url: URL;
+  try { url = new URL(coverUrl); } catch { return; }
+  const prefix = `/storage/v1/object/public/covers/${userId}/`;
+  if (!url.pathname.startsWith(prefix)) return;
+  const filename = url.pathname.slice(prefix.length);
+  if (!/^[0-9a-f-]+\.(jpg|jpeg|png|webp|avif)$/i.test(filename)) return;
+  const baseUrl = `${url.origin}${url.pathname}`;
+  const { data, error } = await supabase.from("books").select("id").like("cover_url", `${baseUrl}%`).limit(1);
+  if (error) throw error;
+  if (data?.length) return;
+  await supabase.storage.from("covers").remove([`${userId}/${filename}`]);
+}
 
 export async function uploadCover(
   userId: string,
@@ -553,6 +582,7 @@ export async function createSeries(userId: string, input: string | SeriesInput):
       description: payload.description?.trim() || null,
       status: payload.status ?? "ongoing",
       is_favorite: payload.is_favorite ?? false,
+      is_wishlist_only: payload.is_wishlist_only ?? false,
       cover_url: payload.cover_url ?? null,
       journal_content: payload.journal_content ?? null,
       user_id: userId,
@@ -573,6 +603,7 @@ export async function createSeries(userId: string, input: string | SeriesInput):
     return {
       status: "ongoing",
       is_favorite: false,
+      is_wishlist_only: false,
       ...minimalData,
     } as Series;
   }
@@ -585,6 +616,7 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
   if (input.description !== undefined) payload.description = input.description;
   if (input.status !== undefined) payload.status = input.status;
   if (input.is_favorite !== undefined) payload.is_favorite = input.is_favorite;
+  if (input.is_wishlist_only !== undefined) payload.is_wishlist_only = input.is_wishlist_only;
   if (input.cover_url !== undefined) payload.cover_url = input.cover_url;
   if (input.journal_content !== undefined) payload.journal_content = input.journal_content;
 
@@ -597,6 +629,7 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
         : {}),
       ...(payload.status !== undefined ? { status: payload.status } : {}),
       ...(payload.is_favorite !== undefined ? { is_favorite: payload.is_favorite } : {}),
+      ...(payload.is_wishlist_only !== undefined ? { is_wishlist_only: payload.is_wishlist_only } : {}),
       ...(payload.cover_url !== undefined ? { cover_url: payload.cover_url ?? null } : {}),
       ...(payload.journal_content !== undefined
         ? { journal_content: payload.journal_content ?? null }
@@ -609,7 +642,7 @@ export async function updateSeries(seriesId: string, input: Partial<SeriesInput>
   return normalizeSeries(data as SeriesRow);
 }
 
-export async function deleteSeries(seriesId: string): Promise<void> {
+export async function deleteSeries(seriesId: string, deleteLinkedBooks = false): Promise<void> {
   const { data: existingSeries, error: existingSeriesError } = await supabase
     .from("series")
     .select("user_id")
@@ -617,15 +650,16 @@ export async function deleteSeries(seriesId: string): Promise<void> {
     .single();
   if (existingSeriesError) throw existingSeriesError;
 
-  const { error: detachError } = await supabase
-    .from("books")
-    .update({ series_id: null })
-    .eq("series_id", seriesId);
-  if (detachError) throw detachError;
-
-  const { error } = await supabase.from("series").delete().eq("id", seriesId);
+  // Snapshot cover references for best-effort cleanup only after the transaction succeeds.
+  const linkedCovers = deleteLinkedBooks
+    ? await supabase.from("books").select("cover_url").eq("series_id", seriesId)
+    : null;
+  if (linkedCovers?.error) throw linkedCovers.error;
+  const { error } = await supabase.rpc("delete_series", { series_uuid: seriesId, delete_linked_books: deleteLinkedBooks });
   if (error) throw error;
-
+  for (const book of linkedCovers?.data ?? []) {
+    if (book.cover_url) await deleteUnreferencedCover(existingSeries.user_id, book.cover_url).catch(() => {});
+  }
   await deleteSeriesBanner(existingSeries.user_id, seriesId).catch(() => {});
 }
 

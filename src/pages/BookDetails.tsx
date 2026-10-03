@@ -7,14 +7,15 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
   Calendar,
   CalendarCheck,
   CalendarClock,
+  ChevronRight,
   Clock,
   Heart,
   ImagePlus,
@@ -36,6 +37,7 @@ import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
+import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import GenreMultiSelect from "@/components/GenreMultiSelect";
 import JournalTimeline from "@/components/JournalTimeline";
 import {
@@ -59,7 +61,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -75,8 +77,10 @@ import {
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
-import { deleteCover, fetchReadingLogsForBook, uploadCover } from "@/lib/books";
-import { addBookToWishlist } from "@/lib/wishlist";
+import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
+import { duplicateBookRecord } from "@/lib/duplication";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
+import { moveBookToWishlist } from "@/lib/wishlist";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
@@ -122,6 +126,8 @@ interface FormValues {
   date_finished: string;
   series_id: string;
   volume_number: string;
+  price: string;
+  purchase_url: string;
 }
 
 const STATUS_OPTIONS: BookStatus[] = [
@@ -157,6 +163,8 @@ function bookToFormValues(book: Book): FormValues {
     date_finished: book.date_finished ?? "",
     series_id: book.series_id ?? "",
     volume_number: book.volume_number?.toString() ?? "",
+    price: book.price?.toString() ?? "",
+    purchase_url: book.purchase_url ?? "",
   };
 }
 
@@ -194,9 +202,11 @@ function getPublicationYear(value?: string | null): string | null {
 
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const {
     books,
     loading,
@@ -247,6 +257,7 @@ export default function BookDetails() {
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
   const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
@@ -277,6 +288,12 @@ export default function BookDetails() {
     clearCoverDraft();
     reset(bookToFormValues(book));
   }, [book, reset]);
+
+  useEffect(() => {
+    if (!book || location.state?.openEdit !== true) return;
+    setIsEditMode(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [book, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     return () => {
@@ -543,6 +560,12 @@ export default function BookDetails() {
     if (dirtyFields.genres) {
       payload.genre_ids = values.genres;
     }
+    if (dirtyFields.status) {
+      payload.status = values.status;
+      // Match the status control in the read view without replacing dates entered below.
+      if (values.status === "Reading" && !values.date_started) payload.date_started = getTodayLocalDate();
+      if (values.status === "Finished" && !values.date_finished) payload.date_finished = getTodayLocalDate();
+    }
     if (dirtyFields.isbn) {
       payload.isbn = values.isbn.trim() || undefined;
       payload.metadata_source = null;
@@ -581,6 +604,27 @@ export default function BookDetails() {
       payload.volume_number = parsedVolumeNumber ?? undefined;
     }
 
+    if (values.status === "Wishlist" && dirtyFields.price) {
+      const price = values.price.trim() ? Number(values.price) : null;
+      if (price !== null && (!Number.isFinite(price) || price < 0)) {
+        setError("price", { message: "Enter a non-negative price." });
+        return;
+      }
+      payload.price = price;
+    }
+    if (values.status === "Wishlist" && dirtyFields.purchase_url) {
+      const url = values.purchase_url.trim();
+      if (url) {
+        try {
+          if (!["http:", "https:"].includes(new URL(url).protocol)) throw new Error();
+        } catch {
+          setError("purchase_url", { message: "Enter a valid web link, including https://." });
+          return;
+        }
+      }
+      payload.purchase_url = url || null;
+    }
+
     if (Object.keys(payload).length === 0 && !coverFile && !removeCover) return;
 
     try {
@@ -589,16 +633,16 @@ export default function BookDetails() {
       setUploadingCover(Boolean(coverFile));
 
       if (coverFile) {
-        payload.cover_url = await uploadCover(user.id, book.id, coverFile);
+        payload.cover_url = await uploadCover(user.id, crypto.randomUUID(), coverFile);
       } else if (removeCover) {
         payload.cover_url = null;
       }
 
       await updateBook(book.id, payload);
-      if (removeCover) await deleteCover(user.id, book.id).catch(() => {});
       clearCoverDraft();
       reset(values);
       setIsEditMode(false);
+      if (values.status === "Wishlist") navigate("/library/wishlist");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
@@ -625,6 +669,30 @@ export default function BookDetails() {
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
+  }
+
+  async function duplicateCurrentBook(options: DuplicateOptions) {
+    if (!book || !user) return;
+    try {
+      setErrorMsg(null);
+      const duplicate = await duplicateBookRecord(book, user.id, options);
+      setDuplicateOpen(false);
+      await reload();
+      navigate(`/books/${duplicate.id}`, { state: { openEdit: true } });
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "Failed to duplicate book");
+    }
+  }
+
+  function openDuplicateDialog() {
+    if (!book || !user) return;
+    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
+    const resolved = resolveDuplicateOptions("book", library.duplicate_journal_entries, library.duplicate_books);
+    if (resolved.needsDialog) {
+      setDuplicateOpen(true);
+      return;
+    }
+    void duplicateCurrentBook(resolved.options);
   }
 
   const quoteJournalEntries = useMemo(
@@ -885,7 +953,14 @@ export default function BookDetails() {
             setErrorMsg(null);
             setIsEditMode(true);
           }}
-          onWishlist={() => { if (user) void addBookToWishlist(user.id, book).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not add to wishlist")); }}
+          onDuplicate={openDuplicateDialog}
+          onWishlist={() => {
+            if (!confirm("Move this book to your wishlist? It will leave your library, but its journal and reading data will be kept.")) return;
+            void moveBookToWishlist(book).then(async () => {
+              await reload();
+              navigate("/library/wishlist");
+            }).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not move to wishlist"));
+          }}
           onDelete={handleDelete}
           onSendAttachment={openAttachmentPicker}
           deleteTitle="Delete this book?"
@@ -1136,6 +1211,14 @@ export default function BookDetails() {
         title={`Send "${book.title}" to chat`}
         description="Add a message, then pick the chat you want to send this book to."
         onSent={() => setShareStatus("Book sent to chat.")}
+      />
+      <DuplicateOptionsDialog
+        open={duplicateOpen}
+        kind="book"
+        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
+        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
+        onOpenChange={setDuplicateOpen}
+        onConfirm={duplicateCurrentBook}
       />
       {authorDialog}
 
@@ -1484,7 +1567,7 @@ function EditDetailsForm({
   hasStagedCover: boolean;
   hasCoverRemoval: boolean;
   errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
-  series: { id: string; name: string }[];
+  series: { id: string; name: string; is_wishlist_only?: boolean }[];
   watchedSeriesId: string;
   clearPublicationDateError: () => void;
   uploadingCover: boolean;
@@ -1493,6 +1576,13 @@ function EditDetailsForm({
   onCreateAuthor: (initialName: string) => void;
 }) {
   const activeCoverUrl = coverPreviewUrl ?? (hasCoverRemoval ? null : coverUrl);
+
+  const [secondaryInformationOpen, setSecondaryInformationOpen] = useState(false);
+  const status = useWatch({ control, name: "status" });
+
+  useEffect(() => {
+    if (errors.publication_date || errors.price || errors.purchase_url) setSecondaryInformationOpen(true);
+  }, [errors.publication_date, errors.price, errors.purchase_url]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28 md:pb-24">
@@ -1577,32 +1667,29 @@ function EditDetailsForm({
         </div>
 
         <div className="md:col-span-2 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="detail-status">Status</Label>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange} disabled={saving}>
+                  <SelectTrigger id="detail-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Wishlist", ...STATUS_OPTIONS, ...(field.value === "Paused" ? ["Paused"] : [])].map((option) => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
           <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
           <div className="space-y-1.5">
             <Label htmlFor="detail-total-pages">Total pages</Label>
             <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
-          </div>
-
-          <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-publication-date">Publication year</Label>
-            <Input
-              id="detail-publication-date"
-              placeholder="YYYY"
-              inputMode="numeric"
-              maxLength={4}
-              aria-invalid={!!errors.publication_date}
-              {...register("publication_date", { onChange: clearPublicationDateError })}
-            />
-            {errors.publication_date && <p className="text-xs text-destructive">{errors.publication_date.message}</p>}
-          </div>
-
-          <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-isbn">ISBN</Label>
-            <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
           </div>
 
           <div className="space-y-1.5">
@@ -1630,7 +1717,7 @@ function EditDetailsForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
-                    {series.map((item) => (
+                    {series.filter((item) => !item.is_wishlist_only || item.id === watchedSeriesId).map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
                       </SelectItem>
@@ -1650,6 +1737,57 @@ function EditDetailsForm({
               )}
             </div>
           )}
+
+          <div className="space-y-3 sm:col-span-2">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-base font-medium text-foreground transition-colors hover:text-primary"
+              onClick={() => setSecondaryInformationOpen((current) => !current)}
+              aria-expanded={secondaryInformationOpen}
+              aria-controls="detail-secondary-information"
+            >
+              <ChevronRight className={`h-[1.125rem] w-[1.125rem] transition-transform ${secondaryInformationOpen ? "rotate-90" : ""}`} aria-hidden="true" />
+              Secondary Information
+            </button>
+            {secondaryInformationOpen && (
+              <div id="detail-secondary-information" className="grid gap-4 sm:grid-cols-2">
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="detail-publication-date">Publication year</Label>
+                  <Input
+                    id="detail-publication-date"
+                    placeholder="YYYY"
+                    inputMode="numeric"
+                    maxLength={4}
+                    aria-invalid={!!errors.publication_date}
+                    {...register("publication_date", { onChange: clearPublicationDateError })}
+                  />
+                  {errors.publication_date && <p className="text-xs text-destructive">{errors.publication_date.message}</p>}
+                </div>
+
+                <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
+
+                <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="detail-isbn">ISBN</Label>
+                  <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
+                </div>
+                {status === "Wishlist" && <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="detail-price">Price</Label>
+                    <Input id="detail-price" type="number" min="0" step="0.01" {...register("price")} />
+                    {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="detail-purchase-url">Purchase link</Label>
+                    <Input id="detail-purchase-url" type="url" {...register("purchase_url")} />
+                    {errors.purchase_url && <p className="text-xs text-destructive">{errors.purchase_url.message}</p>}
+                  </div>
+                </>}
+              </div>
+            )}
+          </div>
 
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="detail-description">Description</Label>

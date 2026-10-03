@@ -117,7 +117,7 @@ export default function Dashboard() {
 
       {currentlyReading.length > 0 && (
         <section className="space-y-3">
-          <SectionHeader title="Currently Reading" level={4} />
+          <SectionHeader title="Currently Reading" level={3} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {currentlyReading.map((book) => (
               <CurrentlyReadingBookCard
@@ -133,7 +133,7 @@ export default function Dashboard() {
 
       {pausedBooks.length > 0 && (
         <section className="space-y-3">
-          <SectionHeader title="Paused" level={4} />
+          <SectionHeader title="Paused" level={3} />
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {pausedBooks.map((book) => (
               <BookCard
@@ -149,7 +149,7 @@ export default function Dashboard() {
 
       {upNext.length > 0 && (
         <section className="space-y-3">
-          <SectionHeader title="Up Next" level={4} />
+          <SectionHeader title="Up Next" level={3} />
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {upNext.map((book) => (
               <BookCard
@@ -164,7 +164,7 @@ export default function Dashboard() {
       )}
 
       <section className="space-y-3">
-        <SectionHeader title="Recently Finished" level={4} />
+        <SectionHeader title="Recently Finished" level={3} />
         {recentlyFinished.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5 md:max-w-[calc(100%-12rem-1rem)] md:grid-cols-4 md:gap-3 lg:max-w-[calc(100%-13rem-1rem)]">
             {recentlyFinished.map((book) => (
