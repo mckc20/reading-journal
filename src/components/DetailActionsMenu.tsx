@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { Bookmark, Copy, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import OverflowMenu from "@/components/OverflowMenu";
+import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,8 +24,9 @@ interface DetailActionsMenuProps {
   pauseDescription?: string;
   onResume?: () => void;
   onEdit?: () => void;
+  onDuplicate?: () => void;
   onWishlist?: () => void;
-  onDelete: () => void | Promise<void>;
+  onDelete: (deleteLinkedBooks?: boolean) => void | Promise<void>;
   onSendAttachment: () => void;
   deleteTitle: string;
   deleteDescription: string;
@@ -49,6 +51,7 @@ export default function DetailActionsMenu({
   pauseDescription = "Are you sure you want to pause this book? Reading time will stop until you resume it.",
   onResume,
   onEdit,
+  onDuplicate,
   onWishlist,
   onDelete,
   onSendAttachment,
@@ -61,6 +64,7 @@ export default function DetailActionsMenu({
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const currentUrl = useMemo(() => window.location.href, []);
@@ -79,7 +83,7 @@ export default function DetailActionsMenu({
 
   async function runDelete() {
     setDeleteOpen(false);
-    await onDelete();
+    await onDelete(kind === "series" && deleteLinkedBooks);
   }
 
   async function runPause() {
@@ -143,12 +147,26 @@ export default function DetailActionsMenu({
               Edit
             </button>
           )}
-          {onWishlist && <button type="button" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { close(); onWishlist(); }}><Bookmark className="h-4 w-4" />Add to Wishlist</button>}
+          {onDuplicate && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => {
+                close();
+                onDuplicate();
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              Duplicate
+            </button>
+          )}
+          {onWishlist && <button type="button" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { close(); onWishlist(); }}><Bookmark className="h-4 w-4" />Move to Wishlist</button>}
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
             onClick={() => {
               close();
+              setDeleteLinkedBooks(false);
               setDeleteOpen(true);
             }}
           >
@@ -203,9 +221,10 @@ export default function DetailActionsMenu({
             <DialogTitle>{deleteTitle}</DialogTitle>
             <DialogDescription>{deleteDescription}</DialogDescription>
           </DialogHeader>
+          {kind === "series" && <DeleteSeriesBooksOption checked={deleteLinkedBooks} onChange={setDeleteLinkedBooks} />}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="destructive" onClick={() => void runDelete()}>
-              {deleteConfirmLabel}
+              {deleteConfirmLabel}{kind === "series" && deleteLinkedBooks ? " series and books" : ""}
             </Button>
             <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
               Cancel

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context";
 import {
   fetchBooks,
@@ -10,10 +10,10 @@ import {
   resumeBook as resumeBookDb,
   deleteBook as deleteBookDb,
   uploadCover,
-  deleteCover,
   type BookInsert,
 } from "@/lib/books";
 import type { Book, BookUpdate } from "@/types";
+import { splitBookScopes } from "@/lib/bookScopes";
 
 export interface AddBookPayload
   extends Omit<BookInsert, "id" | "user_id"> {}
@@ -34,6 +34,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function useBooks() {
   const { user } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
+  const scopes = useMemo(() => splitBookScopes(books), [books]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,10 +114,9 @@ export function useBooks() {
   const updateCover = useCallback(
     async (id: string, file: File): Promise<void> => {
       if (!user) throw new Error("Not authenticated");
-      // Delete old cover files (best-effort)
-      await deleteCover(user.id, id).catch(() => {});
-      // Upload new cover
-      const cover_url = await uploadCover(user.id, id, file);
+      // Never overwrite a cover referenced by another book (including copies).
+      const coverId = crypto.randomUUID();
+      const cover_url = await uploadCover(user.id, coverId, file);
       // Update book record in DB
       const updated = await updateBookDb(id, { cover_url });
       setBooks((prev) => prev.map((b) => (b.id === id ? updated : b)));
@@ -137,8 +137,6 @@ export function useBooks() {
   const deleteBook = useCallback(
     async (id: string): Promise<void> => {
       if (!user) throw new Error("Not authenticated");
-      // The database trigger may return a linked wish to pending state. Do not
-      // delete its cover first: a retained wish must never point at a removed file.
       await deleteBookDb(id);
       setBooks((prev) => prev.filter((b) => b.id !== id));
     },
@@ -146,7 +144,7 @@ export function useBooks() {
   );
 
   return {
-    books,
+    ...scopes,
     loading,
     error,
     addBook,

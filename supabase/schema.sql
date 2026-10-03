@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS series (
   status          text NOT NULL DEFAULT 'ongoing'
                     CHECK (status IN ('ongoing', 'completed')),
   is_favorite     boolean NOT NULL DEFAULT false,
+  is_wishlist_only boolean NOT NULL DEFAULT false,
   cover_url       text,
   journal_content text,
   created_at      timestamptz NOT NULL DEFAULT now()
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS books (
   title           text NOT NULL,
   genres          text[],
   status          text NOT NULL DEFAULT 'To Read'
-                    CHECK (status IN ('To Read','Up Next','Reading','Paused','Finished','DNF')),
+                    CHECK (status IN ('Wishlist','To Read','Up Next','Reading','Paused','Finished','DNF')),
   cover_url       text,
   rating          smallint CHECK (rating BETWEEN 1 AND 5),
   is_favorite     boolean NOT NULL DEFAULT false,
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS books (
   description     text,
   metadata_source text CHECK (metadata_source IN ('open_library','google_books')),
   metadata_source_url text,
+  price           numeric(10,2) CHECK (price >= 0),
+  purchase_url    text,
   series_id       uuid REFERENCES series(id) ON DELETE SET NULL,
   volume_number   numeric CHECK (volume_number > 0),
   created_at      timestamptz NOT NULL DEFAULT now()
@@ -441,7 +444,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     "reading_streak_goal_days": 7,
     "auto_finish_books": true,
     "estimated_completion_dates": true
-    ,"acquired_wishlist_book_deletion": "return_to_pending"
   }'::jsonb,
   library jsonb NOT NULL DEFAULT '{
     "default_sorting": "recently_added",
@@ -1700,24 +1702,6 @@ CREATE POLICY "user_settings: owner insert" ON user_settings FOR INSERT WITH CHE
 CREATE POLICY "user_settings: owner update" ON user_settings FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "user_settings: owner delete" ON user_settings FOR DELETE USING (auth.uid() = user_id);
 
--- wishlist_items is deliberately separate from books: pending wishes are not library books.
-CREATE TABLE IF NOT EXISTS wishlist_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  book_id uuid REFERENCES books(id) ON DELETE SET NULL, title text NOT NULL, authors text[] NOT NULL DEFAULT '{}',
-  genre_ids uuid[] NOT NULL DEFAULT '{}', genres text[] NOT NULL DEFAULT '{}', cover_url text, cover_entity_id uuid,
-  total_pages integer CHECK (total_pages > 0), language text CHECK (language IN ('German','Spanish','English')),
-  format text CHECK (format IN ('eBook','Audiobook','Paperback','Hardcover')), isbn text, publication_date date,
-  description text, metadata_source text CHECK (metadata_source IN ('open_library','google_books')), metadata_source_url text,
-  series_id uuid REFERENCES series(id) ON DELETE SET NULL, volume_number numeric CHECK (volume_number > 0),
-  price numeric(10,2) CHECK (price >= 0), purchase_url text,
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE wishlist_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY wishlist_items_select_own ON wishlist_items FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY wishlist_items_insert_own ON wishlist_items FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY wishlist_items_update_own ON wishlist_items FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-CREATE POLICY wishlist_items_delete_own ON wishlist_items FOR DELETE USING (auth.uid() = user_id);
-
 -- groups
 CREATE POLICY "groups: member select" ON groups FOR SELECT USING (is_active_group_member(id, auth.uid()));
 CREATE POLICY "groups: owner insert" ON groups FOR INSERT WITH CHECK (auth.uid() = created_by);
@@ -2153,3 +2137,89 @@ CREATE POLICY series_volume_rejections_insert_own
   );
 REVOKE ALL ON public.series_volume_rejections FROM anon, authenticated;
 GRANT SELECT, INSERT ON public.series_volume_rejections TO authenticated;
+
+-- Keep series visibility and pause state consistent for every writer (UI and API).
+CREATE OR REPLACE FUNCTION public.sync_book_wishlist_state()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.status = 'Wishlist' AND TG_OP = 'UPDATE' AND OLD.status <> 'Wishlist' THEN
+    UPDATE public.book_pause_periods SET resumed_at = now()
+    WHERE book_id = NEW.id AND user_id = NEW.user_id AND resumed_at IS NULL;
+  END IF;
+  IF NEW.series_id IS NOT NULL AND NEW.status <> 'Wishlist' THEN
+    UPDATE public.series SET is_wishlist_only = false
+    WHERE id = NEW.series_id AND user_id = NEW.user_id AND is_wishlist_only;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS sync_book_wishlist_state ON public.books;
+CREATE TRIGGER sync_book_wishlist_state AFTER INSERT OR UPDATE OF status, series_id ON public.books
+FOR EACH ROW EXECUTE FUNCTION public.sync_book_wishlist_state();
+
+CREATE OR REPLACE FUNCTION public.cleanup_empty_wishlist_series()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.series_id IS NOT DISTINCT FROM NEW.series_id THEN
+    RETURN NEW;
+  END IF;
+  IF OLD.series_id IS NOT NULL THEN
+    DELETE FROM public.series WHERE id = OLD.series_id AND user_id = OLD.user_id
+      AND is_wishlist_only AND NOT EXISTS (SELECT 1 FROM public.books WHERE series_id = OLD.series_id);
+  END IF;
+  RETURN OLD;
+END;
+$$;
+DROP TRIGGER IF EXISTS cleanup_empty_wishlist_series ON public.books;
+CREATE TRIGGER cleanup_empty_wishlist_series AFTER DELETE OR UPDATE OF series_id ON public.books
+FOR EACH ROW EXECUTE FUNCTION public.cleanup_empty_wishlist_series();
+
+-- Preserve existing logs, but do not allow new reading sessions on unacquired books.
+CREATE OR REPLACE FUNCTION public.reject_wishlist_reading_log()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE book_status text; book_owner uuid;
+BEGIN
+  SELECT status, user_id INTO book_status, book_owner FROM public.books WHERE id = NEW.book_id FOR SHARE;
+  IF book_owner IS DISTINCT FROM NEW.user_id THEN
+    RAISE EXCEPTION 'Book not found for this user.';
+  END IF;
+  IF book_status = 'Wishlist' THEN
+    RAISE EXCEPTION 'Add this book to your library before logging reading.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS reject_wishlist_reading_log ON public.reading_logs;
+CREATE TRIGGER reject_wishlist_reading_log BEFORE INSERT ON public.reading_logs
+FOR EACH ROW EXECUTE FUNCTION public.reject_wishlist_reading_log();
+REVOKE ALL ON FUNCTION public.sync_book_wishlist_state() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.cleanup_empty_wishlist_series() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reject_wishlist_reading_log() FROM PUBLIC;
+
+-- Atomically delete a user's series, optionally deleting all linked books.
+CREATE OR REPLACE FUNCTION public.delete_series(
+  series_uuid uuid,
+  delete_linked_books boolean DEFAULT false
+)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+DECLARE owner_id uuid := auth.uid();
+BEGIN
+  IF owner_id IS NULL THEN
+    RAISE EXCEPTION 'You must be signed in.';
+  END IF;
+  -- Lock the parent to prevent concurrent placement changes during deletion.
+  PERFORM 1 FROM public.series WHERE id = series_uuid AND user_id = owner_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Series not found for this user.';
+  END IF;
+  IF delete_linked_books THEN
+    -- Includes wishlist books; existing foreign keys cascade journals/logs/links.
+    DELETE FROM public.books WHERE series_id = series_uuid AND user_id = owner_id;
+  ELSE
+    UPDATE public.books SET series_id = NULL WHERE series_id = series_uuid AND user_id = owner_id;
+  END IF;
+  DELETE FROM public.series WHERE id = series_uuid AND user_id = owner_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.delete_series(uuid, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_series(uuid, boolean) TO authenticated;

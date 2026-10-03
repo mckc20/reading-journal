@@ -22,6 +22,11 @@ test("uses a useful default book-list limit", () => {
   assert.deepEqual(parseBookListOptions(requestWithQuery({})), { status: null, limit: 50 });
 });
 
+test("accepts an explicit wishlist scope and moving a book to wishlist", () => {
+  assert.deepEqual(parseBookListOptions(requestWithQuery({ status: "Wishlist" })), { status: "Wishlist", limit: 50 });
+  assert.deepEqual(parseBookUpdatePayload({ status: "Wishlist" }), { status: "Wishlist" });
+});
+
 test("accepts a known book status and caps an oversized limit", () => {
   assert.deepEqual(
     parseBookListOptions(requestWithQuery({ status: "Reading", limit: "500" })),

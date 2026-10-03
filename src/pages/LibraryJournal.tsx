@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NotebookPen } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
+import { useBooksContext } from "@/context/BooksContext";
 import { fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import {
@@ -14,6 +15,7 @@ import { fetchAllSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import type { JournalTimelineEntry } from "@/lib/journal";
 
 export default function LibraryJournal() {
+  const { books } = useBooksContext();
   const [entries, setEntries] = useState<JournalTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,10 @@ export default function LibraryJournal() {
     };
   }, []);
 
-  const sortedEntries = useMemo(() => sortJournalEntries(entries), [entries]);
+  const sortedEntries = useMemo(() => {
+    const libraryIds = new Set(books.map((book) => book.id));
+    return sortJournalEntries(entries.filter((entry) => entry.entityType !== "Book" || libraryIds.has(entry.entityId)));
+  }, [entries, books]);
 
   return (
     <div className="space-y-8">

@@ -1,4 +1,5 @@
 export type BookStatus =
+  | "Wishlist"
   | "To Read"
   | "Up Next"
   | "Reading"
@@ -30,6 +31,7 @@ export interface Series {
   description?: string | null;
   status: SeriesStatus;
   is_favorite: boolean;
+  is_wishlist_only?: boolean;
   cover_url?: string | null;
   journal_content?: string;
   user_id: string;
@@ -89,6 +91,8 @@ export interface Book {
   description?: string | null;
   metadata_source?: BookMetadataSource | null;
   metadata_source_url?: string | null;
+  price?: number | null;
+  purchase_url?: string | null;
   series_id?: string;
   volume_number?: number;
   pause_periods?: BookPausePeriod[];
@@ -106,33 +110,6 @@ export interface BookPausePeriod {
 }
 
 export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at">>;
-
-/** A catalogue entry saved for later. A linked item has already been acquired. */
-export interface WishlistItem {
-  id: string;
-  user_id: string;
-  book_id?: string | null;
-  title: string;
-  authors: string[];
-  genre_ids?: string[];
-  genres?: string[];
-  cover_url?: string | null;
-  cover_entity_id?: string | null;
-  total_pages?: number | null;
-  language?: BookLanguage | null;
-  format?: BookFormat | null;
-  isbn?: string | null;
-  publication_date?: string | null;
-  description?: string | null;
-  metadata_source?: BookMetadataSource | null;
-  metadata_source_url?: string | null;
-  series_id?: string | null;
-  volume_number?: number | null;
-  price?: number | null;
-  purchase_url?: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export type JournalEntryLabel = "quote" | "review" | "note";
 
@@ -327,13 +304,14 @@ export interface ReadingSettings {
   reading_streak_goal_days: number;
   auto_finish_books: boolean;
   estimated_completion_dates: boolean;
-  acquired_wishlist_book_deletion: "return_to_pending" | "remove_from_wishlist";
   journal_filter_defaults: JournalFilterDefaults;
 }
 
 export type LibrarySorting = "recently_added" | "title" | "author" | "rating" | "status";
 
 export type LibraryView = "grid" | "list";
+
+export type DuplicationPreference = "ask" | "always" | "never";
 
 export interface LibrarySettings {
   default_sorting: LibrarySorting;
@@ -342,6 +320,8 @@ export interface LibrarySettings {
   show_unfinished_series_first: boolean;
   hide_completed_books: boolean;
   show_reading_statistics: boolean;
+  duplicate_journal_entries: DuplicationPreference;
+  duplicate_books: DuplicationPreference;
 }
 
 export type CollectionVisibility = "private" | "followers" | "public";

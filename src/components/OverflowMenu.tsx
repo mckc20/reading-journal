@@ -2,15 +2,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface OverflowMenuProps {
   label: string;
   children: (close: () => void) => ReactNode;
   className?: string;
+  portal?: boolean;
 }
 
 /** Shared three-dot menu used by book, author, and series experiences. */
-export default function OverflowMenu({ label, children, className }: OverflowMenuProps) {
+export default function OverflowMenu({ label, children, className, portal = true }: OverflowMenuProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -37,8 +39,22 @@ export default function OverflowMenu({ label, children, className }: OverflowMen
     setOpen(true);
   }
 
-  return <>
+  const menu = open && (portal ? position : true) ? (
+    <div
+      ref={menuRef}
+      role="menu"
+      className={cn(
+        "z-50 w-48 rounded-lg border bg-popover p-1 shadow-md",
+        portal ? "fixed" : "absolute right-0 top-full mt-2",
+      )}
+      style={portal ? position ?? undefined : undefined}
+    >
+      {children(() => setOpen(false))}
+    </div>
+  ) : null;
+
+  return <div className="relative">
     <Button ref={buttonRef} type="button" size="icon-sm" variant="ghost" aria-label={label} aria-expanded={open} onClick={toggle} className={className}><MoreHorizontal className="h-5 w-5" /></Button>
-    {open && position && createPortal(<div ref={menuRef} role="menu" className="fixed z-50 w-48 rounded-lg border bg-popover p-1 shadow-md" style={position}>{children(() => setOpen(false))}</div>, document.body)}
-  </>;
+    {portal && menu ? createPortal(menu, document.body) : menu}
+  </div>;
 }

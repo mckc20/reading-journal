@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  Bookmark,
   BookOpen,
   ChevronRight,
   LibraryBig,
@@ -19,12 +20,11 @@ import { useSeries } from "@/hooks/useSeries";
 import { buildAuthorSummaries, getAuthorInitials } from "@/lib/authorShelf";
 import { buildGenreSlugLookup } from "@/lib/genres";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
-import { fetchWishlist } from "@/lib/wishlist";
 import BookShelf from "@/pages/library/BookShelf";
 import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorSummary } from "@/lib/authorShelf";
-import type { Book, Genre, WishlistItem } from "@/types";
+import type { Book, Genre } from "@/types";
 
 const recentlyAddedPreviewRows = 2;
 const recentlyAddedPreviewGap = 12;
@@ -56,8 +56,8 @@ const mobileLibraryCategories: Array<{ key: "books" | "authors" | "series" | "ge
   { key: "books", label: "Books", to: "/library/books", icon: BookOpen },
   { key: "authors", label: "Authors", to: "/library/authors", icon: UserRound },
   { key: "series", label: "Series", to: "/library/series", icon: LibraryBig },
+  { key: "wishlist", label: "Wishlist", to: "/library/wishlist", icon: Bookmark },
   { key: "genres", label: "Genres", to: "/library/genres", icon: Tags },
-  { key: "wishlist", label: "Wishlist", to: "/library/wishlist", icon: BookOpen },
 ];
 
 function LoadingGrid() {
@@ -314,19 +314,17 @@ function MobileLibraryCategoryList({
 }
 
 export default function Library() {
-  const { books, loading: booksLoading, error, reload } = useBooksContext();
+  const { books, wishlistBooks: wishlist, loading: booksLoading, error, reload } = useBooksContext();
   const { authors, loading: authorsLoading } = useAuthorsContext();
   const { genres, loading: genresLoading } = useGenresContext();
   const { series, loading: seriesLoading } = useSeries();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
-  useEffect(() => { void fetchWishlist().then(setWishlist).catch(() => {}); }, []);
   const viewParam = searchParams.get("view");
   const sortedBooks = useMemo(() => sortByDateAdded(books), [books]);
   const authorSummaries = useMemo(() => buildAuthorSummaries(authors, sortedBooks), [authors, sortedBooks]);
   const seriesGroups = useMemo(
-    () => buildSeriesGroups(sortedBooks, series, { includeEmpty: true }),
+    () => buildSeriesGroups(sortedBooks, series.filter((item) => !item.is_wishlist_only), { includeEmpty: true }),
     [sortedBooks, series],
   );
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
@@ -352,7 +350,7 @@ export default function Library() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Library" description="Your books, authors, series, genres, and journal." />
+      <PageHeader title="Library" />
 
       {error && (
         <EmptyState
@@ -373,13 +371,13 @@ export default function Library() {
             authors: loadingShelves ? "..." : authorSummaries.length,
             series: loadingShelves ? "..." : seriesGroups.length,
             genres: loadingShelves ? "..." : genres.length,
-            wishlist: loadingShelves ? "..." : wishlist.filter((item) => !item.book_id).length,
+            wishlist: loadingShelves ? "..." : wishlist.length,
           }}
         />
       </div>
 
       <div className="hidden sm:block">
-        <LibrarySection title="Shelves">
+        <section className="min-w-0">
           {loadingShelves ? (
             <LoadingGrid />
           ) : (
@@ -422,6 +420,15 @@ export default function Library() {
                 </HorizontalShelf>
               </EntityShelf>
 
+              <EntityShelf title="Wishlist" count={wishlist.length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
+                <HorizontalShelf ariaLabel="Wishlist shelf">
+                  {wishlist.map((item) => (
+                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-20 shrink-0 overflow-hidden rounded-md border bg-muted sm:w-24">
+                      {item.cover_url ? <img src={item.cover_url} alt={item.title} className="aspect-[2/3] w-full object-cover" /> : <div className="flex aspect-[2/3] items-center justify-center"><BookOpen className="h-6 w-6 text-muted-foreground" /></div>}
+                    </Link>
+                  ))}
+                </HorizontalShelf>
+              </EntityShelf>
               <EntityShelf
                 title="Genres"
                 count={genres.length}
@@ -434,18 +441,9 @@ export default function Library() {
                   ))}
                 </HorizontalShelf>
               </EntityShelf>
-              <EntityShelf title="Wishlist" count={wishlist.filter((item) => !item.book_id).length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
-                <HorizontalShelf ariaLabel="Wishlist shelf">
-                  {wishlist.filter((item) => !item.book_id).map((item) => (
-                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-20 shrink-0 overflow-hidden rounded-md border bg-muted sm:w-24">
-                      {item.cover_url ? <img src={item.cover_url} alt={item.title} className="aspect-[2/3] w-full object-cover" /> : <div className="flex aspect-[2/3] items-center justify-center"><BookOpen className="h-6 w-6 text-muted-foreground" /></div>}
-                    </Link>
-                  ))}
-                </HorizontalShelf>
-              </EntityShelf>
             </div>
           )}
-        </LibrarySection>
+        </section>
       </div>
 
       <LibrarySection

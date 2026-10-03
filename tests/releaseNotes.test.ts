@@ -12,12 +12,12 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-09-18-library-select-mode");
-  assert.equal(entries[0].title, "Library Select mode");
-  assert.equal(entries[0].summary, "Books, authors, and series now share a focused Select mode for managing multiple library items at once.");
-  assert.equal(entries[0].highlights.length, 3);
-  assert.equal(entries[0].highlights[0].title, "Consistent multi-select controls");
-  assert.equal(entries[0].highlights[0].description, "Open Select mode from each library's three-dot menu, select items directly from the grid or list, and clearly see how many are selected.");
+  assert.equal(entries[0].version, "2026-10-03-discover-wishlist-library-management");
+  assert.equal(entries[0].title, "Discover, Wishlist, and library management");
+  assert.equal(entries[0].summary, "Discover your next read, keep a simpler Wishlist, and manage books, authors, and series with more flexible actions.");
+  assert.equal(entries[0].highlights.length, 5);
+  assert.equal(entries[0].highlights[0].title, "Personalized book discovery");
+  assert.equal(entries[0].highlights[0].description, "Discover recommendations with feedback, recommendation history, and suggestions for the next volumes in your series.");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 

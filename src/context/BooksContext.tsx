@@ -4,6 +4,7 @@ import type { Book, BookUpdate } from "@/types";
 
 interface BooksContextValue {
   books: Book[];
+  wishlistBooks: Book[];
   loading: boolean;
   error: string | null;
   addBook: (payload: AddBookPayload, coverFile?: File) => Promise<AddBookResult>;

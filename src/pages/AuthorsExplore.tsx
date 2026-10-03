@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Download, Grid2X2, Heart, ListFilter, Trash2, X } from "lucide-react";
+import { Copy, Download, Grid2X2, Heart, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
 import BackButton from "@/components/BackButton";
+import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
+import { selectionLabel } from "@/lib/selectionLabels";
 import OverflowMenu from "@/components/OverflowMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { buildAuthorSummaries } from "@/lib/authorShelf";
@@ -34,7 +37,9 @@ import {
   uniqueSortedValues,
 } from "@/lib/authorsView";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { duplicateAuthorRecord } from "@/lib/duplication";
 import { pruneSelectedIds, runBulkOperation, toggleAllVisibleIds } from "@/lib/bulkManagement";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import type { AuthorSummary } from "@/lib/authorShelf";
 import type { BookJournalEntryRecord } from "@/types";
 
@@ -255,9 +260,11 @@ function clearAuthorFilters(searchParams: URLSearchParams): URLSearchParams {
 }
 
 export default function AuthorsExplore() {
-  const { authors: authorRecords, loading: authorsLoading, error: authorsError, removeAuthor } =
+  const { user } = useAuth();
+  const { settings } = useUserSettings();
+  const { authors: authorRecords, loading: authorsLoading, error: authorsError, removeAuthor, reload: reloadAuthors } =
     useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { books, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
@@ -267,6 +274,7 @@ export default function AuthorsExplore() {
   const [saving, setSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const sort = normalizeSort(searchParams.get("sort"));
@@ -390,6 +398,39 @@ export default function AuthorsExplore() {
     }
   }
 
+  async function duplicateSelected(options: DuplicateOptions) {
+    if (!user) return;
+    const selectedAuthors = visibleAuthors.filter((author) => selectedIds.has(author.id));
+    if (selectedAuthors.length === 0) return;
+
+    setSaving(true);
+    setBulkError(null);
+    const result = await runBulkOperation(
+      selectedAuthors,
+      (author) => ({ id: author.id, label: author.name }),
+      (author) => duplicateAuthorRecord(author, books, user.id, options).then(() => undefined),
+    );
+    setSaving(false);
+    setDuplicateOpen(false);
+    await Promise.all([reloadAuthors(), reloadBooks()]);
+    if (result.failures.length > 0) {
+      setBulkError(`Could not duplicate: ${result.failures.map((failure) => failure.label).join(", ")}.`);
+    }
+  }
+
+  function openDuplicateDialog() {
+    const selectedAuthors = visibleAuthors.filter((author) => selectedIds.has(author.id));
+    if (selectedAuthors.length === 0) return;
+    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
+    const linkedBookCount = selectedAuthors.reduce((count, author) => count + author.books.length, 0);
+    const resolved = resolveDuplicateOptions("author", library.duplicate_journal_entries, library.duplicate_books, linkedBookCount);
+    if (resolved.needsDialog) {
+      setDuplicateOpen(true);
+      return;
+    }
+    void duplicateSelected(resolved.options);
+  }
+
   function exportSelected() {
     const selectedAuthors = visibleAuthors.filter((author) => selectedIds.has(author.id));
     if (selectedAuthors.length === 0) return;
@@ -449,16 +490,23 @@ export default function AuthorsExplore() {
                 <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-transparent hover:text-destructive" aria-label="Delete selected authors" disabled={selectedIds.size === 0 || saving} onClick={() => setDeleteOpen(true)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Duplicate selected authors" title="Duplicate selected authors" disabled={selectedIds.size === 0 || saving} onClick={openDuplicateDialog}>
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                </Button>
               </div>
             </>}
           </div>
           <div className="absolute right-0 top-0"><OverflowMenu label="Author options">{(close) => <>
               <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
-              {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { updateParam("display", value); close(); }}>
-                {value === "grid" ? "Grid" : "List"}{display === value ? " ✓" : ""}
+              {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { updateParam("display", value); close(); }}>
+                <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">{display === value ? "✓" : ""}</span>
+                <span>{value === "grid" ? "Grid" : "List"}</span>
               </button>)}
               <div className="my-1 border-t" />
-              <button role="menuitem" type="button" className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { toggleManageMode(); close(); }}>{isManageMode ? "Done selecting" : "Select"}</button>
+              <button role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { toggleManageMode(); close(); }}>
+                <SquareMousePointer className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{isManageMode ? "Done selecting" : "Select"}</span>
+              </button>
           </>}</OverflowMenu></div>
         </div>
         {journalEntriesError && (
@@ -653,16 +701,26 @@ export default function AuthorsExplore() {
       )}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete selected authors?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This permanently deletes the selected authors. Their books remain in your library.</p>
+          <DialogHeader><DialogTitle>Delete {selectionLabel("author", selectedIds.size)}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently deletes the selected {selectedIds.size === 1 ? "author" : "authors"}. Their books remain in your library.</p>
           <DialogFooter>
             <Button variant="destructive" onClick={() => { setDeleteOpen(false); void deleteSelected(); }}>
-              Delete {selectedIds.size === 1 ? "author" : "authors"}
+              Delete {selectionLabel("author", selectedIds.size)}
             </Button>
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DuplicateOptionsDialog
+        open={duplicateOpen}
+        kind="author"
+        selectedCount={selectedIds.size}
+        linkedBookCount={visibleAuthors.filter((author) => selectedIds.has(author.id)).reduce((count, author) => count + author.books.length, 0)}
+        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
+        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
+        onOpenChange={setDuplicateOpen}
+        onConfirm={duplicateSelected}
+      />
     </div>
   );
 }

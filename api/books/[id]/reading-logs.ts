@@ -64,6 +64,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
 
+    if (existingBook.status === "Wishlist") {
+      json(response, 400, { error: "Add this book to your library before logging reading." });
+      return;
+    }
+
     const { data: log, error: insertError } = await admin
       .from("reading_logs")
       .insert({

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useOutletContext } from "react-router-d
 import { ArrowRight, Ban, Bookmark, BookOpen, Compass, ExternalLink, Loader2, ThumbsDown } from "lucide-react";
 import { AppHeading } from "@/components/design";
 import BackButton from "@/components/BackButton";
+import { PageHeader } from "@/components/reading-journal";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, useUserSettings } from "@/context";
@@ -360,23 +361,19 @@ export default function Discover() {
     (b.kind === "owned" ? b.book.volume_number ?? 0 : b.volumeNumber)).slice(0, 6);
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-2">
-        {recommendationsPage ? <div className="flex items-start gap-2">
-          <BackButton fallbackTo="/discover" className="mt-1" />
-          <div className="space-y-1">
-            <AppHeading level={1}>Recommendations</AppHeading>
-          </div>
-        </div> : <>
-          <AppHeading level={1}>Discover</AppHeading>
-        </>}
-      </header>
+    <div className="space-y-8">
+      {recommendationsPage ? <header className="flex items-start gap-2">
+        <BackButton fallbackTo="/discover" className="mt-1" />
+        <div className="space-y-1">
+          <AppHeading level={1}>Recommendations</AppHeading>
+        </div>
+      </header> : <PageHeader title="Discover" />}
 
       <section className="space-y-5" aria-labelledby="recommended-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 id="recommended-heading" className="text-xl font-semibold">Recommended for you</h2>
-            {recommendationSet?.generated_at && <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            <AppHeading level={3} as="h3" id="recommended-heading">Recommended for you</AppHeading>
+            {recommendationsPage && recommendationSet?.generated_at && <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
               <span>Updated {formatDate(recommendationSet.generated_at)} · Next reload {formatDate(recommendationSet.expires_at)}</span>
               <Button asChild size="sm" variant="link" className="h-auto p-0 text-xs text-muted-foreground">
                 <Link to="/settings/discover">Change interval</Link>
@@ -473,7 +470,7 @@ export default function Discover() {
 
       {recommendationsPage && <section className="space-y-4" aria-labelledby="continue-heading">
         <div>
-          <h2 id="continue-heading" className="text-xl font-semibold">Continue your reading</h2>
+          <AppHeading level={3} as="h3" id="continue-heading">Continue your reading</AppHeading>
           <p className="mt-1 text-sm text-muted-foreground">Next books from series represented in your library.</p>
         </div>
         {(booksLoading || seriesLoading || seriesSearchLoading) && continuationCards.length === 0 ? <div className="h-24 animate-pulse rounded-xl bg-muted/40" /> : continuationCards.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -514,10 +511,9 @@ export default function Discover() {
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
         {selected && <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader><DialogTitle>{selected.title}</DialogTitle></DialogHeader>
-          <div className="grid gap-5 sm:grid-cols-[10rem_1fr]">
+          <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-5 sm:grid-cols-[10rem_minmax(0,1fr)]">
             {selected.coverUrl ? <img src={selected.coverUrl} alt={`Cover of ${selected.title}`} className="mx-auto max-h-64 rounded-lg object-contain sm:mx-0" /> : <div className="flex h-56 items-center justify-center rounded-lg bg-muted"><BookOpen className="h-10 w-10 text-muted-foreground" /></div>}
-            <div className="space-y-3"><p className="text-muted-foreground">{selected.authors.join(", ")}</p>
+            <div className="space-y-3"><DialogHeader><DialogTitle>{selected.title}</DialogTitle></DialogHeader><p className="text-muted-foreground">{selected.authors.join(", ")}</p>
               {selected.description && <p className="max-h-40 overflow-y-auto whitespace-pre-line text-sm">{selected.description}</p>}
               {selected.genres.length > 0 && <div className="flex flex-wrap gap-1.5" aria-label="Genres">
                 {selected.genres.map((genre) => <span key={genre} className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">{genre}</span>)}
@@ -526,12 +522,17 @@ export default function Discover() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button variant="ghost" className="text-muted-foreground" title="Remove from recommendations" disabled={removingRecommendationKey !== null} onClick={() => void removeRecommendation(selected)}>{removingRecommendationKey === recommendationKey(selected) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}Remove</Button>
+            <div className="flex gap-1">
+              <Button variant="ghost" className="text-muted-foreground" title="Remove from recommendations" disabled={removingRecommendationKey !== null} onClick={() => void removeRecommendation(selected)}>{removingRecommendationKey === recommendationKey(selected) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}Remove</Button>
+              <Button type="button" size="icon" variant={dislikedKeys.has(recommendationKey(selected)) ? "destructive" : "ghost"} className="h-8 w-8" aria-label={dislikedKeys.has(recommendationKey(selected)) ? "Undo not interested" : "Not interested"} title={dislikedKeys.has(recommendationKey(selected)) ? "Undo not interested" : "Not interested"} disabled={savingFeedbackKey !== null} onClick={() => void toggleRecommendationFeedback(selected)}>
+                {savingFeedbackKey === recommendationKey(selected) ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4" />}
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => addSelected(selected)}>Add to Library</Button><Button onClick={() => wishlistSelected(selected)}><Bookmark className="mr-2 h-4 w-4" />Add to Wishlist</Button></div>
           </div>
         </DialogContent>}
       </Dialog>
-    </main>
+    </div>
   );
 }
 
