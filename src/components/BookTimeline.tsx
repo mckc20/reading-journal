@@ -51,22 +51,22 @@ function BookTimelineRow({
     <button
       type="button"
       onClick={() => onBook(book)}
-      className="group relative grid w-full grid-cols-[2rem_4.5rem_minmax(0,1fr)_auto] items-center gap-4 py-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
+      className="group relative grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
     >
       {showDivider && (
-        <span className="pointer-events-none absolute bottom-0 left-[6.75rem] right-0 h-px bg-border/70" />
+        <span className="pointer-events-none absolute bottom-0 left-[3rem] right-0 h-px bg-border/70 sm:left-[6.75rem]" />
       )}
-      <div className="relative flex h-full min-h-[4.5rem] items-center justify-center">
+      <div className="relative row-span-2 flex h-full min-h-[4.5rem] items-center justify-center sm:row-span-1">
         {showPoint && (
           <span className="relative z-10 h-3 w-3 rounded-full border-2 border-primary bg-background transition-colors group-hover:border-muted-foreground" />
         )}
       </div>
-      <div className={`space-y-0.5 text-sm text-muted-foreground ${showDate ? "" : "invisible"}`} aria-hidden={!showDate}>
+      <div className={`col-start-2 col-end-[-1] flex items-baseline gap-2 text-sm text-muted-foreground sm:col-auto sm:block sm:space-y-0.5 ${showDate ? "" : "invisible"}`} aria-hidden={!showDate}>
         <div className="font-medium text-foreground">{dateLabel.month}</div>
         {dateLabel.year && <div className="text-xs tracking-[0.18em]">{dateLabel.year}</div>}
       </div>
-      <div className="flex min-w-0 gap-3">
-        <div className="h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm sm:h-[86px] sm:w-14">
+      <div className="col-start-2 min-w-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 sm:col-auto sm:grid-cols-[3.5rem_minmax(0,1fr)]">
+        <div className="row-span-2 h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm sm:h-[86px] sm:w-14">
           {book.cover_url ? (
             <img src={book.cover_url} alt={book.title} loading="lazy" className="block h-full w-full object-cover object-top" />
           ) : (
@@ -85,10 +85,10 @@ function BookTimelineRow({
             </span>
             {book.is_favorite && <Heart className="h-4 w-4 fill-favorite text-favorite" />}
           </div>
-          {details && <div className="pt-1">{details}</div>}
         </div>
+        {details && <div className="col-span-2 pt-1 sm:col-span-1 sm:col-start-2">{details}</div>}
       </div>
-      <div className="flex items-start justify-end">
+      <div className="col-start-3 row-start-2 flex items-start justify-end sm:col-auto sm:row-auto">
         <Badge variant={statusVariant(book.status)} className="text-[10px]">
           {book.status}
         </Badge>
