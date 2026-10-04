@@ -13,7 +13,6 @@ import {
   ListFilter,
   MoreHorizontal,
   RefreshCw,
-  Star,
   SquareMousePointer,
   Trash2,
   X,
@@ -65,7 +64,7 @@ import {
   type LibraryNote,
   type NoteGroup,
 } from "@/lib/libraryShelves";
-import { cn, statusVariant } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import BookCard from "@/components/BookCard";
 import BookShelf from "@/pages/library/BookShelf";
 import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
@@ -972,22 +971,6 @@ function formatLibraryDate(value: string | number | null | undefined): string {
   return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatNumericDate(value: string | number | null | undefined): string {
-  if (value === undefined || value === null || value === "") return "-";
-
-  const date = typeof value === "number"
-    ? new Date(value)
-    : new Date(value.includes("T") ? value : `${value}T00:00:00`);
-
-  if (!Number.isFinite(date.getTime())) return "-";
-
-  return date.toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "2-digit",
     year: "numeric",
   });
 }
