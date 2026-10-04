@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpen, Copy, Download, Heart, SquareMousePointer, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronRight, Copy, Download, Heart, SquareMousePointer, Trash2, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
@@ -23,6 +23,10 @@ function downloadSeriesCsv(groups: SeriesBookGroup[]) {
   const rows = [["Name", "Favorite", "Books"], ...groups.map((group) => [group.name, group.isFavorite ? "Yes" : "No", String(group.books.length)])];
   const blob = new Blob([rows.map((row) => row.map((value) => `\"${value.replace(/\"/g, '\"\"')}\"`).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "series.csv"; link.click(); URL.revokeObjectURL(url);
+}
+
+function getSeriesAuthors(group: SeriesBookGroup): string[] {
+  return [...new Set(group.books.flatMap((book) => book.authors))];
 }
 
 function LoadingSeriesGrid() {
@@ -225,30 +229,27 @@ export default function Series() {
           </p>
         </div>
       ) : display === "table" ? (
-        <div aria-label="Series collection" className="overflow-x-auto rounded-xl border bg-background dark:bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-              <tr>
-                {managing && <th className="w-10 px-3 py-2"><span className="sr-only">Selection</span></th>}
-                <th className="px-3 py-2">Series</th>
-                <th className="px-3 py-2">Books</th>
-                <th className="px-3 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+        <div aria-label="Series collection" className="bg-background">
+          <table className="w-full table-fixed text-left text-sm">
+            <tbody className="divide-y divide-border/70">
               {groups.map((group) => (
                 <tr key={group.seriesId} className={selected.has(group.seriesId) ? "bg-muted/50" : "hover:bg-muted/50"}>
-                  {managing && <td className="px-3 py-2">
+                  {managing && <td className="w-9 py-1.5 pr-2">
                     <input type="checkbox" checked={selected.has(group.seriesId)} disabled={saving} onChange={() => toggle(group.seriesId)} aria-label={`Select ${group.name}`} className="h-4 w-4 rounded border-border" />
                   </td>}
-                  <td className="px-3 py-2">
-                    <button type="button" className="flex items-center gap-2 text-left font-medium hover:underline" disabled={managing && saving} onClick={() => managing ? toggle(group.seriesId) : openSeries(group.seriesId)}>
-                      {group.name}
-                      {group.isFavorite && <><Heart className="h-4 w-4 shrink-0 fill-favorite text-favorite" aria-hidden="true" /><span className="sr-only">Favorite series</span></>}
+                  <td className="py-2.5">
+                    <button type="button" className="flex w-full items-center gap-2 text-left" disabled={managing && saving} onClick={() => managing ? toggle(group.seriesId) : openSeries(group.seriesId)}>
+                      <span className="relative h-9 w-10 shrink-0">
+                        {group.books.slice(0, 3).map((book, index) => <span key={book.id} className="absolute top-0 h-9 w-6 overflow-hidden rounded-sm border border-background bg-muted" style={{ left: `${index * 7}px`, zIndex: 3 - index }}>{book.cover_url ? <img src={book.cover_url} alt="" className="h-full w-full object-cover" /> : <BookOpen className="m-1 h-4 w-4 text-muted-foreground/50" />}</span>)}
+                        {group.books.length === 0 && <span className="flex h-9 w-7 items-center justify-center rounded-sm bg-muted"><BookOpen className="h-4 w-4 text-muted-foreground/50" /></span>}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{group.name}</span>
+                        {getSeriesAuthors(group).length > 0 && <span className="mt-0.5 block truncate text-xs text-muted-foreground" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{getSeriesAuthors(group).join(", ")}</span>}
+                      </span>
+                      <ChevronRight className="mr-3 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     </button>
                   </td>
-                  <td className="px-3 py-2">{group.books.length}</td>
-                  <td className="px-3 py-2">{getDerivedSeriesStatus(group.books)}</td>
                 </tr>
               ))}
             </tbody>

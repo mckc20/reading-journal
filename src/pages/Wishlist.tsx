@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
-import { BookOpen, Copy, Download, ExternalLink, Loader2, Pencil, SquareMousePointer, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronRight, Copy, Download, ExternalLink, Loader2, Pencil, SquareMousePointer, Trash2, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import OverflowMenu from "@/components/OverflowMenu";
@@ -141,19 +141,9 @@ function WishlistTable({
   const selectable = items.length > 0;
 
   return (
-    <div className="overflow-x-auto rounded-lg border bg-background dark:bg-card">
-      <table className="w-full min-w-[48rem] text-left text-sm">
-        <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-          <tr>
-            {selectable && managing ? <th className="w-10 px-3 py-2" /> : null}
-            <th className="w-16 px-3 py-2">Cover</th>
-            <th className="px-3 py-2">Title</th>
-            <th className="px-3 py-2">Author</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Date Added</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
+    <div className="bg-background">
+      <table className="w-full table-fixed text-left text-sm">
+        <tbody className="divide-y divide-border/70">
           {items.map((item) => {
             const book = bookForItem(item);
             const isSelecting = managing;
@@ -173,7 +163,7 @@ function WishlistTable({
                 }}
                 className={`cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none ${isSelected ? "bg-muted" : ""}`}
               >
-                {selectable && managing ? <td className="px-3 py-2">
+                {selectable && managing ? <td className="w-9 py-1.5 pr-2">
                   {isSelecting && <input
                     type="checkbox"
                     checked={isSelected}
@@ -183,15 +173,16 @@ function WishlistTable({
                     className="h-4 w-4 rounded border-border"
                   />}
                 </td> : null}
-                <td className="px-3 py-2">
-                  <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                <td className="w-12 py-2.5 pr-2">
+                  <div className="h-10 w-7 shrink-0 overflow-hidden rounded-sm bg-muted">
                     {book.cover_url ? <img src={book.cover_url} alt={book.title} loading="lazy" className="block h-full w-full object-cover object-top" /> : <div className="flex h-full w-full items-center justify-center"><BookOpen className="h-4 w-4 text-muted-foreground/40" /></div>}
                   </div>
                 </td>
-                <td className="px-3 py-2"><p className="max-w-72 truncate font-medium leading-snug">{book.title}</p></td>
-                <td className="px-3 py-2 text-muted-foreground"><p className="max-w-64 truncate">{book.authors.join(", ") || "-"}</p></td>
-                <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">Wishlist</Badge></td>
-                <td className="px-3 py-2 text-muted-foreground">{formatDate(item.created_at) ?? "-"}</td>
+                <td className="min-w-0 py-2.5">
+                  <p className="truncate font-medium leading-snug" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.title}</p>
+                  {book.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-muted-foreground" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.authors.join(", ")}</p>}
+                </td>
+                <td className="w-8 py-2.5 pl-2 pr-3"><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></td>
               </tr>
             );
           })}

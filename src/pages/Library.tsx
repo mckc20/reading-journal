@@ -411,7 +411,7 @@ export default function Library() {
               >
                 <HorizontalShelf ariaLabel="Series shelf">
                   {seriesGroups.map((group) => (
-                    <div key={group.seriesId} data-shelf-item className="w-[122px] shrink-0 sm:w-[148px]">
+                  <div key={group.seriesId} data-shelf-item className="w-[90px] shrink-0 sm:w-[104px]">
                       <div className="[&_p]:sr-only">
                         <SeriesStackCard group={group} onSeries={openSeries} />
                       </div>
@@ -423,7 +423,7 @@ export default function Library() {
               <EntityShelf title="Wishlist" count={wishlist.length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
                 <HorizontalShelf ariaLabel="Wishlist shelf">
                   {wishlist.map((item) => (
-                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-20 shrink-0 overflow-hidden rounded-md border bg-muted sm:w-24">
+                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-14 shrink-0 overflow-hidden rounded-sm border bg-muted sm:w-16">
                       {item.cover_url ? <img src={item.cover_url} alt={item.title} className="aspect-[2/3] w-full object-cover" /> : <div className="flex aspect-[2/3] items-center justify-center"><BookOpen className="h-6 w-6 text-muted-foreground" /></div>}
                     </Link>
                   ))}

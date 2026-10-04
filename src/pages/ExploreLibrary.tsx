@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
+  ChevronRight,
   Check,
   ChevronDown,
   Copy,
@@ -368,20 +369,9 @@ function BooksTable({
   if (books.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto rounded-lg border bg-background dark:bg-card">
-      <table className="w-full min-w-[60rem] text-left text-sm">
-        <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-          <tr>
-            {selectedIds ? <th className="w-10 px-3 py-2" /> : null}
-            <th className="w-16 px-3 py-2">Cover</th>
-            <th className="px-3 py-2">Title</th>
-            <th className="px-3 py-2">Author</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Rating</th>
-            <th className="px-3 py-2">Date Added</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
+    <div className="bg-background">
+      <table className="w-full table-fixed text-left text-sm">
+        <tbody className="divide-y divide-border/70">
           {books.map((book) => (
             <BookTableRow
               key={book.id}
@@ -440,61 +430,39 @@ function BookTableRow({
         selected && "bg-muted",
       )}
     >
-      {isSelecting ? (
-        <td className="px-3 py-2">
-          <input
-            type="checkbox"
-            checked={selected}
-            disabled={saving}
-            onClick={(event) => event.stopPropagation()}
-            onChange={() => onToggleBook?.(book.id)}
-            aria-label={`Select ${book.title}`}
-            className="h-4 w-4 rounded border-border"
-          />
-        </td>
-      ) : null}
-      <td className="px-3 py-2">
-        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-          {book.cover_url ? (
-            <img
-              src={book.cover_url}
-              alt={book.title}
-              loading="lazy"
-              className="block h-full w-full object-cover object-top"
+      <td colSpan={3} className="p-0">
+        <div className="flex min-w-0 items-center gap-3 px-2 py-2.5 sm:px-3">
+          {isSelecting && (
+            <input
+              type="checkbox"
+              checked={selected}
+              disabled={saving}
+              onClick={(event) => event.stopPropagation()}
+              onChange={() => onToggleBook?.(book.id)}
+              aria-label={`Select ${book.title}`}
+              className="h-4 w-4 shrink-0 rounded border-border"
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-            </div>
           )}
+          <div className="h-10 w-7 shrink-0 overflow-hidden rounded-sm bg-muted">
+            {book.cover_url ? (
+              <img
+                src={book.cover_url}
+                alt={book.title}
+                loading="lazy"
+                className="block h-full w-full object-cover object-top"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <BookOpen className="h-4 w-4 text-muted-foreground/40" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 py-0.5">
+            <p className="truncate whitespace-nowrap font-medium leading-snug" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.title}</p>
+            {book.authors.length > 0 && <p className="mt-0.5 truncate whitespace-nowrap text-xs text-muted-foreground" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.authors.join(", ")}</p>}
+          </div>
+          <ChevronRight className="mr-1 h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
-      </td>
-      <td className="px-3 py-2">
-        <p className="max-w-72 truncate font-medium leading-snug">{book.title}</p>
-      </td>
-      <td className="px-3 py-2 text-muted-foreground">
-        <p className="max-w-64 truncate">{book.authors.join(", ") || "-"}</p>
-      </td>
-      <td className="px-3 py-2">
-        <Badge variant={statusVariant(book.status)} className="text-[10px]">
-          {book.status}
-        </Badge>
-      </td>
-      <td className="px-3 py-2">
-        {book.rating ? (
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            <Star className="h-3.5 w-3.5 fill-current" />
-            {book.rating}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-        {book.is_favorite && (
-          <Heart className="ml-2 inline h-3.5 w-3.5 fill-favorite text-favorite" aria-label="Favorite" />
-        )}
-      </td>
-      <td className="px-3 py-2 text-muted-foreground">
-        {formatNumericDate(book.created_at)}
       </td>
     </tr>
   );
@@ -1394,6 +1362,8 @@ function LibraryControlsBar({
   onFilterChange,
   onRemoveFilter,
   onClearFilters,
+  filtersOpen,
+  setFiltersOpen,
 }: {
   sort: LibrarySort;
   filters: LibraryFilters;
@@ -1403,8 +1373,9 @@ function LibraryControlsBar({
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
   onRemoveFilter: (keys: LibraryFilterKey[]) => void;
   onClearFilters: () => void;
+  filtersOpen: boolean;
+  setFiltersOpen: (open: boolean) => void;
 }) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const hasActiveFilters = activeFilterChips.length > 0;
   const handleSortDropdownChange = (value: string) => {
     if (value === "all-sorting") {
@@ -1417,7 +1388,7 @@ function LibraryControlsBar({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 border-y py-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 py-0 lg:flex-row lg:items-center lg:justify-between lg:py-3">
         <div className="hidden flex-wrap items-center gap-2 lg:flex">
           <FilterSelect
             label="Status"
@@ -1465,22 +1436,6 @@ function LibraryControlsBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="relative lg:hidden"
-            onClick={() => setFiltersOpen(true)}
-            aria-haspopup="dialog"
-            aria-label="Advanced filters and sorting"
-          >
-            <ListFilter className="h-5 w-5" />
-            {hasActiveFilters && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">
-                {activeFilterChips.length}
-              </span>
-            )}
-          </Button>
           <Select value={sort} onValueChange={handleSortDropdownChange}>
             <SelectTrigger className="hidden w-[12.5rem] justify-start gap-1.5 lg:flex" aria-label="Sort books">
               <span className="text-muted-foreground">Sort by:</span>
@@ -1567,6 +1522,8 @@ function LibraryToolbar({
   onOpenStatus,
   onOpenGenres,
   onDuplicate,
+  onOpenFilters,
+  activeFilterCount,
 }: {
   title: string;
   countLabel: string;
@@ -1584,6 +1541,8 @@ function LibraryToolbar({
   onOpenStatus: () => void;
   onOpenGenres: () => void;
   onDuplicate: () => void;
+  onOpenFilters: () => void;
+  activeFilterCount: number;
 }) {
   return (
     <div className="relative flex flex-col gap-4 pr-10">
@@ -1597,7 +1556,7 @@ function LibraryToolbar({
         </div>
       </div>
 
-      <div className="w-[calc(100%+2.5rem)] shrink-0 space-y-1">
+      <div className={cn("w-[calc(100%+2.5rem)] shrink-0 space-y-1", !isManageMode && "hidden")}>
         {isManageMode && (
           <>
             <div className="flex flex-row-reverse flex-wrap items-center justify-start gap-1 sm:gap-2">
@@ -1654,7 +1613,11 @@ function LibraryToolbar({
           </>
         )}
       </div>
-      <div className="absolute right-0 top-0">
+      <div className="absolute right-0 top-0 flex items-center gap-1">
+        <Button type="button" variant="ghost" size="icon" className="relative lg:hidden" onClick={onOpenFilters} aria-haspopup="dialog" aria-label="Advanced filters and sorting">
+          <ListFilter className="h-5 w-5" />
+          {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">{activeFilterCount}</span>}
+        </Button>
         <OverflowMenu label="Book options">
             {(close) => (
               <>
@@ -2055,6 +2018,7 @@ export default function Library() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkGenresOpen, setBulkGenresOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (viewParam && !isLibraryView(viewParam)) {
@@ -2468,6 +2432,8 @@ export default function Library() {
       onFilterChange={updateLibraryFilter}
       onRemoveFilter={removeLibraryFilters}
       onClearFilters={clearLibraryFilters}
+      filtersOpen={filtersOpen}
+      setFiltersOpen={setFiltersOpen}
     />
   );
 
@@ -2491,6 +2457,8 @@ export default function Library() {
           onOpenStatus={() => setBulkStatusOpen(true)}
           onOpenGenres={() => setBulkGenresOpen(true)}
           onDuplicate={openDuplicateDialog}
+          onOpenFilters={() => setFiltersOpen(true)}
+          activeFilterCount={activeFilterChips.length}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Copy, Download, Grid2X2, Heart, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
+import { ChevronRight, Copy, Download, Grid2X2, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
 import AuthorCard from "@/components/AuthorCard";
 import BackButton from "@/components/BackButton";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
@@ -50,20 +50,6 @@ const allValue = "__all__";
 
 function countLabel(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
-}
-
-function formatDisplayDate(value: string | null | undefined): string {
-  if (!value) return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  return new Intl.DateTimeFormat("de-AT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
 }
 
 function downloadAuthorsCsv(authors: AuthorSummary[]) {
@@ -147,19 +133,9 @@ function AuthorTable({
   interactive?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-background dark:bg-card">
-      <table className="w-full min-w-[52rem] text-left text-sm">
-        <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-          <tr>
-            {selectedIds ? <th className="w-10 px-3 py-2" /> : null}
-            <th className="w-16 px-3 py-2">Photo</th>
-            <th className="px-3 py-2">Author</th>
-            <th className="px-3 py-2">Books</th>
-            <th className="px-3 py-2">Rating</th>
-            <th className="px-3 py-2">Last read</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
+    <div className="overflow-x-auto bg-background">
+      <table className="w-full table-fixed text-left text-sm">
+        <tbody className="divide-y divide-border/70">
           {authors.map((author) => (
             <tr
               key={author.id}
@@ -179,7 +155,7 @@ function AuthorTable({
               className={interactive ? "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" : "transition-colors"}
             >
               {selectedIds && onToggleAuthor ? (
-                <td className="px-3 py-2">
+                <td className="w-9 py-1.5 pr-2">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(author.id)}
@@ -190,8 +166,8 @@ function AuthorTable({
                   />
                 </td>
               ) : null}
-              <td className="px-3 py-2">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-sm">
+                <td className="w-12 py-2.5 pr-2">
+                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-medium text-primary-foreground">
                   {author.photo_url ? (
                     <img src={author.photo_url} alt={author.name} className="h-full w-full object-cover" />
                   ) : (
@@ -199,19 +175,12 @@ function AuthorTable({
                   )}
                 </div>
               </td>
-              <td className="px-3 py-2">
-                <div className="min-w-0">
-                  <p className="max-w-72 truncate font-medium leading-snug">
-                    <span className="inline-flex items-center gap-2">
-                      {author.name}
-                      {author.isFavorite ? <Heart className="h-4 w-4 fill-favorite text-favorite" /> : null}
-                    </span>
-                  </p>
+              <td className="py-2.5">
+                <div className="min-w-0 overflow-hidden">
+                  <p className="truncate font-medium leading-snug" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{author.name}</p>
                 </div>
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{author.bookCount}</td>
-              <td className="px-3 py-2 text-muted-foreground">{author.averageRating ?? "-"}</td>
-              <td className="px-3 py-2 text-muted-foreground">{formatDisplayDate(author.latestReadDate)}</td>
+              <td className="w-8 py-2.5 pl-2 pr-3"><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></td>
             </tr>
           ))}
         </tbody>
@@ -464,9 +433,9 @@ export default function AuthorsExplore() {
   const activeFilterCount = filters.genre.length + filters.language.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="space-y-1">
-        <div className="relative flex flex-wrap items-start gap-3 pr-10">
+        <div className="relative flex flex-wrap items-start gap-3 pr-20">
           <div className="flex min-w-0 items-start gap-2">
             <BackButton fallbackTo="/library" className="mt-1" />
             <div className="space-y-1">
@@ -496,7 +465,20 @@ export default function AuthorsExplore() {
               </div>
             </>}
           </div>
-          <div className="absolute right-0 top-0"><OverflowMenu label="Author options">{(close) => <>
+          <div className="absolute right-0 top-0 flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="relative lg:hidden"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+              aria-label="Advanced filters and sorting"
+            >
+              <ListFilter className="h-5 w-5" />
+              {hasFilters && <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">{activeFilterCount}</span>}
+            </Button>
+            <OverflowMenu label="Author options">{(close) => <>
               <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
               {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { updateParam("display", value); close(); }}>
                 <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">{display === value ? "✓" : ""}</span>
@@ -507,7 +489,8 @@ export default function AuthorsExplore() {
                 <SquareMousePointer className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>{isManageMode ? "Done selecting" : "Select"}</span>
               </button>
-          </>}</OverflowMenu></div>
+          </>}</OverflowMenu>
+          </div>
         </div>
         {journalEntriesError && (
           <p className="text-xs text-muted-foreground">
@@ -516,8 +499,8 @@ export default function AuthorsExplore() {
         )}
       </div>
 
-      <div className="space-y-3">
-        <div className="border-y border-border py-3">
+      <div className="space-y-2">
+        <div className="py-0 lg:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="hidden flex-wrap items-center gap-2 lg:flex">
             <Select value={filters.genre[0] ?? allValue} onValueChange={(value) => updateFilter("genre", value)}>
@@ -549,22 +532,6 @@ export default function AuthorsExplore() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="relative lg:hidden"
-              onClick={() => setFiltersOpen(true)}
-              aria-haspopup="dialog"
-              aria-label="Advanced filters and sorting"
-            >
-              <ListFilter className="h-5 w-5" />
-              {hasFilters && (
-                <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
             <Select value={sort} onValueChange={(value) => updateParam("sort", value)}>
               <SelectTrigger className="hidden w-[12.5rem] justify-between gap-1.5 lg:flex" aria-label="Sort authors">
                 <span className="text-muted-foreground">Sort by:</span>
