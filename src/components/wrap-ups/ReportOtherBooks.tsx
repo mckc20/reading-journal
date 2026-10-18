@@ -40,20 +40,20 @@ export default function ReportOtherBooks({ report }: { report: MonthlyReport }) 
                   {item.journalEntries.length > 0 && (
                     <p>
                       You have {item.journalEntries.length} journal {item.journalEntries.length === 1 ? 'entry' : 'entries'} dated this month.
-                      {item.journalEntries.length > 1 && <span className="hidden sm:inline">{` Showing ${entry?.is_favorite ? 'a saved' : 'the latest'} entry.`}</span>}
+                      {' '}
+                      <Link
+                        to={item.journalEntries.length === 1 && entry
+                          ? `/books/${item.book.id}/journal?entry=${encodeURIComponent(entry.id)}`
+                          : `/books/${item.book.id}/journal`}
+                        className="ml-2 inline-block rounded-sm text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {item.journalEntries.length === 1 ? 'Show entry' : 'Show all entries'}
+                      </Link>
                     </p>
                   )}
                 </div>
               )}
-              {entry && <>
-                <Link
-                  to={`/books/${item.book.id}/journal?entry=${encodeURIComponent(entry.id)}`}
-                  className="inline-block text-sm text-primary underline underline-offset-4 sm:hidden"
-                >
-                  View journal {item.journalEntries.length === 1 ? 'entry' : 'entries'}
-                </Link>
-                <div className="hidden sm:block"><ReportJournalEntryPreview entry={entry} /></div>
-              </>}
+              {entry && <div className="hidden sm:block"><ReportJournalEntryPreview entry={entry} /></div>}
             </div>
           </ReportBookFeature>
         );
