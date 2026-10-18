@@ -117,7 +117,8 @@ export default function WrapUpsHelp() {
           </p>
           <p className="leading-relaxed">
             On desktop, one journal entry is shown: a saved entry is preferred, otherwise the latest
-            dated entry is selected. Mobile shows the entry count and a link to the book’s journal
+            dated entry is selected. Long entries show a shortened preview with a “Read full entry”
+            link. Mobile shows the entry count and a link to the book’s journal
             instead. Older saved wrap-ups may not include per-book totals or journal entries.
           </p>
         </div>
