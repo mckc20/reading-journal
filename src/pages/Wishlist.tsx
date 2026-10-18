@@ -84,7 +84,6 @@ function WishlistCard({
       onSelect={selectMode ? () => onToggle?.(item) : undefined}
       selected={selectMode && selected}
       textSize="compact"
-      footer={<Badge variant="outline" className="text-[10px]">Wishlist</Badge>}
     />
   );
 }

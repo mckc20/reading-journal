@@ -1,5 +1,8 @@
 import { BookOpen, Heart, PauseCircle } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { BookStatus } from "./BookStatus";
+import type { BookStatus as BookStatusType } from "@/types";
 
 type BookCoverSize = "sm" | "md" | "lg" | "fill";
 
@@ -17,6 +20,7 @@ interface BookCoverProps {
   paused?: boolean;
   favorite?: boolean;
   cornerLabel?: string;
+  status?: BookStatusType;
   className?: string;
   imageClassName?: string;
 }
@@ -29,25 +33,28 @@ export function BookCover({
   paused = false,
   favorite = false,
   cornerLabel,
+  status,
   className,
   imageClassName,
 }: BookCoverProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   return (
     <div
       className={cn(
-        "relative aspect-[2/3] overflow-hidden rounded-md bg-muted shadow-sm",
+        "relative aspect-[2/3] overflow-hidden rounded-md bg-muted shadow-md",
         sizeClasses[size],
         paused && "opacity-70",
         className,
       )}
     >
-      {src ? (
+      {src && src !== failedSrc ? (
         <img
           src={src}
           alt={title}
           loading="lazy"
+          onError={() => setFailedSrc(src)}
           className={cn(
-            "block h-full w-full object-cover object-top transition-transform duration-200 ease-out group-hover:scale-[1.02]",
+            "block h-full w-full object-cover",
             paused && "grayscale",
             imageClassName,
           )}
@@ -55,6 +62,7 @@ export function BookCover({
       ) : (
         <div className="flex h-full w-full items-center justify-center" aria-label={`No cover for ${title}`}>
           <BookOpen className="h-1/3 w-1/3 min-h-5 min-w-5 text-muted-foreground/40" aria-hidden="true" />
+          <span className="sr-only">Cover unavailable</span>
         </div>
       )}
       {paused && (
@@ -68,10 +76,15 @@ export function BookCover({
           aria-label="Favorite"
         />
       )}
-      {cornerLabel && (
-        <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
-          {cornerLabel}
-        </span>
+      {(status || cornerLabel) && (
+        <div className="absolute left-1.5 top-1.5 z-10 flex flex-col items-start gap-1">
+          {status && <BookStatus status={status} className="bg-background/95 px-1.5 text-[10px] tracking-normal shadow-sm" />}
+          {cornerLabel && (
+            <span className="rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
+              {cornerLabel}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

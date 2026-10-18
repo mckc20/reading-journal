@@ -1,3 +1,4 @@
+import { readingPageDeltas } from "./readingPageDeltas";
 import type { Book, ReadingLog } from "@/types";
 import { getActiveDaysBetween } from "@/lib/bookAnalytics";
 
@@ -221,44 +222,11 @@ function getCompletionDays(book: Book): number | null {
 }
 
 function buildPageDeltas(logs: ReadingLog[]): PageDelta[] {
-  const logsByBook = new Map<string, ReadingLog[]>();
-
-  for (const log of logs) {
-    const list = logsByBook.get(log.book_id) ?? [];
-    list.push(log);
-    logsByBook.set(log.book_id, list);
-  }
-
-  const deltas: PageDelta[] = [];
-
-  for (const [bookId, bookLogs] of logsByBook.entries()) {
-    const sortedLogs = [...bookLogs].sort(
-      (left, right) => new Date(left.logged_at).getTime() - new Date(right.logged_at).getTime()
-    );
-    let previousPage = 0;
-
-    for (const log of sortedLogs) {
-      const loggedAt = parseDate(log.logged_at);
-      if (!loggedAt) continue;
-
-      const currentPage = Math.max(0, log.current_page);
-      const pages = Math.max(0, currentPage - previousPage);
-      previousPage = Math.max(previousPage, currentPage);
-
-      if (pages <= 0) continue;
-
-      deltas.push({
-        bookId,
-        loggedAt,
-        dayKey: toDayKey(loggedAt),
-        monthKey: toMonthKey(loggedAt),
-        year: String(loggedAt.getFullYear()),
-        pages,
-      });
-    }
-  }
-
-  return deltas.sort((left, right) => left.loggedAt.getTime() - right.loggedAt.getTime());
+  return readingPageDeltas(logs).filter(({ pages }) => pages > 0).map(({ log, pages }) => {
+    const loggedAt = new Date(log.logged_at);
+    return { bookId: log.book_id, loggedAt, dayKey: toDayKey(loggedAt),
+      monthKey: toMonthKey(loggedAt), year: String(loggedAt.getFullYear()), pages };
+  });
 }
 
 function buildReadingSpeedSamples(logs: ReadingLog[]): ReadingSpeedSample[] {

@@ -12,12 +12,13 @@ const changelogMarkdown = readFileSync(
 test("parses the changelog archive in reverse chronological order", () => {
   const entries = parseChangelogMarkdown(changelogMarkdown);
 
-  assert.equal(entries[0].version, "2026-10-03-discover-wishlist-library-management");
-  assert.equal(entries[0].title, "Discover, Wishlist, and library management");
-  assert.equal(entries[0].summary, "Discover your next read, keep a simpler Wishlist, and manage books, authors, and series with more flexible actions.");
-  assert.equal(entries[0].highlights.length, 5);
-  assert.equal(entries[0].highlights[0].title, "Personalized book discovery");
-  assert.equal(entries[0].highlights[0].description, "Discover recommendations with feedback, recommendation history, and suggestions for the next volumes in your series.");
+  assert.equal(entries[0].version, "2026-10-18-wrap-ups-and-library-updates");
+  assert.equal(entries[0].title, "Monthly wrap-ups and a refreshed library");
+  assert.equal(entries[0].summary, "Revisit your reading with saved monthly wrap-ups, enjoy a consistent book design, and explore the latest Discover, Wishlist, and library improvements.");
+  assert.equal(entries[0].highlights.length, 8);
+  assert.equal(entries[0].highlights[0].title, "Your reading, remembered");
+  assert.match(entries[0].highlights[0].description, /Saved wrap-ups keep the details recorded/);
+  assert.equal(entries[0].highlights[3].title, "Personalized book discovery");
   assert.equal(entries[entries.length - 1].version, "2026-04-21-usual-time-metrics");
 });
 
@@ -27,4 +28,5 @@ test("keeps unread state tied to the latest release note only", () => {
 
   assert.equal(isUnreadReleaseNote(latest.version, latest.version), false);
   assert.equal(isUnreadReleaseNote("older-version", latest.version), true);
+  assert.equal(isUnreadReleaseNote("2026-10-03-discover-wishlist-library-management", latest.version), true);
 });

@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@/components/ui/card";
+import BookCardContent, { bookCardBaseClassName, bookCardInteractiveClassName } from "@/components/BookCardContent";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
-import { BookCover, BookProgress, BookStatus, getBookProgress } from "@/components/reading-journal";
+import { BookProgress, getBookProgress } from "@/components/reading-journal";
 import { useBooksContext } from "@/context/BooksContext";
 import { getTodayLocalDate } from "@/lib/utils";
 import type { Book } from "@/types";
@@ -29,7 +29,6 @@ export default function CurrentlyReadingBookCard({
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
   const hasTotalPages = totalPages > 0;
-  const isPaused = book.status === "Paused";
   const progressPercent = getBookProgress(currentPage, totalPages) ?? 0;
 
   const showDashboardQuickProgress = showQuickProgress && book.status === "Reading";
@@ -37,11 +36,10 @@ export default function CurrentlyReadingBookCard({
   const progress = book.status === "Reading" ? getBookProgress(book.current_page, book.total_pages) : null;
 
   return (
-    <Card
+    <div
       role="button"
       tabIndex={0}
-      variant="interactive"
-      className="group gap-0 overflow-hidden pb-2 pt-0"
+      className={`${bookCardBaseClassName} ${bookCardInteractiveClassName}`}
       onClick={() => handleBook?.(book)}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -51,40 +49,18 @@ export default function CurrentlyReadingBookCard({
         }
       }}
     >
-      <BookCover
-        src={book.cover_url}
-        title={book.title}
-        paused={isPaused}
-        favorite={book.is_favorite}
+      <BookCardContent
+        book={book}
         cornerLabel={cornerLabel}
-        className="w-full rounded-none"
+        textSize={textSize}
+        showStatus
+        footer={!showDashboardQuickProgress && progress !== null
+          ? <BookProgress currentPage={book.current_page} totalPages={book.total_pages} />
+          : undefined}
       />
 
-      <CardContent className="space-y-1 p-2">
-        <p
-          className={
-            textSize === "compact"
-              ? "line-clamp-2 font-heading text-sm font-medium leading-tight"
-              : "line-clamp-2 font-heading text-base font-medium leading-tight"
-          }
-        >
-          {book.title}
-        </p>
-        <p
-          className={
-            textSize === "compact"
-              ? "line-clamp-1 text-[11px] text-muted-foreground"
-              : "line-clamp-1 text-xs text-muted-foreground"
-          }
-        >
-          {book.authors.join(", ")}
-        </p>
-        <BookStatus status={book.status} className={textSize === "compact" ? "text-[10px]" : "text-xs"} />
-        {!showDashboardQuickProgress && progress !== null && <BookProgress currentPage={book.current_page} totalPages={book.total_pages} className="mt-1" />}
-      </CardContent>
-
       {showDashboardQuickProgress && (
-        <div className="space-y-1.5 border-t px-2 pb-2 pt-1.5">
+        <div className="space-y-1.5">
           <BookProgress currentPage={currentPage} totalPages={totalPages} />
           <div className="grid grid-cols-[auto_auto] items-center gap-2 sm:grid-cols-[auto_1fr_auto]">
             <p className="text-[11px] text-muted-foreground">{progressPercent}%</p>
@@ -123,6 +99,6 @@ export default function CurrentlyReadingBookCard({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

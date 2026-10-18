@@ -6,6 +6,8 @@ export interface ChartDatum {
   key: string;
   label: string;
   value: number;
+  displayValue?: string;
+  axisLabel?: string;
 }
 
 interface VerticalBarChartProps {
@@ -17,6 +19,7 @@ interface VerticalBarChartProps {
   highlightKey?: string | null;
   showAllXLabels?: boolean;
   yAxisClassName?: string;
+  showEmptySeries?: boolean;
 }
 
 export default function VerticalBarChart({
@@ -28,10 +31,11 @@ export default function VerticalBarChart({
   highlightKey,
   showAllXLabels = false,
   yAxisClassName = "grid-cols-[3rem_1fr]",
+  showEmptySeries = false,
 }: VerticalBarChartProps) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const maxValue = Math.max(...data.map((point) => point.value), 0);
-  const yAxisMax = maxValue > 0 ? maxValue : 1;
+  const yAxisMax = maxValue > 0 ? maxValue : showEmptySeries ? 2 : 1;
   const yTicks = [yAxisMax, yAxisMax / 2, 0];
   const activePoint = activeKey ? data.find((point) => point.key === activeKey) ?? null : null;
   const activePointIndex = activePoint ? data.findIndex((point) => point.key === activePoint.key) : -1;
@@ -65,7 +69,7 @@ export default function VerticalBarChart({
           {action}
         </div>
       )}
-      {data.length === 0 || maxValue <= 0 ? (
+      {data.length === 0 || (maxValue <= 0 && !showEmptySeries) ? (
         <div className="mt-4 flex min-h-36 items-center justify-center rounded-lg bg-muted/20 px-4 text-center text-sm text-muted-foreground">
           {empty}
         </div>
@@ -94,7 +98,7 @@ export default function VerticalBarChart({
                         transform: activePointTooltipTransform,
                       }}
                     >
-                      {activePoint.label}: {formatValue(activePoint.value)}
+                      {activePoint.label}: {activePoint.displayValue ?? formatValue(activePoint.value)}
                     </div>
                   )}
 
@@ -114,7 +118,7 @@ export default function VerticalBarChart({
                           onMouseLeave={() => setActiveKey(null)}
                           onFocus={() => setActiveKey(point.key)}
                           onBlur={() => setActiveKey(null)}
-                          aria-label={`${point.label}: ${formatValue(point.value)}`}
+                          aria-label={`${point.label}: ${point.displayValue ?? formatValue(point.value)}`}
                         >
                           <div
                             className={cn(
@@ -139,7 +143,7 @@ export default function VerticalBarChart({
                       index === 0 ||
                       index === data.length - 1 ||
                       index % labelStep === 0
-                        ? point.label
+                        ? point.axisLabel ?? point.label
                         : ""}
                     </span>
                   ))}
