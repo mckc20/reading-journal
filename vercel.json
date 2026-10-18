@@ -1,5 +1,8 @@
 {
   "rewrites": [
+    { "source": "/api/me", "destination": "/api/app?route=me" },
+    { "source": "/api/wrap-ups", "destination": "/api/app?route=wrap-ups" },
+    { "source": "/api/wrap-ups/:monthKey", "destination": "/api/app?route=wrap-ups&monthKey=:monthKey" },
     { "source": "/((?!api/|@|.*\\.).*)", "destination": "/" }
   ]
 }
