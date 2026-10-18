@@ -86,7 +86,7 @@ export default function ReportBooks({ books, activity }: { books: ReportBook[]; 
       tabIndex={carousel ? 0 : undefined}
       className={cn(carousel
         ? '-mx-1 flex min-w-0 gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth motion-reduce:scroll-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-        : 'grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5')}
+        : 'grid grid-cols-[repeat(2,minmax(0,7rem))] gap-5 md:grid-cols-[repeat(4,minmax(0,9rem))]')}
       onScroll={carousel ? updateEdges : undefined}
       onKeyDown={carousel ? event => {
         if (event.target !== event.currentTarget) return;
@@ -97,9 +97,9 @@ export default function ReportBooks({ books, activity }: { books: ReportBook[]; 
       } : undefined}
     >
       {books.map(book => (
-        <li key={book.id} className={carousel ? 'shrink-0 basis-[90px] sm:basis-[112px]' : 'min-w-0'}>
+        <li key={book.id} className={carousel ? 'shrink-0 basis-28 md:basis-36' : 'min-w-0'}>
           <Link to={`/books/${book.id}`} className={`${bookCardBaseClassName} ${bookCardInteractiveClassName}`}>
-            <BookCardContent book={book} textSize={carousel ? 'compact' : 'default'} showRating />
+            <BookCardContent book={book} textSize={carousel ? 'default' : 'compact'} showRating />
           </Link>
         </li>
       ))}
@@ -107,18 +107,18 @@ export default function ReportBooks({ books, activity }: { books: ReportBook[]; 
   );
   if (!carousel) return bookList;
 
-  // Cover centers: 4px row padding + half the 3:2 height of the 90px / 112px covers.
+  // Cover centers: 4px row padding + half the 3:2 height of the 112px / 144px covers.
   return (
     <div className="relative min-w-0">
       {edges.left && <Button
         type="button" variant="outline" size="icon-sm"
-        className="absolute left-0 top-[71.5px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm sm:top-[88px]"
+        className="absolute left-0 top-[88px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm md:top-[112px]"
         aria-label="Scroll books left" onClick={() => scroll(-1)}
       ><ChevronLeft className="h-4 w-4" aria-hidden="true" /></Button>}
       {bookList}
       {edges.right && <Button
         type="button" variant="outline" size="icon-sm"
-        className="absolute right-0 top-[71.5px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm sm:top-[88px]"
+        className="absolute right-0 top-[88px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm md:top-[112px]"
         aria-label="Scroll books right" onClick={() => scroll(1)}
       ><ChevronRight className="h-4 w-4" aria-hidden="true" /></Button>}
     </div>
