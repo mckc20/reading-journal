@@ -5,6 +5,7 @@ import {
   BookOpen,
   Compass,
   Check,
+  CircleHelp,
   Copy,
   Database,
   Download,
@@ -1741,7 +1742,12 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="space-y-2">
-        <AppHeading level={1} as="h1">Settings</AppHeading>
+        <div className="flex items-center justify-between gap-3">
+          <AppHeading level={1} as="h1">Settings</AppHeading>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/help"><CircleHelp aria-hidden="true" />Help</Link>
+          </Button>
+        </div>
         <HeadingDescription className="max-w-2xl">
           Manage your profile, app preferences, reading defaults, notifications, privacy, and account.
         </HeadingDescription>

@@ -114,7 +114,7 @@ export default function BookShelf({
           <div
             ref={rowRef}
             aria-label={`${title} shelf`}
-            className="flex gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="-mx-1 flex gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             onScroll={updateScrollButtons}
             onWheel={handleRowWheel}
           >

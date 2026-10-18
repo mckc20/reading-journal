@@ -34,6 +34,8 @@ const BookDetails = lazy(() => import("@/pages/BookDetails"));
 const BookAnalytics = lazy(() => import("@/pages/BookAnalytics"));
 const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
 const Changelog = lazy(() => import("@/pages/Changelog"));
+const Help = lazy(() => import("@/pages/Help"));
+const WrapUpsHelp = lazy(() => import("@/pages/WrapUpsHelp"));
 const Groups = lazy(() => import("@/pages/Groups"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
@@ -86,6 +88,7 @@ export const router = createBrowserRouter([
           { path: "/statistics", element: lazyRoute(<Analytics />) },
           { path: "/reading-history", element: lazyRoute(<ReadingHistory />) },
           { path: "/wrap-ups", element: lazyRoute(<WrapUps />) },
+          { path: "/wrap-ups/:monthKey", element: lazyRoute(<WrapUps />) },
           { path: "/messages", element: lazyRoute(<Groups />) },
           { path: "/discover/recommendations", element: lazyRoute(<Discover />) },
           { path: "/discover", element: lazyRoute(<Discover />) },
@@ -110,6 +113,8 @@ export const router = createBrowserRouter([
           { path: "/books/:bookId/journal", element: lazyRoute(<BookAnnotations />) },
           { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
           { path: "/changelog", element: lazyRoute(<Changelog />) },
+          { path: "/help", element: lazyRoute(<Help />) },
+          { path: "/help/wrap-ups", element: lazyRoute(<WrapUpsHelp />) },
           { path: "/analytics", element: <Navigate to="/statistics" replace /> },
           { path: "/analytics/:category", element: <Navigate to="/statistics" replace /> },
           { path: "/account", element: <Navigate to="/settings/profile" replace /> },

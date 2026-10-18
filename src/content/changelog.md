@@ -2,9 +2,16 @@
 
 Notable updates to the reading journal. Very small maintenance changes are omitted.
 
-## 2026-10-03 - Discover, Wishlist, and library management
-Version: `2026-10-03-discover-wishlist-library-management`
-Summary: Discover your next read, keep a simpler Wishlist, and manage books, authors, and series with more flexible actions.
+## 2026-10-18 - Monthly wrap-ups and a refreshed library
+Version: `2026-10-18-wrap-ups-and-library-updates`
+Summary: Revisit your reading with saved monthly wrap-ups, enjoy a consistent book design, and explore the latest Discover, Wishlist, and library improvements.
+
+- Your reading, remembered
+  Open completed months to save a wrap-up with books finished, logged pages and minutes, daily activity, personal highlights, and comparisons. Saved wrap-ups keep the details recorded when they were created, including journal moments from other books you spent time with.
+- Two ways to revisit your months
+  Choose Sliding or List from the Wrap-ups menu on any screen. Browse with arrows, choose a month and year, and enjoy sliding month transitions with clear loading states. Your view choice is remembered in this browser for your account.
+- A shared book design and a new Help guide
+  Book covers, hover underlines, and subtle movement now feel consistent across the app. Status badges sit on covers, and timeline dates and divider lines stay in place. Find the Wrap-ups guide through Help in Settings.
 
 - Personalized book discovery
   Discover recommendations with feedback, recommendation history, and suggestions for the next volumes in your series.

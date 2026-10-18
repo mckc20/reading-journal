@@ -51,7 +51,7 @@ function BookTimelineRow({
     <button
       type="button"
       onClick={() => onBook(book)}
-      className="group relative grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
+      className="group relative grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-4 text-left transition-colors duration-150 ease-out hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none motion-reduce:transition-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
     >
       {showDivider && (
         <span className="pointer-events-none absolute bottom-0 left-[3rem] right-0 h-px bg-border/70 sm:left-[6.75rem]" />
@@ -65,7 +65,7 @@ function BookTimelineRow({
         <div className="font-medium text-foreground">{dateLabel.month}</div>
         {dateLabel.year && <div className="text-xs tracking-[0.18em]">{dateLabel.year}</div>}
       </div>
-      <div className="col-start-2 min-w-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 sm:col-auto sm:grid-cols-[3.5rem_minmax(0,1fr)]">
+      <div className="col-start-2 min-w-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 transition-transform duration-150 ease-out group-hover:-translate-y-0.5 group-focus-visible:-translate-y-0.5 motion-reduce:translate-none motion-reduce:transition-none sm:col-auto sm:grid-cols-[3.5rem_minmax(0,1fr)]">
         <div className="row-span-2 h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm sm:h-[86px] sm:w-14">
           {book.cover_url ? (
             <img src={book.cover_url} alt={book.title} loading="lazy" className="block h-full w-full object-cover object-top" />
@@ -76,7 +76,7 @@ function BookTimelineRow({
           )}
         </div>
         <div className="min-w-0 space-y-1">
-          <p className="line-clamp-2 font-heading text-base font-medium leading-snug">{book.title}</p>
+          <p className="line-clamp-2 font-heading text-base font-medium leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline">{book.title}</p>
           {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">

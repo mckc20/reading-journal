@@ -216,7 +216,7 @@ function HorizontalShelf({
   return (
     <div
       aria-label={ariaLabel}
-      className="flex gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="-mx-1 flex gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {children}
     </div>
@@ -423,9 +423,9 @@ export default function Library() {
               <EntityShelf title="Wishlist" count={wishlist.length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
                 <HorizontalShelf ariaLabel="Wishlist shelf">
                   {wishlist.map((item) => (
-                    <Link key={item.id} to="/library/wishlist" data-shelf-item className="w-[90px] shrink-0 overflow-hidden rounded-sm border bg-muted sm:w-[112px]">
-                      {item.cover_url ? <img src={item.cover_url} alt={item.title} className="aspect-[2/3] w-full object-cover" /> : <div className="flex aspect-[2/3] items-center justify-center"><BookOpen className="h-6 w-6 text-muted-foreground" /></div>}
-                    </Link>
+                    <div key={item.id} data-shelf-item className="w-[90px] shrink-0 sm:w-[112px]">
+                      <LibraryBookCard book={item} onBook={() => navigate('/library/wishlist')} variant="shelf" />
+                    </div>
                   ))}
                 </HorizontalShelf>
               </EntityShelf>

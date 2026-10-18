@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useOutletContext } from "react-router-d
 import { ArrowRight, Ban, Bookmark, BookOpen, Compass, ExternalLink, Loader2, ThumbsDown } from "lucide-react";
 import { AppHeading } from "@/components/design";
 import BackButton from "@/components/BackButton";
+import BookCardContent, { bookCardBaseClassName, bookCardInteractiveClassName } from "@/components/BookCardContent";
 import { PageHeader } from "@/components/reading-journal";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -397,7 +398,7 @@ export default function Discover() {
           <Button variant="ghost" size="sm" onClick={() => void refresh(false)} disabled={refreshing}>Try again</Button>
         </div>}
 
-        {loading && !recommendationSet && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{Array.from({ length: recommendationsPage ? discoverSettings.recommendation_count : 3 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-2xl border bg-muted/40" />)}</div>}
+        {loading && !recommendationSet && <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: recommendationsPage ? discoverSettings.recommendation_count : 3 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-2xl border bg-muted/40" />)}</div>}
 
         {!loading && !recommendationSet && !error && <div className="rounded-2xl border border-dashed p-10 text-center">
           <Compass className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
@@ -411,29 +412,28 @@ export default function Discover() {
           <p className="mt-1 text-sm text-muted-foreground">{hasTasteHistory ? "Try again later, or add more ratings and genres to your finished books." : "Recommendations use your finished books, ratings, favorite authors, and genres."}</p>
         </div>}
 
-        {visibleRecommendations.length > 0 && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {visibleRecommendations.length > 0 && <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {visibleRecommendations.map((item) => {
             const candidateKey = recommendationKey(item);
             const disliked = dislikedKeys.has(candidateKey);
-            return <div key={candidateKey} className="group relative flex min-h-[15rem] overflow-hidden rounded-2xl border bg-card transition hover:-translate-y-0.5 hover:shadow-md">
-            <button type="button" onClick={() => setSelected(item)} className="flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <div className="relative min-h-[15rem] w-28 shrink-0 self-stretch bg-muted sm:w-32">
-              {item.coverUrl ? <img src={item.coverUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center" /> : <div className="absolute inset-0 flex items-center justify-center"><BookOpen className="h-8 w-8 text-muted-foreground/60" /></div>}
-            </div>
-            <div className="flex min-w-0 flex-col p-4 pr-12 pb-12">
-              <span className="line-clamp-3 font-semibold leading-snug">{item.title}</span>
-              <span className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.authors.join(", ")}</span>
-              {item.genres.length > 0 && <div className="mt-auto flex flex-wrap gap-1 pt-4">
-                {item.genres.slice(0, 3).map((genre) => <span key={genre} className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">{genre}</span>)}
-                {item.genres.length > 3 && <span className="px-1 py-0.5 text-[10px] text-muted-foreground">+{item.genres.length - 3}</span>}
-              </div>}
-            </div>
+            return <div key={candidateKey} className="relative min-w-0 space-y-3">
+            <button
+              type="button"
+              onClick={() => setSelected(item)}
+              className={`${bookCardBaseClassName} ${bookCardInteractiveClassName}`}
+            >
+              <BookCardContent book={{ title: item.title, authors: item.authors, cover_url: item.coverUrl ?? null, rating: null }} />
             </button>
+            {item.genres.length > 0 && <div className="flex flex-wrap gap-1">
+              {item.genres.slice(0, 3).map(genre => <span key={genre} className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">{genre}</span>)}
+              {item.genres.length > 3 && <span className="px-1 py-0.5 text-[10px] text-muted-foreground">+{item.genres.length - 3}</span>}
+            </div>}
+            <div className="flex items-center gap-1">
             <Button
               type="button"
               size="icon"
               variant="ghost"
-              className="absolute right-2 top-2 h-8 w-8"
+              className="h-8 w-8"
               aria-label="Save to wishlist"
               title="Save to wishlist"
               onClick={() => wishlistSelected(item)}
@@ -444,7 +444,7 @@ export default function Discover() {
               type="button"
               size="icon"
               variant={disliked ? "destructive" : "ghost"}
-              className="absolute bottom-2 right-2 h-8 w-8"
+              className="h-8 w-8"
               aria-label={disliked ? "Undo not interested" : "Not interested"}
               title={disliked ? "Undo not interested" : "Not interested"}
               disabled={savingFeedbackKey !== null}
@@ -452,6 +452,7 @@ export default function Discover() {
             >
               {savingFeedbackKey === candidateKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4" />}
             </Button>
+            </div>
           </div>;
           })}
         </div>}
