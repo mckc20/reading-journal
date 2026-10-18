@@ -108,7 +108,7 @@ function WrapUpViews({ preferenceKey }: { preferenceKey: string }) {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Sparkles className="h-8 w-8 shrink-0 text-primary" aria-hidden="true" />
-            <AppHeading level={1} className="text-2xl sm:text-3xl">Wrap-ups</AppHeading>
+            <AppHeading level={1} className="text-[1.625rem] sm:text-3xl">Wrap-ups</AppHeading>
           </div>
           <OverflowMenu label="Wrap-up view options">
             {close => <>
