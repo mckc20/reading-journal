@@ -150,6 +150,71 @@ test("keeps most-read authors above the minimum finished-book threshold", () => 
   assert.deepEqual(sortAuthorsByMostRead(authors).map((author) => author.id), ["three-read", "two-read"]);
 });
 
+test("hides wishlist-only authors while keeping standalone authors", () => {
+  const authors = [
+    makeAuthor({ id: "wishlist-author", name: "Wishlist Writer", is_favorite: true }),
+    makeAuthor({ id: "standalone-author", name: "Standalone Writer" }),
+  ];
+  const wishlist = [makeBook({ status: "Wishlist", authors: ["Wishlist Writer"] })];
+
+  const summaries = buildAuthorSummaries(authors, [], [], wishlist);
+
+  assert.deepEqual(summaries.map((author) => author.id), ["standalone-author"]);
+  assert.equal(summaries[0].bookCount, 0);
+  assert.equal(findAuthorSummary(summaries, "wishlist-author"), null);
+});
+
+test("counts only library books for authors shared with the wishlist", () => {
+  const author = makeAuthor({ name: "Shared Writer" });
+  const libraryBook = makeBook({ id: "library", authors: [author.name], rating: 4 });
+  const wishlistBook = makeBook({
+    id: "wishlist", status: "Wishlist", authors: [author.name], rating: 1,
+    date_finished: "2026-08-01", cover_url: "wishlist-cover.jpg",
+  });
+  const [summary] = buildAuthorSummaries(
+    [author], [libraryBook, wishlistBook],
+    [makeNote({ book_id: wishlistBook.id })], [wishlistBook],
+  );
+
+  assert.equal(summary.id, author.id);
+  assert.equal(summary.bookCount, 1);
+  assert.equal(summary.averageRating, 4);
+  assert.equal(summary.quoteCount, 0);
+  assert.deepEqual(summary.books.map((book) => book.id), [libraryBook.id]);
+  assert.deepEqual(summary.coverBooks.map((book) => book.id), [libraryBook.id]);
+  assert.equal(summary.latestReadDate, null);
+});
+
+test("reveals the existing author when a wishlist book moves into the library", () => {
+  const author = makeAuthor({ name: "Future Writer", photo_url: "portrait.jpg" });
+  const book = makeBook({ authors: [author.name], status: "Wishlist" });
+  assert.deepEqual(buildAuthorSummaries([author], [], [], [book]), []);
+
+  const [summary] = buildAuthorSummaries([author], [{ ...book, status: "To Read" }], [], [book]);
+
+  assert.equal(summary.id, author.id);
+  assert.equal(summary.photo_url, author.photo_url);
+  assert.equal(summary.bookCount, 1);
+  assert.equal(summary.statusCounts.wantToRead, 1);
+});
+
+test("matches wishlist author names using the same normalization as library books", () => {
+  const summaries = buildAuthorSummaries(
+    [makeAuthor({ name: "  Future   Writer  " })], [], [],
+    [makeBook({ status: "Wishlist", authors: ["future writer"] })],
+  );
+  assert.deepEqual(summaries, []);
+});
+
+test("excludes wishlist books and coauthors when summaries are built from mixed book scopes", () => {
+  const wishlist = makeBook({ status: "Wishlist", authors: ["Future Writer", "Coauthor"] });
+  assert.deepEqual(buildAuthorSummaries([wishlist]), []);
+  assert.deepEqual(buildAuthorSummaries(
+    [makeAuthor({ name: "Future Writer" }), makeAuthor({ id: "coauthor", name: "Coauthor" })],
+    [wishlist],
+  ), []);
+});
+
 function makeAuthor(overrides: Partial<Author>): Author {
   return {
     id: "author-1",

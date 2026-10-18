@@ -29,7 +29,7 @@ function EmptyState({ message }: { message: string }) {
 export default function AuthorQuotes() {
   const { authorId } = useParams();
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError } = useBooksContext();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function AuthorQuotes() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   const bookTitleById = useMemo(
     () => new Map((author?.books ?? []).map((book) => [book.id, book.title])),

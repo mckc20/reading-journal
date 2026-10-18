@@ -254,7 +254,7 @@ export default function AuthorDetails() {
     removeAuthor,
     reload: reloadAuthors,
   } = useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
   const { genres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
@@ -286,7 +286,7 @@ export default function AuthorDetails() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   useEffect(() => {
     if (!author || location.state?.openEdit !== true) return;
@@ -598,9 +598,9 @@ export default function AuthorDetails() {
               </>
             }
           />
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
             {authorSeries.map((group) => (
-              <SeriesStackCard key={group.seriesId} group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
+              <SeriesStackCard key={group.seriesId} variant="grid" group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
             ))}
           </div>
         </section>

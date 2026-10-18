@@ -102,9 +102,9 @@ function normalizeDisplay(value: string | null): AuthorDisplay {
 
 function LoadingAuthors() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-[22rem] animate-pulse rounded-2xl bg-muted/40" />
+        <div key={index} className="h-32 animate-pulse rounded-md bg-muted/40 sm:h-20" />
       ))}
     </div>
   );
@@ -152,7 +152,7 @@ function AuthorTable({
                     }
                   : undefined
               }
-              className={interactive ? "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" : "transition-colors"}
+              className={interactive ? "group cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" : "transition-colors"}
             >
               {selectedIds && onToggleAuthor ? (
                 <td className="w-9 py-1.5 pr-2">
@@ -166,8 +166,8 @@ function AuthorTable({
                   />
                 </td>
               ) : null}
-                <td className="w-12 py-2.5 pr-2">
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-medium text-primary-foreground">
+                <td className="w-[72px] py-4 pl-2 pr-4 sm:w-[76px] sm:pl-3">
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-medium text-primary-foreground">
                   {author.photo_url ? (
                     <img src={author.photo_url} alt={author.name} className="h-full w-full object-cover" />
                   ) : (
@@ -175,9 +175,9 @@ function AuthorTable({
                   )}
                 </div>
               </td>
-              <td className="py-2.5">
+              <td className="py-4">
                 <div className="min-w-0 overflow-hidden">
-                  <p className="truncate font-medium leading-snug" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{author.name}</p>
+                  <p className="truncate font-heading text-base leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline sm:text-lg" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{author.name}</p>
                 </div>
               </td>
               <td className="w-8 py-2.5 pl-2 pr-3"><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></td>
@@ -233,7 +233,7 @@ export default function AuthorsExplore() {
   const { settings } = useUserSettings();
   const { authors: authorRecords, loading: authorsLoading, error: authorsError, removeAuthor, reload: reloadAuthors } =
     useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
@@ -274,7 +274,7 @@ export default function AuthorsExplore() {
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
   const authorCountLabel = countLabel(authors.length, "author");
   const filteredAuthors = useMemo(() => {
     return authorMatchesSort(filterAuthors(authors, filters), sort);
@@ -652,7 +652,7 @@ export default function AuthorsExplore() {
       ) : displayAuthors.length === 0 ? (
         <EmptyState message="No authors match the current filters." />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
           {displayAuthors.map((author) => (
             <AuthorCard
               key={author.id}

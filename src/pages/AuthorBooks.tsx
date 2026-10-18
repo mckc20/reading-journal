@@ -135,7 +135,7 @@ export default function AuthorBooks() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
@@ -189,7 +189,7 @@ export default function AuthorBooks() {
     };
   }, []);
 
-  const authorSummaries = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries), [authorRecords, books, journalEntries]);
+  const authorSummaries = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
   const author = useMemo(() => findAuthorSummary(authorSummaries, authorId), [authorSummaries, authorId]);
   const latestReadDateByBook = useMemo(() => getReadingLogDateByBook(readingLogs), [readingLogs]);
 

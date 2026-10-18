@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpen, ChevronRight, Copy, Download, Heart, SquareMousePointer, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronRight, Copy, Download, SquareMousePointer, Trash2, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
@@ -31,56 +31,15 @@ function getSeriesAuthors(group: SeriesBookGroup): string[] {
 
 function LoadingSeriesGrid() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(122px,1fr))] gap-x-4 gap-y-6 sm:grid-cols-[repeat(auto-fit,minmax(148px,1fr))] sm:gap-x-6">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
       {Array.from({ length: 8 }).map((_, index) => (
         <div key={index} className="min-w-0">
-          <div className="mx-auto h-[145px] max-w-[148px] animate-pulse rounded-md bg-muted sm:h-[178px]" />
+          <div className="aspect-[2/3] w-full animate-pulse rounded-md bg-muted" />
           <div className="mt-2 h-3 w-24 animate-pulse rounded bg-muted" />
           <div className="mt-2 h-3 w-14 animate-pulse rounded bg-muted" />
         </div>
       ))}
     </div>
-  );
-}
-
-function EmptySeriesCard({
-  group,
-  onSeries,
-  interactive = true,
-  selected = false,
-}: {
-  group: SeriesBookGroup;
-  onSeries: (seriesId: string) => void;
-  interactive?: boolean;
-  selected?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={interactive ? () => onSeries(group.seriesId) : undefined}
-      className={`group block w-full min-w-0 rounded-xl text-left transition-shadow duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${selected ? "bg-muted" : ""}`}
-    >
-      <div className="relative mx-auto h-[145px] w-[122px] sm:h-[178px] sm:w-[148px]">
-        <div className="absolute left-0 top-2 flex h-[135px] w-[90px] items-center justify-center overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border transition-colors group-hover:bg-muted/80 sm:h-[168px] sm:w-[112px]">
-          <BookOpen className="h-8 w-8 text-muted-foreground/40" />
-          {group.isFavorite && (
-            <span className="absolute right-1.5 top-1.5">
-              <Heart className="h-4 w-4 fill-favorite text-favorite drop-shadow" aria-hidden="true" />
-              <span className="sr-only">Favorite series</span>
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="mt-2 min-w-0">
-        {selected ? (
-          <div className="inline-block max-w-full rounded bg-primary px-1.5 py-0.5 text-primary-foreground">
-            <p className="line-clamp-2 text-xs font-medium leading-tight">{group.name}</p>
-          </div>
-        ) : (
-          <p className="line-clamp-2 text-xs font-medium leading-tight text-foreground">{group.name}</p>
-        )}
-      </div>
-    </button>
   );
 }
 
@@ -233,18 +192,18 @@ export default function Series() {
           <table className="w-full table-fixed text-left text-sm">
             <tbody className="divide-y divide-border/70">
               {groups.map((group) => (
-                <tr key={group.seriesId} className={selected.has(group.seriesId) ? "bg-muted/50" : "hover:bg-muted/50"}>
+                <tr key={group.seriesId} className={selected.has(group.seriesId) ? "group bg-muted/50" : "group hover:bg-muted/50"}>
                   {managing && <td className="w-9 py-1.5 pr-2">
                     <input type="checkbox" checked={selected.has(group.seriesId)} disabled={saving} onChange={() => toggle(group.seriesId)} aria-label={`Select ${group.name}`} className="h-4 w-4 rounded border-border" />
                   </td>}
-                  <td className="py-2.5">
-                    <button type="button" className="flex w-full items-center gap-2 text-left" disabled={managing && saving} onClick={() => managing ? toggle(group.seriesId) : openSeries(group.seriesId)}>
-                      <span className="relative h-9 w-10 shrink-0">
-                        {group.books.slice(0, 3).map((book, index) => <span key={book.id} className="absolute top-0 h-9 w-6 overflow-hidden rounded-sm border border-background bg-muted" style={{ left: `${index * 7}px`, zIndex: 3 - index }}>{book.cover_url ? <img src={book.cover_url} alt="" className="h-full w-full object-cover" /> : <BookOpen className="m-1 h-4 w-4 text-muted-foreground/50" />}</span>)}
-                        {group.books.length === 0 && <span className="flex h-9 w-7 items-center justify-center rounded-sm bg-muted"><BookOpen className="h-4 w-4 text-muted-foreground/50" /></span>}
+                  <td className="px-2 py-4 sm:px-3">
+                    <button type="button" className="group flex w-full items-center gap-4 text-left" disabled={managing && saving} onClick={() => managing ? toggle(group.seriesId) : openSeries(group.seriesId)}>
+                      <span className="relative h-[72px] w-12 shrink-0">
+                        {group.books.slice(0, 3).map((book, index) => <span key={book.id} className="absolute top-0 h-[72px] w-12 overflow-hidden rounded-sm border border-background bg-muted" style={{ left: `${index * 3}px`, zIndex: 3 - index }}>{book.cover_url ? <img src={book.cover_url} alt="" className="h-full w-full object-cover" /> : <BookOpen className="m-1 h-4 w-4 text-muted-foreground/50" />}</span>)}
+                        {group.books.length === 0 && <span className="flex h-[72px] w-12 items-center justify-center rounded-sm bg-muted"><BookOpen className="h-4 w-4 text-muted-foreground/50" /></span>}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{group.name}</span>
+                        <span className="block truncate font-heading text-base leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline sm:text-lg" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{group.name}</span>
                         {getSeriesAuthors(group).length > 0 && <span className="mt-0.5 block truncate text-xs text-muted-foreground" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{getSeriesAuthors(group).join(", ")}</span>}
                       </span>
                       <ChevronRight className="mr-3 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -258,15 +217,11 @@ export default function Series() {
       ) : (
         <div
           aria-label="Series collection"
-          className="grid grid-cols-[repeat(auto-fit,minmax(122px,1fr))] gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fit,minmax(148px,1fr))] sm:gap-x-6"
+          className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
         >
           {groups.map((group) => (
             <div key={group.seriesId} className={`relative rounded-lg ${managing ? "cursor-pointer" : ""}`} onClick={managing ? () => toggle(group.seriesId) : undefined} onKeyDown={managing ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(group.seriesId); } } : undefined} role={managing ? "checkbox" : undefined} aria-checked={managing ? selected.has(group.seriesId) : undefined} tabIndex={managing ? 0 : undefined}>
-              {group.books.length === 0 ? (
-              <EmptySeriesCard key={group.seriesId} group={group} onSeries={openSeries} interactive={!managing} selected={selected.has(group.seriesId)} />
-            ) : (
-              <SeriesStackCard key={group.seriesId} group={group} onSeries={openSeries} interactive={!managing} selected={selected.has(group.seriesId)} showBookCount={false} />
-              )}
+              <SeriesStackCard group={group} onSeries={openSeries} interactive={!managing} selected={selected.has(group.seriesId)} showBookCount={false} variant="grid" />
             </div>
           ))}
         </div>

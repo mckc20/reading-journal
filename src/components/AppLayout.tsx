@@ -139,7 +139,9 @@ function AppLayoutContent() {
   const [addMenuHasBeenInteracted, setAddMenuHasBeenInteracted] = useState(false);
   const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
   const [, setDetailEditingOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerPinned, setDrawerPinned] = useState(false);
+  const [drawerHovered, setDrawerHovered] = useState(false);
+  const drawerOpen = drawerPinned || drawerHovered;
   const desktopAddButtonRef = useRef<HTMLButtonElement>(null);
   const desktopAddMenuRef = useRef<HTMLDivElement>(null);
   const mobileAddButtonRef = useRef<HTMLButtonElement>(null);
@@ -199,9 +201,19 @@ function AppLayoutContent() {
     setAddBookOpen(true);
   }
 
-  function toggleAddMenu() {
+  function changeAddMenuOpen(open: boolean) {
     setAddMenuHasBeenInteracted(true);
-    setAddMenuOpen((current) => !current);
+    setAddMenuOpen(open);
+  }
+
+  function closeDrawer() {
+    setDrawerPinned(false);
+    setDrawerHovered(false);
+  }
+
+  function toggleDrawer() {
+    if (drawerPinned) closeDrawer();
+    else setDrawerPinned(true);
   }
 
   function closeAddBook(open: boolean) {
@@ -237,11 +249,12 @@ function AppLayoutContent() {
           displayName={displayName}
           drawerOpen={drawerOpen}
           addMenuOpen={addMenuOpen}
+          addMenuHasBeenInteracted={addMenuHasBeenInteracted}
           addButtonRef={desktopAddButtonRef}
           addMenuRef={desktopAddMenuRef}
-          onToggleDrawer={() => setDrawerOpen((current) => !current)}
-          onCloseDrawer={() => setDrawerOpen(false)}
-          onToggleAddMenu={() => setAddMenuOpen((current) => !current)}
+          onToggleDrawer={toggleDrawer}
+          onCloseDrawer={closeDrawer}
+          onAddMenuOpenChange={changeAddMenuOpen}
           onSelectAddAction={openAddDialog}
         />
 
@@ -249,8 +262,9 @@ function AppLayoutContent() {
           open={drawerOpen}
           pathname={location.pathname}
           search={location.search}
-          onToggleOpen={() => setDrawerOpen((current) => !current)}
-          onClose={() => setDrawerOpen(false)}
+          onToggleOpen={toggleDrawer}
+          onClose={closeDrawer}
+          onHoverOpenChange={setDrawerHovered}
         />
 
         <main
@@ -285,7 +299,7 @@ function AppLayoutContent() {
           addMenuHasBeenInteracted={addMenuHasBeenInteracted}
           addButtonRef={mobileAddButtonRef}
           addMenuRef={mobileAddMenuRef}
-          onToggleAddMenu={toggleAddMenu}
+          onAddMenuOpenChange={changeAddMenuOpen}
           onSelectAddAction={openAddDialog}
         />
       </div>
@@ -336,11 +350,12 @@ function AppHeader({
   displayName,
   drawerOpen,
   addMenuOpen,
+  addMenuHasBeenInteracted,
   addButtonRef,
   addMenuRef,
   onToggleDrawer,
   onCloseDrawer,
-  onToggleAddMenu,
+  onAddMenuOpenChange,
   onSelectAddAction,
 }: {
   pathname: string;
@@ -350,11 +365,12 @@ function AppHeader({
   displayName: string;
   drawerOpen: boolean;
   addMenuOpen: boolean;
+  addMenuHasBeenInteracted: boolean;
   addButtonRef: RefObject<HTMLButtonElement>;
   addMenuRef: RefObject<HTMLDivElement>;
   onToggleDrawer: () => void;
   onCloseDrawer: () => void;
-  onToggleAddMenu: () => void;
+  onAddMenuOpenChange: (open: boolean) => void;
   onSelectAddAction: (action: AddAction) => void;
 }) {
   return (
@@ -410,7 +426,8 @@ function AppHeader({
             buttonRef={addButtonRef}
             menuRef={addMenuRef}
             open={addMenuOpen}
-            onToggleOpen={onToggleAddMenu}
+            hasBeenInteracted={addMenuHasBeenInteracted}
+            onOpenChange={onAddMenuOpenChange}
             onSelect={onSelectAddAction}
           />
           <Button size="icon" variant="ghost" asChild>
@@ -438,12 +455,14 @@ function SideDrawer({
   search,
   onToggleOpen,
   onClose,
+  onHoverOpenChange,
 }: {
   open: boolean;
   pathname: string;
   search: string;
   onToggleOpen: () => void;
   onClose: () => void;
+  onHoverOpenChange: (open: boolean) => void;
 }) {
   return (
     <>
@@ -463,6 +482,14 @@ function SideDrawer({
           open ? "w-72 md:w-64" : "w-16",
           open ? "md:z-[60]" : "md:z-40",
         )}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse" && window.matchMedia("(min-width: 768px)").matches) {
+            onHoverOpenChange(true);
+          }
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") onHoverOpenChange(false);
+        }}
         aria-label="Side navigation"
       >
         <div
@@ -721,38 +748,64 @@ function AddMenuPanel({
 
 function DesktopAddButtonMenu({
   open,
-  onToggleOpen,
+  hasBeenInteracted,
+  onOpenChange,
   onSelect,
   buttonRef,
   menuRef,
 }: {
   open: boolean;
-  onToggleOpen: () => void;
+  hasBeenInteracted: boolean;
+  onOpenChange: (open: boolean) => void;
   onSelect: (action: AddAction) => void;
   buttonRef: RefObject<HTMLButtonElement>;
   menuRef: RefObject<HTMLDivElement>;
 }) {
+  const pointerIsHovering = useRef(false);
+
   return (
-    <div className="relative hidden md:block">
+    <div
+      className="relative hidden md:block"
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse") return;
+        pointerIsHovering.current = true;
+        onOpenChange(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "mouse") return;
+        pointerIsHovering.current = false;
+        if (!event.currentTarget.contains(document.activeElement)) onOpenChange(false);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget) && !pointerIsHovering.current) {
+          onOpenChange(false);
+        }
+      }}
+    >
       <Button
         ref={buttonRef}
         type="button"
-        size="sm"
-        className="gap-1.5"
+        size="icon-lg"
+        className="rounded-full"
         aria-label="Add"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={onToggleOpen}
+        onClick={() => onOpenChange(pointerIsHovering.current || !open)}
       >
-        <Plus className="h-4 w-4" />
-        Add
+        <Plus
+          className={cn("size-5", open ? "animate-mobile-add-spin-open" : hasBeenInteracted ? "animate-mobile-add-spin-close" : undefined)}
+          aria-hidden="true"
+        />
       </Button>
       {open && (
         <div
           ref={menuRef}
-          className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]"
+          // The padding bridges the gap so moving into the menu keeps it open.
+          className="absolute right-0 top-full z-50 w-52 pt-3"
         >
-          <AddMenuPanel onSelect={onSelect} />
+          <div className="animate-desktop-add-dropdown origin-top-right overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]">
+            <AddMenuPanel onSelect={onSelect} animateOptions={open} />
+          </div>
         </div>
       )}
     </div>
@@ -766,7 +819,7 @@ function MobileBottomNav({
   addMenuHasBeenInteracted,
   addButtonRef,
   addMenuRef,
-  onToggleAddMenu,
+  onAddMenuOpenChange,
   onSelectAddAction,
 }: {
   pathname: string;
@@ -775,9 +828,11 @@ function MobileBottomNav({
   addMenuHasBeenInteracted: boolean;
   addButtonRef: RefObject<HTMLButtonElement>;
   addMenuRef: RefObject<HTMLDivElement>;
-  onToggleAddMenu: () => void;
+  onAddMenuOpenChange: (open: boolean) => void;
   onSelectAddAction: (action: AddAction) => void;
 }) {
+  const pointerIsHovering = useRef(false);
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {primaryNavLinks.map(({ to, label, icon: Icon }) => {
@@ -796,16 +851,35 @@ function MobileBottomNav({
           </Link>
         );
       })}
-      <div className="relative flex flex-1 justify-center">
+      <div
+        className="relative flex flex-1 items-center justify-center"
+        onPointerEnter={(event) => {
+          if (event.pointerType !== "mouse") return;
+          pointerIsHovering.current = true;
+          onAddMenuOpenChange(true);
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType !== "mouse") return;
+          pointerIsHovering.current = false;
+          if (!event.currentTarget.contains(document.activeElement)) onAddMenuOpenChange(false);
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget) && !pointerIsHovering.current) {
+            onAddMenuOpenChange(false);
+          }
+        }}
+      >
         <div
           ref={addMenuRef}
           aria-hidden={!addMenuOpen}
           className={cn(
-            "absolute bottom-[calc(100%+0.5rem)] right-2 w-52 origin-bottom-right rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-[var(--shadow-popover)]",
-            addMenuOpen ? "animate-mobile-add-dropup" : "pointer-events-none hidden",
+            "absolute bottom-full right-2 w-52 pb-2",
+            !addMenuOpen && "pointer-events-none hidden",
           )}
         >
-          <AddMenuPanel onSelect={onSelectAddAction} animateOptions={addMenuOpen} />
+          <div className={cn("origin-bottom-right rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-[var(--shadow-popover)]", addMenuOpen && "animate-mobile-add-dropup")}>
+            <AddMenuPanel onSelect={onSelectAddAction} animateOptions={addMenuOpen} />
+          </div>
         </div>
         <button
           ref={addButtonRef}
@@ -817,7 +891,7 @@ function MobileBottomNav({
           aria-label="Add"
           aria-haspopup="menu"
           aria-expanded={addMenuOpen}
-          onClick={onToggleAddMenu}
+          onClick={() => onAddMenuOpenChange(pointerIsHovering.current || !addMenuOpen)}
         >
           <Plus
             className={cn(

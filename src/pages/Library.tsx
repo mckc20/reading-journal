@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { EmptyState, PageHeader, SectionHeader } from "@/components/reading-journal";
 import { Button } from "@/components/ui/button";
+import { bookCardInteractiveClassName } from "@/components/BookCardContent";
+import { cn } from "@/lib/utils";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -21,6 +23,7 @@ import { buildAuthorSummaries, getAuthorInitials } from "@/lib/authorShelf";
 import { buildGenreSlugLookup } from "@/lib/genres";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import BookShelf from "@/pages/library/BookShelf";
+import HorizontalShelf from "@/pages/library/HorizontalShelf";
 import LibraryBookCard from "@/pages/library/LibraryBookCard";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorSummary } from "@/lib/authorShelf";
@@ -206,23 +209,6 @@ function EntityShelf({
   );
 }
 
-function HorizontalShelf({
-  children,
-  ariaLabel,
-}: {
-  children: ReactNode;
-  ariaLabel: string;
-}) {
-  return (
-    <div
-      aria-label={ariaLabel}
-      className="-mx-1 flex gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {children}
-    </div>
-  );
-}
-
 function AuthorShelfItem({
   author,
   onOpen,
@@ -234,17 +220,18 @@ function AuthorShelfItem({
     <button
       type="button"
       data-shelf-item
-      className="group w-24 shrink-0 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-28"
+      className={cn("group w-24 shrink-0 space-y-3 rounded-md text-center sm:w-28", bookCardInteractiveClassName)}
       aria-label={author.name}
       onClick={() => onOpen(author.id)}
     >
-      <div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm transition-opacity group-hover:opacity-90 sm:h-24 sm:w-24">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm sm:h-24 sm:w-24">
         {author.photo_url ? (
           <img src={author.photo_url} alt={author.name} loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <span className="text-lg font-medium leading-none">{getAuthorInitials(author.name)}</span>
         )}
       </div>
+      <p className="line-clamp-2 break-words text-sm font-medium leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline">{author.name}</p>
     </button>
   );
 }
@@ -294,7 +281,7 @@ function MobileLibraryCategoryList({
   counts: Record<(typeof mobileLibraryCategories)[number]["key"], number | string>;
 }) {
   return (
-    <nav aria-label="Library categories" className="border-y">
+    <nav aria-label="Library categories" className="border-b">
       {mobileLibraryCategories.map(({ key, label, to, icon: Icon }) => (
         <Link
           key={to}
@@ -322,7 +309,7 @@ export default function Library() {
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get("view");
   const sortedBooks = useMemo(() => sortByDateAdded(books), [books]);
-  const authorSummaries = useMemo(() => buildAuthorSummaries(authors, sortedBooks), [authors, sortedBooks]);
+  const authorSummaries = useMemo(() => buildAuthorSummaries(authors, sortedBooks, [], wishlist), [authors, sortedBooks, wishlist]);
   const seriesGroups = useMemo(
     () => buildSeriesGroups(sortedBooks, series.filter((item) => !item.is_wishlist_only), { includeEmpty: true }),
     [sortedBooks, series],
@@ -384,6 +371,7 @@ export default function Library() {
             <div className="overflow-hidden rounded-lg border bg-card">
               <BookShelf
                 title="Books"
+                showAuthor={false}
                 books={sortedBooks}
                 onBook={openBook}
                 onViewAll={() => navigate("/library/books")}
@@ -396,7 +384,7 @@ export default function Library() {
                 to="/library/authors"
                 emptyMessage="Authors will appear here after you add books or authors."
               >
-                <HorizontalShelf ariaLabel="Authors shelf">
+                <HorizontalShelf title="Authors">
                   {authorSummaries.map((author) => (
                     <AuthorShelfItem key={author.id} author={author} onOpen={openAuthor} />
                   ))}
@@ -409,22 +397,20 @@ export default function Library() {
                 to="/library/series"
                 emptyMessage="Series you add will appear here."
               >
-                <HorizontalShelf ariaLabel="Series shelf">
+                <HorizontalShelf title="Series">
                   {seriesGroups.map((group) => (
                     <div key={group.seriesId} data-shelf-item className="w-[122px] shrink-0 sm:w-[148px]">
-                      <div className="[&_p]:sr-only">
-                        <SeriesStackCard group={group} onSeries={openSeries} />
-                      </div>
+                      <SeriesStackCard group={group} onSeries={openSeries} variant="shelf" showBookCount={false} />
                     </div>
                   ))}
                 </HorizontalShelf>
               </EntityShelf>
 
               <EntityShelf title="Wishlist" count={wishlist.length} to="/library/wishlist" emptyMessage="Books you save for later will appear here.">
-                <HorizontalShelf ariaLabel="Wishlist shelf">
+                <HorizontalShelf title="Wishlist">
                   {wishlist.map((item) => (
                     <div key={item.id} data-shelf-item className="w-[90px] shrink-0 sm:w-[112px]">
-                      <LibraryBookCard book={item} onBook={() => navigate('/library/wishlist')} variant="shelf" />
+                      <LibraryBookCard book={item} onBook={() => navigate('/library/wishlist')} variant="shelf" showAuthor={false} />
                     </div>
                   ))}
                 </HorizontalShelf>
@@ -435,7 +421,7 @@ export default function Library() {
                 to="/library/genres"
                 emptyMessage="Genres will appear here after you add them."
               >
-                <HorizontalShelf ariaLabel="Genres shelf">
+                <HorizontalShelf title="Genres">
                   {genres.map((genre) => (
                     <GenreShelfItem key={genre.id} genre={genre} slug={slugById.get(genre.id) ?? genre.id} />
                   ))}
@@ -446,18 +432,20 @@ export default function Library() {
         </section>
       </div>
 
-      <LibrarySection
-        title="Recently Added"
-        countLabel={booksLoading ? "..." : bookCountLabel(books.length)}
-      >
-        {booksLoading ? (
-          <LoadingGrid />
-        ) : sortedBooks.length === 0 ? (
-          <EmptyLibraryView message="No books yet. Tap + to add one." />
-        ) : (
-          <RecentlyAddedPreview books={sortedBooks} onBook={openBook} />
-        )}
-      </LibrarySection>
+      <div className="sm:hidden">
+        <LibrarySection
+          title="Recently Added"
+          countLabel={booksLoading ? "..." : bookCountLabel(books.length)}
+        >
+          {booksLoading ? (
+            <LoadingGrid />
+          ) : sortedBooks.length === 0 ? (
+            <EmptyLibraryView message="No books yet. Tap + to add one." />
+          ) : (
+            <RecentlyAddedPreview books={sortedBooks} onBook={openBook} />
+          )}
+        </LibrarySection>
+      </div>
     </div>
   );
 }

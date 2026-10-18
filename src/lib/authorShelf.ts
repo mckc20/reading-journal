@@ -179,6 +179,7 @@ export function buildAuthorSummaries(
   first: Author[] | Book[],
   second: Book[] | BookJournalEntryRecord[] = [],
   third: BookJournalEntryRecord[] = [],
+  wishlistBooks: Book[] = [],
 ): AuthorSummary[] {
   const firstItem = first[0] as Author | Book | undefined;
   const secondItem = second[0] as Book | BookJournalEntryRecord | undefined;
@@ -186,12 +187,23 @@ export function buildAuthorSummaries(
   const secondLooksLikeBook = Boolean(secondItem && "title" in secondItem && "status" in secondItem);
   const usesNewSignature = firstLooksLikeAuthor || third.length > 0 || secondLooksLikeBook;
   const authorsInput = usesNewSignature ? (first as Author[]) : [];
-  const books = usesNewSignature ? (second as Book[]) : (first as Book[]);
+  const inputBooks = usesNewSignature ? (second as Book[]) : (first as Book[]);
+  const books = inputBooks.filter((book) => book.status !== "Wishlist");
+  const wishlistAuthorKeys = new Set(
+    [...wishlistBooks, ...inputBooks.filter((book) => book.status === "Wishlist")]
+      .flatMap(uniqueAuthorNames).map(authorKey),
+  );
+  const libraryAuthorKeys = new Set(books.flatMap(uniqueAuthorNames).map(authorKey));
   const journalEntries = usesNewSignature ? third : (second as BookJournalEntryRecord[]);
 
   const authorGroups = new Map<string, { author: AuthorSummary; books: Book[] }>();
 
   authorsInput.forEach((author) => {
+    // Wishlist saves create author rows too; only library books make those rows visible.
+    // Keep standalone authors that the user added without linking any books.
+    const key = authorKey(author.name);
+    if (wishlistAuthorKeys.has(key) && !libraryAuthorKeys.has(key)) return;
+
     const summary: AuthorSummary = {
       ...author,
       isFavorite: author.is_favorite,

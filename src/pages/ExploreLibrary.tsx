@@ -425,12 +425,12 @@ function BookTableRow({
         }
       }}
       className={cn(
-        "cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+        "group cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
         selected && "bg-muted",
       )}
     >
       <td colSpan={3} className="p-0">
-        <div className="flex min-w-0 items-center gap-3 px-2 py-2.5 sm:px-3">
+        <div className="flex min-w-0 items-center gap-4 px-2 py-4 sm:px-3">
           {isSelecting && (
             <input
               type="checkbox"
@@ -442,7 +442,7 @@ function BookTableRow({
               className="h-4 w-4 shrink-0 rounded border-border"
             />
           )}
-          <div className="h-10 w-7 shrink-0 overflow-hidden rounded-sm bg-muted">
+          <div className="h-[72px] w-12 shrink-0 overflow-hidden rounded-sm bg-muted">
             {book.cover_url ? (
               <img
                 src={book.cover_url}
@@ -457,7 +457,7 @@ function BookTableRow({
             )}
           </div>
           <div className="min-w-0 flex-1 py-0.5">
-            <p className="truncate whitespace-nowrap font-medium leading-snug" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.title}</p>
+            <p className="truncate whitespace-nowrap font-heading text-base leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline sm:text-lg" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.title}</p>
             {book.authors.length > 0 && <p className="mt-0.5 truncate whitespace-nowrap text-xs text-muted-foreground" style={{ maskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 1rem), transparent 100%)" }}>{book.authors.join(", ")}</p>}
           </div>
           <ChevronRight className="mr-1 h-4 w-4 shrink-0 text-muted-foreground" />

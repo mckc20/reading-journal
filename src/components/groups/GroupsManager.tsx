@@ -635,7 +635,7 @@ function formatAttachmentSaveReceipt(receipts: ChatAttachmentSaveReceipt[]): str
 export function GroupsManager() {
   const { user } = useAuth();
   const { authors: authorRecords, addAuthor, editAuthor } = useAuthorsContext();
-  const { books, addBook, updateBook } = useBooksContext();
+  const { books, wishlistBooks, addBook, updateBook } = useBooksContext();
   const { series: librarySeries, addSeries, editSeries } = useSeries();
   const navigate = useNavigate();
   const location = useLocation();
@@ -712,8 +712,8 @@ export function GroupsManager() {
   );
 
   const authorSummaries = useMemo(
-    () => buildAuthorSummaries(authorRecords, books, journalEntries),
-    [authorRecords, books, journalEntries],
+    () => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks),
+    [authorRecords, books, journalEntries, wishlistBooks],
   );
   const seriesBooksById = useMemo(() => {
     const map = new Map<string, Book[]>();

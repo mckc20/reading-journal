@@ -21,9 +21,9 @@ const ALL_AUTHORS_PREVIEW_LIMIT = 6;
 
 function LoadingAuthors() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-[22rem] animate-pulse rounded-2xl bg-muted/40" />
+        <div key={index} className="h-32 animate-pulse rounded-md bg-muted/40 sm:h-20" />
       ))}
     </div>
   );
@@ -212,7 +212,7 @@ function AuthorPreviewGrid({
   if (authors.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
       {authors.map((author) => (
         <AuthorCard key={author.id} author={author} onClick={() => onAuthor(author.id)} compact />
       ))}
@@ -222,7 +222,7 @@ function AuthorPreviewGrid({
 
 export default function Authors() {
   const { authors: authorRecords, loading: authorsLoading, error: authorsError } = useAuthorsContext();
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError } = useBooksContext();
   const navigate = useNavigate();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
@@ -251,8 +251,8 @@ export default function Authors() {
   }, []);
 
   const authors = useMemo(
-    () => buildAuthorSummaries(authorRecords, books, journalEntries),
-    [authorRecords, books, journalEntries],
+    () => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks),
+    [authorRecords, books, journalEntries, wishlistBooks],
   );
   const authorsByName = useMemo(() => sortAuthorsByName(authors), [authors]);
   const topAuthors = useMemo(

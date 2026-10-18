@@ -209,6 +209,7 @@ export default function BookDetails() {
   const { settings } = useUserSettings();
   const {
     books,
+    wishlistBooks,
     loading,
     error,
     updateBook,
@@ -398,8 +399,8 @@ export default function BookDetails() {
   }, [book, books]);
 
   const authorSummaries = useMemo(
-    () => buildAuthorSummaries(authors, books, journalEntries),
-    [authors, books, journalEntries],
+    () => buildAuthorSummaries(authors, books, journalEntries, wishlistBooks),
+    [authors, books, journalEntries, wishlistBooks],
   );
 
   const exploreGenre = useMemo(
