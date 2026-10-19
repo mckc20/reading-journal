@@ -217,7 +217,7 @@ export default function Series() {
       ) : (
         <div
           aria-label="Series collection"
-          className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
+          className="grid grid-cols-[repeat(auto-fill,88px)] justify-between gap-8 sm:grid-cols-[repeat(auto-fill,126px)] lg:grid-cols-[repeat(auto-fill,140px)]"
         >
           {groups.map((group) => (
             <div key={group.seriesId} className={`relative rounded-lg ${managing ? "cursor-pointer" : ""}`} onClick={managing ? () => toggle(group.seriesId) : undefined} onKeyDown={managing ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(group.seriesId); } } : undefined} role={managing ? "checkbox" : undefined} aria-checked={managing ? selected.has(group.seriesId) : undefined} tabIndex={managing ? 0 : undefined}>
