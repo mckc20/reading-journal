@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -175,7 +176,7 @@ export default function AddChatDialog({ open, onOpenChange, onCreated }: AddChat
             <Label>Search results</Label>
             <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2">
               {loading ? (
-                <p className="px-2 py-3 text-sm text-muted-foreground">Searching…</p>
+                <LoadingIndicator variant="inline" label="Searching…" />
               ) : results.length > 0 ? (
                 results.map((profile) => {
                   const selectedHere = selectedIds.has(profile.id);

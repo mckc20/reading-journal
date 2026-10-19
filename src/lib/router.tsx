@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -42,7 +43,7 @@ const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 
 function lazyRoute(element: ReactNode) {
-  return <Suspense fallback={null}>{element}</Suspense>;
+  return <Suspense fallback={<LoadingIndicator variant="page" />}>{element}</Suspense>;
 }
 
 function NotFound() {

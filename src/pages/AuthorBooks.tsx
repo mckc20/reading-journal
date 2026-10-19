@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, Grid2X2, Timeline } from "lucide-react";
@@ -103,11 +104,7 @@ function sortTimelineBooks(
 
 function LoadingAuthors() {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-[18rem] animate-pulse rounded-2xl bg-muted/40" />
-      ))}
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 
@@ -226,7 +223,6 @@ export default function AuthorBooks() {
   if (authorsLoading || booksLoading || journalEntriesLoading || seriesLoading || readingLogsLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
         <LoadingAuthors />
       </div>
     );

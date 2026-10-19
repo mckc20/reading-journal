@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   buildGenreTree,
@@ -10,16 +10,19 @@ export function useGenres() {
   const { user } = useAuth();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedUserId = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      // Keep already loaded content usable during background refreshes.
+      setLoading(loadedUserId.current !== user.id);
       setError(null);
       const data = await fetchGenres();
       setGenres(data);
+      loadedUserId.current = user.id;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load genres");
     } finally {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   createAuthor,
@@ -14,16 +14,19 @@ export function useAuthors() {
   const { user } = useAuth();
   const [authors, setAuthors] = useState<Author[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedUserId = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      // Keep already loaded content usable during background refreshes.
+      setLoading(loadedUserId.current !== user.id);
       setError(null);
       const data = await fetchAuthors();
       setAuthors(data);
+      loadedUserId.current = user.id;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load authors");
     } finally {

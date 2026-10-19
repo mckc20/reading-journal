@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { NotebookPen } from "lucide-react";
@@ -65,9 +66,6 @@ export default function JournalEntryRedirect() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
-      <div className="h-40 animate-pulse rounded-lg bg-muted" />
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }

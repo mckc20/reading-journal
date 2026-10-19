@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context";
 
@@ -10,7 +11,7 @@ export default function ProtectedRoute() {
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <LoadingIndicator variant="page" label="Loading your session…" />
       </div>
     );
   }

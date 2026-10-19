@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
@@ -132,7 +133,7 @@ function StatCard({
   active = false,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   detail?: string;
   icon: React.ComponentType<{ className?: string }>;
   compact?: boolean;
@@ -406,10 +407,7 @@ function SeriesAnalyticsPanel({
 
   if (loading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="h-24 animate-pulse rounded-lg bg-muted/30" />
-        <div className="h-24 animate-pulse rounded-lg bg-muted/30" />
-      </div>
+      <LoadingIndicator label="Loading series analytics…" />
     );
   }
 
@@ -715,7 +713,7 @@ export default function Analytics() {
           </div>
         ) : null}
 
-        <AnalyticsCategoryPanel
+        {isLoading ? <LoadingIndicator label="Loading reading analytics…" /> : <AnalyticsCategoryPanel
           activeCategory={routeCategory}
           analytics={analytics}
           habits={habits}
@@ -724,7 +722,7 @@ export default function Analytics() {
           series={series}
           seriesLoading={seriesLoading}
           seriesError={seriesError}
-        />
+        />}
       </div>
     );
   }
@@ -747,94 +745,93 @@ export default function Analytics() {
         </div>
       ) : null}
 
-      <Section title="Key Statistics" description="The main lifetime numbers for completed books and tracked reading.">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Books Finished"
-            value={isLoading ? "..." : formatNumber(analytics.overview.booksFinished)}
-            icon={BookOpen}
-          />
-          <StatCard
-            label="Pages Read"
-            value={isLoading ? "..." : formatNumber(analytics.overview.pagesRead)}
-            detail="Finished books only"
-            icon={Layers3}
-          />
-          <StatCard
-            label="Reading Time"
-            value={isLoading ? "..." : formatReadingTime(analytics.overview.readingMinutes)}
-            detail="Finished and currently reading books"
-            icon={Clock}
-          />
-          <StatCard
-            label="Average Speed"
-            value={isLoading ? "..." : formatSpeed(analytics.overview.averageSpeed)}
-            detail="From progress logs with reading time"
-            icon={Gauge}
-          />
-        </div>
-      </Section>
-
-      <div className="space-y-10">
-        <Section title="Reading Trend" description="Monthly charts based on when reading activity or finishes happened.">
-          <SimpleBarChart
-            title={monthlyTrendChart.title}
-            data={monthlyTrendChart.data}
-            unit={monthlyTrendChart.unit}
-            action={
-              <div className="inline-flex rounded-md bg-background p-1">
-                {(["books", "pages", "minutes"] as MonthlyTrendMetric[]).map((metric) => (
-                  <Button
-                    key={metric}
-                    type="button"
-                    variant={monthlyTrendMetric === metric ? "default" : "ghost"}
-                    size="xs"
-                    onClick={() => setMonthlyTrendMetric(metric)}
-                  >
-                    {metric === "minutes" ? "Time" : metric[0].toUpperCase() + metric.slice(1)}
-                  </Button>
-                ))}
-              </div>
-            }
-          />
+      {booksLoading ? <LoadingIndicator variant="page" label="Loading reading analytics…" /> : <>
+        <Section title="Key Statistics" description="The main lifetime numbers for completed books and tracked reading.">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Books Finished"
+              value={formatNumber(analytics.overview.booksFinished)}
+              icon={BookOpen}
+            />
+            <StatCard
+              label="Pages Read"
+              value={formatNumber(analytics.overview.pagesRead)}
+              detail="Finished books only"
+              icon={Layers3}
+            />
+            <StatCard
+              label="Reading Time"
+              value={logsLoading ? <LoadingIndicator variant="inline" label="Loading reading time…" /> : formatReadingTime(analytics.overview.readingMinutes)}
+              detail="Finished and currently reading books"
+              icon={Clock}
+            />
+            <StatCard
+              label="Average Speed"
+              value={logsLoading ? <LoadingIndicator variant="inline" label="Loading reading speed…" announce={false} /> : formatSpeed(analytics.overview.averageSpeed)}
+              detail="From progress logs with reading time"
+              icon={Gauge}
+            />
+          </div>
         </Section>
 
-        <Section title="Reading Heatmap" description="Daily reading activity from your progress logs.">
-          {logsLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-muted/30" />
-          ) : logsError ? null : (
-            <ReadingHeatmap logs={logs} />
+        <div className="space-y-10">
+          <Section title="Reading Trend" description="Monthly charts based on when reading activity or finishes happened.">
+            {logsLoading && monthlyTrendMetric !== "books" ? <LoadingIndicator label="Loading reading trend…" announce={false} /> : <SimpleBarChart
+              title={monthlyTrendChart.title}
+              data={monthlyTrendChart.data}
+              unit={monthlyTrendChart.unit}
+              action={
+                <div className="inline-flex rounded-md bg-background p-1">
+                  {(["books", "pages", "minutes"] as MonthlyTrendMetric[]).map((metric) => (
+                    <Button
+                      key={metric}
+                      type="button"
+                      variant={monthlyTrendMetric === metric ? "default" : "ghost"}
+                      size="xs"
+                      onClick={() => setMonthlyTrendMetric(metric)}
+                    >
+                      {metric === "minutes" ? "Time" : metric[0].toUpperCase() + metric.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              }
+            />}
+          </Section>
+
+          <Section title="Reading Heatmap" description="Daily reading activity from your progress logs.">
+            {logsLoading ? (
+              <LoadingIndicator label="Loading reading activity…" announce={false} />
+            ) : logsError ? null : (
+              <ReadingHeatmap logs={logs} />
+            )}
+          </Section>
+        </div>
+
+        <Section title="Genre Analytics" description="Genre insights and remaining genre summaries.">
+          {logsLoading ? <LoadingIndicator label="Loading genre analytics…" announce={false} /> : <GenreAnalyticsContent analytics={analytics} genreCategory={genreCategory} />}
+        </Section>
+
+        <Section title="Author Analytics" description="Summary stats for the authors in your library.">
+          <DetailSection title="Author Summary">
+            <AuthorSummary analytics={analytics} />
+          </DetailSection>
+        </Section>
+
+        <Section title="Book Analytics" description="Remaining book-level trends and insights.">
+          {logsLoading ? <LoadingIndicator label="Loading book analytics…" announce={false} /> : <BookAnalyticsContent analytics={analytics} habits={habits} />}
+        </Section>
+
+        <Section title="Series Analytics" description="Summary stats for your series library.">
+          {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
+          {seriesLoading ? (
+            <LoadingIndicator />
+          ) : (
+            <DetailSection title="Series Summary">
+              <SeriesSummary data={seriesCategory} />
+            </DetailSection>
           )}
         </Section>
-      </div>
-
-      <Section title="Genre Analytics" description="Genre insights and remaining genre summaries.">
-        <GenreAnalyticsContent analytics={analytics} genreCategory={genreCategory} />
-      </Section>
-
-      <Section title="Author Analytics" description="Summary stats for the authors in your library.">
-        <DetailSection title="Author Summary">
-          <AuthorSummary analytics={analytics} />
-        </DetailSection>
-      </Section>
-
-      <Section title="Book Analytics" description="Remaining book-level trends and insights.">
-        <BookAnalyticsContent analytics={analytics} habits={habits} />
-      </Section>
-
-      <Section title="Series Analytics" description="Summary stats for your series library.">
-        {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
-        {seriesLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="h-24 animate-pulse rounded-lg bg-muted/30" />
-            <div className="h-24 animate-pulse rounded-lg bg-muted/30" />
-          </div>
-        ) : (
-          <DetailSection title="Series Summary">
-            <SeriesSummary data={seriesCategory} />
-          </DetailSection>
-        )}
-      </Section>
+      </>}
     </div>
   );
 }

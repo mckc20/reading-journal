@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
 import { BarChart3, BookOpen, CalendarDays, Clock3, PauseCircle, Podium, Timer, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -355,7 +356,7 @@ export function SeriesAnalyticsOverview({
           <StatsOverviewCard
             icon={Clock3}
             label="Hours Read"
-            value={logsLoading ? "..." : logsError ? null : formatStatsReadingTime(stats.overview.readingMinutes)}
+            value={logsLoading ? <LoadingIndicator variant="inline" label="Loading reading time…" /> : logsError ? null : formatStatsReadingTime(stats.overview.readingMinutes)}
             unavailableLabel="Reading logs are unavailable."
           />
         </div>

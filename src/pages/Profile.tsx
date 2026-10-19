@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
 import { LogOut, Pencil } from "lucide-react";
 import { AppHeading } from "@/components/design";
@@ -36,7 +37,7 @@ export default function Profile() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <AppHeading level={1} as="h1">Profile</AppHeading>
-          {loading && <p className="text-sm text-muted-foreground">Loading profile...</p>}
+          {loading && <LoadingIndicator variant="inline" label="Loading profile..." />}
         </div>
         <Button asChild>
           <Link to="/settings/profile">

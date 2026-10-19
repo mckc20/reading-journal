@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, UserRound } from "lucide-react";
@@ -74,7 +75,7 @@ export default function PublicProfilePage() {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading profile...</p>;
+  if (loading) return <LoadingIndicator variant="inline" label="Loading profile..." />;
 
   if (!profile) {
     return (

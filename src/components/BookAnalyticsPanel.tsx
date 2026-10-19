@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { BarChart3, CalendarClock, CalendarRange, ChevronDown, ChevronUp, Clock, ClockFading } from "lucide-react";
 import { AppHeading } from "@/components/design";
@@ -214,10 +215,7 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
 
   if (loading) {
     return (
-      <div className="space-y-3 py-2">
-        <div className="h-64 animate-pulse rounded-lg border bg-muted/30" />
-        <div className="h-44 animate-pulse rounded-lg border bg-muted/30" />
-      </div>
+      <LoadingIndicator label="Loading book analytics…" />
     );
   }
 

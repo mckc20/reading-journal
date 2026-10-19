@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { ArrowRight, Ban, Bookmark, BookOpen, Compass, ExternalLink, Loader2, ThumbsDown } from "lucide-react";
@@ -398,7 +399,7 @@ export default function Discover() {
           <Button variant="ghost" size="sm" onClick={() => void refresh(false)} disabled={refreshing}>Try again</Button>
         </div>}
 
-        {loading && !recommendationSet && <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: recommendationsPage ? discoverSettings.recommendation_count : 3 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-2xl border bg-muted/40" />)}</div>}
+        {loading && !recommendationSet && <LoadingIndicator />}
 
         {!loading && !recommendationSet && !error && <div className="rounded-2xl border border-dashed p-10 text-center">
           <Compass className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
@@ -474,7 +475,7 @@ export default function Discover() {
           <AppHeading level={3} as="h3" id="continue-heading">Continue your reading</AppHeading>
           <p className="mt-1 text-sm text-muted-foreground">Next books from series represented in your library.</p>
         </div>
-        {(booksLoading || seriesLoading || seriesSearchLoading) && continuationCards.length === 0 ? <div className="h-24 animate-pulse rounded-xl bg-muted/40" /> : continuationCards.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {(booksLoading || seriesLoading || seriesSearchLoading) && continuationCards.length === 0 ? <LoadingIndicator /> : continuationCards.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {continuationCards.map((item) => item.kind === "owned" ? <div key={`owned:${item.book.id}`} className="flex items-center gap-3 rounded-xl border bg-card p-3">
             {item.book.cover_url ? <img src={item.book.cover_url} alt="" className="h-16 w-11 rounded object-cover" /> : <div className="flex h-16 w-11 items-center justify-center rounded bg-muted"><BookOpen className="h-5 w-5 text-muted-foreground" /></div>}
             <div className="min-w-0 flex-1"><p className="truncate font-medium">{item.book.title}</p><p className="truncate text-sm text-muted-foreground">{item.seriesName}{item.book.volume_number ? ` · Book ${item.book.volume_number}` : ""}</p></div>

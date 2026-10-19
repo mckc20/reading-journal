@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, NotebookPen, RefreshCw } from "lucide-react";
@@ -89,10 +90,7 @@ export default function BookAnnotations() {
   );
   if (booksLoading) {
     return (
-      <div className="space-y-4">
-        <div className="h-9 w-32 animate-pulse rounded-md bg-muted" />
-        <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 
@@ -140,10 +138,7 @@ export default function BookAnnotations() {
       )}
 
       {journalEntriesLoading ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-        </div>
+        <LoadingIndicator />
       ) : (
         <JournalTimeline
           entries={timelineEntries}

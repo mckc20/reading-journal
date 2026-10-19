@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -344,11 +345,7 @@ function BooksGrid({
 
 function LoadingGrid() {
   return (
-    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
-      ))}
-    </div>
+    <LoadingIndicator />
   );
 }
 
@@ -1990,6 +1987,7 @@ export default function Library() {
   );
   const shouldLoadJournalEntries = isJournalEntriesView;
   const loading = booksLoading || seriesLoading || (isJournalEntriesView && journalEntriesLoading);
+  const loadingReadingOrder = librarySort === "last-read" && !readingLogsLoaded;
   const pageTitle = "Books";
   const filterOptions = useMemo(() => buildLibraryFilterOptions(books, series), [books, series]);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(() => new Set());
@@ -2422,6 +2420,7 @@ export default function Library() {
 
   return (
     <div className="space-y-4">
+      {loadingReadingOrder && <LoadingIndicator variant="inline" label="Loading reading order…" />}
       {showLibraryToolbar && (
         <LibraryToolbar
           title={pageTitle}

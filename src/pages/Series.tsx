@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronRight, Copy, Download, SquareMousePointer, Trash2, X } from "lucide-react";
@@ -31,15 +32,7 @@ function getSeriesAuthors(group: SeriesBookGroup): string[] {
 
 function LoadingSeriesGrid() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="min-w-0">
-          <div className="aspect-[2/3] w-full animate-pulse rounded-md bg-muted" />
-          <div className="mt-2 h-3 w-24 animate-pulse rounded bg-muted" />
-          <div className="mt-2 h-3 w-14 animate-pulse rounded bg-muted" />
-        </div>
-      ))}
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 

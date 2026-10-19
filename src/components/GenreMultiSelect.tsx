@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useMemo, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -198,7 +199,7 @@ export default function GenreMultiSelect({
       {selectedGenres.length === 0 && !loading && (
         <p className="text-xs text-muted-foreground">No genres selected.</p>
       )}
-      {loading && <p className="text-xs text-muted-foreground">Loading genres...</p>}
+      {loading && <LoadingIndicator variant="inline" label="Loading genres..." />}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xl">

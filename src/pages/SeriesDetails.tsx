@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   useCallback,
   useEffect,
@@ -301,10 +302,7 @@ function SeriesJournalSection({
       )}
 
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-        </div>
+        <LoadingIndicator />
       ) : (
         journalEntries.length === 0 ? (
           <EmptySection message="Series journal entries will appear here." />
@@ -555,14 +553,7 @@ function ExploreBooksCard({
 
 function PageLoading() {
   return (
-    <div className="space-y-6">
-      <div className="h-64 animate-pulse rounded-2xl bg-muted" />
-      <div className="grid gap-4 lg:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="h-56 animate-pulse rounded-xl bg-muted" />
-        ))}
-      </div>
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 

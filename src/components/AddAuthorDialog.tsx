@@ -6,6 +6,7 @@ import type { Author } from "@/types";
 interface AddAuthorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   initialAuthor?: Author | null;
   initialName?: string;
   onSaved?: (author: Author) => void;
@@ -14,6 +15,7 @@ interface AddAuthorDialogProps {
 export default function AddAuthorDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   initialAuthor,
   initialName = "",
   onSaved,
@@ -23,7 +25,7 @@ export default function AddAuthorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-2xl">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Author" : "Add Author"}</DialogTitle>
         </DialogHeader>

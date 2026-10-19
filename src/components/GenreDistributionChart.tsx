@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useMemo, useState } from "react";
 import { Check, PieChart } from "lucide-react";
 import {
@@ -264,10 +265,7 @@ export default function GenreDistributionChart({ books, genres = [], loading = f
 
   if (loading) {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-        <div className="h-[22rem] animate-pulse rounded-xl border bg-muted/30" />
-        <div className="h-[22rem] animate-pulse rounded-xl border bg-muted/30" />
-      </div>
+      <LoadingIndicator label="Loading genre distribution…" />
     );
   }
 

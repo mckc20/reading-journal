@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronRight, Copy, Download, Grid2X2, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
@@ -102,11 +103,7 @@ function normalizeDisplay(value: string | null): AuthorDisplay {
 
 function LoadingAuthors() {
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-32 animate-pulse rounded-md bg-muted/40 sm:h-20" />
-      ))}
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 
@@ -413,7 +410,7 @@ export default function AuthorsExplore() {
           <BackButton fallbackTo="/library" className="mt-1" />
           <div className="space-y-1">
             <AppHeading level={1} as="h1">Authors</AppHeading>
-            <HeadingDescription>Loading authors...</HeadingDescription>
+            <HeadingDescription>Your authors and their books.</HeadingDescription>
           </div>
         </div>
         <LoadingAuthors />

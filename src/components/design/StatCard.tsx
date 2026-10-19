@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 interface StatCardProps {
   label: string;
-  value: string;
+  value: ReactNode;
   detail?: string;
   icon?: ComponentType<{ className?: string }>;
   onClick?: () => void;

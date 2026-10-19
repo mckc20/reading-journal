@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context";
 import {
   fetchBooks,
@@ -36,15 +36,18 @@ export function useBooks() {
   const [books, setBooks] = useState<Book[]>([]);
   const scopes = useMemo(() => splitBookScopes(books), [books]);
   const [loading, setLoading] = useState(true);
+  const loadedUserId = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      setLoading(true);
+      // Keep already loaded content usable during background refreshes.
+      setLoading(loadedUserId.current !== user.id);
       setError(null);
       const data = await fetchBooks();
       setBooks(data);
+      loadedUserId.current = user.id;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load books");
     } finally {

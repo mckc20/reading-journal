@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { NotebookPen } from "lucide-react";
@@ -53,7 +54,7 @@ export default function AuthorJournal() {
   );
 
   if (authorsLoading || loading) {
-    return <div className="h-40 animate-pulse rounded-lg bg-muted" />;
+    return <LoadingIndicator variant="page" />;
   }
 
   if (!author) {

@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BookOpen } from "lucide-react";
@@ -79,10 +80,7 @@ export default function SeriesQuotes() {
 
   if (booksLoading || seriesLoading || journalEntriesLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
-        <div className="h-48 animate-pulse rounded-xl bg-muted/40" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

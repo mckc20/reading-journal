@@ -1,6 +1,7 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useCallback, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Heart, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, Heart } from 'lucide-react';
 import { AppHeading } from '@/components/design';
 import { Button } from '@/components/ui/button';
 import ReportBooks from '@/components/wrap-ups/ReportBooks';
@@ -55,10 +56,7 @@ export default function WrapUpDetails({ sliding = false, selectedMonth }: {
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />All wrap-ups
       </Link>}
       {loading && (
-        <div role="status" className="flex min-h-64 items-center justify-center">
-          <LoaderCircle className="size-8 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />
-          <span className="sr-only">Loading your wrap-up…</span>
-        </div>
+        <LoadingIndicator label="Loading your wrap-up…" className="min-h-64" />
       )}
       {error && (
         <div role="alert" className="space-y-3">

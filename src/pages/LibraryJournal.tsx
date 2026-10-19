@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { NotebookPen } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
@@ -15,7 +16,7 @@ import { fetchAllSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import type { JournalTimelineEntry } from "@/lib/journal";
 
 export default function LibraryJournal() {
-  const { books } = useBooksContext();
+  const { books, loading: booksLoading } = useBooksContext();
   const [entries, setEntries] = useState<JournalTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +76,8 @@ export default function LibraryJournal() {
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-3">
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-        </div>
+      {loading || booksLoading ? (
+        <LoadingIndicator />
       ) : (
         <JournalTimeline
           entries={sortedEntries}
@@ -93,7 +91,7 @@ export default function LibraryJournal() {
         />
       )}
 
-      {!loading && sortedEntries.length === 0 && !error && (
+      {!loading && !booksLoading && sortedEntries.length === 0 && !error && (
         <div className="sr-only">
           <NotebookPen aria-hidden="true" />
         </div>

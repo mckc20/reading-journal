@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronRight, Copy, Download, ExternalLink, Loader2, Pencil, SquareMousePointer, Trash2, X } from "lucide-react";
@@ -224,7 +225,7 @@ function WishlistCollectionView({
 export default function Wishlist() {
   const { settings } = useUserSettings();
   const libraryPreferences = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
-  const { wishlistBooks: items, reload: reloadBooks } = useBooksContext();
+  const { wishlistBooks: items, loading, error: booksError, reload: reloadBooks } = useBooksContext();
   const { series } = useSeries();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const navigate = useNavigate();
@@ -503,6 +504,10 @@ export default function Wishlist() {
         </div>
       </div>
 
+      {booksError && <div className="flex flex-wrap items-center gap-3 text-sm text-destructive">
+        <p role="status">{booksError}</p>
+        <Button variant="outline" size="sm" onClick={() => void reloadBooks()}>Try again</Button>
+      </div>}
       {error && <p role="status" className="text-sm text-destructive">{error}</p>}
 
       {managing && <div className="space-y-1">
@@ -533,7 +538,7 @@ export default function Wishlist() {
         </div>
       </div>}
 
-      {!pending.length ? <EmptyState icon={BookOpen} message="No pending wishes yet." /> : (
+      {loading && !pending.length ? <LoadingIndicator label="Loading your wishlist…" /> : booksError && !pending.length ? null : !pending.length ? <EmptyState icon={BookOpen} message="No pending wishes yet." /> : (
         <div className={groupSeriesBooks ? "space-y-6" : ""}>
           {groupSeriesBooks ? pendingGroups.map((group, index) => {
             const isUnsorted = group.seriesId === "__uncategorized__";

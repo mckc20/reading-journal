@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackButton from "@/components/BackButton";
@@ -69,14 +70,7 @@ export default function SeriesAnalytics() {
 
   if (booksLoading || seriesLoading || logsLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-28 animate-pulse rounded-xl bg-muted/40" />
-          ))}
-        </div>
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

@@ -1,6 +1,7 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useRef, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { ChevronRight, ImagePlus, ScanBarcode, Loader2 } from "lucide-react";
+import { ChevronRight, ImagePlus, ScanBarcode } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -74,6 +75,7 @@ interface FormValues {
 interface AddBookDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   initialSeriesId?: string;
   initialVolumeNumber?: number;
   initialRecommendation?: RecommendationItem;
@@ -112,6 +114,7 @@ function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: nu
 export default function AddBookDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   initialSeriesId,
   initialVolumeNumber,
   initialRecommendation,
@@ -655,7 +658,7 @@ export default function AddBookDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{initialBook ? "Edit Wishlist Item" : "Add Book"}</DialogTitle>
         </DialogHeader>
@@ -733,10 +736,7 @@ export default function AddBookDialog({
                   )}
 
                   {isbnStatus === "looking-up" && (
-                    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Looking up book…
-                    </p>
+                    <LoadingIndicator variant="inline" className="flex justify-center" label="Looking up book…" />
                   )}
 
                   {isbnError && (
@@ -771,11 +771,10 @@ export default function AddBookDialog({
                   </div>
 
                   {titleSearchStatus === "searching" && (
-                    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Searching book catalogs…
-                    </p>
+                    <LoadingIndicator variant="inline" className="flex justify-center" label="Searching book catalogs…" />
                   )}
+
+                  {isApplyingTitleResult && <LoadingIndicator variant="inline" label="Loading book details…" />}
 
                   {titleSearchError && (
                     <p className="text-sm text-destructive text-center">{titleSearchError}</p>

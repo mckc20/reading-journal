@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -130,7 +131,7 @@ export default function SendAttachmentDialog({
             <div className="flex items-center justify-between gap-3">
               <label className="text-sm font-medium">Select chat</label>
               <p className="text-xs text-muted-foreground">
-                {loading ? "Loading chats..." : `${threads.length} available`}
+                {loading ? <LoadingIndicator variant="inline" label="Loading chats…" /> : `${threads.length} available`}
               </p>
             </div>
 

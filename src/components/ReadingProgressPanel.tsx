@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useState, useEffect, useMemo } from "react";
 import { BookOpen, History, NotebookPen } from "lucide-react";
 import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
@@ -182,6 +183,7 @@ export default function ReadingProgressPanel({
 
   return (
     <div className="space-y-3">
+      {loadingLog && <LoadingIndicator variant="inline" label="Loading reading progress…" />}
       {!expanded && !hideTrigger && (
         <Button
           type="button"

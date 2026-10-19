@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
@@ -21,11 +22,7 @@ const ALL_AUTHORS_PREVIEW_LIMIT = 6;
 
 function LoadingAuthors() {
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-32 animate-pulse rounded-md bg-muted/40 sm:h-20" />
-      ))}
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 

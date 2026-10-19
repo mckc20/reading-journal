@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -52,11 +53,7 @@ export default function GenreDetails() {
 
   if (genresLoading || booksLoading) {
     return (
-      <div className="space-y-5">
-        <div className="h-9 w-28 animate-pulse rounded-md bg-muted" />
-        <div className="h-56 animate-pulse rounded-xl bg-muted" />
-        <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

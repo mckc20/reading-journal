@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Fragment,
   useEffect,
@@ -726,17 +727,7 @@ export default function BookDetails() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-9 w-32 animate-pulse rounded-md bg-muted" />
-        <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-          <div className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
-          <div className="space-y-3">
-            <div className="h-10 w-4/5 animate-pulse rounded-md bg-muted" />
-            <div className="h-5 w-2/3 animate-pulse rounded-md bg-muted" />
-            <div className="h-32 animate-pulse rounded-lg bg-muted" />
-          </div>
-        </div>
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 
@@ -1338,7 +1329,7 @@ export default function BookDetails() {
               <p className="text-sm font-medium">Progress over time</p>
               <div className="mt-3">
                 {logsLoading ? (
-                  <div className="h-52 animate-pulse rounded-lg bg-muted" />
+                  <LoadingIndicator />
                 ) : logsError ? (
                   <p className="text-sm text-destructive">{logsError}</p>
                 ) : (
@@ -1366,10 +1357,7 @@ export default function BookDetails() {
             </div>
 
             {journalEntriesLoading || logsLoading ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="h-40 animate-pulse rounded-lg bg-muted" />
-                <div className="h-40 animate-pulse rounded-lg bg-muted" />
-              </div>
+              <LoadingIndicator label="Loading journal entries…" announce={!logsLoading} />
             ) : journalEntriesError ? (
               <p className="text-sm text-destructive">{journalEntriesError}</p>
             ) : logsError ? (

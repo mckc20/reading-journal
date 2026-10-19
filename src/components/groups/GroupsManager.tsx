@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -2031,7 +2032,7 @@ export function GroupsManager() {
               <div>
                 <AppHeading level={4} as="h2">Chats</AppHeading>
                 <HeadingDescription className="text-xs">
-                  {loading ? "Loading..." : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
+                  {loading ? <LoadingIndicator variant="inline" label="Loading chats…" /> : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
                 </HeadingDescription>
               </div>
               <Button
@@ -2151,7 +2152,7 @@ export function GroupsManager() {
                 <div className="flex min-h-0 min-w-0 flex-col">
                   <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto bg-background p-4 sm:p-6">
                     {messagesLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading messages...</p>
+                      <LoadingIndicator variant="section" label="Loading messages..." />
                     ) : messages.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No messages yet.</p>
                     ) : (
@@ -2345,7 +2346,7 @@ export function GroupsManager() {
                 <DialogFooter>
                   {attachmentPreviewIsMine && (attachmentPreviewSaveReceipt || attachmentSaveReceiptsLoading) && (
                     <p className="mr-auto max-w-sm text-left text-xs leading-relaxed text-muted-foreground">
-                      {attachmentPreviewSaveReceipt ?? "Loading save receipts..."}
+                      {attachmentPreviewSaveReceipt ?? <LoadingIndicator variant="inline" label="Loading save receipts…" />}
                     </p>
                   )}
                   {(attachmentPreviewIsMine || attachmentPreviewSaved) && (

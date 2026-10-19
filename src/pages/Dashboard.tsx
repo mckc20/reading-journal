@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,16 +48,9 @@ function isRecentlyFinished(book: Book, today = new Date()): boolean {
   return finishedDate >= start && finishedDate <= end;
 }
 
-function SkeletonGrid() {
+function LoadingBooks() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded-xl bg-muted aspect-[2/3]"
-        />
-      ))}
-    </div>
+    <LoadingIndicator variant="page" />
   );
 }
 
@@ -83,7 +77,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-8">
         <PageHeader title="Home" />
-        <SkeletonGrid />
+        <LoadingBooks />
       </div>
     );
   }

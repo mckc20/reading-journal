@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight, Sparkles } from 'lucide-react';
@@ -27,7 +28,7 @@ function WrapUpArchiveList() {
   const years = [...new Set(data?.months.map(month => month.key.slice(0, 4)) ?? [])];
   return (
     <div className="w-full space-y-8">
-      {loading && <p role="status" className="text-muted-foreground">Loading your months…</p>}
+      {loading && <LoadingIndicator variant="section" label="Loading your months…" />}
       {error && <div role="alert" className="space-y-3"><p>{error}</p><Button onClick={retry}>Try again</Button></div>}
       {data && data.months.length === 0 && <div className="rounded-xl bg-muted/30 p-8"><AppHeading level={2} className="text-xl sm:text-2xl">Your story is getting started</AppHeading><p className="mt-3 text-muted-foreground">Wrap-ups will appear here once a month in your recorded reading history is complete.</p><Link className="mt-4 inline-block underline" to="/library">Visit your library</Link></div>}
       {years.map(year => <section key={year} aria-labelledby={`year-${year}`} className="space-y-4">
@@ -61,7 +62,7 @@ function WrapUpArchiveList() {
 function SlidingWrapUps() {
   const { monthKey } = useParams();
   const { data, error, loading, retry } = useWrapUpResource('archive', fetchWrapUpArchive);
-  if (loading) return <p role="status" className="text-muted-foreground">Loading your months…</p>;
+  if (loading) return <LoadingIndicator variant="section" label="Loading your months…" />;
   if (error) return <div role="alert" className="space-y-3"><p>{error}</p><Button onClick={retry}>Try again</Button></div>;
   if (!data) return null;
   if (!monthKey) {

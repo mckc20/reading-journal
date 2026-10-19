@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Check, SlidersHorizontal } from "lucide-react";
@@ -212,6 +213,7 @@ export default function Search() {
         )}
       </div>
 
+      {loading && <LoadingIndicator label="Loading your library…" />}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {journalEntriesError && hasQuery && (
         <p className="text-sm text-destructive">
@@ -293,7 +295,7 @@ export default function Search() {
             <AppHeading level={4} as="h2">Journal entries</AppHeading>
             <HeadingDescription className="text-xs">
               {journalEntriesLoading
-                ? "Searching journal entries..."
+                ? <LoadingIndicator variant="inline" label="Searching journal entries…" announce={!loading} />
                 : `${noteMatches.length} match${noteMatches.length !== 1 ? "es" : ""}`}
             </HeadingDescription>
           </div>

@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, Grid2X2, Timeline } from "lucide-react";
@@ -218,10 +219,7 @@ export default function SeriesBooks() {
 
   if (booksLoading || seriesLoading || (needsReadingLogs && readingLogsLoading)) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
-        <div className="h-64 animate-pulse rounded-xl bg-muted/40" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

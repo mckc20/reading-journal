@@ -1,3 +1,4 @@
+import LoadingDialog from "@/components/LoadingDialog";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -146,6 +147,29 @@ function AppLayoutContent() {
   const desktopAddMenuRef = useRef<HTMLDivElement>(null);
   const mobileAddButtonRef = useRef<HTMLButtonElement>(null);
   const mobileAddMenuRef = useRef<HTMLDivElement>(null);
+  const addDialogStillOpen = useRef(false);
+  const dialogReturnFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    addDialogStillOpen.current = addBookOpen || activeAddAction !== null;
+  }, [addBookOpen, activeAddAction]);
+
+  function rememberDialogOpener() {
+    const active = document.activeElement;
+    // When one add form launches another, keep the opener outside the closing dialog.
+    if (active instanceof HTMLElement && active.closest('[role="dialog"]') && dialogReturnFocus.current?.isConnected) return;
+    // Add-menu entries disappear when selected, so return to the visible Add button.
+    const fromMenu = desktopAddMenuRef.current?.contains(active) || mobileAddMenuRef.current?.contains(active);
+    dialogReturnFocus.current = fromMenu
+      ? (desktopAddButtonRef.current?.getClientRects().length ? desktopAddButtonRef.current : mobileAddButtonRef.current)
+      : active instanceof HTMLElement ? active : null;
+  }
+
+  function restoreAddDialogFocus(event: Event) {
+    // The loaded form must return to the original opener, not the removed loading shell.
+    event.preventDefault();
+    if (!addDialogStillOpen.current) dialogReturnFocus.current?.focus();
+  }
+
   const displayName = getDisplayName(profile, user?.email);
   const isMessagesPage = location.pathname === "/messages";
 
@@ -197,6 +221,7 @@ function AppLayoutContent() {
   }, [addMenuOpen]);
 
   function openAddBook(options?: AddBookDialogLaunchOptions) {
+    rememberDialogOpener();
     setAddBookOptions(options);
     setAddBookOpen(true);
   }
@@ -235,6 +260,7 @@ function AppLayoutContent() {
       openAddBook();
       return;
     }
+    rememberDialogOpener();
     setActiveAddAction(action);
   }
 
@@ -304,9 +330,23 @@ function AppLayoutContent() {
         />
       </div>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={
+        <LoadingDialog
+          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "author" ? "Add Author" : "Add Series"}
+          onOpenChange={(open) => {
+            if (!open) {
+              addDialogStillOpen.current = false;
+              closeAddBook(false);
+              setActiveAddAction(null);
+            }
+          }}
+          stillOpen={addDialogStillOpen}
+          returnFocus={dialogReturnFocus}
+        />
+      }>
         {addBookOpen && (
           <AddBookDialog
+            onCloseAutoFocus={restoreAddDialogFocus}
             open={addBookOpen}
             onOpenChange={closeAddBook}
             initialRecommendation={addBookOptions?.initialRecommendation}
@@ -321,6 +361,7 @@ function AppLayoutContent() {
         )}
         {activeAddAction === "author" && (
           <AddAuthorDialog
+            onCloseAutoFocus={restoreAddDialogFocus}
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
             onSaved={(author) => navigate(`/authors/${author.id}`)}
@@ -328,6 +369,7 @@ function AppLayoutContent() {
         )}
         {activeAddAction === "series" && (
           <AddSeriesDialog
+            onCloseAutoFocus={restoreAddDialogFocus}
             open
             onOpenChange={(open) => !open && setActiveAddAction(null)}
             openAddBook={openAddBook}

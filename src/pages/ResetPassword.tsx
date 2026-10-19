@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -37,8 +38,8 @@ export default function ResetPassword() {
 
   if (loading) {
     return (
-      <main className="flex min-h-svh items-center justify-center bg-foreground">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-background border-t-transparent" />
+      <main className="flex min-h-svh items-center justify-center bg-background">
+        <LoadingIndicator variant="page" label="Loading your session…" />
       </main>
     );
   }

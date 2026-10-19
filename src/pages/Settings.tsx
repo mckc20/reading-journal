@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
@@ -283,11 +284,13 @@ function SettingsSection({
   description,
   icon: Icon,
   children,
+  loading = false,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
   children: ReactNode;
+  loading?: boolean;
 }) {
   return (
     <Card>
@@ -304,7 +307,7 @@ function SettingsSection({
           </div>
         </div>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent>{loading ? <LoadingIndicator label={`Loading ${title.toLowerCase()}…`} /> : children}</CardContent>
     </Card>
   );
 }
@@ -1259,7 +1262,7 @@ function ApiKeysSettings() {
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading API keys…</p>
+            <LoadingIndicator variant="inline" label="Loading API keys…" />
           ) : keys.length === 0 ? (
             <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
               You have not created any API keys yet.
@@ -1531,6 +1534,7 @@ function AccountSettings() {
 
       <SettingsSection
         title="Data & Backup"
+        loading={loading}
         description="Exports, imports, and restore options."
         icon={Database}
       >
@@ -1651,7 +1655,7 @@ function GenreSettings() {
       icon={ListTree}
     >
       {loading ? (
-        <div className="h-64 animate-pulse rounded-lg bg-muted" />
+        <LoadingIndicator />
       ) : error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : flatNodes.length === 0 ? (
@@ -1681,6 +1685,19 @@ function GenreSettings() {
 }
 
 function SettingsTabContent({ tab }: { tab: SettingsTab }) {
+  const { loading: settingsLoading } = useUserSettings();
+  const { loading: profileLoading } = useProfile();
+  const waiting = tab === "profile"
+    ? profileLoading
+    : settingsLoading && ["appearance", "reading", "discover", "notifications", "privacy"].includes(tab);
+  if (waiting) {
+    const section = settingsTabs.find((item) => item.value === tab)!;
+    return (
+      <SettingsSection title={section.label} icon={section.icon}>
+        <LoadingIndicator label={`Loading ${section.label.toLowerCase()} settings…`} />
+      </SettingsSection>
+    );
+  }
   if (tab === "profile") return <ProfileSettings />;
   if (tab === "appearance") return <AppearanceSettings />;
   if (tab === "reading") return <ReadingSettings />;

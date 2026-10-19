@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   useCallback,
   useEffect,
@@ -210,10 +211,7 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
       )}
 
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-          <div className="h-40 animate-pulse rounded-lg bg-muted" />
-        </div>
+        <LoadingIndicator />
       ) : (
         journalEntries.length === 0 ? (
           <EmptySection message="Author journal entries will appear here." />
@@ -377,11 +375,7 @@ export default function AuthorDetails() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-40 animate-pulse rounded bg-muted/50" />
-        <div className="h-56 animate-pulse rounded-xl bg-muted/40" />
-        <div className="h-40 animate-pulse rounded-xl bg-muted/40" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -405,7 +406,7 @@ export default function Login() {
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <LoadingIndicator variant="page" label="Loading your session…" />
       </div>
     );
   }

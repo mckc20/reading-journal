@@ -19,6 +19,7 @@ import type { Series } from "@/types";
 interface AddSeriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   openAddBook: (options?: AddBookDialogLaunchOptions) => void;
   onSaved?: (series: Series) => void;
 }
@@ -32,7 +33,7 @@ function getNextVolume(rows: EditableSeriesBook[]): number {
   return largestVolume + 1 || visibleRows.length + 1;
 }
 
-export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSaved }: AddSeriesDialogProps) {
+export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, openAddBook, onSaved }: AddSeriesDialogProps) {
   const { user } = useAuth();
   const { addSeries, editSeries } = useSeries();
   const { books, updateBookSeriesPlacement } = useBooksContext();
@@ -197,7 +198,7 @@ export default function AddSeriesDialog({ open, onOpenChange, openAddBook, onSav
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-4xl">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Series</DialogTitle>
           <DialogDescription>

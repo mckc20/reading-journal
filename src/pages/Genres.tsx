@@ -1,3 +1,4 @@
+import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
 import { BookOpen, ChevronRight, ListTree } from "lucide-react";
 import BackButton from "@/components/BackButton";
@@ -76,11 +77,7 @@ export default function Genres() {
 
   if (loading) {
     return (
-      <div className="space-y-5">
-        <div className="h-9 w-44 animate-pulse rounded-md bg-muted" />
-        <div className="h-48 animate-pulse rounded-xl bg-muted" />
-        <div className="h-48 animate-pulse rounded-xl bg-muted" />
-      </div>
+      <LoadingIndicator variant="page" />
     );
   }
 

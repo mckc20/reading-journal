@@ -530,3 +530,20 @@
     box-shadow: 0 0 0 999px color-mix(in oklch, var(--foreground) 28%, transparent);
   }
 }
+
+/* SVG coordinates keep the turning page hinged to the book's spine at every size. */
+.loading-book-page {
+  transform-origin: 50px 38px;
+  animation: loading-book-turn 2s ease-in-out infinite;
+}
+
+@keyframes loading-book-turn {
+  0%, 12% { transform: perspective(180px) rotateY(0deg); opacity: 0; }
+  18% { opacity: 1; }
+  78% { transform: perspective(180px) rotateY(-180deg); opacity: 1; }
+  90%, 100% { transform: perspective(180px) rotateY(-180deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-book-page { animation: none; }
+}
