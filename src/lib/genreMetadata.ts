@@ -1,29 +1,133 @@
+import {
+  Backpack, BookOpen, BookOpenText, BookUser, Brain, Building2, Calculator,
+  CalendarDays, ChartNoAxesCombined, CookingPot, Crown, Feather, Fingerprint,
+  FlaskConical, Ghost, GraduationCap, HatGlasses, Heart, HeartPulse, Hourglass,
+  Landmark, Laugh, Leaf, Mail, Map, Megaphone, Microscope, NotebookPen, Orbit,
+  Palette, PanelsTopLeft, Rocket, Skull, Sparkles, Sprout, Swords, Telescope,
+  ToyBrick, User, UserRound, Zap, type LucideIcon,
+} from "lucide-react";
+
 export type GenreMetadata = {
   name: string;
   description: string;
-  accentClassName?: string;
 };
+
+// Explicit imports keep the genre-to-icon choices easy to review and allow tree shaking.
+const genreIcons: Record<string, LucideIcon> = {
+  // Fiction
+  "action-adventure": Zap,
+  "contemporary-fiction": CalendarDays,
+  epistolary: Mail,
+  fantasy: Sparkles,
+  "epic-fantasy": Swords,
+  "high-fantasy": Crown,
+  "urban-fantasy": Building2,
+  "historical-fiction": Hourglass,
+  horror: Skull,
+  "humor-satire": Laugh,
+  "literary-fiction": Feather,
+  "mystery-crime": HatGlasses,
+  romance: Heart,
+  "science-fiction": Orbit,
+  dystopian: PanelsTopLeft,
+  "hard-sci-fi": Microscope,
+  "space-opera": Rocket,
+  "short-stories": BookOpenText,
+  "thriller-suspense": Ghost,
+  // Non-fiction
+  "art-photography-design": Palette,
+  "biography-memoir": BookUser,
+  "business-economics": ChartNoAxesCombined,
+  "cookbooks-food": CookingPot,
+  "essays-anthologies": NotebookPen,
+  "health-wellness": HeartPulse,
+  history: Landmark,
+  "philosophy-spirituality": Brain,
+  "politics-current-events": Megaphone,
+  "science-technology": FlaskConical,
+  mathematics: Calculator,
+  "nature-environment": Leaf,
+  "popular-science": Telescope,
+  "self-help-personal-development": Sprout,
+  travel: Map,
+  "true-crime": Fingerprint,
+  // Reading audiences
+  adult: UserRound,
+  childrens: ToyBrick,
+  "middle-grade": Backpack,
+  "new-adult": GraduationCap,
+  "young-adult": User,
+};
+
+type GenreAccent = "book" | "castle" | "orbit" | "heart" | "search" | "feather" | "landmark" | "leaf" | "compass" | "sparkles";
+
+const genreAccentGroups: Record<string, GenreAccent> = {
+  fiction: "book", "non-fiction": "feather", "age-target": "heart",
+  fantasy: "castle", "science-fiction": "orbit", romance: "heart",
+  "epic-fantasy": "castle", "high-fantasy": "castle", "urban-fantasy": "castle",
+  dystopian: "orbit", "hard-sci-fi": "orbit", "space-opera": "orbit", mathematics: "orbit",
+  epistolary: "feather", "short-stories": "feather",
+  "mystery-crime": "search", "thriller-suspense": "search", horror: "sparkles",
+  "historical-fiction": "landmark", "literary-fiction": "feather",
+  "contemporary-fiction": "feather", "action-adventure": "compass", "humor-satire": "sparkles",
+  "biography-memoir": "feather", history: "landmark", "true-crime": "search",
+  "politics-current-events": "landmark", "self-help-personal-development": "leaf",
+  "business-economics": "landmark", "science-technology": "orbit", "popular-science": "orbit",
+  "nature-environment": "leaf", "philosophy-spirituality": "sparkles", "health-wellness": "leaf",
+  travel: "compass", "cookbooks-food": "leaf", "art-photography-design": "feather", "essays-anthologies": "feather",
+  adult: "book", childrens: "feather", "middle-grade": "compass", "new-adult": "heart", "young-adult": "orbit",
+};
+
+/** Keep accents quiet enough that the user's covers remain the main visual. */
+export function getGenreArtwork(slug: string) {
+  const accent = genreAccentGroups[slug] ?? "book";
+  const accents: Record<GenreAccent, string> = {
+    book: "from-[#a6ad96]/30 via-[#a6ad96]/15 to-[#d5bd9d]/15",
+    castle: "from-[#90aa96]/30 via-[#90aa96]/15 to-[#d5bd9d]/15",
+    orbit: "from-[#b2a4c5]/30 via-[#b2a4c5]/15 to-[#b9cbd0]/15",
+    heart: "from-[#c8969e]/30 via-[#c8969e]/15 to-[#d5bd9d]/15",
+    search: "from-[#a5a3af]/30 via-[#a5a3af]/15 to-[#c7b7cb]/15",
+    feather: "from-[#c7a16f]/30 via-[#c7a16f]/15 to-[#d9b5b2]/15",
+    landmark: "from-[#c69b82]/30 via-[#c69b82]/15 to-[#d5bd9d]/15",
+    leaf: "from-[#9fac82]/30 via-[#9fac82]/15 to-[#d5bd9d]/15",
+    compass: "from-[#92acb8]/30 via-[#92acb8]/15 to-[#b9c8af]/15",
+    sparkles: "from-[#b7a0bc]/30 via-[#b7a0bc]/15 to-[#d9b5b2]/15",
+  };
+  const iconColors: Record<GenreAccent, string> = {
+    book: "text-[#a6ad96] dark:text-[#c0c7af]",
+    castle: "text-[#90aa96] dark:text-[#aec4b1]",
+    orbit: "text-[#b2a4c5] dark:text-[#c0b2d3]",
+    heart: "text-[#c8969e] dark:text-[#deb0b5]",
+    search: "text-[#a5a3af] dark:text-[#bebbc6]",
+    feather: "text-[#c7a16f] dark:text-[#dfbe91]",
+    landmark: "text-[#c69b82] dark:text-[#deb79e]",
+    leaf: "text-[#9fac82] dark:text-[#bac79e]",
+    compass: "text-[#92acb8] dark:text-[#b0c7d1]",
+    sparkles: "text-[#b7a0bc] dark:text-[#ccb3cf]",
+  };
+  return {
+    illustration: genreIcons[slug] ?? BookOpen,
+    accentClassName: accents[accent],
+    iconClassName: iconColors[accent],
+  };
+}
 
 export const genreMetadataBySlug: Record<string, GenreMetadata> = {
   fiction: {
     name: "Fiction",
     description: "Stories shaped by character, setting, conflict, and imagination.",
-    accentClassName: "from-rose-500/25 via-amber-500/15 to-sky-500/20",
   },
   "non-fiction": {
     name: "Non-Fiction",
     description: "Books rooted in real people, events, ideas, research, and practical knowledge.",
-    accentClassName: "from-emerald-500/25 via-cyan-500/15 to-slate-500/20",
   },
   "age-target": {
     name: "Age Target",
     description: "Reading age and audience labels that help you browse across genres.",
-    accentClassName: "from-fuchsia-500/20 via-orange-500/15 to-lime-500/20",
   },
   fantasy: {
     name: "Fantasy",
     description: "Stories where magic, myth, invented worlds, or supernatural forces shape the plot.",
-    accentClassName: "from-emerald-500/25 via-indigo-500/15 to-rose-500/20",
   },
   "high-fantasy": {
     name: "High Fantasy",
@@ -40,7 +144,6 @@ export const genreMetadataBySlug: Record<string, GenreMetadata> = {
   "science-fiction": {
     name: "Science Fiction",
     description: "Speculative stories built around science, technology, space, time, or future societies.",
-    accentClassName: "from-cyan-500/25 via-violet-500/15 to-amber-500/20",
   },
   "space-opera": {
     name: "Space Opera",
@@ -177,8 +280,8 @@ export function getGenreMetadata(slug: string, name: string, isSystem: boolean):
     genreMetadataBySlug[slug] ?? {
       name,
       description: isSystem
-        ? `Browse books filed under ${name} and any of its subgenres.`
-        : `${name} is a read-only genre in your library. Books from this genre and its subgenres are grouped here.`,
+        ? `Discover the stories and ideas in your ${name} collection.`
+        : `A collection of books you've brought together under ${name}.`,
     }
   );
 }

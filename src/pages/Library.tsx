@@ -7,7 +7,6 @@ import {
   ChevronRight,
   LibraryBig,
   RefreshCw,
-  SwatchBook,
   Tags,
   UserRound,
   type LucideIcon,
@@ -15,6 +14,7 @@ import {
 import { EmptyState, PageHeader, SectionHeader } from "@/components/reading-journal";
 import { Button } from "@/components/ui/button";
 import { bookCardInteractiveClassName } from "@/components/BookCardContent";
+import { GenreIllustration } from "@/components/genres/GenreVisuals";
 import { cn } from "@/lib/utils";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -22,6 +22,7 @@ import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import { buildAuthorSummaries, getAuthorInitials } from "@/lib/authorShelf";
 import { buildGenreSlugLookup } from "@/lib/genres";
+import { sortGenresByRecentBooks } from "@/lib/genreCollection";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import BookShelf from "@/pages/library/BookShelf";
 import HorizontalShelf from "@/pages/library/HorizontalShelf";
@@ -244,11 +245,14 @@ function GenreShelfItem({
     <Link
       to={`/genres/${slug}`}
       data-shelf-item
-      className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn("group flex w-24 shrink-0 flex-col items-center gap-3 rounded-md text-center sm:w-28", bookCardInteractiveClassName)}
       aria-label={genre.name}
       title={genre.name}
     >
-      <SwatchBook className="h-8 w-8" aria-hidden="true" />
+      <div className="flex h-20 w-20 items-center justify-center sm:h-24 sm:w-24">
+        <GenreIllustration slug={slug} className="h-10 w-10 sm:h-12 sm:w-12" />
+      </div>
+      <p className="line-clamp-2 break-words text-sm font-medium leading-relaxed underline-offset-4 group-hover:underline group-focus-visible:underline">{genre.name}</p>
     </Link>
   );
 }
@@ -312,6 +316,7 @@ export default function Library() {
     [sortedBooks, series],
   );
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
+  const recentGenres = useMemo(() => sortGenresByRecentBooks(genres, books), [genres, books]);
   const hasExploreParams = libraryRedirectParamKeys.some((key) => searchParams.has(key));
   const loadingShelves = booksLoading || authorsLoading || seriesLoading || genresLoading;
 
@@ -419,7 +424,7 @@ export default function Library() {
                 emptyMessage="Genres will appear here after you add them."
               >
                 <HorizontalShelf title="Genres">
-                  {genres.map((genre) => (
+                  {recentGenres.map((genre) => (
                     <GenreShelfItem key={genre.id} genre={genre} slug={slugById.get(genre.id) ?? genre.id} />
                   ))}
                 </HorizontalShelf>

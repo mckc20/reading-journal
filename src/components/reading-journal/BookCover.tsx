@@ -23,6 +23,7 @@ interface BookCoverProps {
   status?: BookStatusType;
   className?: string;
   imageClassName?: string;
+  showFallbackTitle?: boolean;
 }
 
 /** The shared visual treatment for every book-cover image and fallback. */
@@ -36,6 +37,7 @@ export function BookCover({
   status,
   className,
   imageClassName,
+  showFallbackTitle = false,
 }: BookCoverProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   return (
@@ -60,8 +62,9 @@ export function BookCover({
           )}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center" aria-label={`No cover for ${title}`}>
+        <div className={cn("flex h-full w-full items-center justify-center", showFallbackTitle && "flex-col gap-2 bg-gradient-to-br from-primary/10 to-muted p-2 text-center")} aria-label={`No cover for ${title}`}>
           <BookOpen className="h-1/3 w-1/3 min-h-5 min-w-5 text-muted-foreground/40" aria-hidden="true" />
+          {showFallbackTitle && <span className="line-clamp-3 font-heading text-xs leading-snug text-foreground/80">{title}</span>}
           <span className="sr-only">Cover unavailable</span>
         </div>
       )}
