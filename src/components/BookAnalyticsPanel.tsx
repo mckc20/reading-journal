@@ -311,18 +311,21 @@ export default function BookAnalyticsPanel({ book }: BookAnalyticsPanelProps) {
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium">
-            {timelineMode === "progress" ? "Progress over time" : "Speed over time"}
+            {timelineMode === "progress"
+              ? "Progress over time"
+              : timelineMode === "speed" ? "Speed over time" : "Pages over time"}
           </p>
           <div className="inline-flex rounded-md bg-background p-1">
-            {(["progress", "speed"] as ProgressOverTimeChartMode[]).map((mode) => (
+            {(["progress", "speed", "pages"] as ProgressOverTimeChartMode[]).map((mode) => (
               <Button
                 key={mode}
                 type="button"
                 variant={timelineMode === mode ? "default" : "ghost"}
                 size="xs"
+                aria-pressed={timelineMode === mode}
                 onClick={() => setTimelineMode(mode)}
               >
-                {mode === "progress" ? "Progress" : "Speed"}
+                {mode === "progress" ? "Progress" : mode === "speed" ? "Speed" : "Pages"}
               </Button>
             ))}
           </div>

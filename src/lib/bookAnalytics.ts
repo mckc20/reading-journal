@@ -44,6 +44,34 @@ export interface ProgressTimelineResult {
 
 export const MIN_READING_LOGS_FOR_ESTIMATED_FINISH = 3;
 
+export function buildPagesTimeline(logs: ReadingLog[]): { dayKey: string; pages: number }[] {
+  const sortedLogs = logs
+    .filter((log) => isValidDate(new Date(log.logged_at)) && Number.isFinite(log.current_page))
+    .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
+  if (sortedLogs.length === 0) return [];
+
+  const pagesByDay = new Map<string, number>();
+  let highestPage = 0;
+  for (const log of sortedLogs) {
+    const dayKey = toLocalDayKey(new Date(log.logged_at));
+    const currentPage = Math.max(0, log.current_page);
+    // A backward correction must not count previously read pages a second time.
+    const pages = Math.max(0, currentPage - highestPage);
+    pagesByDay.set(dayKey, (pagesByDay.get(dayKey) ?? 0) + pages);
+    highestPage = Math.max(highestPage, currentPage);
+  }
+
+  const points: { dayKey: string; pages: number }[] = [];
+  const cursor = startOfLocalDay(new Date(sortedLogs[0].logged_at));
+  const lastDay = startOfLocalDay(new Date(sortedLogs[sortedLogs.length - 1].logged_at));
+  while (cursor <= lastDay) {
+    const dayKey = toLocalDayKey(cursor);
+    points.push({ dayKey, pages: pagesByDay.get(dayKey) ?? 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return points;
+}
+
 function getEstimateConfidence(readingSessionCount: number): EstimatedFinishResult["confidence"] {
   if (readingSessionCount >= 10) return "high";
   if (readingSessionCount >= 6) return "medium";

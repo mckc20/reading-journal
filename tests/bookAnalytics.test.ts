@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildPagesTimeline,
   buildProgressTimeline,
   formatCalendarSpan,
   formatPagesPerHour,
@@ -39,6 +40,55 @@ function makeProgressLog(
     logged_at: loggedAt,
   };
 }
+
+test("builds daily pages from unsorted logs, combines sessions, and fills gaps", () => {
+  const logs = [
+    makeProgressLog("last", 90, "2026-04-04T12:00:00"),
+    makeProgressLog("evening", 50, "2026-04-01T18:00:00"),
+    makeProgressLog("first", 20, "2026-04-01T09:00:00"),
+    makeProgressLog("same-page", 50, "2026-04-02T12:00:00"),
+  ];
+  assert.deepEqual(buildPagesTimeline(logs), [
+    { dayKey: "2026-04-01", pages: 50 },
+    { dayKey: "2026-04-02", pages: 0 },
+    { dayKey: "2026-04-03", pages: 0 },
+    { dayKey: "2026-04-04", pages: 40 },
+  ]);
+  assert.equal(logs[0].id, "last");
+});
+
+test("does not count previously read pages again after backward corrections", () => {
+  assert.deepEqual(buildPagesTimeline([
+    makeProgressLog("a", 50, "2026-04-01T12:00:00"),
+    makeProgressLog("b", 30, "2026-04-02T12:00:00"),
+    makeProgressLog("c", 40, "2026-04-03T12:00:00"),
+    makeProgressLog("d", 70, "2026-04-04T12:00:00"),
+  ]), [
+    { dayKey: "2026-04-01", pages: 50 },
+    { dayKey: "2026-04-02", pages: 0 },
+    { dayKey: "2026-04-03", pages: 0 },
+    { dayKey: "2026-04-04", pages: 20 },
+  ]);
+});
+
+test("ignores invalid dates and page values without changing the page baseline", () => {
+  assert.deepEqual(buildPagesTimeline([
+    makeProgressLog("bad-date", 500, "invalid"),
+    makeProgressLog("bad-pages", NaN, "2026-03-01T12:00:00"),
+    makeProgressLog("valid", 30, "2026-04-01T12:00:00"),
+  ]), [{ dayKey: "2026-04-01", pages: 30 }]);
+});
+
+test("handles empty logs and logs without positive progress", () => {
+  assert.deepEqual(buildPagesTimeline([]), []);
+  assert.deepEqual(buildPagesTimeline([
+    makeProgressLog("a", -5, "2026-04-01T12:00:00"),
+    makeProgressLog("b", 0, "2026-04-02T12:00:00"),
+  ]), [
+    { dayKey: "2026-04-01", pages: 0 },
+    { dayKey: "2026-04-02", pages: 0 },
+  ]);
+});
 
 test("sums reading minutes and formats with days, hours, and minutes", () => {
   const logs: ReadingLog[] = [makeLog("a", 60), makeLog("b", 24 * 60), makeLog("c", 15)];

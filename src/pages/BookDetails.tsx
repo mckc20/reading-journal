@@ -72,6 +72,7 @@ import {
   formatCalendarSpan,
   formatPagesPerHour,
   formatTotalReadingTime,
+  getCalendarPagesPerDay,
   getEstimatedFinish,
   getPagesPerHour,
   getReadingDuration,
@@ -815,6 +816,43 @@ export default function BookDetails() {
   const isReading = book.status === "Reading";
   const readingActionLabel = book.status === "Finished" ? "Reread" : "Start Reading";
   const hasSecondaryMetadata = Boolean(publicationYear || book.source || book.isbn);
+  const hasReadingLogs = readingLogs.length > 0;
+  // Only use date-based stats after a successful fetch confirms there are no logs.
+  const hasNoReadingLogs = !logsLoading && !logsError && !hasReadingLogs;
+  const hasStartedReading = isReading || isPaused || book.status === "Finished" || book.status === "DNF";
+  const useDateBasedStats = hasNoReadingLogs && hasStartedReading;
+  const calendarPagesPerDay = useDateBasedStats
+    ? getCalendarPagesPerDay({
+        pages: book.status === "Finished" ? totalPages : currentPage,
+        dateStarted: book.date_started,
+        dateEnded: book.date_finished,
+        pausePeriods: book.pause_periods,
+      })
+    : null;
+  const calendarPaceLabel = calendarPagesPerDay === null
+    ? "Not available"
+    : `${calendarPagesPerDay.toFixed(1)} pages/day`;
+  const readingTimeStat: ProgressStat = {
+    icon: Clock,
+    label: useDateBasedStats
+      ? "Total Reading Duration"
+      : book.status === "Finished" ? "Total Reading Time" : "Time Reading",
+    value: useDateBasedStats ? daysReading : formatTotalReadingTime(totalReadingMinutes),
+  };
+  const readingPaceStat: ProgressStat = {
+    icon: TrendingUp,
+    label: useDateBasedStats
+      ? "Reading Pace"
+      : book.status === "Finished" ? "Average Speed" : "Current Speed",
+    value: useDateBasedStats
+      ? calendarPaceLabel
+      : formatPagesPerHour(
+          getPagesPerHour({
+            pages: book.status === "Finished" ? totalPages : currentPage,
+            readingMinutes: totalReadingMinutes,
+          }),
+        ),
+  };
   const readingProgressStats: ProgressStat[] =
     isReading
       ? [
@@ -831,21 +869,8 @@ export default function BookDetails() {
                 ? formatDateObjectForDisplay(estimatedFinish.finishDate)
                 : "Not available",
           },
-          {
-            icon: Clock,
-            label: "Time Reading",
-            value: formatTotalReadingTime(totalReadingMinutes),
-          },
-          {
-            icon: TrendingUp,
-            label: "Current Speed",
-            value: formatPagesPerHour(
-              getPagesPerHour({
-                pages: currentPage,
-                readingMinutes: totalReadingMinutes,
-              }),
-            ),
-          },
+          readingTimeStat,
+          readingPaceStat,
         ]
       : isPaused
         ? [
@@ -854,21 +879,8 @@ export default function BookDetails() {
               label: "Started On",
               value: formatDateForDisplay(book.date_started),
             },
-            {
-              icon: TrendingUp,
-              label: "Current Speed",
-              value: formatPagesPerHour(
-                getPagesPerHour({
-                  pages: currentPage,
-                  readingMinutes: totalReadingMinutes,
-                }),
-              ),
-            },
-            {
-              icon: Clock,
-              label: "Time Reading",
-              value: formatTotalReadingTime(totalReadingMinutes),
-            },
+            readingPaceStat,
+            readingTimeStat,
             {
               icon: CalendarClock,
               label: "Estimated Finish",
@@ -890,21 +902,8 @@ export default function BookDetails() {
               label: "Finished On",
               value: formatDateForDisplay(book.date_finished),
             },
-            {
-              icon: Clock,
-              label: "Total Reading Time",
-              value: formatTotalReadingTime(totalReadingMinutes),
-            },
-            {
-              icon: TrendingUp,
-              label: "Average Speed",
-              value: formatPagesPerHour(
-                getPagesPerHour({
-                  pages: totalPages,
-                  readingMinutes: totalReadingMinutes,
-                }),
-              ),
-            },
+            readingTimeStat,
+            readingPaceStat,
           ]
         : [
             {
@@ -917,12 +916,8 @@ export default function BookDetails() {
               label: "Current Page",
               value: `${currentPage} / ${totalPages || "-"}`,
             },
-            {
-              icon: Clock,
-              label: "Time Reading",
-              value: formatTotalReadingTime(totalReadingMinutes),
-            },
-            {
+            readingTimeStat,
+            useDateBasedStats ? readingPaceStat : {
               icon: Calendar,
               label: "Days Reading",
               value: daysReading,
@@ -1316,31 +1311,35 @@ export default function BookDetails() {
               <AppHeading level={2}>
                 Reading <span className="font-serif italic">Progress</span>
               </AppHeading>
-              <Button asChild variant="link" className="px-0">
-                <Link to={`/books/${book.id}/analytics`}>
-                  View more
-                  <ArrowRight className="ml-1.5 h-4 w-4" />
-                </Link>
-              </Button>
+              {!logsLoading && !logsError && hasReadingLogs && (
+                <Button asChild variant="link" className="px-0">
+                  <Link to={`/books/${book.id}/analytics`}>
+                    View more
+                    <ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
             <ProgressStatsStrip stats={readingProgressStats} />
 
-            <div className="rounded-xl pt-2">
-              <p className="text-sm font-medium">Progress over time</p>
-              <div className="mt-3">
-                {logsLoading ? (
-                  <LoadingIndicator />
-                ) : logsError ? (
-                  <p className="text-sm text-destructive">{logsError}</p>
-                ) : (
-                  <ProgressOverTimeChart
-                    logs={readingLogs}
-                    totalPages={book.total_pages}
-                    pausePeriods={book.pause_periods}
-                  />
-                )}
+            {!hasNoReadingLogs && (
+              <div className="rounded-xl pt-2">
+                <p className="text-sm font-medium">Progress over time</p>
+                <div className="mt-3">
+                  {logsLoading ? (
+                    <LoadingIndicator />
+                  ) : logsError ? (
+                    <p className="text-sm text-destructive">{logsError}</p>
+                  ) : (
+                    <ProgressOverTimeChart
+                      logs={readingLogs}
+                      totalPages={book.total_pages}
+                      pausePeriods={book.pause_periods}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           <section className="space-y-4">

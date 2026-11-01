@@ -1,6 +1,8 @@
 import { useId, useMemo, useState } from "react";
 import { PauseCircle } from "lucide-react";
+import { VerticalBarChart } from "@/components/design";
 import {
+  buildPagesTimeline,
   buildProgressTimeline,
   formatPagesPerHour,
   getPagesPerHour,
@@ -8,7 +10,7 @@ import {
 import type { ProgressTimelinePoint } from "@/lib/bookAnalytics";
 import type { BookPausePeriod, ReadingLog } from "@/types";
 
-export type ProgressOverTimeChartMode = "progress" | "speed";
+export type ProgressOverTimeChartMode = "progress" | "speed" | "pages";
 
 interface ProgressOverTimeChartProps {
   logs: ReadingLog[];
@@ -122,6 +124,15 @@ export default function ProgressOverTimeChart({
     [logs, pausePeriods, totalPages],
   );
   const speedTimeline = useMemo(() => buildSpeedTimeline(logs), [logs]);
+  const pagesData = useMemo(
+    () => buildPagesTimeline(logs).map((point) => ({
+      key: point.dayKey,
+      label: formatFullDayLabel(point.dayKey),
+      axisLabel: formatDayLabel(dayFromKey(point.dayKey)),
+      value: point.pages,
+    })),
+    [logs],
+  );
   const isSpeedMode = mode === "speed";
 
   const chartHeight = 176;
@@ -205,6 +216,16 @@ export default function ProgressOverTimeChart({
     if (datePoints.length <= 56) return 4;
     return 7;
   }, [datePoints.length]);
+
+  if (mode === "pages") {
+    return (
+      <VerticalBarChart
+        data={pagesData}
+        formatValue={(value) => `${value.toLocaleString()} pages`}
+        empty="No pages read data yet."
+      />
+    );
+  }
 
   if (!isSpeedMode && !progressTimeline.isAvailable) {
     return (
