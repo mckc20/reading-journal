@@ -129,6 +129,13 @@ function AuthorTable({
   onOpenAuthor: (authorId: string) => void;
   interactive?: boolean;
 }) {
+  const isSelecting = Boolean(selectedIds && onToggleAuthor);
+  const isRowInteractive = interactive || isSelecting;
+  const activateAuthor = (authorId: string) => {
+    if (isSelecting) onToggleAuthor?.(authorId);
+    else onOpenAuthor(authorId);
+  };
+
   return (
     <div className="overflow-x-auto bg-background">
       <table className="w-full table-fixed text-left text-sm">
@@ -136,20 +143,22 @@ function AuthorTable({
           {authors.map((author) => (
             <tr
               key={author.id}
-              tabIndex={interactive ? 0 : undefined}
-              role={interactive ? "button" : undefined}
-              onClick={interactive ? () => onOpenAuthor(author.id) : undefined}
+              tabIndex={isRowInteractive ? 0 : undefined}
+              role={isRowInteractive ? "button" : undefined}
+              aria-pressed={isSelecting ? selectedIds?.has(author.id) : undefined}
+              onClick={isRowInteractive ? () => activateAuthor(author.id) : undefined}
               onKeyDown={
-                interactive
+                isRowInteractive
                   ? (event) => {
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        onOpenAuthor(author.id);
+                        activateAuthor(author.id);
                       }
                     }
                   : undefined
               }
-              className={interactive ? "group cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" : "transition-colors"}
+              className={isRowInteractive ? "group cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" : "transition-colors"}
             >
               {selectedIds && onToggleAuthor ? (
                 <td className="w-9 py-1.5 pr-2">
