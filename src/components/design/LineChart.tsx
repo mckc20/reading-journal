@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design/Typography";
+import ChartTooltip from "@/components/design/ChartTooltip";
 import type { ChartDatum } from "@/components/design/VerticalBarChart";
 
 interface LineChartProps {
@@ -36,12 +37,6 @@ export default function LineChart({
     }));
   }, [data, yAxisMax]);
   const activePoint = activeKey ? points.find((point) => point.key === activeKey) ?? null : null;
-  const activePointTooltipTransform =
-    !activePoint || activePoint.x < 8
-      ? "translateX(0)"
-      : activePoint.x > 92
-        ? "translateX(-100%)"
-        : "translateX(-50%)";
   const labelStep = useMemo(() => {
     if (data.length <= 10) return 1;
     if (data.length <= 28) return 2;
@@ -84,12 +79,9 @@ export default function LineChart({
                   </div>
 
                   {activePoint && (
-                    <div
-                      className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                      style={{ left: `${activePoint.x}%`, transform: activePointTooltipTransform }}
-                    >
+                    <ChartTooltip xPercent={activePoint.x} y={activePoint.y}>
                       {activePoint.label}: {formatValue(activePoint.value)}
-                    </div>
+                    </ChartTooltip>
                   )}
 
                   <svg

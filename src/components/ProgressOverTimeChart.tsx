@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { PauseCircle } from "lucide-react";
 import { VerticalBarChart } from "@/components/design";
+import ChartTooltip from "@/components/design/ChartTooltip";
 import {
   buildPagesTimeline,
   buildProgressTimeline,
@@ -201,13 +202,6 @@ export default function ProgressOverTimeChart({
 
   const activePoint =
     activePointIndex === null ? null : chartPoints[activePointIndex] ?? null;
-  const activePointXPercent = activePoint === null ? 0 : activePoint.x;
-  const activeTooltipTransform =
-    activePointXPercent < 8
-      ? "translateX(0)"
-      : activePointXPercent > 92
-        ? "translateX(-100%)"
-        : "translateX(-50%)";
 
   const labelStep = useMemo(() => {
     if (datePoints.length <= 14) return 1;
@@ -296,13 +290,7 @@ export default function ProgressOverTimeChart({
             ))}
 
             {activePoint && (
-              <div
-                className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                style={{
-                  left: `${activePointXPercent}%`,
-                  transform: activeTooltipTransform,
-                }}
-              >
+              <ChartTooltip xPercent={activePoint.x} y={activePoint.y}>
                 {activePoint.mode === "progress" ? (
                   <>
                     {activePoint.isStart
@@ -316,7 +304,7 @@ export default function ProgressOverTimeChart({
                     {formatPagesPerHour(activePoint.value)}
                   </>
                 )}
-              </div>
+              </ChartTooltip>
             )}
 
             <svg

@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design/Typography";
+import ChartTooltip from "@/components/design/ChartTooltip";
 import { cn } from "@/lib/utils";
 
 export interface ChartDatum {
@@ -37,16 +38,13 @@ export default function VerticalBarChart({
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const yAxisMax = maxValue > 0 ? maxValue : showEmptySeries ? 2 : 1;
   const yTicks = [yAxisMax, yAxisMax / 2, 0];
+  const chartHeight = 176;
+  const getBarHeight = (value: number) =>
+    value > 0 ? Math.max(Math.round((value / yAxisMax) * chartHeight), 4) : 0;
   const activePoint = activeKey ? data.find((point) => point.key === activeKey) ?? null : null;
   const activePointIndex = activePoint ? data.findIndex((point) => point.key === activePoint.key) : -1;
   const activePointXPercent =
     activePointIndex < 0 || data.length === 0 ? 0 : ((activePointIndex + 0.5) / data.length) * 100;
-  const activePointTooltipTransform =
-    activePointXPercent < 12
-      ? "translateX(0)"
-      : activePointXPercent > 88
-        ? "translateX(-100%)"
-        : "translateX(-50%)";
 
   const labelStep = useMemo(() => {
     if (showAllXLabels) return 1;
@@ -91,22 +89,18 @@ export default function VerticalBarChart({
                   </div>
 
                   {activePoint && activePointIndex >= 0 && (
-                    <div
-                      className="pointer-events-none absolute top-2 z-10 rounded-md border bg-background/95 px-2 py-1 text-[11px] shadow-sm"
-                      style={{
-                        left: `${activePointXPercent}%`,
-                        transform: activePointTooltipTransform,
-                      }}
+                    <ChartTooltip
+                      xPercent={activePointXPercent}
+                      y={chartHeight - getBarHeight(activePoint.value)}
+                      barCount={data.length}
                     >
                       {activePoint.label}: {activePoint.displayValue ?? formatValue(activePoint.value)}
-                    </div>
+                    </ChartTooltip>
                   )}
 
                   <div className="relative grid h-full w-full items-end" style={gridStyle}>
                     {data.map((point) => {
-                      const chartHeightPx = 176;
-                      const normalizedHeight = Math.round((point.value / yAxisMax) * chartHeightPx);
-                      const barHeight = point.value > 0 ? Math.max(normalizedHeight, 4) : 0;
+                      const barHeight = getBarHeight(point.value);
                       const highlighted = point.key === highlightKey;
 
                       return (
