@@ -1,4 +1,5 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
+import HistoryMonthNavigation from "@/components/HistoryMonthNavigation";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
@@ -57,9 +58,26 @@ export default function ReadingHistory() {
     [books],
   );
 
+  const months = useMemo(() => {
+    const seen = new Set<string>();
+    return historyBooks.flatMap((book) => {
+      const { month, year } = getDateLabel(book);
+      const key = `${month}-${year}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      const date = new Date(getHistoryTime(book));
+      return [{
+        anchorId: `history-month-${book.id}`,
+        bookId: book.id,
+        label: month === "--" ? "Unknown month" : date.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      }];
+    });
+  }, [historyBooks]);
+
   const timelineItems = useMemo<BookTimelineItem[]>(
     () =>
       historyBooks.map((book, index) => ({
+        anchorId: months.find((month) => month.bookId === book.id)?.anchorId,
         book,
         dateLabel: getDateLabel(book),
         subtitle: book.authors.length > 0 ? book.authors.join(", ") : "Unknown author",
@@ -74,7 +92,7 @@ export default function ReadingHistory() {
           </div>
         ),
       })),
-    [historyBooks],
+    [historyBooks, months],
   );
 
   if (loading) {
@@ -103,7 +121,10 @@ export default function ReadingHistory() {
       </div>
 
       {timelineItems.length > 0 ? (
-        <BookTimeline items={timelineItems} onBook={(book) => navigate(`/books/${book.id}`)} />
+        <div className="pr-4">
+          <BookTimeline items={timelineItems} onBook={(book) => navigate(`/books/${book.id}`)} />
+          <HistoryMonthNavigation months={months} />
+        </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center">
           <BookOpen className="h-10 w-10 text-muted-foreground/40" aria-hidden="true" />

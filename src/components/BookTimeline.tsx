@@ -10,6 +10,7 @@ export type BookTimelineDateLabel = {
 };
 
 export type BookTimelineItem = {
+  anchorId?: string;
   book: Book;
   dateLabel: BookTimelineDateLabel;
   subtitle?: string;
@@ -49,9 +50,10 @@ function BookTimelineRow({
 
   return (
     <button
+      id={item.anchorId}
       type="button"
       onClick={() => onBook(book)}
-      className="group relative grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-4 text-left transition-colors duration-150 ease-out hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none motion-reduce:transition-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
+      className="group relative grid w-full scroll-mt-24 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-4 text-left transition-colors duration-150 ease-out hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none motion-reduce:transition-none sm:grid-cols-[2rem_5rem_minmax(0,1fr)_auto] sm:gap-5"
     >
       {showDivider && (
         <span className="pointer-events-none absolute bottom-0 left-[3rem] right-0 h-px bg-border/70 sm:left-[6.75rem]" />
