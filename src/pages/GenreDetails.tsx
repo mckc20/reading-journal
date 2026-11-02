@@ -1,3 +1,6 @@
+import CollectionEmptyState from "@/components/CollectionEmptyState";
+import { FilterSelect, LibrarySortingControls, LibraryFilterChips } from "@/components/LibraryControls";
+import { sortDirectionLabel, type LibrarySort, type SortDirection } from "@/lib/librarySorting";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -6,7 +9,6 @@ import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { GenreIllustration } from "@/components/genres/GenreVisuals";
-import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { buildGenreSlugLookup, getBooksForGenreSubtree, getGenrePath, resolveGenreSlug } from "@/lib/genres";
@@ -15,8 +17,12 @@ import { getGenreArtwork, getGenreMetadata } from "@/lib/genreMetadata";
 import { cn } from "@/lib/utils";
 import type { Book, BookStatus } from "@/types";
 
+const genreSortOptions: Array<{ value: GenreBookSort; label: string; bookSort: LibrarySort }> = [
+  { value: "title", label: "Title", bookSort: "title" },
+  { value: "rating", label: "Rating", bookSort: "rating" },
+  { value: "recently-finished", label: "Date Finished", bookSort: "date-finished" },
+];
 const statuses: BookStatus[] = ["To Read", "Up Next", "Reading", "Paused", "Finished", "DNF"];
-const selectClassName = "h-10 max-w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function BooksGrid({ books, onBook }: { books: Book[]; onBook: (book: Book) => void }) {
   return <div className="grid grid-cols-[repeat(auto-fill,minmax(108px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(132px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
@@ -34,15 +40,16 @@ function GenreDetailsContent({ genreId }: { genreId?: string }) {
   const navigate = useNavigate();
   const { genres, loading: genresLoading, error: genresError } = useGenresContext();
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
-  const [status, setStatus] = useState<BookStatus | "all">("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<BookStatus[]>([]);
   const [sort, setSort] = useState<GenreBookSort>("title");
+  const [direction, setDirection] = useState<SortDirection>("asc");
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const genre = genreId ? resolveGenreSlug(genreId, genres) : null;
   const slug = genre ? slugById.get(genre.id) ?? genre.id : "";
   const path = genre ? getGenrePath(genre.id, genres) : [];
   const matchingBooks = useMemo(() => genre ? getBooksForGenreSubtree(books, genre.id, genres) : [], [books, genre, genres]);
   const summary = summarizeGenreBooks(matchingBooks);
-  const visibleBooks = filterAndSortGenreBooks(matchingBooks, status, sort);
+  const visibleBooks = filterAndSortGenreBooks(matchingBooks, selectedStatuses, sort, direction);
   const subgenres = genre ? genres.filter((item) => item.parent_id === genre.id)
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })) : [];
   const onBook = (book: Book) => navigate(`/books/${book.id}`);
@@ -139,27 +146,25 @@ function GenreDetailsContent({ genreId }: { genreId?: string }) {
             <p role="status" className="text-sm text-muted-foreground">{visibleBooks.length} of {summary.total} book{summary.total === 1 ? "" : "s"}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <div className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
-              <label htmlFor="genre-status">Status</label>
-              <select id="genre-status" className={selectClassName} value={status} onChange={(event) => setStatus(event.target.value as BookStatus | "all")}>
-                <option value="all">All statuses</option>
-                {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1.5 text-xs text-muted-foreground">
-              <label htmlFor="genre-sort">Sort by</label>
-              <select id="genre-sort" className={selectClassName} value={sort} onChange={(event) => setSort(event.target.value as GenreBookSort)}>
-                <option value="title">Title</option><option value="rating">Highest rating</option><option value="recently-finished">Recently finished</option>
-              </select>
-            </div>
+            <FilterSelect label="Status" value={selectedStatuses} options={statuses} emptyLabel="All statuses"
+              triggerClassName="w-[9.75rem]"
+              onChange={(value) => setSelectedStatuses((current) => !value ? [] : current.includes(value as BookStatus)
+                ? current.filter((status) => status !== value) : [...current, value as BookStatus])} />
+            <LibrarySortingControls sort={sort}
+              options={genreSortOptions.map((option) => ({ ...option, directionLabel: sortDirectionLabel(option.bookSort, option.value === "title" ? "asc" : "desc") }))}
+              directionLabel={sortDirectionLabel(genreSortOptions.find((option) => option.value === sort)!.bookSort, direction)}
+              onSortChange={(value) => { setSort(value as GenreBookSort); setDirection(value === "title" ? "asc" : "desc"); }}
+              onDirectionChange={() => setDirection((current) => current === "asc" ? "desc" : "asc")} />
           </div>
         </div>
+        <LibraryFilterChips chips={selectedStatuses.map((status) => ({ label: `Status: ${status}`, onRemove: () => setSelectedStatuses((current) => current.filter((value) => value !== status)) }))} onClear={() => setSelectedStatuses([])} />
         {visibleBooks.length > 0 ? <BooksGrid books={visibleBooks} onBook={onBook} /> :
-          <div className="rounded-2xl border border-dashed px-5 py-12 text-center">
-            <p className="font-heading text-lg">{summary.total === 0 ? "A new chapter awaits" : "No books with this status"}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{summary.total === 0 ? "Books you add to this genre will appear here." : "Try another status to see more of your collection."}</p>
-            {summary.total > 0 && <Button variant="outline" size="sm" className="mt-4" onClick={() => setStatus("all")}>Show all statuses</Button>}
-          </div>}
+          <CollectionEmptyState
+            title={summary.total === 0 ? "A new chapter awaits" : "No books match your filters"}
+            description={summary.total === 0 ? "Books you add to this genre will appear here." : "Try changing your filters to see more of your collection."}
+            onShowAll={selectedStatuses.length > 0 ? () => setSelectedStatuses([]) : undefined}
+          />}
+
       </section>
     </div>
   );

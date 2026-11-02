@@ -94,3 +94,24 @@ test("cover previews prefer covers, then finished favorites, ratings and title; 
   assert.equal(books[0].id, "missing");
   assert.deepEqual(selectGenreCovers([]), []);
 });
+
+test("genre status filters support several statuses and clearing the selection", () => {
+  const books = [book("a", { status: "Reading" }), book("b", { status: "Paused" }), book("c", { status: "Finished" })];
+  assert.deepEqual(filterAndSortGenreBooks(books, ["Reading", "Paused"], "title").map((book) => book.id), ["a", "b"]);
+  assert.equal(filterAndSortGenreBooks(books, [], "title").length, 3);
+  assert.deepEqual(books.map((book) => book.id), ["a", "b", "c"]);
+});
+
+test("genre sorting reverses title and rating while leaving unrated books last", () => {
+  const books = [book("a", { rating: 2 }), book("b", { rating: 5 }), book("c")];
+  assert.deepEqual(filterAndSortGenreBooks(books, [], "title", "desc").map((book) => book.id), ["c", "b", "a"]);
+  assert.deepEqual(filterAndSortGenreBooks(books, [], "rating", "asc").map((book) => book.id), ["a", "b", "c"]);
+  assert.deepEqual(filterAndSortGenreBooks(books, [], "rating", "desc").map((book) => book.id), ["b", "a", "c"]);
+});
+
+test("genre finish sorting supports both directions and keeps missing dates last", () => {
+  const books = [book("a", { date_finished: "2026-01-01" }), book("b", { date_finished: "2026-02-01" }),
+    book("c", { status: "Reading", date_finished: "2026-03-01" }), book("d", { date_finished: "invalid" })];
+  assert.deepEqual(filterAndSortGenreBooks(books, [], "recently-finished", "asc").map((book) => book.id), ["a", "b", "c", "d"]);
+  assert.deepEqual(filterAndSortGenreBooks(books, [], "recently-finished", "desc").map((book) => book.id), ["b", "a", "c", "d"]);
+});

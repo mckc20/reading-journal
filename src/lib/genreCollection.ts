@@ -1,3 +1,4 @@
+import type { SortDirection } from "./librarySorting";
 import type { Book, BookStatus, Genre } from "../types";
 import { getBooksForGenreSubtree, isGenreRoot } from "./genreTree";
 
@@ -62,15 +63,28 @@ export function sortGenresByRecentBooks(genres: Genre[], books: Book[]): Genre[]
     .map((entry) => entry.genre);
 }
 
-export function filterAndSortGenreBooks(books: Book[], status: BookStatus | "all", sort: GenreBookSort): Book[] {
-  return books.filter((book) => status === "all" || book.status === status).sort((a, b) => {
-    if (sort === "rating") return (b.rating ?? -1) - (a.rating ?? -1) || compareBookTitles(a, b);
-    if (sort === "recently-finished") {
-      // Only completed books have a completion date for this view.
-      const dateA = a.status === "Finished" ? a.date_finished ?? "" : "";
-      const dateB = b.status === "Finished" ? b.date_finished ?? "" : "";
-      return dateB.localeCompare(dateA) || compareBookTitles(a, b);
-    }
-    return compareBookTitles(a, b);
+export function filterAndSortGenreBooks(
+  books: Book[],
+  status: BookStatus | "all" | readonly BookStatus[],
+  sort: GenreBookSort,
+  direction: SortDirection = sort === "title" ? "asc" : "desc",
+): Book[] {
+  const statuses = typeof status === "string" ? status === "all" ? [] : [status] : status;
+  const value = (book: Book): string | number | null => {
+    if (sort === "title") return book.title;
+    if (sort === "rating") return book.rating ?? null;
+    // Only completed books have a completion date for this view.
+    const date = book.status === "Finished" && book.date_finished ? Date.parse(book.date_finished) : NaN;
+    return Number.isFinite(date) ? date : null;
+  };
+  return books.filter((book) => !statuses.length || statuses.includes(book.status)).sort((a, b) => {
+    const av = value(a);
+    const bv = value(b);
+    if (av === null && bv !== null) return 1;
+    if (av !== null && bv === null) return -1;
+    const difference = av === null || bv === null ? 0
+      : sort === "title" ? a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true })
+        : Number(av) - Number(bv);
+    return difference * (direction === "asc" ? 1 : -1) || compareBookTitles(a, b);
   });
 }

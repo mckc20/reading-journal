@@ -1,7 +1,14 @@
+import CollectionEmptyState from "@/components/CollectionEmptyState";
+import { fetchReadingLogs } from "@/lib/books";
+import type { SortDirection } from "@/lib/librarySorting";
+import { sortLibrarySeries, seriesSortOptions, defaultSeriesSortDirection, seriesSortDirectionLabel } from "@/lib/libraryEntitySorting";
+import { FilterSelect, LibrarySortingControls, LibraryFilterChips } from "@/components/LibraryControls";
+import { Separator } from "@/components/ui/separator";
+import LibraryFiltersDialog from "@/components/LibraryFiltersDialog";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpen, ChevronRight, Copy, Download, SquareMousePointer, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronRight, Copy, Download, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
@@ -9,6 +16,7 @@ import { selectionLabel } from "@/lib/selectionLabels";
 import OverflowMenu from "@/components/OverflowMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
+import { uniqueSortedValues } from "@/lib/authorsView";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, useUserSettings } from "@/context";
 import { useBooksContext } from "@/context/BooksContext";
@@ -19,6 +27,8 @@ import { getDerivedSeriesStatus } from "@/lib/seriesDetails";
 import { duplicateSeriesRecord } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
+
+const seriesStatuses = ["Not Started", "Ongoing", "Completed", "DNF"] as const;
 
 function downloadSeriesCsv(groups: SeriesBookGroup[]) {
   const rows = [["Name", "Favorite", "Books"], ...groups.map((group) => [group.name, group.isFavorite ? "Yes" : "No", String(group.books.length)])];
@@ -55,10 +65,98 @@ export default function Series() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"ongoing" | "completed" | "all">("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const genreFilters = useMemo(() => searchParams.getAll("genre").filter(Boolean), [searchParams]);
+  const statusFilters = useMemo(() => searchParams.getAll("status").filter((value) => seriesStatuses.includes(value as typeof seriesStatuses[number])), [searchParams]);
+  const sort = seriesSortOptions.find((option) => option.value === searchParams.get("sort"))?.value ?? "name";
+  const directionParam = searchParams.get("direction");
+  const direction: SortDirection = directionParam === "asc" || directionParam === "desc" ? directionParam : defaultSeriesSortDirection(sort);
+  const [latestReadTimesByBook, setLatestReadTimesByBook] = useState<Map<string, number>>(new Map());
+  const [readingLogsLoaded, setReadingLogsLoaded] = useState(false);
+  const [readingLogsError, setReadingLogsError] = useState(false);
+  const seriesCreatedAtById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item.created_at])), [librarySeries]);
+
+  useEffect(() => {
+    if (sort !== "last-read" || readingLogsLoaded) return;
+    let cancelled = false;
+    setReadingLogsError(false);
+    fetchReadingLogs().then((logs) => {
+      if (cancelled) return;
+      const latest = new Map<string, number>();
+      logs.forEach((log) => {
+        const time = Date.parse(log.logged_at);
+        if (Number.isFinite(time) && time > (latest.get(log.book_id) ?? -Infinity)) latest.set(log.book_id, time);
+      });
+      setLatestReadTimesByBook(latest);
+    }).catch(() => {
+      if (!cancelled) setReadingLogsError(true);
+    }).finally(() => {
+      if (!cancelled) setReadingLogsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [sort, readingLogsLoaded]);
+  const activeFilterCount = genreFilters.length + statusFilters.length;
+  const genres = useMemo(
+    () => uniqueSortedValues(allGroups.flatMap((group) => group.books.flatMap((book) => book.genres ?? []))),
+    [allGroups],
+  );
   const groups = useMemo(
-    () => statusFilter === "all" ? allGroups : allGroups.filter((group) => getDerivedSeriesStatus(group.books).toLocaleLowerCase() === statusFilter),
-    [allGroups, statusFilter],
+    () => sortLibrarySeries(allGroups.filter((group) => {
+      if (statusFilters.length && !statusFilters.includes(getDerivedSeriesStatus(group.books))) return false;
+      // Match whole series when any linked book has one of the selected genres.
+      return !genreFilters.length || group.books.some((book) => (book.genres ?? []).some((genre) => genreFilters.includes(genre)));
+    }), sort, direction, { seriesCreatedAtById, latestReadTimesByBook }),
+    [allGroups, statusFilters, genreFilters, sort, direction, seriesCreatedAtById, latestReadTimesByBook],
+  );
+
+  function updateFilter(key: "genre" | "status", value: string) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      const selected = next.getAll(key);
+      next.delete(key);
+      if (value) {
+        const values = selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value];
+        values.forEach((item) => next.append(key, item));
+      }
+      return next;
+    }, { replace: true });
+  }
+
+  function clearFilters() {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("genre");
+      next.delete("status");
+      return next;
+    }, { replace: true });
+  }
+
+  const filterFields = (compact = false) => (
+    <div className={compact ? "flex flex-wrap items-center gap-2" : "grid gap-3"}>
+      {(["genre", "status"] as const).map((key) => (
+        <FilterSelect key={key} label={key === "genre" ? "Genre" : "Status"}
+          value={key === "genre" ? genreFilters : statusFilters} options={key === "genre" ? genres : [...seriesStatuses]}
+          onChange={(value) => updateFilter(key, value)}
+          emptyLabel="All"
+          triggerClassName={compact ? "w-[9.75rem]" : undefined} />
+      ))}
+    </div>
+  );
+  const sortingControls = (compact = false) => (
+    <LibrarySortingControls sort={sort} options={seriesSortOptions.map((option) => ({ ...option, directionLabel: seriesSortDirectionLabel(option.value, defaultSeriesSortDirection(option.value)) }))}
+      directionLabel={seriesSortDirectionLabel(sort, direction)}
+      onSortChange={(value) => setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        if (value === "name") next.delete("sort");
+        else next.set("sort", value);
+        next.delete("direction");
+        return next;
+      }, { replace: true })}
+      onDirectionChange={() => setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("direction", direction === "asc" ? "desc" : "asc");
+        return next;
+      }, { replace: true })} compact={compact} />
   );
   useEffect(() => setSelected((current) => pruneSelectedIds(current, groups.map((group) => group.seriesId))), [groups]);
   const selectedGroups = groups.filter((group) => selected.has(group.seriesId));
@@ -123,8 +221,15 @@ export default function Series() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="relative flex flex-wrap items-start gap-2 pr-10">
+    <>
+      <LibraryFiltersDialog id="series-library-filters" open={filtersOpen} onOpenChange={setFiltersOpen}>
+        {filterFields()}
+        <Separator />
+        {sortingControls()}
+        {activeFilterCount > 0 && <Button type="button" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+      </LibraryFiltersDialog>
+    <div className="space-y-4">
+      <div className="relative flex flex-wrap items-start gap-2 pr-20">
         <BackButton fallbackTo="/library" className="mt-1" />
         <div className="space-y-1">
           <AppHeading level={1} as="h1">Series</AppHeading>
@@ -146,7 +251,12 @@ export default function Series() {
             </div>
           </>}
         </div>
-        <div className="absolute right-0 top-0"><OverflowMenu label="Series options">{(close) => <>
+        <div className="absolute right-0 top-0 flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" className="relative lg:hidden" onClick={() => setFiltersOpen(!filtersOpen)} aria-expanded={filtersOpen} aria-controls="series-library-filters" aria-haspopup="dialog" aria-label="Filters and sorting">
+            <ListFilter className="h-5 w-5" />
+            {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">{activeFilterCount}</span>}
+          </Button>
+          <OverflowMenu label="Series options">{(close) => <>
             <p className="px-2 py-1 text-xs font-medium text-muted-foreground">View</p>
             {(["grid", "table"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => {
               setSearchParams((current) => { const next = new URLSearchParams(current); next.set("display", value); return next; }, { replace: true });
@@ -156,12 +266,6 @@ export default function Series() {
               <span>{value === "grid" ? "Grid" : "List"}</span>
             </button>)}
             <div className="my-1 border-t" />
-            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Filter series</p>
-            {(["all", "ongoing", "completed"] as const).map((value) => <button key={value} role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setStatusFilter(value); close(); }}>
-              <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">{statusFilter === value ? "✓" : ""}</span>
-              <span>{value === "all" ? "All series" : value === "ongoing" ? "Ongoing" : "Completed"}</span>
-            </button>)}
-            <div className="my-1 border-t" />
             <button role="menuitem" type="button" className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted" onClick={() => { setManaging((value) => !value); setSelected(new Set()); close(); }}>
               <SquareMousePointer className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{managing ? "Done selecting" : "Select"}</span>
@@ -169,10 +273,35 @@ export default function Series() {
         </>}</OverflowMenu></div>
       </div>
 
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 py-0 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:py-3">
+          <div className="hidden lg:block">{filterFields(true)}</div>
+          {sortingControls(true)}
+        </div>
+        <LibraryFilterChips
+          chips={(["genre", "status"] as const).flatMap((key) => (key === "genre" ? genreFilters : statusFilters).map((value) => ({
+            label: `${key === "genre" ? "Genre" : "Status"}: ${value}`,
+            onRemove: () => updateFilter(key, value),
+          })))}
+          onClear={clearFilters}
+        />
+      </div>
+
+      {sort === "last-read" && !readingLogsLoaded && <LoadingIndicator variant="inline" label="Loading reading order…" />}
+      {sort === "last-read" && readingLogsError && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <p>Reading activity could not be loaded. Last Read currently uses book finish dates.</p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setReadingLogsLoaded(false)}>Try again</Button>
+        </div>
+      )}
+
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : loading ? (
         <LoadingSeriesGrid />
+      ) : groups.length === 0 && activeFilterCount > 0 ? (
+        <CollectionEmptyState title="No series match your filters"
+          description="Try changing your filters to see more of your collection." onShowAll={clearFilters} />
       ) : groups.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <BookOpen className="h-10 w-10 text-muted-foreground/40" />
@@ -243,5 +372,6 @@ export default function Series() {
         onConfirm={duplicateSelected}
       />
     </div>
+    </>
   );
 }

@@ -1,18 +1,28 @@
+import CollectionEmptyState from "@/components/CollectionEmptyState";
+import { FilterSelect, LibrarySortingControls, LibraryFilterChips } from "@/components/LibraryControls";
+import LibraryFiltersDialog from "@/components/LibraryFiltersDialog";
+import {
+  sortLibraryBooks,
+  librarySortLabels as sortLabels,
+  librarySorts,
+  defaultSortDirection,
+  sortDirectionLabel,
+  normalizeLibrarySort,
+  type LibrarySort,
+  type SortDirection,
+} from "@/lib/librarySorting";
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   ChevronRight,
-  Check,
-  ChevronDown,
   Copy,
   Download,
   Grid2X2,
   Heart,
   List,
   ListFilter,
-  MoreHorizontal,
   RefreshCw,
   SquareMousePointer,
   Trash2,
@@ -23,7 +33,6 @@ import BackButton from "@/components/BackButton";
 import OverflowMenu from "@/components/OverflowMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { selectionLabel } from "@/lib/selectionLabels";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -100,22 +109,6 @@ type CategoryShelf = {
   value: LibraryValueShelf;
   label: string;
 };
-
-type LibrarySort =
-  | "date-added"
-  | "last-read"
-  | "title"
-  | "author"
-  | "publication-date"
-  | "progress"
-  | "date-started"
-  | "date-finished"
-  | "currently-reading"
-  | "highest-rated"
-  | "lowest-rated"
-  | "page-count"
-  | "continue-reading"
-  | "near-completion";
 
 type LibraryDisplay = "grid" | "table";
 
@@ -198,22 +191,6 @@ const filterLabels: Record<LibraryFilterKey, string> = {
   favorite: "Favorite",
 };
 
-const validSorts = new Set<LibrarySort>([
-  "date-added",
-  "last-read",
-  "title",
-  "author",
-  "publication-date",
-  "progress",
-  "date-started",
-  "date-finished",
-  "currently-reading",
-  "highest-rated",
-  "lowest-rated",
-  "page-count",
-  "continue-reading",
-  "near-completion",
-]);
 const validDisplays = new Set<LibraryDisplay>(["grid", "table"]);
 const primaryShelves: PrimaryShelf[] = [
   {
@@ -291,10 +268,6 @@ const validViews = new Set<LibraryView>([
 
 function isLibraryView(value: string | null): value is LibraryView {
   return value !== null && validViews.has(value as LibraryView);
-}
-
-function isLibrarySort(value: string | null): value is LibrarySort {
-  return value !== null && validSorts.has(value as LibrarySort);
 }
 
 function isLibraryDisplay(value: string | null): value is LibraryDisplay {
@@ -676,6 +649,8 @@ function getFilterValues(searchParams: URLSearchParams, key: LibraryFilterKey): 
   );
 }
 
+// Retain URL filters for existing metadata links and bookmarks, even when a
+// field is no longer offered in the library filter panel.
 function getLibraryFilters(searchParams: URLSearchParams): LibraryFilters {
   return {
     status: getFilterValues(searchParams, "status"),
@@ -825,16 +800,6 @@ function matchesLibrarySearch(book: Book, series: Series[], query: string): bool
   return searchableText.includes(normalizedQuery);
 }
 
-function compareByTitle(a: Book, b: Book): number {
-  return a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
-}
-
-function compareByAuthor(a: Book, b: Book): number {
-  const firstAuthorA = a.authors[0] ?? "";
-  const firstAuthorB = b.authors[0] ?? "";
-  return firstAuthorA.localeCompare(firstAuthorB, undefined, { sensitivity: "base", numeric: true }) || compareByTitle(a, b);
-}
-
 function buildLatestReadTimesByBook(logs: ReadingLog[]): Map<string, number> {
   const latestReadTimes = new Map<string, number>();
 
@@ -849,110 +814,26 @@ function buildLatestReadTimesByBook(logs: ReadingLog[]): Map<string, number> {
   return latestReadTimes;
 }
 
-function getLastReadSortTime(book: Book, latestReadTimesByBook: Map<string, number>): number {
-  return latestReadTimesByBook.get(book.id) ?? (book.date_finished ? new Date(book.date_finished).getTime() : 0);
-}
-
-function getPublicationDateSortTime(book: Book): number {
-  if (!book.publication_date) return 0;
-  const date = new Date(`${book.publication_date}T00:00:00`);
-  const time = date.getTime();
-  return Number.isFinite(time) ? time : 0;
-}
-
-function sortLibraryBooks(
-  books: Book[],
-  sort: LibrarySort,
-  latestReadTimesByBook = new Map<string, number>(),
-): Book[] {
-  return [...books].sort((a, b) => {
-    if (sort === "date-added") {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || compareByTitle(a, b);
-    }
-
-    if (sort === "last-read") {
-      return getLastReadSortTime(b, latestReadTimesByBook) - getLastReadSortTime(a, latestReadTimesByBook) || compareByTitle(a, b);
-    }
-
-    if (sort === "author") {
-      return compareByAuthor(a, b);
-    }
-
-    if (sort === "publication-date") {
-      return getPublicationDateSortTime(b) - getPublicationDateSortTime(a) || compareByTitle(a, b);
-    }
-
-    if (sort === "progress") {
-      return getBookProgress(b) - getBookProgress(a) || compareByTitle(a, b);
-    }
-
-    if (sort === "date-started") {
-      const startedA = a.date_started ? new Date(a.date_started).getTime() : 0;
-      const startedB = b.date_started ? new Date(b.date_started).getTime() : 0;
-      return startedB - startedA || compareByTitle(a, b);
-    }
-
-    if (sort === "date-finished") {
-      const finishedA = a.date_finished ? new Date(a.date_finished).getTime() : 0;
-      const finishedB = b.date_finished ? new Date(b.date_finished).getTime() : 0;
-      return finishedB - finishedA || compareByTitle(a, b);
-    }
-
-    if (sort === "currently-reading") {
-      return Number(b.status === "Reading") - Number(a.status === "Reading") || compareByTitle(a, b);
-    }
-
-    if (sort === "highest-rated") {
-      return (b.rating ?? -1) - (a.rating ?? -1) || compareByTitle(a, b);
-    }
-
-    if (sort === "lowest-rated") {
-      const ratingA = a.rating ?? Number.POSITIVE_INFINITY;
-      const ratingB = b.rating ?? Number.POSITIVE_INFINITY;
-      return ratingA - ratingB || compareByTitle(a, b);
-    }
-
-    if (sort === "page-count") {
-      return (b.total_pages ?? 0) - (a.total_pages ?? 0) || compareByTitle(a, b);
-    }
-
-    if (sort === "continue-reading") {
-      return (
-        Number(b.status === "Reading") - Number(a.status === "Reading") ||
-        getBookProgress(b) - getBookProgress(a) ||
-        compareByTitle(a, b)
-      );
-    }
-
-    if (sort === "near-completion") {
-      return (
-        Number(a.status === "Finished") - Number(b.status === "Finished") ||
-        getBookProgress(b) - getBookProgress(a) ||
-        compareByTitle(a, b)
-      );
-    }
-
-    return compareByTitle(a, b);
-  });
-}
-
 function filterAndSortBooks({
   books,
   series,
   query,
   sort,
+  direction,
   latestReadTimesByBook,
 }: {
   books: Book[];
   series: Series[];
   query: string;
   sort: LibrarySort;
+  direction?: SortDirection;
   latestReadTimesByBook?: Map<string, number>;
 }) {
   return sortLibraryBooks(
     books.filter((book) => matchesLibrarySearch(book, series, query)),
     sort,
     latestReadTimesByBook,
+    direction,
   );
 }
 
@@ -980,361 +861,52 @@ function noteGroupCountLabel(count: number) {
   return `${count} entr${count === 1 ? "y" : "ies"}`;
 }
 
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-  showLabel = true,
-  emptyLabel,
-  triggerClassName,
-  disabled = false,
-  mutedEmptyValue = false,
-}: {
-  label: string;
-  value: string[];
-  options: string[];
-  onChange: (value: string) => void;
-  showLabel?: boolean;
-  emptyLabel?: string;
-  triggerClassName?: string;
-  disabled?: boolean;
-  mutedEmptyValue?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const selectedValues = new Set(value);
-  const selectedLabel =
-    value.length === 0
-      ? (emptyLabel ?? `Any ${label.toLowerCase()}`)
-      : value.length === 1
-        ? value[0]
-        : `${value.length} selected`;
+const visibleBookFilters = ["status", "language", "year", "rating"] as const;
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const container = containerRef.current;
-      if (!container || container.contains(event.target as Node)) return;
-      setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
-
-  return (
-    <div ref={containerRef} className={cn("relative", showLabel && "space-y-1.5")}>
-      {showLabel && <Label className="text-xs text-muted-foreground">{label}</Label>}
-      <Button
-        type="button"
-        variant="outline"
-        aria-label={label}
-        aria-expanded={open}
-        disabled={disabled}
-        className={cn(
-          "w-full justify-between font-normal",
-          triggerClassName,
-          value.length === 0 && mutedEmptyValue && "text-muted-foreground",
-        )}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="min-w-0 truncate">{selectedLabel}</span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      </Button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-full min-w-44 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
-          <button
-            type="button"
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              value.length === 0 && mutedEmptyValue && "text-muted-foreground",
-            )}
-            onClick={() => onChange("")}
-          >
-            {emptyLabel ?? `Any ${label.toLowerCase()}`}
-          </button>
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onChange(option)}
-            >
-              <span
-                className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-input",
-                  selectedValues.has(option) && "border-primary bg-primary text-primary-foreground",
-                )}
-              >
-                {selectedValues.has(option) && <Check className="h-3 w-3" />}
-              </span>
-              <span className="min-w-0 truncate">{option}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DisabledFilterButton({ label }: { label: string }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full justify-start text-muted-foreground"
-        disabled
-        title={`${label} is not implemented yet.`}
-      >
-        --
-      </Button>
-    </div>
-  );
-}
-
-function FilterGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
-    </section>
-  );
-}
-
-function AllFilterFields({
-  filters,
-  filterOptions,
-  onFilterChange,
-}: {
+function AllFilterFields({ filters, filterOptions, onFilterChange, compact = false }: {
   filters: LibraryFilters;
   filterOptions: LibraryFilterOptions;
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="space-y-6">
-      <FilterGroup title="Basic Filters">
+    <div className={compact ? "flex flex-wrap items-center gap-2" : "grid gap-3"}>
+      {visibleBookFilters.map((key) => (
         <FilterSelect
-          label="Status"
-          value={filters.status}
-          options={filterOptions.status}
-          onChange={(value) => onFilterChange("status", value)}
-          emptyLabel="--"
-          mutedEmptyValue
+          key={key}
+          label={filterLabels[key]}
+          value={filters[key]}
+          options={filterOptions[key]}
+          onChange={(value) => onFilterChange(key, value)}
+          emptyLabel="All"
+          triggerClassName={compact ? "w-[9.75rem]" : undefined}
         />
-        <FilterSelect
-          label="Genre"
-          value={filters.genre}
-          options={filterOptions.genre}
-          onChange={(value) => onFilterChange("genre", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Language"
-          value={filters.language}
-          options={filterOptions.language}
-          onChange={(value) => onFilterChange("language", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Format"
-          value={filters.format}
-          options={filterOptions.format}
-          onChange={(value) => onFilterChange("format", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Source"
-          value={filters.source}
-          options={filterOptions.source}
-          onChange={(value) => onFilterChange("source", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-      </FilterGroup>
-
-      <FilterGroup title="Reading Filters">
-        <FilterSelect
-          label="Year Read"
-          value={filters.year}
-          options={filterOptions.year}
-          onChange={(value) => onFilterChange("year", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Publication Year"
-          value={filters.publicationYear}
-          options={filterOptions.publicationYear}
-          onChange={(value) => onFilterChange("publicationYear", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Progress"
-          value={filters.progress}
-          options={filterOptions.progress}
-          onChange={(value) => onFilterChange("progress", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <FilterSelect
-          label="Rating"
-          value={filters.rating}
-          options={filterOptions.rating}
-          onChange={(value) => onFilterChange("rating", value)}
-            emptyLabel="--"
-            mutedEmptyValue
-        />
-      </FilterGroup>
-
-      <FilterGroup title="Organization">
-        <FilterSelect
-          label="Series"
-          value={filters.series}
-          options={filterOptions.series}
-          onChange={(value) => onFilterChange("series", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-        <DisabledFilterButton label="Collection" />
-        <FilterSelect
-          label="Author"
-          value={filters.author}
-          options={filterOptions.author}
-          onChange={(value) => onFilterChange("author", value)}
-          emptyLabel="--"
-          mutedEmptyValue
-        />
-      </FilterGroup>
+      ))}
     </div>
   );
 }
 
-const sortLabels: Record<LibrarySort, string> = {
-  "date-added": "Recently Added",
-  "last-read": "Last Read",
-  title: "Title A-Z",
-  author: "Author A-Z",
-  "publication-date": "Publication Date",
-  progress: "Progress",
-  "date-started": "Date Started",
-  "date-finished": "Date Finished",
-  "currently-reading": "Currently Reading",
-  "highest-rated": "Highest - Lowest",
-  "lowest-rated": "Lowest - Highest",
-  "page-count": "Pages",
-  "continue-reading": "Continue Reading",
-  "near-completion": "Near Completion",
-};
-
-function SortOptionButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      className={cn(
-        "h-7 justify-start gap-2 px-1.5 text-left",
-        active && "bg-secondary text-secondary-foreground",
-        disabled && "text-muted-foreground",
-      )}
-      disabled={disabled}
-      title={disabled ? `${label} is not implemented yet.` : undefined}
-      onClick={onClick}
-    >
-      <span
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-input",
-          active && "border-primary bg-primary text-primary-foreground",
-        )}
-      >
-        {active && <Check className="h-3 w-3" />}
-      </span>
-      {label}
-    </Button>
-  );
-}
-
-function SortGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <div className="flex flex-col gap-1">{children}</div>
-    </section>
-  );
-}
-
-function AllSortingFields({
-  sort,
-  onSortChange,
-}: {
+function AllSortingFields({ sort, direction, onSortChange, onDirectionChange }: {
   sort: LibrarySort;
+  direction: SortDirection;
   onSortChange: (sort: LibrarySort) => void;
+  onDirectionChange: () => void;
 }) {
-  const option = (value: LibrarySort) => (
-    <SortOptionButton
-      key={value}
-      label={sortLabels[value]}
-      active={sort === value}
-      onClick={() => onSortChange(value)}
-    />
-  );
-
   return (
-    <div className="space-y-6">
-      <SortGroup title="Activity">
-        {option("date-added")}
-        {option("last-read")}
-      </SortGroup>
-      <SortGroup title="Book Details">
-        {option("title")}
-        {option("author")}
-        {option("publication-date")}
-        {option("page-count")}
-      </SortGroup>
-      <SortGroup title="Reading">
-        {option("progress")}
-        {option("date-started")}
-        {option("date-finished")}
-      </SortGroup>
-      <SortGroup title="Rating">
-        {option("highest-rated")}
-        {option("lowest-rated")}
-      </SortGroup>
-    </div>
+    <LibrarySortingControls
+      sort={sort}
+      options={librarySorts.map((value) => ({ value, label: sortLabels[value], directionLabel: sortDirectionLabel(value, defaultSortDirection(value)) }))}
+      directionLabel={sortDirectionLabel(sort, direction)}
+      onSortChange={(value) => onSortChange(value as LibrarySort)}
+      onDirectionChange={onDirectionChange}
+    />
   );
 }
 
 function LibraryControlsBar({
   sort,
+  direction,
+  onDirectionChange,
   filters,
   filterOptions,
   activeFilterChips,
@@ -1342,10 +914,10 @@ function LibraryControlsBar({
   onFilterChange,
   onRemoveFilter,
   onClearFilters,
-  filtersOpen,
-  setFiltersOpen,
 }: {
   sort: LibrarySort;
+  direction: SortDirection;
+  onDirectionChange: () => void;
   filters: LibraryFilters;
   filterOptions: LibraryFilterOptions;
   activeFilterChips: ActiveFilterChip[];
@@ -1353,134 +925,29 @@ function LibraryControlsBar({
   onFilterChange: (key: LibraryFilterKey, value: string) => void;
   onRemoveFilter: (keys: LibraryFilterKey[]) => void;
   onClearFilters: () => void;
-  filtersOpen: boolean;
-  setFiltersOpen: (open: boolean) => void;
 }) {
-  const hasActiveFilters = activeFilterChips.length > 0;
-  const handleSortDropdownChange = (value: string) => {
-    if (value === "all-sorting") {
-      setFiltersOpen(true);
-      return;
-    }
-
-    onSortChange(value as LibrarySort);
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 py-0 lg:flex-row lg:items-center lg:justify-between lg:py-3">
-        <div className="hidden flex-wrap items-center gap-2 lg:flex">
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            options={filterOptions.status}
-            onChange={(value) => onFilterChange("status", value)}
-            showLabel={false}
-            emptyLabel="Status"
-            triggerClassName="w-[9.75rem]"
-          />
-          <FilterSelect
-            label="Genre"
-            value={filters.genre}
-            options={filterOptions.genre}
-            onChange={(value) => onFilterChange("genre", value)}
-            showLabel={false}
-            emptyLabel="Genre"
-            triggerClassName="w-[8.5rem]"
-          />
-          <FilterSelect
-            label="Rating"
-            value={filters.rating}
-            options={filterOptions.rating}
-            onChange={(value) => onFilterChange("rating", value)}
-            showLabel={false}
-            emptyLabel="Rating"
-            triggerClassName="w-[8.5rem]"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="relative"
-            onClick={() => setFiltersOpen(true)}
-            aria-haspopup="dialog"
-            aria-label="All filters"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-            {hasActiveFilters && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">
-                {activeFilterChips.length}
-              </span>
-            )}
-          </Button>
+      <div className="flex flex-col gap-3 py-0 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:py-3">
+        <div className="hidden lg:block">
+          <AllFilterFields filters={filters} filterOptions={filterOptions} onFilterChange={onFilterChange} compact />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <Select value={sort} onValueChange={handleSortDropdownChange}>
-            <SelectTrigger className="hidden w-[12.5rem] justify-start gap-1.5 lg:flex" aria-label="Sort books">
-              <span className="text-muted-foreground">Sort by:</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date-added">Recently Added</SelectItem>
-              <SelectItem value="date-finished">Date Finished</SelectItem>
-              <SelectItem value="publication-date">Publication Date</SelectItem>
-              <SelectItem value="title">Title A-Z</SelectItem>
-              <SelectItem value="author">Author A-Z</SelectItem>
-              <SelectItem value="all-sorting" className="text-muted-foreground">
-                View all
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <LibrarySortingControls
+          sort={sort}
+          options={librarySorts.map((value) => ({ value, label: sortLabels[value], directionLabel: sortDirectionLabel(value, defaultSortDirection(value)) }))}
+          directionLabel={sortDirectionLabel(sort, direction)}
+          onSortChange={(value) => onSortChange(value as LibrarySort)}
+          onDirectionChange={onDirectionChange}
+          compact
+        />
       </div>
 
-      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <DialogContent className="left-auto right-0 top-0 h-svh max-h-svh max-w-full translate-x-0 translate-y-0 content-start overflow-y-auto rounded-none border-l p-4 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-normal">
-              Advanced Filters and Sorting
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-8">
-            <AllFilterFields
-              filters={filters}
-              filterOptions={filterOptions}
-              onFilterChange={onFilterChange}
-            />
-            <Separator />
-            <AllSortingFields sort={sort} onSortChange={onSortChange} />
-          </div>
-          <DialogFooter>
-            {hasActiveFilters && (
-              <Button type="button" variant="ghost" onClick={onClearFilters}>
-                Clear filters
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeFilterChips.map((chip) => (
-            <Badge key={chip.label} variant="secondary" className="gap-1 pr-1">
-              {chip.label}
-              <button
-                type="button"
-                className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                aria-label={`Remove ${chip.label}`}
-                onClick={() => onRemoveFilter(chip.keys)}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
-            Clear filters
-          </Button>
-        </div>
-      )}
+      <LibraryFilterChips
+        chips={activeFilterChips.map((chip) => ({ label: chip.label, onRemove: () => onRemoveFilter(chip.keys) }))}
+        onClear={onClearFilters}
+      />
     </div>
   );
 }
@@ -1503,6 +970,7 @@ function LibraryToolbar({
   onOpenGenres,
   onDuplicate,
   onOpenFilters,
+  filtersOpen,
   activeFilterCount,
 }: {
   title: string;
@@ -1522,6 +990,7 @@ function LibraryToolbar({
   onOpenGenres: () => void;
   onDuplicate: () => void;
   onOpenFilters: () => void;
+  filtersOpen: boolean;
   activeFilterCount: number;
 }) {
   return (
@@ -1594,7 +1063,7 @@ function LibraryToolbar({
         )}
       </div>
       <div className="absolute right-0 top-0 flex items-center gap-1">
-        <Button type="button" variant="ghost" size="icon" className="relative lg:hidden" onClick={onOpenFilters} aria-haspopup="dialog" aria-label="Advanced filters and sorting">
+        <Button type="button" variant="ghost" size="icon" className="relative lg:hidden" onClick={onOpenFilters} aria-expanded={filtersOpen} aria-controls="book-library-filters" aria-haspopup="dialog" aria-label="Filters and sorting">
           <ListFilter className="h-5 w-5" />
           {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">{activeFilterCount}</span>}
         </Button>
@@ -1770,12 +1239,14 @@ function readingShelfBooks(
   query: string,
   sort: LibrarySort,
   latestReadTimesByBook?: Map<string, number>,
+  direction?: SortDirection,
 ) {
   return filterAndSortBooks({
     books: books.filter((book) => book.status === "Reading"),
     series,
     query,
     sort,
+    direction,
     latestReadTimesByBook,
   });
 }
@@ -1975,7 +1446,11 @@ export default function Library() {
   const activeView = hasExplicitView ? viewParam : "all";
   const contentView = activeView;
   const libraryQuery = queryParam;
-  const librarySort: LibrarySort = isLibrarySort(sortParam) ? sortParam : "title";
+  const librarySort = normalizeLibrarySort(sortParam);
+  const directionParam = searchParams.get("direction");
+  const libraryDirection: SortDirection = directionParam === "asc" || directionParam === "desc"
+    ? directionParam
+    : sortParam === "lowest-rated" ? "asc" : defaultSortDirection(librarySort);
   const libraryDisplay = normalizeLibraryDisplay(displayParam);
   const isManageMode = modeParam === "manage";
   const isJournalEntriesView = contentView === "journalEntries";
@@ -2082,7 +1557,7 @@ export default function Library() {
     setJournalEntriesError(null);
   }
 
-  function updateLibraryParam(key: "q" | "sort" | "display", value: string) {
+  function updateLibraryParam(key: "q" | "sort" | "display" | "direction", value: string) {
     const nextParams = new URLSearchParams(searchParams);
     const normalizedValue = key === "q" ? value.trim() : value;
     const isDefaultValue =
@@ -2096,6 +1571,7 @@ export default function Library() {
       nextParams.set(key, normalizedValue);
     }
 
+    if (key === "sort") nextParams.delete("direction");
     setSearchParams(nextParams, { replace: true });
   }
 
@@ -2104,6 +1580,7 @@ export default function Library() {
     nextParams.delete("view");
     nextParams.delete("value");
     nextParams.delete("sort");
+    nextParams.delete("direction");
     filterKeys.forEach((key) => nextParams.delete(key));
 
     Object.entries(getShelfFilters(shelf)).forEach(([key, values]) => {
@@ -2300,9 +1777,10 @@ export default function Library() {
       series,
       query: libraryQuery,
       sort: librarySort,
+      direction: libraryDirection,
       latestReadTimesByBook,
     });
-  }, [activePrimaryShelf, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, series]);
+  }, [activePrimaryShelf, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, libraryDirection, series]);
 
   const continueReadingBooks = useMemo(
     () =>
@@ -2312,8 +1790,9 @@ export default function Library() {
         libraryQuery,
         librarySort,
         latestReadTimesByBook,
+        libraryDirection,
       ),
-    [books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, series],
+    [books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, libraryDirection, series],
   );
 
   const smartShelves = useMemo(
@@ -2337,9 +1816,10 @@ export default function Library() {
       series,
       query: libraryQuery,
       sort: librarySort,
+      direction: libraryDirection,
       latestReadTimesByBook,
     });
-  }, [activeValueShelf, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, selectedValue, series]);
+  }, [activeValueShelf, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, libraryDirection, selectedValue, series]);
 
   const groupedBooks = useMemo(() => {
     const filterableBooks = filterAndSortBooks({
@@ -2347,6 +1827,7 @@ export default function Library() {
       series,
       query: libraryQuery,
       sort: librarySort,
+      direction: libraryDirection,
       latestReadTimesByBook,
     });
     if (contentView === "series") return buildSeriesGroups(filterableBooks, series);
@@ -2359,7 +1840,7 @@ export default function Library() {
       return buildSingleValueGroups(filterableBooks, (book) => book.source);
     }
     return [];
-  }, [contentView, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, series]);
+  }, [contentView, books, latestReadTimesByBook, libraryFilters, libraryQuery, librarySort, libraryDirection, series]);
 
   const groupedJournalEntries = useMemo(() => {
     if (isJournalEntriesView && selectedValue) {
@@ -2389,6 +1870,10 @@ export default function Library() {
     return itemCountLabel(books.length, "book");
   })();
   const hasActiveFilters = activeFilterChips.length > 0;
+  const hasEmptyFilteredResults = hasActiveFilters && !isJournalEntriesView && (
+    activePrimaryShelf ? visibleBooks.length === 0
+      : selectedValue ? filteredBooks.length === 0 : groupedBooks.length === 0
+  );
   const isMyBooksOverview = false;
   const managementBooks = activePrimaryShelf
     ? visibleBooks
@@ -2406,6 +1891,8 @@ export default function Library() {
   const controlsBar = (
     <LibraryControlsBar
       sort={librarySort}
+      direction={libraryDirection}
+      onDirectionChange={() => updateLibraryParam("direction", libraryDirection === "asc" ? "desc" : "asc")}
       filters={libraryFilters}
       filterOptions={filterOptions}
       activeFilterChips={activeFilterChips}
@@ -2413,12 +1900,24 @@ export default function Library() {
       onFilterChange={updateLibraryFilter}
       onRemoveFilter={removeLibraryFilters}
       onClearFilters={clearLibraryFilters}
-      filtersOpen={filtersOpen}
-      setFiltersOpen={setFiltersOpen}
     />
   );
 
   return (
+    <>
+      <LibraryFiltersDialog id="book-library-filters" open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <>
+          <AllFilterFields filters={libraryFilters} filterOptions={filterOptions} onFilterChange={updateLibraryFilter} />
+          <Separator />
+          <AllSortingFields
+            sort={librarySort}
+            direction={libraryDirection}
+            onSortChange={(sort) => updateLibraryParam("sort", sort)}
+            onDirectionChange={() => updateLibraryParam("direction", libraryDirection === "asc" ? "desc" : "asc")}
+          />
+          {hasActiveFilters && <Button type="button" variant="ghost" onClick={clearLibraryFilters}>Clear filters</Button>}
+        </>
+      </LibraryFiltersDialog>
     <div className="space-y-4">
       {loadingReadingOrder && <LoadingIndicator variant="inline" label="Loading reading order…" />}
       {showLibraryToolbar && (
@@ -2439,7 +1938,8 @@ export default function Library() {
           onOpenStatus={() => setBulkStatusOpen(true)}
           onOpenGenres={() => setBulkGenresOpen(true)}
           onDuplicate={openDuplicateDialog}
-          onOpenFilters={() => setFiltersOpen(true)}
+          onOpenFilters={() => setFiltersOpen(!filtersOpen)}
+          filtersOpen={filtersOpen}
           activeFilterCount={activeFilterChips.length}
         />
       )}
@@ -2502,6 +2002,9 @@ export default function Library() {
           <section className="min-w-0">
             {loading ? (
               <LoadingGrid />
+            ) : hasEmptyFilteredResults ? (
+              <CollectionEmptyState title="No books match your filters"
+                description="Try changing your filters to see more of your collection." onShowAll={clearLibraryFilters} />
             ) : activePrimaryShelf ? (
               visibleBooks.length === 0 ? (
                 <EmptyLibraryView
@@ -2642,5 +2145,6 @@ export default function Library() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

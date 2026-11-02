@@ -1,3 +1,9 @@
+import CollectionEmptyState from "@/components/CollectionEmptyState";
+import { Separator } from "@/components/ui/separator";
+import { FilterSelect, LibrarySortingControls, LibraryFilterChips } from "@/components/LibraryControls";
+import { authorSortOptions, authorSortDirectionLabel, sortLibraryAuthors } from "@/lib/libraryEntitySorting";
+import type { SortDirection } from "@/lib/librarySorting";
+import LibraryFiltersDialog from "@/components/LibraryFiltersDialog";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -16,25 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { buildAuthorSummaries } from "@/lib/authorShelf";
 import {
-  compareAuthorsByName,
   filterAuthors,
   getAuthorFilters,
   hasActiveAuthorFilters,
-  sortAuthorsByMostRead,
-  sortAuthorsByName,
-  sortAuthorsByRecentlyRead,
   uniqueSortedValues,
 } from "@/lib/authorsView";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
@@ -46,8 +41,6 @@ import type { BookJournalEntryRecord } from "@/types";
 
 type AuthorDisplay = "grid" | "table";
 type AuthorSort = "name" | "recently-added" | "latest-read" | "top-rated" | "most-read";
-
-const allValue = "__all__";
 
 function countLabel(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
@@ -195,28 +188,6 @@ function AuthorTable({
   );
 }
 
-function authorMatchesSort(authors: AuthorSummary[], sort: AuthorSort): AuthorSummary[] {
-  if (sort === "recently-added") {
-    return [...authors].sort((a, b) => {
-      const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      return diff !== 0 ? diff : compareAuthorsByName(a, b);
-    });
-  }
-  if (sort === "latest-read") return sortAuthorsByRecentlyRead(authors);
-  if (sort === "top-rated") {
-    return [...authors].sort((a, b) => {
-      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      if ((b.averageRating ?? -1) !== (a.averageRating ?? -1)) {
-        return (b.averageRating ?? -1) - (a.averageRating ?? -1);
-      }
-      if (a.bookCount !== b.bookCount) return b.bookCount - a.bookCount;
-      return compareAuthorsByName(a, b);
-    });
-  }
-  if (sort === "most-read") return sortAuthorsByMostRead(authors);
-  return sortAuthorsByName(authors);
-}
-
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false;
   for (const value of a) {
@@ -227,8 +198,6 @@ function setsEqual(a: Set<string>, b: Set<string>): boolean {
 
 function clearAuthorFilters(searchParams: URLSearchParams): URLSearchParams {
   const nextParams = new URLSearchParams(searchParams);
-  nextParams.delete("sort");
-  nextParams.delete("display");
   nextParams.delete("genre");
   nextParams.delete("language");
   return nextParams;
@@ -253,6 +222,8 @@ export default function AuthorsExplore() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const sort = normalizeSort(searchParams.get("sort"));
+  const directionParam = searchParams.get("direction");
+  const direction: SortDirection = directionParam === "asc" || directionParam === "desc" ? directionParam : sort === "name" ? "asc" : "desc";
   const display = normalizeDisplay(searchParams.get("display"));
   const mode = searchParams.get("mode");
   const filters = useMemo(() => getAuthorFilters(searchParams), [searchParams]);
@@ -283,8 +254,8 @@ export default function AuthorsExplore() {
   const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
   const authorCountLabel = countLabel(authors.length, "author");
   const filteredAuthors = useMemo(() => {
-    return authorMatchesSort(filterAuthors(authors, filters), sort);
-  }, [authors, filters, sort]);
+    return sortLibraryAuthors(filterAuthors(authors, filters), sort, direction);
+  }, [authors, filters, sort, direction]);
 
   const filterOptions = useMemo(
     () => ({
@@ -304,25 +275,22 @@ export default function AuthorsExplore() {
     });
   }, [visibleAuthors]);
 
-  function updateParam(key: "sort" | "display" | "mode", value: string) {
+  function updateParam(key: "sort" | "display" | "mode" | "direction", value: string) {
     const nextParams = new URLSearchParams(searchParams);
     const normalizedValue = value.trim();
-
-    if (!normalizedValue || (key === "sort" && normalizedValue === "name") || (key === "display" && normalizedValue === "grid")) {
-      nextParams.delete(key);
-    } else {
-      nextParams.set(key, normalizedValue);
-    }
-
+    if (!normalizedValue || (key === "sort" && normalizedValue === "name") || (key === "display" && normalizedValue === "grid")) nextParams.delete(key);
+    else nextParams.set(key, normalizedValue);
+    if (key === "sort") nextParams.delete("direction");
     setSearchParams(nextParams, { replace: true });
   }
 
   function updateFilter(key: "genre" | "language", value: string) {
     const nextParams = new URLSearchParams(searchParams);
-    if (value === allValue) {
-      nextParams.delete(key);
-    } else {
-      nextParams.set(key, value);
+    const selected = nextParams.getAll(key);
+    nextParams.delete(key);
+    if (value) {
+      const values = selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value];
+      values.forEach((item) => nextParams.append(key, item));
     }
     setSearchParams(nextParams, { replace: true });
   }
@@ -438,7 +406,29 @@ export default function AuthorsExplore() {
   const hasFilters = hasActiveAuthorFilters(filters);
   const activeFilterCount = filters.genre.length + filters.language.length;
 
+  const filterFields = (compact = false) => (
+    <div className={compact ? "flex flex-wrap items-center gap-2" : "grid gap-3"}>
+      {(["genre", "language"] as const).map((key) => (
+        <FilterSelect key={key} label={key === "genre" ? "Genre" : "Language"} value={filters[key]} options={filterOptions[key]}
+          onChange={(value) => updateFilter(key, value)}
+          emptyLabel="All"
+          triggerClassName={compact ? "w-[9.75rem]" : undefined} />
+      ))}
+    </div>
+  );
+  const sortingControls = (compact = false) => (
+    <LibrarySortingControls sort={sort} options={authorSortOptions.map((option) => ({ ...option, directionLabel: authorSortDirectionLabel(option.value, option.value === "name" ? "asc" : "desc") }))} directionLabel={authorSortDirectionLabel(sort, direction)}
+      onSortChange={(value) => updateParam("sort", value)} onDirectionChange={() => updateParam("direction", direction === "asc" ? "desc" : "asc")} compact={compact} />
+  );
+
   return (
+    <>
+      <LibraryFiltersDialog id="author-library-filters" open={filtersOpen} onOpenChange={setFiltersOpen}>
+        {filterFields()}
+        <Separator />
+        {sortingControls()}
+        {hasFilters && <Button type="button" variant="ghost" onClick={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })}>Clear filters</Button>}
+      </LibraryFiltersDialog>
     <div className="space-y-4">
       <div className="space-y-1">
         <div className="relative flex flex-wrap items-start gap-3 pr-20">
@@ -477,9 +467,10 @@ export default function AuthorsExplore() {
               variant="ghost"
               size="icon"
               className="relative lg:hidden"
-              onClick={() => setFiltersOpen(true)}
-              aria-haspopup="dialog"
-              aria-label="Advanced filters and sorting"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              aria-expanded={filtersOpen}
+              aria-controls="author-library-filters"
+              aria-haspopup="dialog" aria-label="Filters and sorting"
             >
               <ListFilter className="h-5 w-5" />
               {hasFilters && <span className="absolute -right-1 -top-1 rounded-full bg-secondary px-1.5 text-xs text-secondary-foreground">{activeFilterCount}</span>}
@@ -505,136 +496,18 @@ export default function AuthorsExplore() {
         )}
       </div>
 
-      <div className="space-y-2">
-        <div className="py-0 lg:py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="hidden flex-wrap items-center gap-2 lg:flex">
-            <Select value={filters.genre[0] ?? allValue} onValueChange={(value) => updateFilter("genre", value)}>
-              <SelectTrigger className="w-[9.75rem] justify-between gap-1.5" aria-label="Filter authors by genre">
-                <SelectValue placeholder="Genre" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={allValue}>Genre</SelectItem>
-                {filterOptions.genre.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filters.language[0] ?? allValue} onValueChange={(value) => updateFilter("language", value)}>
-              <SelectTrigger className="w-[9.75rem] justify-between gap-1.5" aria-label="Filter authors by language">
-                <SelectValue placeholder="Language" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={allValue}>Language</SelectItem>
-                {filterOptions.language.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Select value={sort} onValueChange={(value) => updateParam("sort", value)}>
-              <SelectTrigger className="hidden w-[12.5rem] justify-between gap-1.5 lg:flex" aria-label="Sort authors">
-                <span className="text-muted-foreground">Sort by:</span>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="recently-added">Recently added</SelectItem>
-                <SelectItem value="latest-read">Latest read</SelectItem>
-                <SelectItem value="top-rated">Top rated</SelectItem>
-                <SelectItem value="most-read">Most read</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          </div>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 py-0 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:py-3">
+          <div className="hidden lg:block">{filterFields(true)}</div>
+          {sortingControls(true)}
         </div>
-
-        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <DialogContent className="left-auto right-0 top-0 h-svh max-h-svh max-w-full translate-x-0 translate-y-0 content-start overflow-y-auto rounded-none border-l p-4 sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-normal">Advanced Filters and Sorting</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <h2 className="font-heading text-base font-medium">Filters</h2>
-                <Select value={filters.genre[0] ?? allValue} onValueChange={(value) => updateFilter("genre", value)}>
-                  <SelectTrigger aria-label="Filter authors by genre">
-                    <SelectValue placeholder="Genre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={allValue}>Genre</SelectItem>
-                    {filterOptions.genre.map((option) => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filters.language[0] ?? allValue} onValueChange={(value) => updateFilter("language", value)}>
-                  <SelectTrigger aria-label="Filter authors by language">
-                    <SelectValue placeholder="Language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={allValue}>Language</SelectItem>
-                    {filterOptions.language.map((option) => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-3 border-t pt-6">
-                <h2 className="font-heading text-base font-medium">Sort by</h2>
-                <div className="grid gap-2">
-                  {([
-                    ["name", "Name"],
-                    ["recently-added", "Recently added"],
-                    ["latest-read", "Latest read"],
-                    ["top-rated", "Top rated"],
-                    ["most-read", "Most read"],
-                  ] as const).map(([value, label]) => (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant={sort === value ? "secondary" : "outline"}
-                      className="justify-start"
-                      onClick={() => updateParam("sort", value)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {hasFilters && (
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })}
-                >
-                  Clear filters
-                </Button>
-              </DialogFooter>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {hasFilters && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })}
-            >
-              Clear filters
-            </Button>
-          )}
-        </div>
+        <LibraryFilterChips
+          chips={(["genre", "language"] as const).flatMap((key) => filters[key].map((value) => ({
+            label: `${key === "genre" ? "Genre" : "Language"}: ${value}`,
+            onRemove: () => updateFilter(key, value),
+          })))}
+          onClear={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })}
+        />
       </div>
 
       {bulkError && (
@@ -643,20 +516,20 @@ export default function AuthorsExplore() {
         </div>
       )}
 
-      {display === "table" ? (
-        displayAuthors.length === 0 ? (
-          <EmptyState message="No authors match the current filters." />
-        ) : (
-          <AuthorTable
-            authors={displayAuthors}
-            selectedIds={isManageMode ? selectedIds : undefined}
-            onToggleAuthor={isManageMode ? toggleSelected : undefined}
-            onOpenAuthor={openAuthor}
-            interactive={!isManageMode}
-          />
-        )
-      ) : displayAuthors.length === 0 ? (
-        <EmptyState message="No authors match the current filters." />
+      {displayAuthors.length === 0 ? (
+        hasFilters ? (
+          <CollectionEmptyState title="No authors match your filters"
+            description="Try changing your filters to see more of your collection."
+            onShowAll={() => setSearchParams(clearAuthorFilters(searchParams), { replace: true })} />
+        ) : <EmptyState message="No authors yet." />
+      ) : display === "table" ? (
+        <AuthorTable
+          authors={displayAuthors}
+          selectedIds={isManageMode ? selectedIds : undefined}
+          onToggleAuthor={isManageMode ? toggleSelected : undefined}
+          onOpenAuthor={openAuthor}
+          interactive={!isManageMode}
+        />
       ) : (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:gap-4">
           {displayAuthors.map((author) => (
@@ -695,5 +568,6 @@ export default function AuthorsExplore() {
         onConfirm={duplicateSelected}
       />
     </div>
+    </>
   );
 }
