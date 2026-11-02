@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 type HistoryMonth = {
   anchorId: string;
@@ -11,6 +11,25 @@ export default function HistoryMonthNavigation({ months }: { months: HistoryMont
   const touched = useRef(false);
   const lastDraggedMonth = useRef<number | null>(null);
   const [preview, setPreview] = useState<{ index: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!preview) return;
+
+    const timeout = window.setTimeout(() => setPreview(null), 1500);
+    // Restart the countdown whenever a month is shown, and clean up on unmount.
+    return () => window.clearTimeout(timeout);
+  }, [preview]);
+
+  useEffect(() => {
+    function hideOnScroll() {
+      // Keep the month visible while a finger is actively dragging over the dots.
+      if (draggingPointer.current === null) setPreview(null);
+    }
+
+    // Capture also catches scrolling inside the page's scrollable containers.
+    window.addEventListener("scroll", hideOnScroll, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", hideOnScroll, true);
+  }, []);
 
   function showMonth(index: number) {
     const nav = navRef.current;
