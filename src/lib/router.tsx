@@ -2,7 +2,9 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import AppLayout from "@/components/AppLayout";
+
+// Load the signed-in app shell only after ProtectedRoute resolves the session.
+const AppLayout = lazy(() => import("@/components/AppLayout"));
 
 const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
@@ -75,7 +77,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       {
-        element: <AppLayout />,
+        element: lazyRoute(<AppLayout />),
         children: [
           { path: "/", element: lazyRoute(<Dashboard />) },
           { path: "/library", element: lazyRoute(<Library />) },

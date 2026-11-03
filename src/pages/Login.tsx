@@ -2,7 +2,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useAuth } from "@/context";
+import { useAuth } from "@/context/AuthContext";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

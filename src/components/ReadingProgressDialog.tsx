@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import ReadingProgressPanel from "@/components/ReadingProgressPanel";
+import { lazy, Suspense, useState, type ReactNode } from "react";
+import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { notifyBookFinished } from "@/lib/confetti";
 import type { Book } from "@/types";
+
+// The panel includes the journal editor; fetch it only when the dialog opens.
+const ReadingProgressPanel = lazy(() => import("@/components/ReadingProgressPanel"));
 
 interface ReadingProgressDialogProps {
   book: Book;
@@ -46,24 +49,26 @@ export default function ReadingProgressDialog({
         <DialogHeader>
           <DialogTitle>Update progress</DialogTitle>
         </DialogHeader>
-        <ReadingProgressPanel
-          book={book}
-          defaultExpanded
-          hideTrigger
-          onEntryComposerOpenChange={setEntryComposerOpen}
-          onCancel={() => handleOpenChange(false)}
-          onProgressSaved={async (newPage) => {
-            const totalPages = book.total_pages ?? 0;
-            const finishedBook = totalPages > 0 && newPage >= totalPages;
+        <Suspense fallback={<LoadingIndicator variant="section" label="Loading progress form…" />}>
+          <ReadingProgressPanel
+            book={book}
+            defaultExpanded
+            hideTrigger
+            onEntryComposerOpenChange={setEntryComposerOpen}
+            onCancel={() => handleOpenChange(false)}
+            onProgressSaved={async (newPage) => {
+              const totalPages = book.total_pages ?? 0;
+              const finishedBook = totalPages > 0 && newPage >= totalPages;
 
-            await onProgressSaved(newPage);
-            handleOpenChange(false);
+              await onProgressSaved(newPage);
+              handleOpenChange(false);
 
-            if (finishedBook) {
-              notifyBookFinished(book.id);
-            }
-          }}
-        />
+              if (finishedBook) {
+                notifyBookFinished(book.id);
+              }
+            }}
+          />
+        </Suspense>
       </DialogContent>
     </Dialog>
   );

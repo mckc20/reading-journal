@@ -1,5 +1,7 @@
 import { RouterProvider } from "react-router-dom";
-import { AuthProvider, ThemeProvider, UserSettingsProvider } from "@/context";
+import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { UserSettingsProvider } from "@/context/UserSettingsContext";
 import { router } from "@/lib/router";
 
 export default function App() {

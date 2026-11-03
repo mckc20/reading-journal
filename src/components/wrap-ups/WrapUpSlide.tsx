@@ -34,6 +34,7 @@ export default function WrapUpSlide({ monthKey, inline = false, children }: {
   const keys = slide.previous ? [slide.previous, slide.current] : [slide.current];
   return (
     <Tag
+      tabIndex={inline ? undefined : -1}
       className={`wrap-up-slide ${inline ? 'wrap-up-slide-heading' : ''}`}
       style={{ '--wrap-up-slide-direction': slide.direction } as CSSProperties}
     >
@@ -43,10 +44,20 @@ export default function WrapUpSlide({ monthKey, inline = false, children }: {
           <Tag
             key={key}
             ref={node => {
-              if (outgoing) node?.setAttribute('inert', '');
-              else node?.removeAttribute('inert');
+              if (!node) return;
+              if (outgoing) {
+                // Move focus before hiding the old month from assistive technology.
+                // The parent survives month changes, including incoming loading states.
+                if (node.contains(node.ownerDocument.activeElement)) {
+                  node.parentElement?.focus({ preventScroll: true });
+                }
+                node.setAttribute('inert', '');
+                node.setAttribute('aria-hidden', 'true');
+              } else {
+                node.removeAttribute('inert');
+                node.removeAttribute('aria-hidden');
+              }
             }}
-            aria-hidden={outgoing ? true : undefined}
             className={`wrap-up-slide-layer ${outgoing ? 'wrap-up-slide-outgoing' : ''} ${moving ? outgoing ? 'wrap-up-slide-out' : 'wrap-up-slide-in' : ''}`}
           >
             {children(key)}
