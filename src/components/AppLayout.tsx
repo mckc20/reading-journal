@@ -296,8 +296,8 @@ function AppLayoutContent() {
         <main
           className={cn(
             isMessagesPage
-              ? "w-full max-w-none flex-1 px-0 py-0 pb-16 transition-[padding] duration-200 md:pb-0 md:pt-16"
-              : "mx-auto w-full max-w-7xl flex-1 px-5 py-5 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
+              ? "w-full max-w-none flex-1 px-0 pt-16 pb-16 transition-[padding] duration-200 md:pb-0"
+              : "mx-auto w-full max-w-7xl flex-1 px-5 pt-21 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
             drawerOpen
               ? isMessagesPage
                 ? "md:pl-64"
@@ -418,10 +418,10 @@ function AppHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:fixed md:left-16 md:right-0",
+        "fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:left-16",
       )}
     >
-      <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-8 lg:px-10">
+      <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-8 lg:px-10">
         <div className="flex min-w-0 items-center gap-2">
           <Button
             type="button"

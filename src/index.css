@@ -324,6 +324,14 @@
   * {
     @apply border-border outline-ring/50;
     }
+  html,
+  body {
+    /* Keep overflow from moving the page; shelves can still scroll themselves.
+       clip also preserves sticky headers without adding a scroll container. */
+    overflow-x: clip;
+    /* Prevent edge bounce from pulling the navigation bars with the page. */
+    overscroll-behavior-y: none;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-weight: 400;
