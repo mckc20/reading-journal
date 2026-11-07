@@ -17,11 +17,11 @@ export function GenreIllustration({ slug, className }: { slug: string; className
 export function GenreCoverComposition({ books, compact = false }: { books: Book[]; compact?: boolean }) {
   const covers = selectGenreCovers(books);
   return (
-    <div aria-hidden="true" className={cn("flex shrink-0 items-end justify-center -space-x-3 px-3", compact ? "h-20" : "mx-auto h-44 w-full max-w-80 sm:h-48")}>
+    <div aria-hidden="true" className={cn("flex shrink-0 items-end justify-center -space-x-3", compact ? "h-16 px-2" : "mx-auto h-44 w-full max-w-80 px-3 sm:h-48")}>
       {covers.map((book, index) => (
-        <BookCover key={book.id} src={book.cover_url} title={book.title} showFallbackTitle
+        <BookCover key={book.id} src={book.cover_url} title={book.title} showFallbackTitle={!compact}
           className={cn("shrink-0 origin-bottom border border-background/70 shadow-lg transition-transform duration-200 motion-reduce:transition-none",
-            compact ? "w-11" : "w-[32%] max-w-28",
+            compact ? "w-9" : "w-[32%] max-w-28",
             index === 0 && covers.length > 1 && "-rotate-6",
             index === 1 && "z-10 -translate-y-2",
             index === 2 && "rotate-6")} />
@@ -35,14 +35,22 @@ export function GenreCollectionCard({ genre, slug, books, compact = false }: { g
   const metadata = getGenreMetadata(slug, genre.name, genre.is_system);
   const summary = summarizeGenreBooks(books);
   return (
-    <Link to={`/genres/${slug}`} className={cn("group overflow-hidden rounded-2xl border bg-card transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", compact && "flex items-center gap-3 p-4")}>
+    <Link to={`/genres/${slug}`} className={cn("group block overflow-hidden rounded-xl border bg-card transition-colors hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:rounded-2xl", compact && "flex items-center gap-3 p-4")}>
+      {!compact && <div className="flex items-center gap-2.5 px-3 py-2 sm:hidden">
+        <GenreIllustration slug={slug} className="h-6 w-6 shrink-0 stroke-[1.5]" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <AppHeading level={4} as="h3" className="line-clamp-2">{genre.name}</AppHeading>
+          <p className="text-xs text-muted-foreground">{summary.finished} finished · {summary.total} total</p>
+        </div>
+        <GenreCoverComposition books={books} compact />
+      </div>}
       {!compact && (
-        <div className={cn("relative bg-gradient-to-br px-5 pb-5 pt-7", getGenreArtwork(slug).accentClassName)}>
+        <div className={cn("relative hidden bg-gradient-to-br px-5 pb-5 pt-7 sm:block", getGenreArtwork(slug).accentClassName)}>
           <GenreIllustration slug={slug} className="absolute right-4 top-4 h-12 w-12" />
           <GenreCoverComposition books={books} />
         </div>
       )}
-      <div className={cn("min-w-0 flex-1 space-y-2", !compact && "p-5")}>
+      <div className={cn("min-w-0 flex-1 space-y-2", !compact && "hidden p-5 sm:block")}>
         <div className="flex items-start justify-between gap-2">
           <AppHeading level={compact ? 4 : 3} as="h3">{genre.name}</AppHeading>
           <ArrowUpRight aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />

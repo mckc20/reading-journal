@@ -21,6 +21,8 @@ export function summarizeGenreBooks(books: Book[]) {
     reading: books.filter((book) => book.status === "Reading").length,
     ratedCount: rated.length,
     averageRating: rated.length ? rated.reduce((sum, book) => sum + book.rating!, 0) / rated.length : null,
+    // Sustained enjoyment: three stars is neutral; lower ratings subtract points.
+    enjoymentScore: rated.reduce((sum, book) => sum + book.rating! - 3, 0),
     smallSample: rated.length > 0 && rated.length < 3,
   };
 }
@@ -37,9 +39,10 @@ export function getMainGenreCollection(genres: Genre[], books: Book[]): GenreCol
     .sort((a, b) => a.genre.name.localeCompare(b.genre.name, undefined, { sensitivity: "base", numeric: true }));
 }
 
-export function getHighestRatedGenres(collection: GenreCollectionEntry[]): GenreCollectionEntry[] {
+export function getFavoriteGenres(collection: GenreCollectionEntry[]): GenreCollectionEntry[] {
   return collection.filter((entry) => entry.averageRating !== null)
-    .sort((a, b) => b.averageRating! - a.averageRating! || b.ratedCount - a.ratedCount
+    .sort((a, b) => b.enjoymentScore - a.enjoymentScore
+      || b.averageRating! - a.averageRating! || b.ratedCount - a.ratedCount
       || a.genre.name.localeCompare(b.genre.name, undefined, { sensitivity: "base", numeric: true }))
     .slice(0, 5);
 }

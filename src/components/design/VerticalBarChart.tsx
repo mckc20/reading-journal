@@ -9,6 +9,7 @@ export interface ChartDatum {
   value: number;
   displayValue?: string;
   axisLabel?: string;
+  mobileAxisLabel?: string;
 }
 
 interface VerticalBarChartProps {
@@ -133,7 +134,10 @@ export default function VerticalBarChart({
                       key={`${point.key}-label`}
                       className="min-w-0 text-center text-[10px] leading-tight text-muted-foreground"
                     >
-                      {data.length <= 10 ||
+                      {point.mobileAxisLabel !== undefined ? <>
+                        <span className="sm:hidden">{(data.length - 1 - index) % 2 === 0 ? point.mobileAxisLabel : ""}</span>
+                        <span className="hidden sm:inline">{data.length <= 10 || index === 0 || index === data.length - 1 || index % labelStep === 0 ? point.axisLabel ?? point.label : ""}</span>
+                      </> : data.length <= 10 ||
                       index === 0 ||
                       index === data.length - 1 ||
                       index % labelStep === 0

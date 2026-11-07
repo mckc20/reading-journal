@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterAndSortGenreBooks, getHighestRatedGenres, getMainGenreCollection, selectGenreCovers, sortGenresByRecentBooks, summarizeGenreBooks } from "../src/lib/genreCollection";
+import { filterAndSortGenreBooks, getFavoriteGenres, getMainGenreCollection, selectGenreCovers, sortGenresByRecentBooks, summarizeGenreBooks } from "../src/lib/genreCollection";
 import type { Book, Genre } from "../src/types";
 
 const genre = (id: string, name: string, parent_id: string | null = null): Genre => ({
@@ -37,7 +37,7 @@ test("summary uses only valid ratings on finished books and counts current readi
     book("reading", { status: "Reading", rating: 1 }), book("paused", { status: "Paused", rating: 1 }),
     book("dnf", { status: "DNF", rating: 1 }),
   ]);
-  assert.deepEqual(summary, { total: 9, finished: 6, reading: 1, ratedCount: 2, averageRating: 4, smallSample: true });
+  assert.deepEqual(summary, { total: 9, finished: 6, reading: 1, ratedCount: 2, averageRating: 4, enjoymentScore: 2, smallSample: true });
   assert.equal(summarizeGenreBooks([book("a"), book("b", { status: "Reading", rating: 5 })]).averageRating, null);
   assert.equal(summarizeGenreBooks([]).smallSample, false);
   assert.equal(summarizeGenreBooks([book("a", { rating: 4 }), book("b", { rating: 4 }), book("c", { rating: 4 })]).smallSample, false);
@@ -50,10 +50,10 @@ test("main collections are alphabetical, exclude audience/legacy/root genres, an
   assert.deepEqual(collection.map((entry) => entry.total), [1, 1, 0]);
   assert.equal(collection[0].ratedCount, 1);
   assert.equal(collection[0].averageRating, 4);
-  assert.equal(getHighestRatedGenres(collection).length, 2);
+  assert.equal(getFavoriteGenres(collection).length, 2);
 });
 
-test("rankings use average then sample size then name, exclude unrated genres and limit to five", () => {
+test("rankings use enjoyment score then average, sample size and name, exclude unrated genres and limit to five", () => {
   const rankedGenres = [genre("fiction", "Fiction"), ...["Zeta", "Alpha", "Beta", "Delta", "Epsilon", "Gamma", "Empty"].map((name) => genre(name, name, "fiction"))];
   const books = [
     book("z", { genre_ids: ["Zeta"], rating: 5 }),
@@ -63,11 +63,62 @@ test("rankings use average then sample size then name, exclude unrated genres an
     ]),
   ];
   const collection = getMainGenreCollection(rankedGenres, books);
-  assert.deepEqual(getHighestRatedGenres(collection).map((entry) => entry.genre.name), ["Zeta", "Beta", "Alpha", "Delta", "Epsilon"]);
+  assert.deepEqual(getFavoriteGenres(collection).map((entry) => entry.genre.name), ["Zeta", "Beta", "Alpha", "Delta", "Epsilon"]);
   // Display rounding must not turn different averages into a name-based tie.
   const close = collection.slice(0, 2).map((entry, index) => ({ ...entry, averageRating: index ? 4.04 : 4.01 }));
-  assert.equal(getHighestRatedGenres(close)[0].averageRating, 4.04);
-  assert.deepEqual(getHighestRatedGenres([]), []);
+  assert.equal(getFavoriteGenres(close)[0].averageRating, 4.04);
+  assert.deepEqual(getFavoriteGenres([]), []);
+});
+
+test("favorite genres reward sustained enjoyment rather than a tiny perfect sample or volume alone", () => {
+  const books = [
+    ...Array.from({ length: 30 }, (_, index) => book(`history${index}`, { genre_ids: ["history"], rating: 4.2 })),
+    ...Array.from({ length: 2 }, (_, index) => book(`fantasy${index}`, { rating: 5 })),
+    ...Array.from({ length: 100 }, (_, index) => book(`romance${index}`, { genre_ids: ["romance"], rating: 3 })),
+  ];
+  const collection = getMainGenreCollection(genres, books);
+  const original = structuredClone(collection);
+  const favorites = getFavoriteGenres(collection);
+  assert.deepEqual(favorites.map((entry) => entry.genre.name), ["History", "Fantasy", "Romance"]);
+  assert.ok(Math.abs(favorites[0].enjoymentScore - 36) < 0.000001);
+  assert.equal(favorites[1].enjoymentScore, 4);
+  assert.equal(favorites[2].enjoymentScore, 0);
+  assert.deepEqual(collection, original);
+});
+
+test("enjoyment includes negative and fractional ratings but excludes unrated and unfinished books", () => {
+  const summary = summarizeGenreBooks([
+    book("five", { rating: 5 }), book("four", { rating: 4 }), book("neutral", { rating: 3 }),
+    book("two", { rating: 2 }), book("one", { rating: 1 }), book("half", { rating: 3.5 }),
+    book("unrated"), book("invalid", { rating: 6 }), book("nan", { rating: NaN }),
+    book("reading", { status: "Reading", rating: 5 }), book("dnf", { status: "DNF", rating: 1 }),
+  ]);
+  assert.equal(summary.enjoymentScore, 0.5);
+  assert.equal(summary.ratedCount, 6);
+  assert.equal(summarizeGenreBooks([book("low", { rating: 1 })]).enjoymentScore, -2);
+  assert.equal(summarizeGenreBooks([]).enjoymentScore, 0);
+});
+
+test("favorite scores include descendants once and a shared book contributes to each main genre", () => {
+  const collection = getMainGenreCollection(genres, [book("shared", {
+    genre_ids: ["fantasy", "epic", "history", "ya"], rating: 5,
+  })]);
+  assert.deepEqual(getFavoriteGenres(collection).map((entry) => [entry.genre.name, entry.enjoymentScore, entry.ratedCount]),
+    [["Fantasy", 2, 1], ["History", 2, 1]]);
+});
+
+test("equal enjoyment scores prefer average then rated count then name, retaining neutral and negative scores", () => {
+  const base = getMainGenreCollection(genres, [book("rated", { rating: 4 })])[0];
+  const entries = [
+    { ...base, genre: { ...base.genre, name: "Zeta" }, enjoymentScore: 2, averageRating: 4, ratedCount: 2 },
+    { ...base, genre: { ...base.genre, name: "Beta" }, enjoymentScore: 2, averageRating: 5, ratedCount: 1 },
+    { ...base, genre: { ...base.genre, name: "Alpha" }, enjoymentScore: 2, averageRating: 4, ratedCount: 2 },
+    { ...base, genre: { ...base.genre, name: "Larger sample" }, enjoymentScore: 2, averageRating: 4, ratedCount: 3 },
+    { ...base, genre: { ...base.genre, name: "Neutral" }, enjoymentScore: 0, averageRating: 3 },
+    { ...base, genre: { ...base.genre, name: "Negative" }, enjoymentScore: -1, averageRating: 2 },
+  ];
+  assert.deepEqual(getFavoriteGenres(entries).map((entry) => entry.genre.name), ["Beta", "Larger sample", "Alpha", "Zeta", "Neutral"]);
+  assert.equal(getFavoriteGenres(entries.slice(-1))[0].genre.name, "Negative");
 });
 
 test("status and sorting work together without mutating the source, with missing values last", () => {

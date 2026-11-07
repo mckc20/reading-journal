@@ -16,8 +16,6 @@ import {
 import ReadingHeatmap from "@/components/ReadingHeatmap";
 import {
   AppHeading,
-  DesignLineChart,
-  HeadingDescription,
   StatCard as SharedStatCard,
   VerticalBarChart,
 } from "@/components/design";
@@ -41,13 +39,6 @@ function getAnalyticsCategoryTitle(category: AnalyticsCategory): string {
   if (category === "genre") return "Genre Analytics";
   if (category === "series") return "Series Analytics";
   return "Book Analytics";
-}
-
-function getAnalyticsCategoryDescription(category: AnalyticsCategory): string {
-  if (category === "author") return "Author-level summary stats from your library.";
-  if (category === "genre") return "Genre summary stats from your finished books.";
-  if (category === "series") return "Series coverage across your library.";
-  return "Cumulative pages, reading time habits, speed trend, and book insights.";
 }
 
 function parseAnalyticsCategory(value?: string): AnalyticsCategory | null {
@@ -100,22 +91,17 @@ function getBookSubtitle(book?: Book): string | null {
 
 function Section({
   title,
-  description,
   action,
   children,
 }: {
   title: string;
-  description?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <AppHeading level={3} as="h2">{title}</AppHeading>
-          {description ? <HeadingDescription>{description}</HeadingDescription> : null}
-        </div>
+        <AppHeading level={3} as="h2">{title}</AppHeading>
         {action}
       </div>
       {children}
@@ -155,22 +141,25 @@ function StatCard({
 
 function DetailSection({
   title,
-  description,
   children,
 }: {
   title: string;
-  description?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="space-y-3">
-      <div className="space-y-1">
-        <AppHeading level={4} as="h3">{title}</AppHeading>
-        {description ? <HeadingDescription>{description}</HeadingDescription> : null}
-      </div>
+      <AppHeading level={4} as="h3">{title}</AppHeading>
       {children}
     </section>
   );
+}
+
+function monthlyChartData(data: TimeBucket[]) {
+  const monthLabel = new Intl.DateTimeFormat(undefined, { month: "short" });
+  return data.map((point) => {
+    const [year, month] = point.key.split("-").map(Number);
+    return { ...point, mobileAxisLabel: monthLabel.format(new Date(year, month - 1, 1)) };
+  });
 }
 
 function SimpleBarChart({
@@ -191,7 +180,7 @@ function SimpleBarChart({
   return (
     <VerticalBarChart
       title={title}
-      data={data}
+      data={monthlyChartData(data)}
       formatValue={(value) =>
         unit === "minutes"
           ? formatChartValue(value, "minutes")
@@ -202,30 +191,7 @@ function SimpleBarChart({
       action={action}
       highlightKey={highlightKey}
       showAllXLabels={showAllXLabels}
-    />
-  );
-}
-
-function LineChart({
-  title,
-  data,
-  unit,
-  empty,
-}: {
-  title: string;
-  data: TimeBucket[];
-  unit: "pages" | "speed";
-  empty: string;
-}) {
-  return (
-    <DesignLineChart
-      title={title}
-      data={data}
-      formatValue={(value) =>
-        unit === "speed" ? formatChartValue(value, "speed") : formatChartValue(value, "pages")
-      }
-      empty={empty}
-      ariaLabel="Line chart showing average reading speed over time"
+      showEmptySeries={unit === "books"}
     />
   );
 }
@@ -250,8 +216,8 @@ function RankedList({ items, empty }: { items: Array<{ label: string; value: str
   );
 }
 
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return <SharedStatCard label={label} value={value} />;
+function DetailStat({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return <SharedStatCard label={label} value={value} detail={detail} />;
 }
 
 function formatRating(value: number | null): string {
@@ -259,75 +225,12 @@ function formatRating(value: number | null): string {
   return `${value.toFixed(1)} / 5`;
 }
 
-function getAnalyticsBookGenres(book: Book): string[] {
-  const rawGenres = book.genres ?? book.genre_paths ?? [];
-  return Array.from(new Set(rawGenres.map((genre) => genre.trim()).filter(Boolean)));
-}
-
-function buildReadingMinutesByBook(logs: ReadingLog[]): Map<string, number> {
-  const minutesByBook = new Map<string, number>();
-
-  for (const log of logs) {
-    minutesByBook.set(log.book_id, (minutesByBook.get(log.book_id) ?? 0) + Math.max(0, log.reading_time_minutes ?? 0));
-  }
-
-  return minutesByBook;
-}
-
 function average(values: number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function buildGenreCategoryAnalytics(books: Book[], logs: ReadingLog[]) {
-  const genreStats = new Map<string, { books: number; pages: number; ratingTotal: number; ratingCount: number; minutes: number }>();
-  const minutesByBook = buildReadingMinutesByBook(logs);
-  const currentYear = new Date().getFullYear();
-  const genresThisYear = new Set<string>();
-
-  for (const book of books) {
-    const genres = getAnalyticsBookGenres(book);
-    if (genres.length === 0) continue;
-
-    const bookMinutes = minutesByBook.get(book.id) ?? 0;
-    const finishedThisYear =
-      book.status === "Finished" && book.date_finished
-        ? new Date(book.date_finished).getFullYear() === currentYear
-        : false;
-
-    for (const genre of genres) {
-      const current = genreStats.get(genre) ?? { books: 0, pages: 0, ratingTotal: 0, ratingCount: 0, minutes: 0 };
-      if (book.status === "Finished") {
-        current.books += 1;
-        current.pages += Math.max(0, book.total_pages ?? 0);
-      }
-      if (typeof book.rating === "number") {
-        current.ratingTotal += book.rating;
-        current.ratingCount += 1;
-      }
-      current.minutes += bookMinutes;
-      genreStats.set(genre, current);
-      if (finishedThisYear) genresThisYear.add(genre);
-    }
-  }
-
-  const rows = [...genreStats.entries()].map(([genre, stats]) => ({
-    genre,
-    books: stats.books,
-    pages: stats.pages,
-    minutes: stats.minutes,
-    averageRating: stats.ratingCount > 0 ? stats.ratingTotal / stats.ratingCount : null,
-  }));
-
-  return {
-    totalGenres: rows.filter((row) => row.books > 0).length,
-    genresThisYear: genresThisYear.size,
-    pagesRead: [...rows].sort((left, right) => right.pages - left.pages).slice(0, 8),
-    readingTime: [...rows].sort((left, right) => right.minutes - left.minutes).slice(0, 8),
-  };
-}
-
-function buildSeriesAnalytics(books: Book[], series: Series[]) {
+function getFavoriteSeries(books: Book[], series: Series[]) {
   const seriesById = new Map(series.map((entry) => [entry.id, entry]));
   const booksBySeries = new Map<string, Book[]>();
 
@@ -341,7 +244,6 @@ function buildSeriesAnalytics(books: Book[], series: Series[]) {
   const seriesStats = [...booksBySeries.entries()]
     .map(([seriesId, seriesBooks]) => {
       const knownSeries = seriesById.get(seriesId);
-      const finishedBooks = seriesBooks.filter((book) => book.status === "Finished").length;
       const pagesRead = seriesBooks
         .filter((book) => book.status === "Finished")
         .reduce((sum, book) => sum + Math.max(0, book.total_pages ?? 0), 0);
@@ -354,9 +256,6 @@ function buildSeriesAnalytics(books: Book[], series: Series[]) {
         id: seriesId,
         name: knownSeries?.name ?? "Unknown series",
         totalBooks: seriesBooks.length,
-        finishedBooks,
-        completed: seriesBooks.length > 0 && finishedBooks === seriesBooks.length,
-        ongoing: seriesBooks.some((book) => book.status === "Reading" || book.status === "Paused" || book.status === "Up Next" || book.status === "To Read"),
         pagesRead,
         averageRating,
       };
@@ -366,106 +265,51 @@ function buildSeriesAnalytics(books: Book[], series: Series[]) {
       return left.name.localeCompare(right.name);
     });
 
-  return {
-    totalSeries: series.length,
-    seriesWithBooks: seriesStats.length,
-    booksInSeries: seriesStats.reduce((sum, entry) => sum + entry.totalBooks, 0),
-    completedSeries: seriesStats.filter((entry) => entry.completed).length,
-    ongoingSeries: seriesStats.filter((entry) => !entry.completed).length,
-    largestSeries: seriesStats[0] ?? null,
-    favoriteSeries: [...seriesStats]
-      .filter((entry) => entry.averageRating !== null)
-      .sort((left, right) => {
-        if ((right.averageRating ?? 0) !== (left.averageRating ?? 0)) return (right.averageRating ?? 0) - (left.averageRating ?? 0);
-        return right.pagesRead - left.pagesRead;
-      })[0] ?? null,
-    pagesReadBySeries: [...seriesStats].sort((left, right) => right.pagesRead - left.pagesRead).slice(0, 8),
-    averageRatingBySeries: [...seriesStats]
-      .filter((entry) => entry.averageRating !== null)
-      .sort((left, right) => (right.averageRating ?? 0) - (left.averageRating ?? 0))
-      .slice(0, 8),
-    seriesStats,
-  };
+  return seriesStats
+    .filter((entry) => entry.averageRating !== null)
+    .sort((left, right) => {
+      if ((right.averageRating ?? 0) !== (left.averageRating ?? 0)) return (right.averageRating ?? 0) - (left.averageRating ?? 0);
+      return right.pagesRead - left.pagesRead;
+    })[0] ?? null;
 }
 
-function SeriesAnalyticsPanel({
+function AuthorSeriesSummary({
+  favoriteAuthor,
   books,
   series,
   loading,
   error,
 }: {
+  favoriteAuthor: string | null;
   books: Book[];
   series: Series[];
   loading: boolean;
   error: string | null;
 }) {
-  const data = useMemo(() => buildSeriesAnalytics(books, series), [books, series]);
-
-  if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
-  }
-
-  if (loading) {
-    return (
-      <LoadingIndicator label="Loading series analytics…" />
-    );
-  }
+  const favoriteSeries = useMemo(() => getFavoriteSeries(books, series), [books, series]);
 
   return (
-    <SeriesSummary data={data} />
-  );
-}
-
-function SeriesSummary({
-  data,
-}: {
-  data: ReturnType<typeof buildSeriesAnalytics>;
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <DetailStat label="Series" value={formatNumber(data.totalSeries)} />
-      <DetailStat label="Books in series" value={formatNumber(data.booksInSeries)} />
-      <DetailStat label="Completed series" value={formatNumber(data.completedSeries)} />
-      <DetailStat label="Ongoing series" value={formatNumber(data.ongoingSeries)} />
-      <DetailStat
-        label="Favorite series"
-        value={data.favoriteSeries ? `${data.favoriteSeries.name} · ${formatRating(data.favoriteSeries.averageRating)}` : "No data"}
-      />
-    </div>
-  );
-}
-
-function AuthorSummary({
-  analytics,
-}: {
-  analytics: AnalyticsDashboardData;
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <DetailStat label="Favorite Author" value={analytics.insights.favoriteAuthor ?? "No data"} />
-      <DetailStat label="Most Reread Author" value={analytics.insights.mostRereadAuthor ?? "No data"} />
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DetailStat label="Favorite Author" value={favoriteAuthor ?? "No data"} />
+        <DetailStat label="Favorite Series" value={loading ? "Loading…" : error ? "Unavailable"
+          : favoriteSeries ? `${favoriteSeries.name} · ${formatRating(favoriteSeries.averageRating)}` : "No data"} />
+      </div>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }
 
 function GenreAnalyticsContent({
   analytics,
-  genreCategory,
+  books,
 }: {
   analytics: AnalyticsDashboardData;
-  genreCategory: ReturnType<typeof buildGenreCategoryAnalytics>;
+  books: Book[];
 }) {
   return (
     <div className="space-y-4">
-      <DetailSection title="Genre Insights">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <DetailStat label="Favorite Genre" value={analytics.insights.favoriteGenre ?? "No data"} />
-          <DetailStat label="Genre Explored Most This Year" value={analytics.insights.genreExploredMostThisYear ?? "No data"} />
-          <DetailStat label="Genre Diversity" value={`${formatNumber(genreCategory.totalGenres)} genres`} />
-          <DetailStat label="Genres This Year" value={formatNumber(genreCategory.genresThisYear)} />
-        </div>
-      </DetailSection>
-      <DetailSection title="Most Abandoned Genres">
+      {books.some((book) => book.status === "DNF") && <DetailSection title="Most Abandoned Genres">
         <div className="rounded-lg bg-muted/20 p-4">
           {analytics.completion.hasEnoughDnfData ? (
             <RankedList
@@ -481,7 +325,7 @@ function GenreAnalyticsContent({
             </p>
           )}
         </div>
-      </DetailSection>
+      </DetailSection>}
     </div>
   );
 }
@@ -495,9 +339,6 @@ function BookAnalyticsContent({
 }) {
   return (
     <div className="space-y-4">
-      <DetailSection title="Speed">
-        <LineChart title="Speed Trend" data={analytics.trends.averageSpeedByMonth} unit="speed" empty="No speed data yet." />
-      </DetailSection>
       <DetailSection title="Insights">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -530,7 +371,6 @@ function AnalyticsCategoryPanel({
   analytics,
   habits,
   books,
-  logs,
   series,
   seriesLoading,
   seriesError,
@@ -539,27 +379,21 @@ function AnalyticsCategoryPanel({
   analytics: AnalyticsDashboardData;
   habits: ReturnType<typeof calculateReadingHabits>;
   books: Book[];
-  logs: ReadingLog[];
   series: Series[];
   seriesLoading: boolean;
   seriesError: string | null;
 }) {
-  const genreCategory = useMemo(() => buildGenreCategoryAnalytics(books, logs), [books, logs]);
 
   return (
     <div className="space-y-4">
-      {activeCategory === "author" ? (
-        <DetailSection title="Author Summary">
-          <AuthorSummary analytics={analytics} />
+      {activeCategory === "author" || activeCategory === "series" ? (
+        <DetailSection title="Authors & Series">
+          <AuthorSeriesSummary favoriteAuthor={analytics.insights.favoriteAuthor} books={books} series={series} loading={seriesLoading} error={seriesError} />
         </DetailSection>
       ) : null}
 
       {activeCategory === "genre" ? (
-        <GenreAnalyticsContent analytics={analytics} genreCategory={genreCategory} />
-      ) : null}
-
-      {activeCategory === "series" ? (
-        <SeriesAnalyticsPanel books={books} series={series} loading={seriesLoading} error={seriesError} />
+        <GenreAnalyticsContent analytics={analytics} books={books} />
       ) : null}
 
       {activeCategory === "book" ? (
@@ -634,8 +468,6 @@ export default function Analytics() {
     [habitsLogs, habitsRange.endIso, habitsRange.startIso]
   );
   const analytics = useMemo(() => buildAnalyticsDashboardData(books, logs), [books, logs]);
-  const genreCategory = useMemo(() => buildGenreCategoryAnalytics(books, logs), [books, logs]);
-  const seriesCategory = useMemo(() => buildSeriesAnalytics(books, series), [books, series]);
 
   async function loadReadingLogs() {
     try {
@@ -696,10 +528,7 @@ export default function Analytics() {
           <Link to="/statistics" className="text-sm font-medium text-primary hover:underline">
             &lt;- Back to Analytics
           </Link>
-          <div className="space-y-1">
-        <AppHeading level={1} as="h1">{getAnalyticsCategoryTitle(routeCategory)}</AppHeading>
-        <HeadingDescription>{getAnalyticsCategoryDescription(routeCategory)}</HeadingDescription>
-          </div>
+          <AppHeading level={1} as="h1">{getAnalyticsCategoryTitle(routeCategory)}</AppHeading>
         </div>
 
         {booksError ? <p className="text-sm text-destructive">{booksError}</p> : null}
@@ -718,7 +547,6 @@ export default function Analytics() {
           analytics={analytics}
           habits={habits}
           books={books}
-          logs={logs}
           series={series}
           seriesLoading={seriesLoading}
           seriesError={seriesError}
@@ -729,10 +557,7 @@ export default function Analytics() {
 
   return (
     <div className="space-y-10">
-      <div className="space-y-1">
-        <AppHeading level={1} as="h1">Analytics</AppHeading>
-        <HeadingDescription>Lifetime reading patterns from your books and progress logs.</HeadingDescription>
-      </div>
+      <AppHeading level={1} as="h1">Analytics</AppHeading>
 
       {booksError ? <p className="text-sm text-destructive">{booksError}</p> : null}
       {logsError ? (
@@ -746,7 +571,7 @@ export default function Analytics() {
       ) : null}
 
       {booksLoading ? <LoadingIndicator variant="page" label="Loading reading analytics…" /> : <>
-        <Section title="Key Statistics" description="The main lifetime numbers for completed books and tracked reading.">
+        <Section title="Key Statistics">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Books Finished"
@@ -775,7 +600,7 @@ export default function Analytics() {
         </Section>
 
         <div className="space-y-10">
-          <Section title="Reading Trend" description="Monthly charts based on when reading activity or finishes happened.">
+          <Section title="Reading Trend">
             {logsLoading && monthlyTrendMetric !== "books" ? <LoadingIndicator label="Loading reading trend…" announce={false} /> : <SimpleBarChart
               title={monthlyTrendChart.title}
               data={monthlyTrendChart.data}
@@ -798,7 +623,7 @@ export default function Analytics() {
             />}
           </Section>
 
-          <Section title="Reading Heatmap" description="Daily reading activity from your progress logs.">
+          <Section title="Reading Heatmap">
             {logsLoading ? (
               <LoadingIndicator label="Loading reading activity…" announce={false} />
             ) : logsError ? null : (
@@ -807,30 +632,18 @@ export default function Analytics() {
           </Section>
         </div>
 
-        <Section title="Genre Analytics" description="Genre insights and remaining genre summaries.">
-          {logsLoading ? <LoadingIndicator label="Loading genre analytics…" announce={false} /> : <GenreAnalyticsContent analytics={analytics} genreCategory={genreCategory} />}
+        {books.some((book) => book.status === "DNF") && <Section title="Genre Analytics">
+          {logsLoading ? <LoadingIndicator label="Loading genre analytics…" announce={false} /> : <GenreAnalyticsContent analytics={analytics} books={books} />}
+        </Section>}
+
+        <Section title="Authors & Series">
+          <AuthorSeriesSummary favoriteAuthor={analytics.insights.favoriteAuthor} books={books} series={series} loading={seriesLoading} error={seriesError} />
         </Section>
 
-        <Section title="Author Analytics" description="Summary stats for the authors in your library.">
-          <DetailSection title="Author Summary">
-            <AuthorSummary analytics={analytics} />
-          </DetailSection>
-        </Section>
-
-        <Section title="Book Analytics" description="Remaining book-level trends and insights.">
+        <Section title="Book Analytics">
           {logsLoading ? <LoadingIndicator label="Loading book analytics…" announce={false} /> : <BookAnalyticsContent analytics={analytics} habits={habits} />}
         </Section>
 
-        <Section title="Series Analytics" description="Summary stats for your series library.">
-          {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
-          {seriesLoading ? (
-            <LoadingIndicator />
-          ) : (
-            <DetailSection title="Series Summary">
-              <SeriesSummary data={seriesCategory} />
-            </DetailSection>
-          )}
-        </Section>
       </>}
     </div>
   );

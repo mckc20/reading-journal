@@ -100,7 +100,6 @@ export interface AnalyticsDashboardData {
   };
   insights: {
     averageReadingGapDays: number | null;
-    favoriteGenre: string | null;
     favoriteAuthor: string | null;
     mostProductiveMonth: string | null;
     averageBookLength: number | null;
@@ -647,7 +646,7 @@ function buildMostReadWeekday(logs: ReadingLog[]): string | null {
   })[0]?.[0] ?? null;
 }
 
-export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): AnalyticsDashboardData {
+export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[], now = new Date()): AnalyticsDashboardData {
   const finishedBooks = books.filter((book) => book.status === "Finished");
   const dnfBooks = books.filter((book) => book.status === "DNF");
   const activeBookIds = new Set(
@@ -665,7 +664,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
   const trendMonthKeys = [...finishedDates, ...logDates].map(toMonthKey);
   const allTrendMonths = getMonthRange(trendMonthKeys);
 
-  const booksFinishedByMonth = sumByMonth(
+  const finishedMonthCounts = sumByMonth(
     finishedBooks,
     (book) => {
       const finished = parseDate(book.date_finished);
@@ -673,6 +672,13 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     },
     () => 1
   );
+  const finishedCountsByMonth = new Map(finishedMonthCounts.map((bucket) => [bucket.key, bucket.value]));
+  // Include the current calendar month even before the first finish is recorded.
+  const booksFinishedByMonth = getMonthRange([...finishedCountsByMonth.keys(), toMonthKey(now)]).map((key) => ({
+    key,
+    label: formatMonthLabel(key),
+    value: finishedCountsByMonth.get(key) ?? 0,
+  }));
   const pagesReadByMonthMap = new Map(sumByMonth(pageDeltas, (delta) => delta.monthKey, (delta) => delta.pages).map((bucket) => [bucket.key, bucket.value]));
   const readingMinutesByMonthMap = new Map(
     sumByMonth(
@@ -797,13 +803,6 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     }
   }
 
-  const finishedGenreCounts = new Map<string, number>();
-  for (const book of finishedBooks) {
-    for (const genre of getBookGenres(book)) {
-      finishedGenreCounts.set(genre, (finishedGenreCounts.get(genre) ?? 0) + 1);
-    }
-  }
-
   const finishedAuthorCounts = new Map<string, number>();
   for (const book of finishedBooks) {
     for (const author of getBookAuthors(book)) {
@@ -876,7 +875,6 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[]): 
     hallOfFame: buildHallOfFame(books, logs, pageDeltas),
     insights: {
       averageReadingGapDays: buildReadingGaps(books, logs),
-      favoriteGenre: topPercentages(finishedGenreCounts, 1)[0]?.label ?? null,
       favoriteAuthor: topPercentages(finishedAuthorCounts, 1)[0]?.label ?? null,
       mostProductiveMonth: mostProductiveMonth?.value > 0 ? formatRecordMonth(mostProductiveMonth.key) : null,
       averageBookLength:

@@ -81,6 +81,35 @@ test("builds overview and monthly trend metrics from books and reading logs", ()
   ]);
 });
 
+test("finished-book history extends to the current month with zero-count months", () => {
+  const data = buildAnalyticsDashboardData([
+    makeBook({ id: "one", date_finished: "2026-09-05" }),
+    makeBook({ id: "two", date_finished: "2026-09-30" }),
+  ], [], new Date(2026, 10, 7));
+  assert.deepEqual(data.trends.booksFinishedByMonth.map((bucket) => [bucket.key, bucket.value]), [
+    ["2026-09", 2], ["2026-10", 0], ["2026-11", 0],
+  ]);
+  assert.equal(data.overview.booksFinished, 2);
+});
+
+test("finished-book history shows the current month with no finished books", () => {
+  const data = buildAnalyticsDashboardData([
+    makeBook({ status: "Reading", date_finished: undefined }),
+  ], [], new Date(2026, 10, 7));
+  assert.deepEqual(data.trends.booksFinishedByMonth.map((bucket) => [bucket.key, bucket.value]), [["2026-11", 0]]);
+  assert.equal(data.insights.mostProductiveMonth, null);
+});
+
+test("finished-book history handles year boundaries and current-month finishes", () => {
+  const books = [makeBook({ id: "old", date_finished: "2026-12-31" })];
+  const now = new Date(2027, 0, 2);
+  assert.deepEqual(buildAnalyticsDashboardData(books, [], now).trends.booksFinishedByMonth.map((bucket) => [bucket.key, bucket.value]),
+    [["2026-12", 1], ["2027-01", 0]]);
+  books.push(makeBook({ id: "new", date_finished: "2027-01-01" }));
+  assert.deepEqual(buildAnalyticsDashboardData(books, [], now).trends.booksFinishedByMonth.map((bucket) => [bucket.key, bucket.value]),
+    [["2026-12", 1], ["2027-01", 1]]);
+});
+
 test("builds average speed over time as cumulative pages per hour", () => {
   const data = buildAnalyticsDashboardData(
     [makeBook({ id: "book-1", total_pages: 400, date_finished: "2026-02-10" })],
