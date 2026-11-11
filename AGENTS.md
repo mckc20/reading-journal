@@ -1,10 +1,10 @@
 # AGENTS.md
 
-This file provides guidance to coding agents when working with code in this repository.
+This file provides guidance to coding agents working in this repository. Check the current code and migrations before relying on older plans in `README.md` or `implementation-plan.md`.
 
 ## Project Overview
 
-A personal reading journal web app for tracking books, reading progress, and analytics. Multi-user, with data isolation per user via Supabase RLS.
+Reading Journal is an invite-only, multi-user web app for tracking books, reading progress, journals, and analytics. Supabase Auth identifies users; PostgreSQL Row Level Security (RLS) protects their data. The app runs on Vercel, including serverless API routes.
 
 ## Developer Context
 
@@ -20,25 +20,29 @@ The primary developer on this project is a self-taught junior software developer
 
 When making changes, briefly explain what changed, why it was done that way, and what I should look at if I want to understand the implementation.
 
-## Tech Stack
+## Current Tech Stack
 
-- **Frontend:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui
-- **Backend:** Supabase (PostgreSQL, Auth, Storage)
-- **External APIs:** Google Books API / Open Library API (ISBN lookups)
-- **Barcode Scanning:** `html5-qrcode`
+- **Frontend:** React 18, Vite 5, TypeScript, React Router 7, Tailwind CSS 4, shadcn/ui and Radix UI
+- **Backend:** Supabase PostgreSQL, Auth, and Storage; Vercel serverless functions in `api/`
+- **Book metadata:** Open Library and Google Books (`src/lib/bookLookup.ts`)
+- **Barcode scanning:** `@ericblade/quagga2` (`src/components/BarcodeScanner.tsx`)
+- **Rich text journals:** Tiptap
+- **Tests:** Node's test runner via `tsx`; PGlite for isolated SQL migration tests
 - **Hosting:** Vercel
 
-## Commands
-
-Once initialized (Phase 1):
+## Local Commands and Configuration
 
 ```bash
-npm run dev       # Start Vite dev server
-npm run build     # Production build
-npm run preview   # Preview production build
+npm install
+npm run dev        # Vite frontend only
+npx vercel dev     # Frontend plus local Vercel API functions
+npm run build      # TypeScript project build and Vite production build
+npm run typecheck  # TypeScript check without output
+npm test           # Automated tests, including isolated migration tests
+npm run preview    # Preview a production frontend build
 ```
 
-Environment variables go in `.env` — Supabase URL and anon key from the Supabase dashboard.
+The browser client reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env`. Vercel API functions use server-only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; never put the service-role key in a `VITE_` variable. The invite and metadata backfill scripts use `VITE_SUPABASE_URL` plus the service-role key; invites also require `INVITE_REDIRECT_URL`. Database backups use `SUPABASE_DB_URL` and `npm run backup:db`. MCP also needs `READING_JOURNAL_API_ORIGIN`; see `doc/mcp-access.md`.
 
 ## Release Process
 
@@ -49,49 +53,36 @@ Before creating a PR, update the user-facing release content for any user-facing
 - Treat this as a required pre-PR step, not a follow-up task.
 - If the change is visible to users, include a short note about what they should notice.
 - Only add a new changelog entry when the user explicitly asks for one.
-- If the user tells to make a PR it should include a summary of all the changes included in the PR
+- If the user tells to make a PR it should include a summary of all the changes included in the PR.
 
-## Architecture
+`src/lib/releaseNotes.ts` parses the Markdown changelog. The dialog opens when the latest version differs from `user_settings.last_seen_release_note_version`. Check this path when a release note is requested.
 
-### Database Schema (Supabase/PostgreSQL)
+## Architecture and Where to Look
 
-**`books`** — core entity: title, author, genre, status, cover_url (Supabase Storage), rating (1–5), is_favorite (heart toggle), current_page, total_pages, date_started, date_finished, language, belongs_to, format, series_id, volume_number, user_id
+- `src/lib/router.tsx` defines public and protected routes. `src/components/ProtectedRoute.tsx` checks the session, and `src/components/AppLayout.tsx` provides the signed-in shell.
+- `src/pages/` contains route-level pages. `src/components/` contains reusable UI, including `components/ui/` primitives and `components/wrap-ups/` report views.
+- `src/context/` and `src/hooks/` manage auth, books, authors, genres, profiles, settings, and shared frontend data. `src/lib/` contains data access and domain calculations; `src/types/` holds shared TypeScript types.
+- `api/` contains Vercel functions. `api/app.ts` handles the rewritten `/api/me` and `/api/wrap-ups` routes; `api/_lib/` holds their logic. Other functions serve book, recommendation, and MCP APIs. `vercel.json` contains the rewrites.
+- `supabase/schema.sql` describes the base schema for new databases. `supabase/migrations/` contains changes for existing databases and some later features; inspect the relevant migration before changing the database. Do not assume editing SQL files applies them to a live Supabase project.
+- `tests/` contains automated tests. Add or run focused tests for behavior and SQL changes, then use `npm run build` for a production check.
 
-**`series`** — series name, overarching properties, journal content, user_id
+## Data and Security Rules
 
-**`reading_logs`** — timestamp, book_id, current_page, reading_time_minutes, user_id
+- `books` is the core record. Authors and genres use linked tables (`authors`/`book_authors` and `genres`/`book_genres`); series use `series_id`. Status, current and total pages, rating, favorite flag, dates, language, source, format, ISBN, publication metadata, price, and purchase URL live on the book. Progress percentage is calculated from current and total pages.
+- **Book statuses:** `Wishlist` | `To Read` | `Up Next` | `Reading` | `Paused` | `Finished` | `DNF`. Use `src/types/index.ts` and the database constraints as the source of truth. `Unread` and `belongs_to` are old names; the current book property is `source` (`Owned` | `Family` | `Friends` | `Library`).
+- Wishlist entries are books with status `Wishlist`, not rows in a separate wishlist table. `useBooksContext().books` contains library books and `wishlistBooks` contains wishes. Keep wishlist books out of library counts and reading analytics unless a feature explicitly includes them. See `doc/wishlist-migration.md`.
+- `reading_logs` records page position and optional reading minutes. `book_pause_periods` records pauses. Journal entries are stored in separate book, series, and author journal tables, with related visibility and media tables.
+- Profiles, user settings, groups/messages, recommendation data, API keys, and saved `wrap_up_reports` also have dedicated database structures. RLS protects user data; group policies use membership rules. System genres are shared. Check the actual policy when changing access, and explicitly filter by user when using the server's service-role client because it bypasses RLS.
+- Browser requests to Supabase use the user's session and RLS. Server routes authenticate either a Supabase web session or a revocable API key; do not treat those credentials as interchangeable (`api/_lib/auth.ts`).
+- The app is invite-only. `/login` and `/reset-password` are public; the main app routes require authentication. The server-side invite script is `scripts/invite-user.ts`.
 
-All tables use Row Level Security so queries are automatically scoped to `auth.uid()`.
+## Current Feature Map
 
-### Key Domain Values
+- **Home and library:** `Dashboard`, `Library`, `ExploreLibrary`, and `Wishlist` pages; book detail, journal/annotations, analytics, pause/resume, bulk management, and add-book dialog with ISBN lookup and camera scanning.
+- **Collections and journals:** Series, authors, and hierarchical genres have library and detail pages. The library journal combines book, series, and author entries. Journal entries support notes, quotes, reviews, tags, links, and media.
+- **Reading data:** `/statistics` shows aggregate analytics; `/reading-history` shows reading history; book and series routes have detail analytics. The reusable calculations live mainly in `src/lib/`.
+- **Wrap-ups:** `/wrap-ups` and `/wrap-ups/:monthKey` show monthly saved reports in list or sliding views. `src/lib/wrapUpReports.ts` calculates report data; `api/_lib/wrapUpReports.ts` generates immutable snapshots. See the wrap-up sections in `README.md` and the help page for calculation and missing-data rules. Yearly reports are a schema possibility, not a completed UI feature.
+- **Discover and community:** `/discover` has recommendations and series volume suggestions. `/messages` has groups and chat; profiles and settings have their own pages.
+- **External access:** `/api/books` and related routes expose authenticated book operations; `/api/mcp` exposes a remote MCP interface using revocable API keys. See `doc/mcp-access.md`.
 
-- **Status:** `Wishlist` | `Unread` | `Up Next` | `Reading` | `Finished` | `DNF`
-- **Language:** `German` | `Spanish` | `English`
-- **Belongs to:** `Me` | `Family` | `Friends` | `Library`
-- **Format:** `eBook` | `Audiobook` | `Paperback` | `Hardcover`
-- **Progress:** calculated as `current_page / total_pages` percentage
-
-### Planned `src/` Structure
-
-```
-src/
-  components/   # Reusable UI (cards, modals, forms, charts)
-  pages/        # Route-level components (Dashboard, Library, Timeline, etc.)
-  lib/          # Supabase client, API helpers (Google Books, Open Library)
-  hooks/        # Custom React hooks
-  context/      # Auth context
-  types/        # Shared TypeScript types
-```
-
-### Key Features & Where They Live
-
-- **Dashboard** — currently reading cards, insights block (pacing predictor, genre donut chart, reading speed)
-- **Book detail modal** — properties tab, journal tab (rich text + guide questions + quotes), analytics tab (per-book reading history charts)
-- **Add Book** — manual form or barcode/ISBN scanner → auto-fill via Books API → optional series link prompt
-- **Library views** — All Books, TBR, Series Library, Timeline (Gantt), Authors, Genres, Languages
-- **Series detail** — same tab structure as book detail (journal + analytics)
-- **Analytics** — pacing predictor from `reading_logs`, monthly summaries, yearly wrap-up
-
-### Auth
-
-Protected routing: unauthenticated users see only the landing/auth pages. Supabase Auth handles email/password sign-up and login.
+Use `src/lib/router.tsx`, `src/types/index.ts`, the relevant page or library module, and the matching SQL migration when a feature description here differs from the implementation.
