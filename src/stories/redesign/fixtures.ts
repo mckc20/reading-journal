@@ -18,3 +18,16 @@ export const posts: HomePost[] = [
   { id: 'post-1', author: 'Alex Rivers', initials: 'AR', postedAt: 'Yesterday at 8:30', content: 'A strange, beautiful world to get lost in. I’m still thinking about the final chapter. Has anyone else read this?', book: books[4], likes: 12, comments: 3 },
   { id: 'post-2', author: 'Sam Brooks', initials: 'SB', postedAt: 'Yesterday at 16:15', quote: true, content: 'A quiet chapter.\nA little time to think.\nA book to come back to.', attribution: 'Sam’s reading journal', book: books[0], likes: 8, comments: 2 },
 ];
+
+export const previewCommentAuthor = { name: 'Taylor Lane', initials: 'TL' };
+export const sampleComments = {
+  'post-1': [
+    { id: 'comment-1', author: { name: 'Sam Brooks', initials: 'SB' }, postedAt: 'Yesterday at 9:10', content: 'I loved the atmosphere too. Every room felt like a new discovery.' },
+    { id: 'comment-2', author: { name: 'Robin Park', initials: 'RP' }, postedAt: 'Yesterday at 10:25', content: 'This has just moved to the top of my reading list!' },
+    { id: 'comment-3', author: { name: 'Alex Rivers', initials: 'AR' }, postedAt: 'Yesterday at 11:00', content: 'I would love to hear what you think when you finish it.' },
+  ],
+  'post-2': [
+    { id: 'comment-4', author: { name: 'Robin Park', initials: 'RP' }, postedAt: 'Yesterday at 17:00', content: 'That sounds like a lovely way to spend an afternoon.' },
+    { id: 'comment-5', author: { name: 'Alex Rivers', initials: 'AR' }, postedAt: 'Yesterday at 18:20', content: 'A good reminder to slow down and enjoy the chapter.' },
+  ],
+};

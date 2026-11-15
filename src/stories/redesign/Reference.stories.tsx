@@ -5,7 +5,9 @@ import { QuickProgress } from '@/components/redesign/RedesignHome';
 import { BookShelf, CommunityPost, GoalCard, ReadingBookCard, type HomeBook, type HomePost } from '@/components/redesign/HomeCards';
 import { ProgressDialog } from '@/components/redesign/ProgressDialog';
 import { SharePostDialog } from '@/components/redesign/SharePostDialog';
-import { books, posts } from './fixtures';
+import { books, posts, previewCommentAuthor } from './fixtures';
+import { CommentsDialog } from '@/components/redesign/CommentsDialog';
+import { useCommentPreview } from './useCommentPreview';
 
 const noop = () => {};
 
@@ -14,6 +16,8 @@ function ReferenceBoard() {
   const [selectedId, setSelectedId] = useState(books[1].id);
   const [activeBook, setActiveBook] = useState<HomeBook | null>(null);
   const [activePost, setActivePost] = useState<HomePost | null>(null);
+  const { comments, addComment } = useCommentPreview();
+  const [commentsPost, setCommentsPost] = useState<HomePost | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const recommended = Array.from({ length: 4 }, (_, index) => ({ ...books[0], id: `reference-${index}` }));
 
@@ -23,9 +27,10 @@ function ReferenceBoard() {
       <section className="rj-home-section"><h2>Currently Reading</h2><ReadingBookCard book={books[0]} onOpen={noop} /></section>
       <section className="rj-home-section"><h2>Your Goals</h2><GoalCard goal={{ year: 2026, completed: 23, target: 60 }} onOpen={noop} /></section>
       <section className="rj-home-section"><h2>Recommended for you</h2><BookShelf books={recommended} onOpen={noop} /></section>
-      <section className="rj-home-section"><h2>From others</h2><div className="rj-posts">{posts.map(post => <CommunityPost key={post.id} post={post} onLike={noop} onComments={noop} onOpen={noop} onProfile={noop} onChat={noop} onShare={() => { returnFocus.current = document.activeElement as HTMLElement; setActivePost(post); }} />)}</div></section>
+      <section className="rj-home-section"><h2>From others</h2><div className="rj-posts">{posts.map(post => <CommunityPost key={post.id} post={{ ...post, comments: (comments[post.id] ?? []).length }} onLike={noop} onComments={() => { returnFocus.current = document.activeElement as HTMLElement; setCommentsPost(post); }} onOpen={noop} onProfile={noop} onChat={noop} onShare={() => { returnFocus.current = document.activeElement as HTMLElement; setActivePost(post); }} />)}</div></section>
     </HomeShell>
     {activeBook && <ProgressDialog book={activeBook} open trigger={null} returnFocusTo={returnFocus.current} onOpenChange={open => { if (!open) setActiveBook(null); }} onSave={async () => {}} />}
+    {commentsPost && <CommentsDialog post={commentsPost} comments={comments[commentsPost.id] ?? []} currentUser={previewCommentAuthor} open trigger={null} returnFocusTo={returnFocus.current} onOpenChange={open => { if (!open) setCommentsPost(null); }} onAddComment={content => addComment(commentsPost.id, content)} />}
     {activePost && <SharePostDialog post={activePost} open trigger={null} returnFocusTo={returnFocus.current} onOpenChange={open => { if (!open) setActivePost(null); }} onShare={async () => {}} />}
   </div>;
 }

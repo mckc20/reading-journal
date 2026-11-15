@@ -32,10 +32,10 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
   );
 }
 
-export function BookShelf({ books, onOpen }: { books: HomeBook[]; onOpen: (book: HomeBook) => void }) {
+export function BookShelf({ books, onOpen, showStatus = true }: { books: HomeBook[]; onOpen: (book: HomeBook) => void; showStatus?: boolean }) {
   return <div className="rj-shelf" tabIndex={0} aria-label="Books; scroll for more">
     {books.map(book => <button key={book.id} className="rj-shelf-book" onClick={() => onOpen(book)}>
-      <BookCover src={book.cover} title={book.title} status={book.status} showFallbackTitle />
+      <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle />
       <span className="rj-book-title">{book.title}</span>
       <span className="rj-muted">{book.author}</span>
     </button>)}

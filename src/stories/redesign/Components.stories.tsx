@@ -20,6 +20,16 @@ export const FinishPlan: Story = { render: () => <PlanCard book={books[0]} kind=
 export const Post: Story = { render: () => <CommunityPost post={posts[0]} onLike={noop} onComments={noop} onShare={noop} onOpen={noop} onProfile={noop} onChat={noop} /> };
 export const QuotePost: Story = { render: () => <CommunityPost post={posts[1]} onLike={noop} onComments={noop} onShare={noop} onOpen={noop} onProfile={noop} onChat={noop} /> };
 export const AddMenu: Story = { render: () => <AddLauncher onCreate={noop} /> };
+export const AddMenuOpen: Story = {
+  render: () => <AddLauncher onCreate={noop} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Add' }));
+    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu');
+    await waitFor(() => expect(within(menu).getByText('Add a book', { exact: true })).toBeVisible());
+    await Promise.all(menu.getAnimations({ subtree: true }).map(animation => animation.finished));
+    await expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
+  },
+};
 function ProgressWidget({ reference = false }: { reference?: boolean }) {
   const [selectedId, setSelectedId] = useState(reference ? books[1].id : books[0].id);
   const [activeBook, setActiveBook] = useState<HomeBook | null>(null);

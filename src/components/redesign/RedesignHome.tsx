@@ -48,7 +48,7 @@ export interface RedesignHomeProps {
 function GoalSections({ goal, upNext = [], onGoal, onOpenBook }: Pick<RedesignHomeProps, 'goal' | 'upNext' | 'onGoal' | 'onOpenBook'>) {
   return <>
     <HomeSection title="Your Goals">{goal ? <GoalCard goal={goal} onOpen={onGoal} /> : <Button variant="outline" onClick={onGoal}>Set a reading goal</Button>}</HomeSection>
-    {upNext.length > 0 && <HomeSection title="Up Next"><BookShelf books={upNext} onOpen={onOpenBook} /></HomeSection>}
+    {upNext.length > 0 && <HomeSection title="Up Next"><BookShelf books={upNext} onOpen={onOpenBook} showStatus={false} /></HomeSection>}
   </>;
 }
 
