@@ -22,7 +22,7 @@ export function BookProgress({ currentPage, totalPages, showLabel = false, class
 
   return (
     <div className={cn("space-y-1", className)}>
-      <Progress value={value} className={cn("h-1", barClassName)} />
+      <Progress aria-label="Reading progress" value={value} className={cn("h-1", barClassName)} />
       {showLabel && <p className="text-xs text-muted-foreground">{value}% · {Math.max(0, currentPage ?? 0)} / {totalPages}</p>}
     </div>
   );

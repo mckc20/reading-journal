@@ -5,6 +5,12 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+storybook-static/
+debug-storybook.log
+
+# Local browser captures and reference exports; retain the redesign handoff.
+.playwright-mcp/*
+!.playwright-mcp/REDESIGN-HANDOFF.md
 
 # Local database backups
 backups/
