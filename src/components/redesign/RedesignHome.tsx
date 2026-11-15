@@ -20,8 +20,8 @@ export function QuickProgress({ books, selectedId, onSelect, onRead, onChangeDat
   const selected = books.find(book => book.id === selectedId) ?? books[0];
   return <div className="rj-quick-container"><section className="rj-quick-progress" aria-label="Quick reading progress">
     <div className="rj-quick-copy"><h1>How’s your<br />reading going?</h1>
-      <div className="rj-quick-actions"><Button onClick={() => selected && onRead(selected)} disabled={!selected}><span className="rj-read-label">I read today</span></Button>
-        <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button variant="outline" size="icon-lg" aria-label="More reading actions" disabled={!selected}><MoreHorizontal /></Button></DropdownMenu.Trigger>
+      <div className="rj-quick-actions"><Button onClick={() => selected && onRead(selected)} disabled={!selected}><span className="rj-read-label">Update Progress</span></Button>
+        <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button className="rj-more-reading-trigger" variant="outline" size="icon-lg" aria-label="More reading actions" disabled={!selected}><MoreHorizontal /></Button></DropdownMenu.Trigger>
           <DropdownMenu.Content className="rj-add-menu" sideOffset={8} align="start" collisionPadding={12}>
             <DropdownMenu.Item onSelect={() => selected && onChangeDate(selected)}><CalendarDays size={16} />Change date</DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => selected && onSession(selected)}><Clock3 size={16} />Log a session</DropdownMenu.Item>
@@ -30,18 +30,26 @@ export function QuickProgress({ books, selectedId, onSelect, onRead, onChangeDat
         </DropdownMenu.Root>
       </div>
     </div>
-    <QuickBookCarousel books={books} selectedId={selected?.id} onSelect={onSelect} />
+    <QuickBookCarousel books={books} selectedId={selected?.id} onSelect={onSelect} onActivate={id => { const book = books.find(item => item.id === id); if (book) onRead(book); }} />
   </section></div>;
 }
 
 export interface RedesignHomeProps {
   reading: HomeBook[]; recommendations: HomeBook[]; goal?: ReadingGoal; posts: HomePost[];
+  upNext?: HomeBook[];
   loading?: boolean; error?: string; onRetry: () => void;
   onRead: (book: HomeBook) => void; onChangeDate: (book: HomeBook) => void; onSession: (book: HomeBook) => void; onEditLogs: (book: HomeBook) => void;
   onOpenBook: (book: HomeBook) => void; onGoal: () => void;
   onNavigate: (destination: HomeDestination) => void; onCreate: (destination: CreateDestination) => void;
-  onNotifications: () => void; onWishlist: () => void;
+  onNotifications: () => void;
   onPostAction: (post: HomePost, action: 'like' | 'comments' | 'share' | 'open' | 'profile' | 'chat') => void;
+}
+
+function GoalSections({ goal, upNext = [], onGoal, onOpenBook }: Pick<RedesignHomeProps, 'goal' | 'upNext' | 'onGoal' | 'onOpenBook'>) {
+  return <>
+    <HomeSection title="Your Goals">{goal ? <GoalCard goal={goal} onOpen={onGoal} /> : <Button variant="outline" onClick={onGoal}>Set a reading goal</Button>}</HomeSection>
+    {upNext.length > 0 && <HomeSection title="Up Next"><BookShelf books={upNext} onOpen={onOpenBook} /></HomeSection>}
+  </>;
 }
 
 /** Home composition for review. All account behavior is supplied by its caller. */
@@ -55,11 +63,11 @@ export function RedesignHome(props: RedesignHomeProps) {
           <HomeSection title="Currently Reading">
             {props.reading.length === 1 ? <ReadingBookCard book={props.reading[0]} onOpen={props.onOpenBook} /> : props.reading.length > 1 ? <BookShelf books={props.reading} onOpen={props.onOpenBook} /> : <EmptyState compact title="A new chapter awaits" message="Choose a book from your library to start reading." action={<Button variant="outline" onClick={() => props.onNavigate('Library')}>Browse library</Button>} />}
           </HomeSection>
-          <div className="rj-mobile-goal"><HomeSection title="Your Goals">{props.goal ? <GoalCard goal={props.goal} onOpen={props.onGoal} /> : <Button variant="outline" onClick={props.onGoal}>Set a reading goal</Button>}</HomeSection></div>
+          <div className="rj-mobile-goal"><GoalSections {...props} /></div>
           <HomeSection title="Recommended for you">{props.recommendations.length ? <BookShelf books={props.recommendations} onOpen={props.onOpenBook} /> : <p className="rj-muted">No recommendations yet. Your next favorite is waiting in your library.</p>}</HomeSection>
           <HomeSection title="From others">{props.posts.length ? <div className="rj-posts">{props.posts.map(post => <CommunityPost key={post.id} post={post} onLike={() => props.onPostAction(post, 'like')} onComments={() => props.onPostAction(post, 'comments')} onShare={() => props.onPostAction(post, 'share')} onOpen={() => props.onPostAction(post, 'open')} onProfile={() => props.onPostAction(post, 'profile')} onChat={() => props.onPostAction(post, 'chat')} />)}</div> : <p className="rj-muted">Posts from your reading friends will appear here.</p>}</HomeSection>
         </div>
-        <aside className="rj-desktop-goal" aria-label="Reading goals"><HomeSection title="Your Goals">{props.goal ? <GoalCard goal={props.goal} onOpen={props.onGoal} /> : <Button variant="outline" onClick={props.onGoal}>Set a reading goal</Button>}</HomeSection><p className="rj-aside-note">Your place, for your books.<br />One chapter at a time.</p></aside>
+        <aside className="rj-desktop-goal" aria-label="Reading goals and up next"><GoalSections {...props} /><p className="rj-aside-note">Your place, for your books.<br />One chapter at a time.</p></aside>
       </div>
     </>}
   </HomeShell></div>;

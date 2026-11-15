@@ -24,9 +24,11 @@ The full PDF was reviewed again at enlarged scale, including the rasterized anno
 | Currently Reading | Cover extends above/below a full-width gray backing; compact metadata and progress beside it |
 | Shelves | Smaller covers, consistent title/author hierarchy and a gray shelf backing behind the covers |
 | Community posts | Compact preview aligned beneath the author, cover and corner arrow, ellipsis menu, decorative quotation marks and attribution |
-| Header/navigation/Add | Existing book-and-quill logo, star/bell header icons, book/feather/compass navigation icons, rose Add trigger and pill-shaped launch choices with icons on the right |
+| Header/navigation/Add | Existing book-and-quill logo, notifications bell, book/feather/compass navigation icons, rose Add trigger and pill-shaped launch choices with icons on the right. The star/Wishlist shortcut was removed at the user's request. |
 
 The quick widget now sizes from its container, so a narrow component story does not accidentally get desktop heading sizes. Personal photos and prose remain replaced with fictional fixtures. The reference board intentionally combines the PDF's three-book quick widget and single-book reading-card example; it is a composition comparison, not a claim that those book counts represent one live account state.
+
+Final layout refinements: at 1024px and wider, navigation sits inside the top header and is centered on the page using equal left/right grid columns. At 768–1023px it uses a second header row; phone navigation stays at the bottom. The fixed-width PDF comparison board keeps its footer navigation. Reading-card page counts are grouped with a 16px gap; each label/value stays together if the row wraps. The goal ring is anchored beside the text, with its left offset capped at 170px, rather than tracking the far right edge of a wide card.
 
 The PDF's white-on-blue goal/plan text and white-on-rose button text do not meet normal-text contrast requirements in every size. The reference colors are preserved for review. **Home → Enhanced Contrast** is a separate proposal with darker blue/rose backings, keeping the same white text and layout. The default palette should not be treated as accessibility-approved.
 
@@ -52,9 +54,11 @@ The CSS theme is scoped to `.rj-redesign`. The deployed Dashboard and app shell 
 
 - Select a currently-reading book, open progress, change the page/time, save locally, or cancel. Local progress is reset on a page reload.
 - Keyboard-accessible Add menu using Radix; each item reports the requested destination.
+- The reading widget's ellipsis trigger keeps its rose dots and circular background when hovered, focused or open; hover/open uses the shared subtle surface tint. **Components → Reading Widget More Actions** verifies open-state styling and Escape/focus return.
 - Local like/unlike state on community posts.
 - Share buttons open the PDF's post-preview dialog. Choose chat, link or email, then confirm or cancel; confirmation is simulated locally.
 - One-book and multiple-book layouts, empty/loading/error examples, missing cover/page count, long title and completed-goal examples.
+- **Home → Up Next** adds books with shared Up Next status badges directly below Your Goals (phone main flow; wider-screen sidebar). These books are separate from Currently Reading and the progress widget; clicking them previews their book-details destination.
 - Standalone goal/plan/post cards, progress-dialog error/pending/unknown-total states, Share-dialog error state and a visual foundations story. **Progress PDF Reference** and **Share Post PDF Reference** open the dialogs immediately for visual comparison.
 - Story `play` checks for saving page/time, cancelling without changing progress, retaining selections after a simulated save failure, and confirming or failing a simulated share.
 
@@ -64,7 +68,7 @@ Navigation, creation, timed sessions, log editing, goals/plans, notifications, r
 
 - Progress now follows the PDF's wheel controls: three visible rows, a pill outline around the selection, a half-width page wheel and side-by-side hour/minute wheels on light gray panels. Scroll, tap a visible row, use arrow keys, or type digits while focused. Minutes advance in five-minute steps, matching the PDF's 00m / 05m / 10m examples. Unknown page totals extend the available rows as needed.
 - The Share dialog includes the author, truncated post text, book cover, three circular destination controls and Cancel/Share actions. The fourth unlabeled circle in the PDF is decorative because no fourth destination has been specified. No messages, emails or clipboard writes occur in the workshop.
-- The reading strip scrolls beneath a fixed, centered 2px white frame. The book under the frame becomes the target for “I read today” and the reading menu; neighbors use 70% opacity. Native horizontal scrolling, mouse dragging, cover clicks and Left/Right/Home/End keys all select and center books. Clicking a cover slides it into the frame smoothly; reduced-motion preferences use instant positioning. End padding lets the first and last cover reach the same frame. The **Home → Sliding Reading Selection** story checks that scrolling changes the action's book while the frame stays fixed.
+- The reading strip scrolls beneath a fixed, centered 2px white frame; neighbors use 70% opacity. Swiping, dragging and Left/Right/Home/End keys browse books. The **Update Progress** button opens progress for the centered book. Tapping a cover slides it into the frame, then opens that book's progress dialog only when it arrives; an already-centered cover opens immediately. Reduced-motion preferences use instant positioning before opening. Interrupted navigation cancels a pending dialog. End padding lets the first and last cover reach the same frame. **Home → Sliding Reading Selection** checks browsing plus the main action; **Components → Reading Widget Click Slides** checks motion, arrival before opening, and focus return.
 - The draft starts at the recorded page rather than silently adding one page. Saving without reading time sends no time value. The existing app's draft defaults are unchanged.
 - The PDF example's 246 / 301 pages and 40% disagree. Sample progress uses the real shared calculation; 64 / 160 is 40%.
 - The quick widget's visible pill/circle proportions follow the PDF, with transparent padding retaining a 44px-high action target. See the contrast review above before adopting the reference palette in the live app.

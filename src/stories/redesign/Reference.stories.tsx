@@ -18,7 +18,7 @@ function ReferenceBoard() {
   const recommended = Array.from({ length: 4 }, (_, index) => ({ ...books[0], id: `reference-${index}` }));
 
   return <div className="rj-redesign rj-pdf-reference">
-    <HomeShell onNavigate={noop} onCreate={noop} onNotifications={noop} onWishlist={noop}>
+    <HomeShell navigationPlacement="footer" onNavigate={noop} onCreate={noop} onNotifications={noop}>
       <QuickProgress books={[books[2], books[1], books[3]]} selectedId={selectedId} onSelect={setSelectedId} onRead={book => { returnFocus.current = document.activeElement as HTMLElement; setActiveBook(book); }} onChangeDate={noop} onSession={noop} onEditLogs={noop} />
       <section className="rj-home-section"><h2>Currently Reading</h2><ReadingBookCard book={books[0]} onOpen={noop} /></section>
       <section className="rj-home-section"><h2>Your Goals</h2><GoalCard goal={{ year: 2026, completed: 23, target: 60 }} onOpen={noop} /></section>

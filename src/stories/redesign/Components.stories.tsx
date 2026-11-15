@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import { ReadingBookCard, BookShelf, GoalCard, PlanCard, CommunityPost } from '@/components/redesign/HomeCards';
+import { ReadingBookCard, BookShelf, GoalCard, PlanCard, CommunityPost, type HomeBook } from '@/components/redesign/HomeCards';
 import { QuickProgress } from '@/components/redesign/RedesignHome';
 import { AddLauncher } from '@/components/redesign/HomeShell';
 import { ProgressDialog } from '@/components/redesign/ProgressDialog';
@@ -20,10 +20,35 @@ export const FinishPlan: Story = { render: () => <PlanCard book={books[0]} kind=
 export const Post: Story = { render: () => <CommunityPost post={posts[0]} onLike={noop} onComments={noop} onShare={noop} onOpen={noop} onProfile={noop} onChat={noop} /> };
 export const QuotePost: Story = { render: () => <CommunityPost post={posts[1]} onLike={noop} onComments={noop} onShare={noop} onOpen={noop} onProfile={noop} onChat={noop} /> };
 export const AddMenu: Story = { render: () => <AddLauncher onCreate={noop} /> };
-function ProgressWidget() { const [selectedId, setSelectedId] = useState(books[0].id); return <QuickProgress books={books.slice(0, 3)} selectedId={selectedId} onSelect={setSelectedId} onRead={noop} onChangeDate={noop} onSession={noop} onEditLogs={noop} />; }
+function ProgressWidget({ reference = false }: { reference?: boolean }) {
+  const [selectedId, setSelectedId] = useState(reference ? books[1].id : books[0].id);
+  const [activeBook, setActiveBook] = useState<HomeBook | null>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  return <>
+    <QuickProgress books={reference ? [books[2], books[1], books[3]] : books.slice(0, 3)} selectedId={selectedId} onSelect={setSelectedId} onRead={book => { returnFocus.current = document.activeElement as HTMLElement; setActiveBook(book); }} onChangeDate={noop} onSession={noop} onEditLogs={noop} />
+    {activeBook && <ProgressDialog book={activeBook} open trigger={null} returnFocusTo={returnFocus.current} onOpenChange={open => { if (!open) setActiveBook(null); }} onSave={async () => {}} />}
+  </>;
+}
 export const ReadingWidget: Story = { render: () => <ProgressWidget /> };
-function ReferenceProgressWidget() { const [selectedId, setSelectedId] = useState(books[1].id); return <QuickProgress books={[books[2], books[1], books[3]]} selectedId={selectedId} onSelect={setSelectedId} onRead={noop} onChangeDate={noop} onSession={noop} onEditLogs={noop} />; }
+function ReferenceProgressWidget() { return <ProgressWidget reference />; }
 export const ReadingWidgetPdfReference: Story = { render: () => <ReferenceProgressWidget /> };
+export const ReadingWidgetMoreActions: Story = {
+  render: () => <ReferenceProgressWidget />,
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'More reading actions' });
+    const initialColor = getComputedStyle(trigger).color;
+    const circleWidth = getComputedStyle(trigger, '::before').width;
+    await userEvent.click(trigger);
+    await within(canvasElement.ownerDocument.body).findByRole('menu');
+    await waitFor(() => expect(getComputedStyle(trigger).color).toBe(initialColor));
+    await expect(getComputedStyle(trigger, '::before').content).not.toBe('none');
+    await expect(getComputedStyle(trigger, '::before').backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(getComputedStyle(trigger, '::before').width).toBe(circleWidth);
+    await userEvent.keyboard('{Escape}');
+    await expect(trigger).toHaveFocus();
+    await userEvent.click(trigger);
+  },
+};
 export const ReadingWidgetClickSlides: Story = {
   render: () => <ReferenceProgressWidget />,
   play: async ({ canvasElement }) => {
@@ -32,16 +57,32 @@ export const ReadingWidgetClickSlides: Story = {
     await waitFor(() => expect(strip.scrollLeft).toBeGreaterThan(0));
     const start = strip.scrollLeft;
     const positions: number[] = [];
+    const cover = canvas.getByRole('button', { name: 'Update Progress for The Night Circus' });
+    const frame = canvasElement.querySelector('.rj-quick-selection-frame')!;
+    let openedBeforeCentered = false;
     let animationFrame = 0;
-    function sample() { positions.push(strip.scrollLeft); animationFrame = requestAnimationFrame(sample); }
+    function sample() {
+      positions.push(strip.scrollLeft);
+      if (canvasElement.ownerDocument.querySelector('[role="dialog"]')) {
+        const bookBounds = cover.getBoundingClientRect();
+        const frameBounds = frame.getBoundingClientRect();
+        if (Math.abs(bookBounds.x + bookBounds.width / 2 - frameBounds.x - frameBounds.width / 2) > 1) openedBeforeCentered = true;
+      }
+      animationFrame = requestAnimationFrame(sample);
+    }
     animationFrame = requestAnimationFrame(sample);
     try {
-      await userEvent.click(canvas.getByRole('button', { name: 'Select The Night Circus' }));
+      await userEvent.click(cover);
       await waitFor(() => expect(strip.scrollLeft).toBeCloseTo(0, 0));
-      await expect(canvas.getByRole('button', { name: 'Select The Night Circus' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(cover).toHaveAttribute('aria-pressed', 'true');
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         await expect(positions.some(position => position > 0 && position < start)).toBe(true);
       }
+      const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
+      await waitFor(() => expect(within(dialog).getByText('The Night Circus', { exact: true })).toBeVisible());
+      await expect(openedBeforeCentered).toBe(false);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      await expect(cover).toHaveFocus();
     } finally { cancelAnimationFrame(animationFrame); }
   },
 };

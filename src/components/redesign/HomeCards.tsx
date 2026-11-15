@@ -3,6 +3,7 @@ import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { BookProgress, getBookProgress } from '@/components/reading-journal/BookProgress';
+import type { BookStatus } from '@/types';
 
 /** Presentation data only: these components do not fetch or save account data. */
 export interface HomeBook {
@@ -12,6 +13,7 @@ export interface HomeBook {
   cover?: string | null;
   currentPage: number;
   totalPages?: number | null;
+  status?: BookStatus;
 }
 
 export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (book: HomeBook) => void }) {
@@ -22,7 +24,7 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
       <span className="rj-reading-card-copy">
         <span className="rj-book-title">{book.title}</span>
         <span className="rj-muted">{book.author}</span>
-        <span className="rj-page-count">Current page: {book.currentPage} <span>Total pages: {book.totalPages || 'Unknown'}</span></span>
+        <span className="rj-page-count"><span>Current page: {book.currentPage}</span><span>Total pages: {book.totalPages || 'Unknown'}</span></span>
         <span className="rj-progress-copy">{progress === null ? 'Total pages needed to track progress' : `You’re ${progress}% through the book`}</span>
         <BookProgress currentPage={book.currentPage} totalPages={book.totalPages} />
       </span>
@@ -33,7 +35,7 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
 export function BookShelf({ books, onOpen }: { books: HomeBook[]; onOpen: (book: HomeBook) => void }) {
   return <div className="rj-shelf" tabIndex={0} aria-label="Books; scroll for more">
     {books.map(book => <button key={book.id} className="rj-shelf-book" onClick={() => onOpen(book)}>
-      <BookCover src={book.cover} title={book.title} showFallbackTitle />
+      <BookCover src={book.cover} title={book.title} status={book.status} showFallbackTitle />
       <span className="rj-book-title">{book.title}</span>
       <span className="rj-muted">{book.author}</span>
     </button>)}

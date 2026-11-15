@@ -22,7 +22,7 @@ function HomeReview(args: RedesignHomeProps) {
       onSession={book => preview(`Timed session for ${book.title}`)} onEditLogs={book => preview(`Edit logs for ${book.title}`)}
       onOpenBook={book => preview(`Book details: ${book.title}`)} onGoal={() => preview('Goals and plans')}
       onNavigate={destination => preview(destination)} onCreate={destination => preview(`Create ${destination}`)}
-      onNotifications={() => preview('Notifications')} onWishlist={() => preview('Wishlist')} onRetry={() => preview('Retry requested')}
+      onNotifications={() => preview('Notifications')} onRetry={() => preview('Retry requested')}
       onPostAction={(post, action) => {
         if (action === 'like') setCommunity(current => current.map(item => item.id === post.id ? { ...item, liked: !item.liked, likes: item.likes + (item.liked ? -1 : 1) } : item));
         else if (action === 'share') { returnFocus.current = document.activeElement as HTMLElement; setSharedPost(post); }
@@ -44,7 +44,7 @@ const noop = () => {};
 const meta = {
   title: 'Redesign/Home', component: RedesignHome,
   parameters: { layout: 'fullscreen', docs: { description: { component: 'Home from the supplied Modern Redesign PDF. Data and saves are local simulations. Phone follows the reference; wider layouts are a proposed adaptation. Navigation and new feature destinations report their intent only.' } } },
-  args: { reading: [books[0]], recommendations: [books[4], books[3], books[1], books[2]], goal: { year: 2026, completed: 23, target: 60 }, posts, onRetry: noop, onRead: noop, onChangeDate: noop, onSession: noop, onEditLogs: noop, onOpenBook: noop, onGoal: noop, onNavigate: noop, onCreate: noop, onNotifications: noop, onWishlist: noop, onPostAction: noop },
+  args: { reading: [books[0]], recommendations: [books[4], books[3], books[1], books[2]], goal: { year: 2026, completed: 23, target: 60 }, posts, onRetry: noop, onRead: noop, onChangeDate: noop, onSession: noop, onEditLogs: noop, onOpenBook: noop, onGoal: noop, onNavigate: noop, onCreate: noop, onNotifications: noop, onPostAction: noop },
   render: args => <HomeReview key={JSON.stringify([args.reading, args.posts])} {...args} />,
 } satisfies Meta<typeof RedesignHome>;
 export default meta;
@@ -52,6 +52,10 @@ type Story = StoryObj<typeof meta>;
 
 export const SingleBook: Story = {};
 export const SeveralBooks: Story = { args: { reading: books.slice(0, 3) } };
+export const UpNext: Story = {
+  args: { upNext: [books[3], books[4], books[2]].map(book => ({ ...book, currentPage: 0, status: 'Up Next' as const })) },
+  parameters: { docs: { description: { story: 'Books marked Up Next appear immediately below Your Goals: in the main flow on phone and beneath the goals card in the wider sidebar. They stay separate from Currently Reading and the progress carousel.' } } },
+};
 export const SlidingReadingSelection: Story = {
   args: { reading: books.slice(0, 3) },
   play: async ({ canvasElement }) => {
@@ -60,13 +64,13 @@ export const SlidingReadingSelection: Story = {
     const frame = canvasElement.querySelector('.rj-quick-selection-frame')!;
     const before = frame.getBoundingClientRect();
     strip.scrollTo({ left: strip.scrollWidth, behavior: 'auto' });
-    await waitFor(() => expect(canvas.getByRole('button', { name: 'Select The Night Circus' })).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(() => expect(canvas.getByRole('button', { name: 'Update Progress for The Night Circus' })).toHaveAttribute('aria-pressed', 'true'));
     const after = frame.getBoundingClientRect();
     await expect(after.x).toBeCloseTo(before.x, 1);
     await expect(after.y).toBeCloseTo(before.y, 1);
-    await userEvent.click(canvas.getByRole('button', { name: 'I read today' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Update Progress' }));
     const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
-    await expect(within(dialog).getByText('The Night Circus', { exact: true })).toBeVisible();
+    await waitFor(() => expect(within(dialog).getByText('The Night Circus', { exact: true })).toBeVisible());
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   },
 };
@@ -82,7 +86,7 @@ export const EnhancedContrast: Story = {
 export const SaveProgress: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'I read today' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Update Progress' }));
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
     const page = within(dialog).getByRole('spinbutton', { name: /To what page/ });
@@ -100,7 +104,7 @@ export const SaveProgress: Story = {
 export const CancelProgress: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const trigger = canvas.getByRole('button', { name: 'I read today' });
+    const trigger = canvas.getByRole('button', { name: 'Update Progress' });
     await userEvent.click(trigger);
     const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
     const page = within(dialog).getByRole('spinbutton', { name: /To what page/ });

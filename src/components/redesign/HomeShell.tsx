@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, Star, UserRound, Layers } from 'lucide-react';
+import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, UserRound, Layers } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/rj-logo-transparent.png';
@@ -23,19 +23,22 @@ export function AddLauncher({ onCreate }: { onCreate: (destination: CreateDestin
   </DropdownMenu.Root>;
 }
 
-export function HomeShell({ children, onNavigate, onCreate, onNotifications, onWishlist }: {
+export function HomeShell({ children, onNavigate, onCreate, onNotifications, navigationPlacement = 'responsive' }: {
   children: ReactNode; onNavigate: (destination: HomeDestination) => void;
-  onCreate: (destination: CreateDestination) => void; onNotifications: () => void; onWishlist: () => void;
+  onCreate: (destination: CreateDestination) => void; onNotifications: () => void;
+  navigationPlacement?: 'responsive' | 'footer';
 }) {
+  const navigation = <nav className="rj-navigation" aria-label="Main navigation">
+    {destinations.map(({ name, icon: Icon }) => <button key={name} aria-current={name === 'Home' ? 'page' : undefined} onClick={() => onNavigate(name)}><Icon size={22} aria-hidden="true" /><span>{name}</span></button>)}
+  </nav>;
   return <div className="rj-home-shell">
     <a className="rj-skip-link" href="#redesign-home-content">Skip to content</a>
     <header className="rj-app-header">
       <button className="rj-brand" onClick={() => onNavigate('Home')} aria-label="Reading Journal home"><img src={logo} alt="" /><span>Reading Journal</span></button>
-      <div className="rj-header-actions"><Button variant="ghost" size="icon-lg" onClick={onWishlist} aria-label="Wishlist"><Star /></Button><Button variant="ghost" size="icon-lg" onClick={onNotifications} aria-label="Notifications"><Bell /></Button></div>
+      {navigationPlacement === 'responsive' && navigation}
+      <div className="rj-header-actions"><Button variant="ghost" size="icon-lg" onClick={onNotifications} aria-label="Notifications"><Bell /></Button></div>
     </header>
-    <nav className="rj-navigation" aria-label="Main navigation">
-      {destinations.map(({ name, icon: Icon }) => <button key={name} aria-current={name === 'Home' ? 'page' : undefined} onClick={() => onNavigate(name)}><Icon size={22} aria-hidden="true" /><span>{name}</span></button>)}
-    </nav>
+    {navigationPlacement === 'footer' && navigation}
     <main id="redesign-home-content" tabIndex={-1}>{children}</main>
     <div className="rj-floating-add"><AddLauncher onCreate={onCreate} /></div>
   </div>;

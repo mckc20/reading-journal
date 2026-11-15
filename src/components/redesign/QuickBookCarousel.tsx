@@ -6,10 +6,11 @@ interface QuickBookCarouselProps {
   books: HomeBook[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  onActivate: (id: string) => void;
 }
 
 /** Covers scroll beneath one stationary selection frame, including at either end. */
-export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCarouselProps) {
+export function QuickBookCarousel({ books, selectedId, onSelect, onActivate }: QuickBookCarouselProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(selectedId);
   const scrollingRef = useRef(false);
@@ -18,8 +19,17 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
   const draggedRef = useRef(false);
   const pointerFocusRef = useRef(false);
   const movingFocusRef = useRef(false);
+  const pendingActivation = useRef<string | null>(null);
+  const activationFrame = useRef<number>();
+  const activateRef = useRef(onActivate);
   const [dragging, setDragging] = useState(false);
   const bookIds = books.map(book => book.id).join('\0');
+
+  function cancelActivation() {
+    pendingActivation.current = null;
+    if (activationFrame.current !== undefined) cancelAnimationFrame(activationFrame.current);
+    activationFrame.current = undefined;
+  }
 
   function buttons() {
     return Array.from(scrollerRef.current?.querySelectorAll<HTMLButtonElement>('.rj-quick-book') ?? []);
@@ -55,6 +65,31 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
     centerBook(id, reducedMotion ? 'auto' : behavior);
   }
 
+  function activate(id: string) {
+    cancelActivation();
+    select(id);
+    pendingActivation.current = id;
+
+    // Open on arrival, rather than after a guessed animation duration. This also
+    // handles reduced motion and a cover that is already inside the frame.
+    function openWhenCentered() {
+      if (pendingActivation.current !== id) return;
+      const scroller = scrollerRef.current;
+      const book = buttons().find(button => button.dataset.bookId === id);
+      if (!scroller || !book) { cancelActivation(); return; }
+      const target = book.offsetLeft + book.offsetWidth / 2 - scroller.clientWidth / 2;
+      if (Math.abs(scroller.scrollLeft - target) < 1) {
+        cancelActivation();
+        activateRef.current(id);
+      } else {
+        activationFrame.current = requestAnimationFrame(openWhenCentered);
+      }
+    }
+    openWhenCentered();
+  }
+
+  useLayoutEffect(() => { activateRef.current = onActivate; });
+
   useLayoutEffect(() => {
     selectedRef.current = selectedId;
     // Prop updates caused by scrolling must not pull the strip back mid-gesture.
@@ -65,11 +100,12 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const observer = new ResizeObserver(() => {
+      cancelActivation();
       scrollingRef.current = false;
       centerBook(selectedRef.current);
     });
     observer.observe(scroller);
-    return () => { observer.disconnect(); clearTimeout(settleTimer.current); };
+    return () => { observer.disconnect(); clearTimeout(settleTimer.current); cancelActivation(); };
   }, []);
 
   function finishDrag(event: PointerEvent<HTMLDivElement>) {
@@ -93,6 +129,7 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
       role="group"
       aria-label="Choose a book to update"
       tabIndex={books.length ? 0 : -1}
+      onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) cancelActivation(); }}
       onScroll={() => {
         scrollingRef.current = true;
         const id = nearestBook()?.dataset.bookId;
@@ -101,6 +138,7 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
         settleTimer.current = setTimeout(() => { scrollingRef.current = false; }, 150);
       }}
       onKeyDown={event => {
+        cancelActivation();
         pointerFocusRef.current = false;
         const index = books.findIndex(book => book.id === selectedRef.current);
         const indexes: Record<string, number> = { ArrowLeft: Math.max(0, index - 1), ArrowRight: Math.min(books.length - 1, index + 1), Home: 0, End: books.length - 1 };
@@ -113,7 +151,9 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
         select(book.id);
       }}
       onDragStart={event => event.preventDefault()}
+      onWheel={cancelActivation}
       onPointerDown={event => {
+        cancelActivation();
         pointerFocusRef.current = true;
         draggedRef.current = false;
         if (event.pointerType !== 'mouse' || event.button !== 0) return;
@@ -139,9 +179,9 @@ export function QuickBookCarousel({ books, selectedId, onSelect }: QuickBookCaro
         key={book.id}
         data-book-id={book.id}
         className="rj-quick-book"
-        aria-label={`Select ${book.title}`}
+        aria-label={`Update Progress for ${book.title}`}
         aria-pressed={selectedId === book.id}
-        onClick={() => select(book.id)}
+        onClick={() => activate(book.id)}
         onFocus={event => { if (!pointerFocusRef.current && !movingFocusRef.current && event.currentTarget.matches(':focus-visible')) select(book.id, 'auto'); }}
       ><BookCover src={book.cover} title={book.title} showFallbackTitle /></button>) : <p>Start a book to log your next chapter.</p>}
     </div>

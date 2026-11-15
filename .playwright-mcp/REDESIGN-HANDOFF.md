@@ -2,13 +2,57 @@
 
 Updated 15 November 2026. Read this file and the repository AGENTS.md before continuing. The original conversation can be replaced; the wiki and local artifacts hold the work.
 
-## Continuation update — Storybook first slice
+## Current state — start here in a new session
+
+The current task is a **Storybook-first redesign workshop**, based on the supplied PDF. The original baseline and wiki analysis are complete. Storybook is installed and the Home/component prototypes are implemented. The live Dashboard has not been replaced. App/backend integration, another page, a PR, deployment and a release note have not been requested.
+
+The original workshop checkpoint is `541cffb8` (`chore: checkpoint Storybook redesign workshop`). This handoff is saved with the follow-up interaction/layout refinements and ellipsis-menu fix. Use `git log -1 --oneline` and `git status --short` to establish the current checkout before continuing.
+
+### Open the workshop
+
+- Run `npm run storybook -- --host 127.0.0.1`; the server is normally at http://127.0.0.1:6006. Check whether it is already running before starting another process. A running process is not guaranteed to survive a session change.
+- Main responsive Home: http://127.0.0.1:6006/?path=/story/redesign-home--single-book. Use **Several Books**, **Empty**, **Loading**, and **Load Error** for other states.
+- PDF composition board: http://127.0.0.1:6006/?path=/story/redesign-pdf-reference--home. This is intentionally a fixed-width phone comparison with footer navigation and independent sample states; use the Home stories to review desktop/tablet behavior.
+- Standalone widget: `Redesign/Components/Reading Widget PDF Reference`. Regression stories: **Reading Widget Click Slides**, **Reading Widget More Actions**, **Home/Sliding Reading Selection**, **Save Progress**, **Cancel Progress**, and the progress/share error stories. Their `play` functions run when those stories open; there is no separate browser-test CI runner.
+- Detailed implementation map and limitations: `docs/storybook.md`. Presentational components are in `src/components/redesign/`, controlled data/interaction examples in `src/stories/redesign/`, config in `.storybook/`.
+
+### Latest user-approved behavior and layout
+
+- The gold reading widget's main action is **Update Progress**, renamed from **I read today**.
+- Its white frame is stationary, centered and 2px thick. Other covers have 70% opacity. Swiping, mouse dragging or arrow/Home/End keys browse books beneath it without opening a dialog.
+- Tapping a cover outside the frame slides it into place first, then opens that book's progress dialog. Opening waits for actual centering, not a guessed delay. An already-centered cover opens immediately. Reduced motion positions instantly before opening. New navigation, focus leaving the carousel, or an interrupted gesture cancels pending activation. Closing the dialog returns focus to its trigger.
+- Desktop navigation is inside the header and centered on the page at ≥1024px. At 768–1023px it occupies a second header row; phone navigation stays at the bottom. The PDF comparison board explicitly uses footer placement.
+- Latest user refinement: remove the star icon and its Wishlist shortcut from the redesign header. Only the notifications bell remains on the right; the unused wishlist callback has been removed from the prototype and stories. This does not remove the live app's Wishlist feature or book status.
+- Latest added state: **Redesign/Home/Up Next** supplies a separate `upNext` list. Those books show the shared Up Next status badges and a shelf directly below Your Goals, in the phone flow or wider-screen sidebar. Other Home states do not show an empty Up Next section. These books do not enter Currently Reading or the progress carousel; book clicks preview the details destination.
+- Current/Total page labels sit together with a 16px gap; each label/value remains together if the row needs to wrap. The goal ring stays near the text (left offset capped at 170px), rather than moving to the far edge of a wide card.
+- Progress uses three-row wheel controls with outlined selected pills; page wheel occupies half a gray panel, hours/minutes sit side by side. Minutes step by five. Unknown/large page totals use a bounded row window. One save operation, no nested journal editor.
+- Share dialog includes author, excerpt, cover, circular chat/link/email choices and Cancel/Share. The PDF's unspecified fourth circle is decorative.
+- Latest bug fixed: the ellipsis trigger's white circle and rose dots disappeared/turned black when its menu opened because the CSS used `:last-child`; Radix inserts menu content after the trigger. Its own `rj-more-reading-trigger` class now keeps styling stable through open/hover/focus, with the usual subtle surface tint. **Reading Widget More Actions** checks appearance, dimensions and Escape/focus return.
+
+### Scope, remaining decisions and verification
+
+- All sample progress, likes and sharing are local simulations; reload resets them. No production account data, chats, clipboard content or email is changed. Navigation/creation, date changes, timed sessions, log editing, goals/plans, notifications, recommendations and comments are sample content or intent-only placeholders. A comments panel from the PDF is not implemented yet.
+- Lighter PDF palette, Lora headings, DM Sans body, and rounded cards/buttons are the current reference direction. The white-on-blue/rose reference colors have known contrast failures. **Home/Enhanced Contrast** separately proposes darker backings and passed a focused axe scan; that palette has not been selected for the live app. Dark mode and real-device touch/software-keyboard checks remain outstanding.
+- Preserve the existing shared Button/Dialog/BookCover/BookProgress/etc. Reconcile the prototype's book summaries with canonical BookCard before app integration. Do not infer database, auth, analytics or persistence changes from this visual workshop.
+- Latest verification on 15 November: `npm run build` and `npm run build-storybook` passed; `npm test` passed all 381 tests. The test runner required execution outside the sandbox because its local IPC socket was blocked, not because a test failed. Browser checked carousel slide-before-open, local save/cancel, reduced motion, header/nav boundaries (767/768/1023/1024), 320/390/834/1024/1440 layout widths, menu keyboard actions and the fixed ellipsis open/closed colors/background/dimensions/focus. Star/Wishlist shortcut absence and the remaining notifications bell were checked at phone/tablet/desktop widths. Up Next was checked at 390/834/1440 for three badged books, direct placement after Goals, separation from the reading carousel, book-details preview action, and no horizontal overflow. These are focused checks, not a complete usability or accessibility audit.
+- Current changes are local Git commits; no wiki update/push, app push, PR, deployment or release note was requested. No new changelog entry should be added unless the user asks.
+- No next page or implementation phase has been selected. Ask what the user wants to refine next; do not assume production integration is approved. The historical wiki decisions below still need reconciliation with these prototype choices before broader implementation.
+
+### Reference and privacy
+
+The PDF is local at `/Users/martina/Downloads/Reading Journal - Modern Redesign.pdf`. It includes rasterized notes, so inspect rendered regions as well as extracted text. Five cover images are committed as fixtures; personal photos/prose were replaced with fictional data. Browser captures, manifests and PDF renders under `.playwright-mcp/` remain ignored and may contain private reference material. This handoff is the only tracked exception. Do not publish raw captures or the PDF. Existing public wiki references and capture/privacy limitations are retained below.
+
+## Prior implementation notes (chronological)
 
 Checkpoint on 15 November 2026: the Storybook setup, redesign components, stories, assets, workshop documentation and shared progress accessibility label are saved together in Git. Browser captures and reference exports remain local and ignored; this handoff is the exception. The live Dashboard is unchanged. No PR, deployment or release note is part of this checkpoint. The wiki checkout and published page links are recorded below.
 
 15 November clarification: the user specified that the quick-reading widget's white rectangle stays stationary and covers slide beneath it. Added `QuickBookCarousel` with a fixed centered 4px frame, 70% opacity for unselected covers, center-based selection, native scroll/snap, mouse drag, click and keyboard support. First/last book can reach the frame; the selected book drives “I read today.” `Home/Sliding Reading Selection` adds a regression story. This supersedes the earlier moving-outline/click-only strip.
 
 15 November refinement: user requested a thinner frame and a sliding transition on cover clicks. Frame is now 2px. Protected smooth scrolling from the selected-prop layout effect and prevented focus handling from instantly recentering a clicked cover. Reduced-motion preferences still position instantly. `Components/Reading Widget Click Slides` samples intermediate scroll positions as a regression check.
+
+15 November interaction decision: user approved renaming “I read today” to “Update Progress” and tapping any cover to open its progress dialog, with a required slide into the fixed frame first for off-center covers. `QuickBookCarousel` now waits for actual centering before activation (not a fixed delay), opens centered covers immediately, and cancels pending activation when browsing is interrupted. Swipe/drag/arrow navigation still browse only. Standalone widget stories now open a real sample-data ProgressDialog too. The reference board and Home use the same behavior; saves remain local simulations.
+
+15 November final layout refinements: user requested desktop navigation in the top bar centered beside the branding, grouped Current/Total page counts, and the goal ring closer to its text on wider portrait/tablet layouts. HomeShell now places its single navigation inside the header (centered grid at ≥1024px, second header row at 768–1023px, fixed bottom on phone). The PDF reference board explicitly keeps footer placement. Page-count groups use a 16px gap instead of space-between. Goal ring left offset is capped at 170px to prevent a growing gap on wide cards. Browser checked 390/834/1024/1440 widths, header centering/no overlap, grouped counts and no horizontal overflow.
 
 This update supersedes the historical statements below that the target design has not been supplied and Storybook is not installed.
 
