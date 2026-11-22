@@ -1,7 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useRef, useState, useEffect, useMemo, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
-import { BookOpen, ImagePlus, ScanBarcode, Search } from "lucide-react";
+import { BookOpen, ScanBarcode, Search } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   fetchBookByISBN,
@@ -9,6 +9,7 @@ import {
   type BookTitleSearchResult,
 } from "@/lib/bookLookup";
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
+import { CoverUploadField } from "@/components/redesign/CoverUploadField";
 import { Dialog } from "@/components/ui/dialog";
 import { BookLookupModeSwitch, BookFormTagField, mergeBookNames } from "@/components/redesign/BookFormFields";
 import { BookCover } from "@/components/reading-journal/BookCover";
@@ -131,7 +132,6 @@ export default function AddBookDialog({
   const [pendingSeriesSelectionId, setPendingSeriesSelectionId] = useState<string | null>(null);
   const [authorQuery, setAuthorQuery] = useState("");
   const [genreQuery, setGenreQuery] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const recommendationPrefillRef = useRef<string | null>(null);
   const recommendationGenresPrefillRef = useRef<string | null>(null);
   const catalogPrefillRef = useRef<string | null>(null);
@@ -285,9 +285,7 @@ export default function AddBookDialog({
     void applyCoverFromUrl(initialCatalogBook.coverUrl, initialCatalogBook.id, true);
   }, [initialCatalogBook, genres, open, setValue]);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function handleFileChange(file: File) {
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
@@ -297,7 +295,6 @@ export default function AddBookDialog({
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(null);
     setCoverPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleImportMethodChange(value: ImportMethod) {
@@ -828,13 +825,9 @@ export default function AddBookDialog({
 
               <div className="rj-book-form-primary">
                 <div className="rj-book-cover-editor">
-                  <label className="rj-book-cover-upload">
-                    <input type="file" accept="image/*" className="sr-only" aria-label="Book cover" ref={fileInputRef} onChange={handleFileChange} />
-                    <BookCover src={coverPreview} title={watch("title") || "New book"} decorative />
-                    <span><ImagePlus size={18} aria-hidden="true" />{coverPreview ? "Change cover" : "Add cover"}</span>
-                  </label>
+                  <CoverUploadField id="cover-upload" label="Book cover" shape="cover" preview={coverPreview}
+                    fileName={coverFile?.name} onFileChange={handleFileChange} />
                   {coverPreview && <Button type="button" variant="ghost" onClick={clearCoverSelection}>Remove cover</Button>}
-                  {coverFile && <p className="rj-book-form-hint truncate">{coverFile.name}</p>}
                 </div>
                 <div className="rj-book-form-identity">
                   <div className="rj-book-form-field">

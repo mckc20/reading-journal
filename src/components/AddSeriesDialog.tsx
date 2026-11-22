@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { ImagePlus, Layers } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Layers } from "lucide-react";
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
+import { CoverUploadField } from "@/components/redesign/CoverUploadField";
 import { Dialog } from "@/components/ui/dialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import type { AddBookDialogLaunchOptions } from "@/components/AppLayout";
@@ -38,7 +39,6 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
   const { user } = useAuth();
   const { addSeries, editSeries } = useSeries();
   const { books, updateBookSeriesPlacement } = useBooksContext();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -66,9 +66,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
     setSaving(false);
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function handleFileChange(file: File) {
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
@@ -211,35 +209,8 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="series-cover">Banner image</Label>
-                  <label
-                    htmlFor="series-cover"
-                    className="rj-creation-upload group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
-                  >
-                    {coverPreview ? (
-                      <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <ImagePlus className="h-6 w-6" />
-                        <span className="text-xs">Click to upload</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                      <ImagePlus className="h-5 w-5 text-white" />
-                    </div>
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    id="series-cover"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleFileChange}
-                  />
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-xs text-muted-foreground">
-                      {coverFile ? coverFile.name : "PNG, JPG, WEBP, or AVIF."}
-                    </p>
-                  </div>
+                  <CoverUploadField id="series-cover" label="Banner image" shape="banner" preview={coverPreview}
+                    fileName={coverFile?.name} onFileChange={handleFileChange} />
                 </div>
 
                 <div className="space-y-1.5">

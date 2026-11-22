@@ -13,6 +13,7 @@
 .rj-creation-book-scroll [data-slot='scroll-area-viewport'] { overscroll-behavior: contain; }
 .rj-creation-book-fields { padding: 24px; }
 .rj-creation-upload { border-radius: 14px; box-shadow: none; }
+.rj-creation-upload:has(input:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
 .rj-creation-dialog .rj-book-form-heading [data-slot='button'],
 .rj-creation-actions [data-slot='button'] { min-height: 44px; }
 .rj-creation-dialog .rj-book-form-close { width: 44px; }
