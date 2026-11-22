@@ -1,5 +1,5 @@
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
-import QuoteBlock from "@/components/QuoteBlock";
+import QuoteBlock, { ClosingQuoteMark } from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntryTags, type JournalTimelineEntry } from "@/lib/journal";
 import { visibleJournalTags } from "@/lib/journalTags";
@@ -28,7 +28,7 @@ export function JournalEntryDate({ date }: { date: string }) {
   return <time dateTime={date} className="mb-2 block text-xs text-muted-foreground">{formatJournalDate(date)}</time>;
 }
 
-export function JournalEntryExcerpt({ markdown }: { markdown: string }) {
+export function JournalEntryExcerpt({ markdown, quote = false }: { markdown: string; quote?: boolean }) {
   const text = useMemo(() => {
     const template = document.createElement("template");
     const html = renderNoteMarkdownToHtml(markdown);
@@ -37,7 +37,11 @@ export function JournalEntryExcerpt({ markdown }: { markdown: string }) {
   }, [markdown]);
 
   if (!text) return null;
-  return <p className="line-clamp-3 whitespace-pre-line break-words text-[13px] leading-5">{text}</p>;
+  return (
+    <p className="line-clamp-3 whitespace-pre-line break-words text-[13px] leading-5">
+      {text}{quote && <ClosingQuoteMark />}
+    </p>
+  );
 }
 
 export function JournalEntryReadButton({ date, onRead }: {
@@ -119,7 +123,7 @@ export default function JournalEntryCard({ entry, date, onRead, actions, showTag
           className={cn(actions && "pr-8")}
           attribution={attributionForEntry(entry) ? `- ${attributionForEntry(entry)}` : null}
         >
-          <JournalEntryExcerpt markdown={contentForEntry(entry)} />
+          <JournalEntryExcerpt markdown={contentForEntry(entry)} quote />
         </QuoteBlock>
       ) : (
         <JournalEntryExcerpt markdown={contentForEntry(entry)} />

@@ -25,7 +25,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
-import { AppHeading } from "@/components/design";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import JournalEntryCard, { formatJournalDate, JournalEntryDate, JournalEntryExcerpt, JournalEntryReadButton } from "@/components/JournalEntryCard";
@@ -1394,12 +1393,10 @@ function JournalEntryBacklinks({ backlinks }: { backlinks: JournalBacklink[] }) 
 function NotebookEntryContent({
   entry,
   compact = false,
-  showTitle = true,
   textClassName = "text-sm leading-6",
 }: {
   entry: ManualJournalTimelineEntry;
   compact?: boolean;
-  showTitle?: boolean;
   textClassName?: string;
 }) {
   const note = getManualNote(entry);
@@ -1407,7 +1404,7 @@ function NotebookEntryContent({
   const media = getManualNoteMedia(entry);
   const content = compact ? (
     <>
-      <JournalEntryExcerpt markdown={note.content} />
+      <JournalEntryExcerpt markdown={note.content} quote={entry.type === "passage"} />
       {media.length > 0 && (
         <JournalEntryMediaContent
           markdown=""
@@ -1445,7 +1442,7 @@ function NotebookEntryContent({
 
   return (
     <div className="space-y-2">
-      {showTitle && title && <AppHeading level={4} as="h3" className={compact ? "text-sm" : undefined}>{title}</AppHeading>}
+      {title && <p className={cn("font-medium", textClassName)}>{title}</p>}
       {content}
     </div>
   );
@@ -1454,7 +1451,6 @@ function NotebookEntryContent({
 function NotebookEntryMeta({ entry, parentContextLabel }: { entry: JournalTimelineEntry; parentContextLabel?: string | null }) {
   const note = isManualEntry(entry) ? getManualNote(entry) : null;
   const details = [
-    entryPage(entry),
     parentContextLabel ? `with ${parentContextLabel}` : null,
     isBookJournalEntryRecordEntry(entry) && entry.relatedBookTitle && entry.relatedContext ? entry.relatedBookTitle : null,
   ].filter((detail): detail is string => Boolean(detail));
@@ -2122,7 +2118,7 @@ export default function JournalTimeline({
   const [searchParams, setSearchParams] = useSearchParams();
   const [readingEntry, setReadingEntry] = useState<JournalTimelineEntry | null>(null);
   const [readerOpen, setReaderOpen] = useState(false);
-  const readerTitleRef = useRef<HTMLHeadingElement>(null);
+  const readerContentRef = useRef<HTMLDivElement>(null);
   const readerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(Boolean(selectedEntryId));
   const [editingEntry, setEditingEntry] = useState<ManualJournalTimelineEntry | null>(null);
@@ -3343,7 +3339,7 @@ export default function JournalTimeline({
           className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
-            readerTitleRef.current?.focus();
+            readerContentRef.current?.focus({ preventScroll: true });
           }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -3352,30 +3348,33 @@ export default function JournalTimeline({
         >
           {readingEntry && (
             <>
-              <header className="shrink-0 border-b px-5 py-4 pr-12">
-                <DialogTitle ref={readerTitleRef} tabIndex={-1} className="break-words">
-                  {displayEntryTitle(readingEntry) ?? (readingEntry.type === "passage" ? "Quote" : "Journal entry")}
-                </DialogTitle>
-                <DialogDescription className="mt-1 text-xs">
-                  {formatJournalDate(entryDate(readingEntry))}
-                </DialogDescription>
-              </header>
+              <DialogTitle className="sr-only">{readingEntry.type === "passage" ? "Quote" : "Journal entry"}</DialogTitle>
               <div
-                className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4 [overflow-wrap:anywhere]"
+                ref={readerContentRef}
+                tabIndex={-1}
+                className="min-h-0 overflow-y-auto overscroll-contain p-5 outline-none [overflow-wrap:anywhere]"
                 onClickCapture={(event) => {
                   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
                   const href = event.target instanceof Element ? event.target.closest("a")?.getAttribute("href") : null;
                   if (href?.startsWith("/") && !href.startsWith("//")) setReaderOpen(false);
                 }}
               >
+                <DialogDescription asChild>
+                  <time dateTime={entryDate(readingEntry)} className="mb-2 block pr-8 text-[11px] font-semibold tracking-widest uppercase">
+                    {formatJournalDate(entryDate(readingEntry))}
+                  </time>
+                </DialogDescription>
                 {isManualEntry(readingEntry) ? (
                   <>
-                    <NotebookEntryContent entry={readingEntry} showTitle={false} textClassName={readerTextClassName} />
+                    <NotebookEntryContent entry={readingEntry} textClassName={readerTextClassName} />
                     <NotebookEntryMeta entry={readingEntry} parentContextLabel={parentContextLabelsByEntryId.get(readingEntry.id)} />
                     <JournalEntryBacklinks backlinks={backlinksByPublicId.get(getJournalEntryPublicId(readingEntry) ?? "") ?? []} />
                   </>
                 ) : (
-                  <FormattedNoteContent markdown={readingText} className={readerTextClassName} />
+                  <div className="space-y-2">
+                    <p className={cn("font-medium", readerTextClassName)}>{displayEntryTitle(readingEntry)}</p>
+                    <FormattedNoteContent markdown={readingText} className={readerTextClassName} />
+                  </div>
                 )}
               </div>
             </>

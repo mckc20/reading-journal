@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Calendar, CalendarClock, ChevronRight, Clock, type LucideIcon } from "lucide-react";
+import { Calendar, CalendarClock, ChevronRight, Clock, Flag, Hourglass, type LucideIcon } from "lucide-react";
 import ProgressOverTimeChart, { type ProgressOverTimeChartMode } from "@/components/ProgressOverTimeChart";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   parseLocalDateOnly,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
+import { cn } from "@/lib/utils";
 import type { Book, ReadingLog } from "@/types";
 
 const chartModes = [
@@ -55,11 +56,27 @@ function ReadingStat({
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+const statTones = {
+  date: "bg-primary/12 text-primary",
+  time: "bg-note/15 text-note",
+  estimate: "bg-insight/15 text-insight",
+};
+
+function StatRow({ icon: Icon, tone, label, value }: {
+  icon: LucideIcon;
+  tone: keyof typeof statTones;
+  label: string;
+  value: string;
+}) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+    <div className="relative grid min-h-16 content-center gap-1 rounded-xl bg-card py-3 pr-3 pl-16">
+      <dt className="text-xs text-muted-foreground">
+        <span aria-hidden="true" className={cn("absolute top-1/2 left-3 grid size-10 -translate-y-1/2 place-items-center rounded-lg", statTones[tone])}>
+          <Icon className="size-5" />
+        </span>
+        {label}
+      </dt>
+      <dd className="text-base font-semibold leading-snug">{value}</dd>
     </div>
   );
 }
@@ -134,24 +151,26 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
     <div className="min-w-0 space-y-6">
       <div className="rj-reading-stats">
         <ReadingStat icon={Calendar} label="Started on" value={startedOn}>
-          <dl className="divide-y text-sm">
-            <StatRow label="Started on" value={startedOn} />
-            <StatRow label="Reading time" value={readingTime} />
-            <StatRow label="Reading duration" value={duration.span ? formatCalendarSpan(duration.span) : "Not available"} />
-            {book.date_finished && <StatRow label="Finished on" value={formatDate(parseLocalDateOnly(book.date_finished))} />}
+          <dl className="space-y-2">
+            <StatRow icon={Calendar} tone="date" label="Started on" value={startedOn} />
+            <StatRow icon={Clock} tone="time" label="Reading time" value={readingTime} />
+            <StatRow icon={CalendarClock} tone="date" label="Reading duration" value={duration.span ? formatCalendarSpan(duration.span) : "Not available"} />
+            {book.date_finished && <StatRow icon={Flag} tone="date" label="Finished on" value={formatDate(parseLocalDateOnly(book.date_finished))} />}
           </dl>
         </ReadingStat>
         <ReadingStat icon={Clock} label="Reading time" value={readingTime}>
-          <dl className="text-sm">
-            <StatRow label="Total logged reading time" value={readingTime} />
+          <dl>
+            <StatRow icon={Clock} tone="time" label="Total logged reading time" value={readingTime} />
           </dl>
           <ReadingLogDetails logs={logs} />
         </ReadingStat>
         {showEstimate && (
           <ReadingStat icon={CalendarClock} label="Estimated finish" value={finishDate}>
-            <dl className="divide-y text-sm">
-              <StatRow label="Estimated finish" value={finishDate} />
+            <dl className="space-y-2">
+              <StatRow icon={Flag} tone="estimate" label="Estimated finish" value={finishDate} />
               <StatRow
+                icon={Hourglass}
+                tone="time"
                 label="Reading time left"
                 value={estimate.remainingMinutes !== null
                   ? formatTotalReadingTime(estimate.remainingMinutes)

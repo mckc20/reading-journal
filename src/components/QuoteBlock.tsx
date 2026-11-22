@@ -12,6 +12,10 @@ interface QuoteBlockProps {
   markClassName?: string;
 }
 
+export function ClosingQuoteMark() {
+  return <span data-quote-closing aria-hidden="true">{"\u2060”"}</span>;
+}
+
 export default function QuoteBlock({
   children,
   attribution,
@@ -27,25 +31,24 @@ export default function QuoteBlock({
   useLayoutEffect(() => {
     const markdownBlocks = contentRef.current?.querySelectorAll(".journal-markdown");
     const markdown = markdownBlocks?.[markdownBlocks.length - 1];
-    let target = markdown?.lastElementChild ?? null;
-    // Place the mark inside the final text block, so formatted paragraphs and
-    // lists keep their layout while the mark flows directly after the text.
-    while (target?.lastElementChild && target.matches("ul, ol, blockquote, div") && !target.lastElementChild.hasAttribute("data-quote-closing")) {
-      target = target.lastElementChild;
+    if (!markdown) {
+      setClosingMarkTarget(null);
+      return;
     }
-    if (target?.matches("img, hr, br, input")) target = markdown ?? null;
-    setClosingMarkTarget(target);
+    // Find the last text block even if a list, image or divider ends the Markdown.
+    const walker = document.createTreeWalker(markdown, NodeFilter.SHOW_TEXT);
+    let text = walker.lastChild();
+    while (text && (!text.textContent?.trim() || text.parentElement?.closest("[data-quote-closing]"))) {
+      text = walker.previousNode();
+    }
+    setClosingMarkTarget(
+      text?.parentElement?.closest("p, li, td, th, pre, h1, h2, h3, h4, h5, h6, blockquote, div") ?? null,
+    );
   }, [children]);
 
   const quotationMarkClassName = cn(
     "font-serif text-4xl font-semibold leading-none text-primary",
     markClassName,
-  );
-
-  const closingMark = (
-    <span data-quote-closing aria-hidden="true" className={cn(quotationMarkClassName, "relative top-3 ml-5 inline-block align-top")}>
-      ”
-    </span>
   );
 
   return (
@@ -66,7 +69,7 @@ export default function QuoteBlock({
           )}
         >
           {children}
-          {closingMarkTarget ? createPortal(closingMark, closingMarkTarget) : closingMark}
+          {closingMarkTarget && createPortal(<ClosingQuoteMark />, closingMarkTarget)}
         </blockquote>
         {(attribution || actions) && (
           <figcaption
