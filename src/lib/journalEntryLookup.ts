@@ -6,7 +6,7 @@ import {
   sortJournalEntries,
   type JournalTimelineEntry,
 } from "@/lib/journal";
-import { extractJournalEntryPublicIds } from "@/lib/journalLinks";
+import { bookJournalHref, extractJournalEntryPublicIds } from "@/lib/journalLinks";
 import type {
   AuthorJournalEntryRecord,
   BookJournalEntryRecord,
@@ -69,7 +69,7 @@ export async function resolveJournalEntryByPublicId(publicId: string): Promise<R
     return {
       source: "book_note",
       record,
-      href: `/books/${encodeURIComponent(record.book_id)}/journal?entry=${encodeURIComponent(record.id)}`,
+      href: bookJournalHref(record.book_id, new URLSearchParams({ entry: record.id })),
     };
   }
 

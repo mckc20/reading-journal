@@ -9,8 +9,22 @@ import type { ReactNode } from "react";
 
 interface JournalEntryCardProps {
   entry: JournalTimelineEntry;
+  date: string;
   actions?: ReactNode;
   showTags?: boolean;
+}
+
+export function formatJournalDate(value: string): string {
+  const dateValue = value.includes("T") ? value : `${value}T00:00:00`;
+  return new Date(dateValue).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function JournalEntryDate({ date }: { date: string }) {
+  return <time dateTime={date} className="mb-2 block text-xs text-muted-foreground">{formatJournalDate(date)}</time>;
 }
 
 function titleForEntry(entry: JournalTimelineEntry): ReactNode {
@@ -50,7 +64,7 @@ function mediaForEntry(entry: JournalTimelineEntry) {
   return [];
 }
 
-export default function JournalEntryCard({ entry, actions, showTags = true }: JournalEntryCardProps) {
+export default function JournalEntryCard({ entry, date, actions, showTags = true }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
   const media = mediaForEntry(entry);
@@ -58,7 +72,7 @@ export default function JournalEntryCard({ entry, actions, showTags = true }: Jo
   return (
     <article
       className={cn(
-        "relative h-full rounded-lg border bg-background p-4",
+        "relative h-full rounded-lg bg-card p-4",
         actions ? "pr-24" : "pr-4",
       )}
     >
@@ -68,6 +82,7 @@ export default function JournalEntryCard({ entry, actions, showTags = true }: Jo
         </div>
       )}
 
+      <JournalEntryDate date={date} />
       {title && <h3 className="mb-3 pr-8 text-sm font-medium">{title}</h3>}
 
       {entry.type === "passage" ? (

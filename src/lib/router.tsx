@@ -1,7 +1,8 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
+import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { bookJournalHref } from "@/lib/journalLinks";
 
 // Load the signed-in app shell only after ProtectedRoute resolves the session.
 const AppLayout = lazy(() => import("@/components/AppLayout"));
@@ -35,7 +36,6 @@ const Genres = lazy(() => import("@/pages/Genres"));
 const AllGenres = lazy(() => import("@/pages/AllGenres"));
 const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
-const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
 const Changelog = lazy(() => import("@/pages/Changelog"));
 const Help = lazy(() => import("@/pages/Help"));
 const WrapUpsHelp = lazy(() => import("@/pages/WrapUpsHelp"));
@@ -59,6 +59,12 @@ function NotFound() {
 function RedirectTo({ to, preserveSearch = false }: { to: string; preserveSearch?: boolean }) {
   const location = useLocation();
   return <Navigate to={`${to}${preserveSearch ? location.search : ""}`} replace />;
+}
+
+function RedirectBookJournal() {
+  const { bookId } = useParams<{ bookId: string }>();
+  const { search } = useLocation();
+  return <Navigate to={bookId ? bookJournalHref(bookId, new URLSearchParams(search)) : "/library"} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -114,8 +120,8 @@ export const router = createBrowserRouter([
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/books/:bookId/analytics", element: <Navigate to=".." relative="path" replace /> },
-          { path: "/books/:bookId/journal", element: lazyRoute(<BookAnnotations />) },
-          { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
+          { path: "/books/:bookId/journal", element: <RedirectBookJournal /> },
+          { path: "/books/:bookId/annotations", element: <RedirectBookJournal /> },
           { path: "/changelog", element: lazyRoute(<Changelog />) },
           { path: "/help", element: lazyRoute(<Help />) },
           { path: "/help/wrap-ups", element: lazyRoute(<WrapUpsHelp />) },

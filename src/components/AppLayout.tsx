@@ -1,5 +1,5 @@
 import LoadingDialog from "@/components/LoadingDialog";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -56,6 +56,7 @@ const addActions = [
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
   openAddBook: (options?: AddBookDialogLaunchOptions) => void;
+  openAddJournalEntry: (options?: AddJournalEntryLaunchOptions, trigger?: HTMLElement) => void;
   setDetailEditingOpen: (open: boolean) => void;
 }
 
@@ -69,6 +70,8 @@ export interface AddBookDialogLaunchOptions {
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
 }
+
+type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "initialBookId" | "initialTags" | "onSaved">;
 
 type NavLink = {
   to: string;
@@ -106,6 +109,7 @@ function AppLayoutContent() {
   const isBookDetail = Boolean(useMatch("/books/:bookId"));
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
+  const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
   const [activeAddAction, setActiveAddAction] = useState<Exclude<AddAction, "book"> | null>(null);
   const [detailEditingOpen, setDetailEditingOpen] = useState(false);
   const addDialogStillOpen = useRef(false);
@@ -114,12 +118,22 @@ function AppLayoutContent() {
     addDialogStillOpen.current = addBookOpen || activeAddAction !== null;
   }, [addBookOpen, activeAddAction]);
 
-  function rememberDialogOpener() {
+  const rememberDialogOpener = useCallback((trigger?: HTMLElement) => {
+    if (trigger) {
+      dialogReturnFocus.current = trigger;
+      return;
+    }
     const active = document.activeElement;
     // When one add form launches another, keep the opener outside the closing dialog.
     if (active instanceof HTMLElement && active.closest('[role="dialog"]') && dialogReturnFocus.current?.isConnected) return;
     dialogReturnFocus.current = active instanceof HTMLElement ? active : null;
-  }
+  }, []);
+
+  const openAddJournalEntry = useCallback((options?: AddJournalEntryLaunchOptions, trigger?: HTMLElement) => {
+    rememberDialogOpener(trigger);
+    setJournalEntryOptions(options);
+    setActiveAddAction("entry");
+  }, [rememberDialogOpener]);
 
   function restoreAddDialogFocus(event: Event) {
     // The loaded form must return to the original opener, not the removed loading shell.
@@ -177,6 +191,8 @@ function AppLayoutContent() {
     if (action === "book") {
       setAddBookOptions(undefined);
       setAddBookOpen(true);
+    } else if (action === "entry") {
+      openAddJournalEntry(undefined, trigger);
     } else {
       setActiveAddAction(action);
     }
@@ -197,6 +213,7 @@ function AppLayoutContent() {
           <Outlet context={{
             onAddBookClick: () => openAddBook(),
             openAddBook,
+            openAddJournalEntry,
             setDetailEditingOpen,
           } satisfies AppLayoutOutletContext} />
         </main>
@@ -245,10 +262,20 @@ function AppLayoutContent() {
         )}
         {activeAddAction === "entry" && (
           <AddJournalEntryDialog
+            {...journalEntryOptions}
             onCloseAutoFocus={restoreAddDialogFocus}
             open
-            onOpenChange={(open) => !open && setActiveAddAction(null)}
-            onSubmitSaved={(entry) => navigate(entry.public_id ? `/journal/${entry.public_id}` : "/library/journal")}
+            onOpenChange={(open) => {
+              if (!open) {
+                setActiveAddAction(null);
+                setJournalEntryOptions(undefined);
+              }
+            }}
+            onSubmitSaved={(entry) => {
+              if (!journalEntryOptions?.onSaved) {
+                navigate(entry.public_id ? `/journal/${entry.public_id}` : "/library/journal");
+              }
+            }}
           />
         )}
       </Suspense>

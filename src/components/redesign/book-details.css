@@ -105,7 +105,6 @@
 .rj-detail-empty { padding: 28px 18px; text-align: center; background: var(--card); border-radius: 20px; }
 .rj-detail-empty svg { margin: 0 auto 12px; color: var(--muted-foreground); }
 .rj-detail-empty [data-slot='button'] { margin-top: 16px; }
-.rj-detail-journal .rj-detail-journal-preview { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 768px) {
   .rj-detail-hero { grid-template-columns: minmax(240px, .85fr) minmax(0, 1.15fr); gap: 40px; align-items: center; }
   .rj-detail-cover-stage { padding: 68px 32px 0; }

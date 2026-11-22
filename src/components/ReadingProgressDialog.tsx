@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { notifyBookFinished } from "@/lib/confetti";
-import type { Book } from "@/types";
+import type { Book, BookJournalEntryRecord } from "@/types";
 import "@/components/redesign/redesign.css";
 
 // The panel includes the journal editor; fetch it only when the dialog opens.
@@ -18,6 +18,7 @@ interface ReadingProgressDialogProps {
   book: Book;
   trigger?: ReactNode;
   onProgressSaved: (newCurrentPage: number) => Promise<void> | void;
+  onJournalEntrySaved?: (entry: BookJournalEntryRecord) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
@@ -27,6 +28,7 @@ export default function ReadingProgressDialog({
   book,
   trigger,
   onProgressSaved,
+  onJournalEntrySaved,
   open,
   onOpenChange,
   onCloseAutoFocus,
@@ -60,6 +62,7 @@ export default function ReadingProgressDialog({
             book={book}
             onSavingChange={setSaving}
             onEntryComposerOpenChange={setEntryComposerOpen}
+            onJournalEntrySaved={onJournalEntrySaved}
             onCancel={() => handleOpenChange(false)}
             onProgressSaved={async (newPage) => {
               const totalPages = book.total_pages ?? 0;

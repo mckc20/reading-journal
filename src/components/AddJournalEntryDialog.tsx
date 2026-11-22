@@ -441,7 +441,11 @@ export function JournalEntryForm({
     setAutosaveError(null);
     setMediaItems(initialEntry?.media ?? []);
     setMediaError(null);
-    reset(draft ? { ...initialValues, ...draft } : initialValues);
+    reset(draft ? {
+      ...initialValues,
+      ...draft,
+      bookId: !initialEntry && initialBookId ? initialBookId : draft.bookId,
+    } : initialValues);
     const timeoutId = window.setTimeout(() => {
       draftSaveReadyRef.current = true;
       autosaveReadyRef.current = true;

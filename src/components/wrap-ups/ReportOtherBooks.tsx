@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import ReportBookFeature from './ReportBookFeature';
 import ReportJournalEntryPreview from './ReportJournalEntryPreview';
 import { bookMonthContext, featuredJournalEntry } from '@/lib/wrapUpPresentation';
+import { bookJournalHref } from '@/lib/journalLinks';
 import type { MonthlyReport } from '@/lib/wrapUpReports';
 
 export default function ReportOtherBooks({ report }: { report: MonthlyReport }) {
@@ -43,8 +44,8 @@ export default function ReportOtherBooks({ report }: { report: MonthlyReport }) 
                       {' '}
                       <Link
                         to={item.journalEntries.length === 1 && entry
-                          ? `/books/${item.book.id}/journal?entry=${encodeURIComponent(entry.id)}`
-                          : `/books/${item.book.id}/journal`}
+                          ? bookJournalHref(item.book.id, new URLSearchParams({ entry: entry.id }))
+                          : bookJournalHref(item.book.id)}
                         className="ml-2 inline-block rounded-sm text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {item.journalEntries.length === 1 ? 'Show entry' : 'Show all entries'}

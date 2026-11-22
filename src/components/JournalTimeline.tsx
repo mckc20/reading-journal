@@ -28,7 +28,7 @@ import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import { AppHeading } from "@/components/design";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
-import JournalEntryCard from "@/components/JournalEntryCard";
+import JournalEntryCard, { formatJournalDate, JournalEntryDate } from "@/components/JournalEntryCard";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,7 @@ interface JournalTimelineProps {
   layout?: "timeline" | "cards" | "list";
   sortMode?: "entry-date" | "date-added" | "book-progress";
   selectedEntryId?: string | null;
+  initialEntryLimit?: number;
   previewMode?: {
     getEntryHref: (entry: JournalTimelineEntry) => string;
   };
@@ -123,16 +124,6 @@ type PendingDeleteTarget =
   | { type: "entry"; entry: ManualJournalTimelineEntry }
   | { type: "note"; entry: ManualJournalTimelineEntry };
 type PendingRelationshipAction = { type: "unattach"; entry: ManualJournalTimelineEntry };
-
-function formatJournalDate(value: string): string {
-  const dateValue = value.includes("T") ? value : `${value}T00:00:00`;
-
-  return new Date(dateValue).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function formatJournalTime(value: string): string {
   const dateValue = value.includes("T") ? value : `${value}T00:00:00`;
@@ -1341,11 +1332,11 @@ function ListJournalEntry({
   return (
     <article
       className={cn(
-        "group/notebook relative border-b border-border/60 py-6 last:border-b-0",
-        indented && "ml-6 border-l border-border/60 pl-5",
+        "group/notebook relative min-w-0 rounded-xl bg-card p-4",
+        indented && "ml-6",
       )}
     >
-      <div className="absolute right-0 top-5 z-10 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/notebook:opacity-100 sm:group-focus-within/notebook:opacity-100">
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/notebook:opacity-100 sm:group-focus-within/notebook:opacity-100">
         <TimelineTopActions
           entry={entry}
           busy={busy}
@@ -1361,7 +1352,8 @@ function ListJournalEntry({
           allowAttach={allowAttach}
         />
       </div>
-      <div className="pr-16">
+      <div className="min-w-0 break-words pr-16">
+        <JournalEntryDate date={entryDate(entry)} />
         <NotebookEntryContent entry={entry} />
         <NotebookEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
         <JournalEntryBacklinks backlinks={backlinks} />
@@ -2094,6 +2086,7 @@ export default function JournalTimeline({
   layout = "timeline",
   sortMode = "entry-date",
   selectedEntryId = null,
+  initialEntryLimit,
   previewMode,
   inlineComposer,
   onEntryUpdated,
@@ -2103,6 +2096,7 @@ export default function JournalTimeline({
 }: JournalTimelineProps) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showAllEntries, setShowAllEntries] = useState(Boolean(selectedEntryId));
   const [editingEntry, setEditingEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [composerParentEntry, setComposerParentEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [generatedComposerTarget, setGeneratedComposerTarget] = useState<GeneratedNoteTarget | null>(null);
@@ -2147,31 +2141,6 @@ export default function JournalTimeline({
     return expandedEntries;
   }, [optimisticUncompressedReadingLogIds, visibleEntries]);
   const entity = entries[0] ? { type: entries[0].entityType, id: entries[0].entityId } : null;
-
-  useEffect(() => {
-    const parentEntries = visibleEntries.filter((entry): entry is ManualJournalTimelineEntry => (
-      isManualEntry(entry) && !isReplyEntry(entry)
-    ));
-
-    if (parentEntries.length === 0) {
-      setTimelineRepliesByParentId({});
-      return;
-    }
-
-    let cancelled = false;
-    Promise.all(parentEntries.map((entry) => fetchRepliesForEntry(entry).then((replies) => [entry.sourceId, replies] as const)))
-      .then((results) => {
-        if (cancelled) return;
-        setTimelineRepliesByParentId(Object.fromEntries(results));
-      })
-      .catch(() => {
-        if (!cancelled) setTimelineRepliesByParentId({});
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [visibleEntries]);
 
   useEffect(() => {
     if (!entity) {
@@ -2229,6 +2198,44 @@ export default function JournalTimeline({
     });
     return { visible, hidden };
   }, [displayEntries, generatedAttachmentTagsInTimeline, hiddenEntries, sortMode]);
+  const listEntries = useMemo(() => {
+    if (layout !== "list") return [];
+    return groupJournalEntriesByDate(splitEntries.visible)
+      .flatMap(group => group.entries)
+      .filter(isManualEntry);
+  }, [layout, splitEntries.visible]);
+  const renderedListEntries = useMemo(() => (
+    initialEntryLimit === undefined || showAllEntries || selectedEntryId
+      ? listEntries
+      : listEntries.slice(0, initialEntryLimit)
+  ), [initialEntryLimit, listEntries, selectedEntryId, showAllEntries]);
+  const entriesForReplies = layout === "list" && initialEntryLimit !== undefined ? renderedListEntries : visibleEntries;
+
+  useEffect(() => {
+    const parentEntries = entriesForReplies.filter((entry): entry is ManualJournalTimelineEntry => (
+      isManualEntry(entry) && !isReplyEntry(entry)
+    ));
+
+    if (parentEntries.length === 0) {
+      setTimelineRepliesByParentId({});
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all(parentEntries.map((entry) => fetchRepliesForEntry(entry).then((replies) => [entry.sourceId, replies] as const)))
+      .then((results) => {
+        if (cancelled) return;
+        setTimelineRepliesByParentId(Object.fromEntries(results));
+      })
+      .catch(() => {
+        if (!cancelled) setTimelineRepliesByParentId({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entriesForReplies]);
+
   function isEntryHidden(entry: JournalTimelineEntry): boolean {
     return hiddenEntries.has(getJournalVisibilityKey(getEntryVisibilityInput(entry)));
   }
@@ -2375,6 +2382,7 @@ export default function JournalTimeline({
       if (!target) return;
 
       consumedSelectedEntryIdRef.current = selectedEntryId;
+      if (initialEntryLimit !== undefined) setShowAllEntries(true);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
       target.focus({ preventScroll: true });
       showEntryHighlight(selectedEntryId);
@@ -2387,7 +2395,7 @@ export default function JournalTimeline({
     }, 100);
 
     return () => window.clearTimeout(timeoutId);
-  }, [searchParams, selectedEntryId, setSearchParams, splitEntries.visible]);
+  }, [initialEntryLimit, searchParams, selectedEntryId, setSearchParams, splitEntries.visible, timelineRepliesByParentId]);
 
   async function handleHide(entry: JournalTimelineEntry) {
     if (!user) return;
@@ -2879,12 +2887,10 @@ export default function JournalTimeline({
     return 0;
   }
 
-  const journalListGroups = layout === "list" ? groupJournalEntriesByDate(splitEntries.visible) : [];
-
   return (
     <>
-      {layout === "list" && splitEntries.visible.length > 0 ? (
-        <div className={cn("mr-auto max-w-5xl space-y-12", className)}>
+      {layout === "list" && listEntries.length > 0 ? (
+        <div className={cn("mr-auto max-w-5xl space-y-3", className)}>
           {inlineComposer && (
             <InlineJournalEntryComposer
               open={inlineComposer.open}
@@ -2896,106 +2902,100 @@ export default function JournalTimeline({
               onSaved={handleInlineComposerSaved}
             />
           )}
-          {journalListGroups.map((group) => (
-            <section key={group.dateKey} className="space-y-2">
-              <header className="border-b border-border/70 pb-3">
-                <AppHeading level={1} as="h2">
-                  {formatJournalDate(group.dateKey)}
-                </AppHeading>
-              </header>
-              <div>
-                {group.entries.map((entry) => {
-                  if (!isManualEntry(entry)) return null;
+          <div className="space-y-3">
+            {renderedListEntries.map((entry) => {
+              const timelineReplies = timelineRepliesByParentId[entry.sourceId] ?? [];
+              const composerOpen = composerParentEntry?.id === entry.id;
 
-                  const timelineReplies = timelineRepliesByParentId[entry.sourceId] ?? [];
-                  const composerOpen = composerParentEntry?.id === entry.id;
-
-                  return (
+              return (
+                <div
+                  key={entry.id}
+                  id={journalEntryElementId(entry.sourceId)}
+                  tabIndex={-1}
+                  className={cn(
+                    "scroll-mt-24 rounded-xl outline-none transition-shadow duration-500",
+                    entryHighlightClassName(entry.sourceId),
+                  )}
+                >
+                  {editingEntry?.sourceId === entry.sourceId ? (
+                    <InlineEditEntryComposer
+                      entry={entry}
+                      entryLinkTargets={journalLinkTargetsExcept(entry)}
+                      onCancel={() => setEditingEntry(null)}
+                      onSaved={(_editedEntry, note, options) => {
+                        handleEditingEntrySaved(note, options);
+                      }}
+                    />
+                  ) : (
+                    <ListJournalEntry
+                      entry={entry}
+                      busy={busyEntryId === entry.id}
+                      isHidden={isEntryHidden(entry)}
+                      attachedCount={attachedCountForEntry(entry)}
+                      backlinks={backlinksByPublicId.get(getJournalEntryPublicId(entry) ?? "") ?? []}
+                      onToggleSaved={(item) => void handleToggleSaved(item)}
+                      onReply={startReply}
+                      onAttach={startAttaching}
+                      onUnattach={requestUnattachNote}
+                      onToggleHidden={toggleEntryHidden}
+                      onEdit={startEditing}
+                      onDelete={requestTimelineDelete}
+                      parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
+                      allowAttach={(timelineRepliesByParentId[entry.sourceId]?.length ?? 0) === 0}
+                    />
+                  )}
+                  <InlineAddEntryComposer
+                    parentEntry={entry}
+                    open={composerOpen}
+                    entryLinkTargets={journalLinkTargets}
+                    onCancel={() => setComposerParentEntry(null)}
+                    onSaved={handleComposerEntrySaved}
+                  />
+                  {timelineReplies.map((reply) => (
                     <div
-                      key={entry.id}
-                      id={journalEntryElementId(entry.sourceId)}
+                      key={reply.id}
+                      id={journalEntryElementId(reply.sourceId)}
                       tabIndex={-1}
                       className={cn(
-                        "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
-                        entryHighlightClassName(entry.sourceId),
+                        "mt-2 scroll-mt-24 rounded-xl outline-none transition-shadow duration-500",
+                        entryHighlightClassName(reply.sourceId),
                       )}
                     >
-                      {editingEntry?.sourceId === entry.sourceId ? (
-                        <InlineEditEntryComposer
-                          entry={entry}
-                          entryLinkTargets={journalLinkTargetsExcept(entry)}
-                          onCancel={() => setEditingEntry(null)}
-                          onSaved={(_editedEntry, note, options) => {
-                            handleEditingEntrySaved(note, options);
-                          }}
+                      {editingReplyEntry?.id === reply.id ? (
+                        <InlineEditReplyComposer
+                          entry={reply}
+                          generatedParentEntry={null}
+                          entryLinkTargets={journalLinkTargetsExcept(reply)}
+                          onCancel={() => setEditingReplyEntry(null)}
+                          onSaved={handleReplyEditSaved}
                         />
                       ) : (
                         <ListJournalEntry
-                          entry={entry}
-                          busy={busyEntryId === entry.id}
-                          isHidden={isEntryHidden(entry)}
-                          attachedCount={attachedCountForEntry(entry)}
-                          backlinks={backlinksByPublicId.get(getJournalEntryPublicId(entry) ?? "") ?? []}
+                          entry={reply}
+                          busy={busyEntryId === reply.id}
+                          isHidden={isEntryHidden(reply)}
+                          backlinks={backlinksByPublicId.get(getJournalEntryPublicId(reply) ?? "") ?? []}
                           onToggleSaved={(item) => void handleToggleSaved(item)}
-                          onReply={startReply}
                           onAttach={startAttaching}
                           onUnattach={requestUnattachNote}
                           onToggleHidden={toggleEntryHidden}
                           onEdit={startEditing}
-                          onDelete={requestTimelineDelete}
-                          parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
-                          allowAttach={(timelineRepliesByParentId[entry.sourceId]?.length ?? 0) === 0}
+                          onDelete={requestNoteDelete}
+                          allowAttach
+                          indented
                         />
                       )}
-                      <InlineAddEntryComposer
-                        parentEntry={entry}
-                        open={composerOpen}
-                        entryLinkTargets={journalLinkTargets}
-                        onCancel={() => setComposerParentEntry(null)}
-                        onSaved={handleComposerEntrySaved}
-                      />
-                      {timelineReplies.map((reply) => (
-                        <div
-                          key={reply.id}
-                          id={journalEntryElementId(reply.sourceId)}
-                          tabIndex={-1}
-                          className={cn(
-                            "scroll-mt-24 rounded-sm outline-none transition-shadow duration-500",
-                            entryHighlightClassName(reply.sourceId),
-                          )}
-                        >
-                          {editingReplyEntry?.id === reply.id ? (
-                            <InlineEditReplyComposer
-                              entry={reply}
-                              generatedParentEntry={null}
-                              entryLinkTargets={journalLinkTargetsExcept(reply)}
-                              onCancel={() => setEditingReplyEntry(null)}
-                              onSaved={handleReplyEditSaved}
-                            />
-                          ) : (
-                            <ListJournalEntry
-                              entry={reply}
-                              busy={busyEntryId === reply.id}
-                              isHidden={isEntryHidden(reply)}
-                              backlinks={backlinksByPublicId.get(getJournalEntryPublicId(reply) ?? "") ?? []}
-                              onToggleSaved={(item) => void handleToggleSaved(item)}
-                              onAttach={startAttaching}
-                              onUnattach={requestUnattachNote}
-                              onToggleHidden={toggleEntryHidden}
-                              onEdit={startEditing}
-                              onDelete={requestNoteDelete}
-                              allowAttach
-                              indented
-                            />
-                          )}
-                        </div>
-                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          {initialEntryLimit !== undefined && listEntries.length > initialEntryLimit && (
+            <Button type="button" variant="outline" aria-expanded={showAllEntries} onClick={() => setShowAllEntries(!showAllEntries)}>
+              {showAllEntries ? "Show fewer" : "Show all"}
+            </Button>
+          )}
         </div>
       ) : splitEntries.visible.length > 0 ? (
         <div className={cn(layout === "cards" ? "grid gap-3 md:grid-cols-2" : "space-y-4", className)}>
@@ -3045,12 +3045,13 @@ export default function JournalTimeline({
                     to={previewMode.getEntryHref(entry)}
                     className="block h-full rounded-lg outline-none transition-colors hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <JournalEntryCard entry={entry} showTags={false} />
+                    <JournalEntryCard entry={entry} date={entryDate(entry)} showTags={false} />
                   </Link>
                 ) : (
                   <div className="relative h-full">
                     <JournalEntryCard
                       entry={entry}
+                      date={entryDate(entry)}
                       showTags
                       actions={
                         <JournalEntryActionsMenu

@@ -1,3 +1,4 @@
+import { bookJournalHref } from "@/lib/journalLinks";
 import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -53,7 +54,7 @@ export default function BookFinishedCelebration() {
   function addReview() {
     if (!bookId) return;
     setOpen(false);
-    navigate(`/books/${bookId}/journal?new=1&tag=review`);
+    navigate(bookJournalHref(bookId, new URLSearchParams({ new: "1", tag: "review" })));
   }
 
   return (

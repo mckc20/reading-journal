@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FormattedNoteContent from '@/components/FormattedNoteContent';
 import QuoteBlock from '@/components/QuoteBlock';
+import { bookJournalHref } from '@/lib/journalLinks';
 import type { ReportJournalEntry } from '@/lib/wrapUpReports';
 
 export default function ReportJournalEntryPreview({ entry }: { entry: ReportJournalEntry }) {
@@ -49,7 +50,7 @@ export default function ReportJournalEntryPreview({ entry }: { entry: ReportJour
       </div>
       {truncated && (
         <Link
-          to={`/books/${entry.book_id}/journal?entry=${encodeURIComponent(entry.id)}`}
+          to={bookJournalHref(entry.book_id, new URLSearchParams({ entry: entry.id }))}
           className="inline-block text-sm text-primary underline underline-offset-4"
         >Read full entry</Link>
       )}

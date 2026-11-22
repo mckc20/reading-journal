@@ -83,6 +83,7 @@ import { createSeriesJournalEntryRecord, fetchAllSeriesJournalEntryRecords } fro
 import { createAuthorJournalEntryRecord, fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
+import { bookJournalHref } from "@/lib/journalLinks";
 import type {
   Book,
   AuthorJournalEntryRecord,
@@ -1817,7 +1818,7 @@ export function GroupsManager() {
 
     if (attachment.note.source_type === "book") {
       const matchingBook = books.find((book) => book.id === attachment.note.source_id);
-      return matchingBook ? `/books/${matchingBook.id}/journal` : "/library";
+      return matchingBook ? bookJournalHref(matchingBook.id) : "/library";
     }
 
     if (attachment.note.source_type === "series") {
@@ -1839,7 +1840,7 @@ export function GroupsManager() {
 
     const messageId = noteImportMessage.id;
     const libraryHref = noteImportTargetKind === "book"
-      ? `/books/${noteImportTargetId}/journal`
+      ? bookJournalHref(noteImportTargetId)
       : noteImportTargetKind === "series"
         ? `/series/${noteImportTargetId}/journal`
         : `/authors/${encodeURIComponent(noteImportTargetId)}/journal`;

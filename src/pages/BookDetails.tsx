@@ -1,6 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -9,9 +10,8 @@ import {
   type TouchEvent,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
-  ArrowUpRight,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -71,9 +71,10 @@ import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
 import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
   bookJournalToJournalEntries,
-  isThoughtJournalEntry,
   sortJournalEntries,
+  type JournalTimelineEntry,
 } from "@/lib/journal";
+import { BOOK_JOURNAL_HASH } from "@/lib/journalLinks";
 import {
   formatPublicationDateForDisplay,
   formatPublicationDateInput,
@@ -254,8 +255,14 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const { bookId } = useParams<{ bookId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
+  const { openAddJournalEntry, setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedEntryId = searchParams.get("entry");
+  const wantsJournalEditor = searchParams.get("new") === "1";
+  const hasJournalAnchor = location.hash === BOOK_JOURNAL_HASH;
+  const addEntryButtonRef = useRef<HTMLButtonElement>(null);
+  const journalSectionRef = useRef<HTMLElement>(null);
   const { settings } = useUserSettings();
   const {
     books,
@@ -302,7 +309,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
-  const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
+  const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
@@ -386,7 +393,13 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         setJournalEntriesLoading(true);
         setJournalEntriesError(null);
         const data = await fetchBookJournalEntryRecords(currentBookId);
-        if (!cancelled) setJournalEntries(data);
+        if (!cancelled) {
+          // An entry saved while the initial request was pending takes precedence.
+          setJournalEntries((current) => sortBookJournalEntryRecords([
+            ...data.filter((note) => !current.some((saved) => saved.id === note.id)),
+            ...current,
+          ]));
+        }
       } catch (err) {
         if (!cancelled) setJournalEntriesError(err instanceof Error ? err.message : "Failed to load journal entries");
       } finally {
@@ -683,33 +696,51 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     void duplicateCurrentBook(resolved.options);
   }
 
-  const quoteJournalEntries = useMemo(
-    () =>
-      sortJournalEntries(
-        bookJournalToJournalEntries(journalEntries.filter((note) => note.label === "quote")).map((entry) => ({
-          ...entry,
-          relatedBookTitle: book?.title,
-        })),
-      ),
-    [book?.title, journalEntries],
-  );
-  const thoughtJournalEntries = useMemo(
-    () =>
-      sortJournalEntries(
-        bookJournalToJournalEntries(journalEntries.filter((note) => note.label === "note" || note.label === "review"))
-          .map((entry) => ({ ...entry, relatedBookTitle: book?.title }))
-          .filter(isThoughtJournalEntry),
-      ),
-    [book?.title, journalEntries],
-  );
   const visibleJournalEntries = useMemo(
-    () =>
-      sortJournalEntries([
-        ...quoteJournalEntries,
-        ...thoughtJournalEntries,
-      ]),
-    [quoteJournalEntries, thoughtJournalEntries],
+    () => sortJournalEntries(bookJournalToJournalEntries(journalEntries).map((entry) => ({
+      ...entry,
+      relatedBookTitle: book?.title,
+    }))),
+    [book?.title, journalEntries],
   );
+
+  const rememberSavedEntry = useCallback((entry: BookJournalEntryRecord) => {
+    if (entry.book_id !== bookId) return;
+    setJournalEntries((current) => {
+      const otherEntries = current.filter((note) => note.id !== entry.id);
+      if (entry.parent_entry_id) return otherEntries.length === current.length ? current : otherEntries;
+      return sortBookJournalEntryRecords([entry, ...otherEntries]);
+    });
+  }, [bookId]);
+
+  const launchJournalEditor = useCallback((trigger?: HTMLElement, initialTags?: string[]) => {
+    if (!bookId || !user) return;
+    openAddJournalEntry({
+      initialBookId: bookId,
+      initialTags,
+      onSaved: (entry) => { if ("book_id" in entry) rememberSavedEntry(entry); },
+    }, trigger);
+  }, [bookId, openAddJournalEntry, rememberSavedEntry, user]);
+
+  const journalAvailable = Boolean(book) && !loading && !error && !isEditMode;
+  useEffect(() => {
+    if (!journalAvailable || !wantsJournalEditor || !user) return;
+    launchJournalEditor(addEntryButtonRef.current ?? undefined, searchParams.get("tag") === "review" ? ["review"] : undefined);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("new");
+    next.delete("tag");
+    setSearchParams(next, { replace: true });
+  }, [journalAvailable, launchJournalEditor, searchParams, setSearchParams, user, wantsJournalEditor]);
+
+  useEffect(() => {
+    if (!journalAvailable || !hasJournalAnchor || selectedEntryId || wantsJournalEditor) return;
+    journalSectionRef.current?.scrollIntoView({ block: "start" });
+  }, [hasJournalAnchor, journalAvailable, selectedEntryId, wantsJournalEditor]);
+
+  function handleJournalTimelineChange(entry: JournalTimelineEntry) {
+    if (entry.source === "book_note") rememberSavedEntry(entry.bookJournalEntry);
+  }
 
   if (loading) {
     return (
@@ -991,6 +1022,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             ) : isReading ? (
               <ReadingProgressDialog
                 book={book}
+                onJournalEntrySaved={rememberSavedEntry}
                 open={isProgressDialogOpen}
                 onOpenChange={setIsProgressDialogOpen}
                 onProgressSaved={async (newPage) => {
@@ -1025,11 +1057,15 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                 {readingActionLabel}
               </Button>
             )}
-            <Button asChild type="button" variant="outline">
-              <Link to={`/books/${book.id}/journal?new=1`}>
-                <NotebookPen aria-hidden="true" />
-                Add entry
-              </Link>
+            <Button
+              ref={addEntryButtonRef}
+              type="button"
+              variant="outline"
+              disabled={!user}
+              onClick={(event) => launchJournalEditor(event.currentTarget)}
+            >
+              <NotebookPen aria-hidden="true" />
+              Add entry
             </Button>
           </div>
         </div>
@@ -1134,14 +1170,9 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           )}
         </section>
 
-        <section className="rj-detail-journal" aria-labelledby="book-detail-journal">
+        <section ref={journalSectionRef} id={BOOK_JOURNAL_HASH.slice(1)} className="scroll-mt-4" aria-labelledby="book-detail-journal-title">
           <div className="rj-detail-section-heading">
-            <h2 id="book-detail-journal">Journal</h2>
-            <Button asChild variant="ghost">
-              <Link to={`/books/${book.id}/journal`}>
-                Open journal <ArrowUpRight aria-hidden="true" />
-              </Link>
-            </Button>
+            <h2 id="book-detail-journal-title">Journal</h2>
           </div>
 
           {journalEntriesLoading ? (
@@ -1149,33 +1180,28 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           ) : journalEntriesError ? (
             <p className="text-sm text-destructive" role="alert">{journalEntriesError}</p>
           ) : visibleJournalEntries.length > 0 ? (
-            <>
-              <JournalTimeline
-                entries={visibleJournalEntries.slice(0, 1)}
-                layout="cards"
-                className="rj-detail-journal-preview"
-                previewMode={{
-                  getEntryHref: (entry) => `/books/${book.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
-                }}
-                emptyMessage="No journal entries yet."
-                onEntryUpdated={(entry) => {
-                  if (entry.source !== "book_note") return;
-                  setJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-                }}
-                onEntryDeleted={(entry) => {
-                  setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
-                }}
-              />
-              {visibleJournalEntries.length > 1 && (
-                <p className="rj-detail-entry-count">{visibleJournalEntries.length} journal entries</p>
-              )}
-            </>
+            <JournalTimeline
+              entries={visibleJournalEntries}
+              layout="list"
+              initialEntryLimit={hasJournalAnchor ? undefined : 3}
+              selectedEntryId={selectedEntryId}
+              onEntryUpdated={handleJournalTimelineChange}
+              onEntryCreated={handleJournalTimelineChange}
+              onEntryDeleted={(entry) => {
+                setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
+              }}
+            />
           ) : (
             <div className="rj-detail-empty">
               <NotebookPen aria-hidden="true" />
               <p>A place for your thoughts</p>
-              <Button asChild variant="outline" className="mt-4">
-                <Link to={`/books/${book.id}/journal?new=1`}>Write your first entry</Link>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!user}
+                onClick={(event) => launchJournalEditor(event.currentTarget)}
+              >
+                Write your first entry
               </Button>
             </div>
           )}

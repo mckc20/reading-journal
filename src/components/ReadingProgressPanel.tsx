@@ -15,6 +15,7 @@ const JournalEntryForm = lazy(() => import("@/components/AddJournalEntryDialog")
 interface ReadingProgressPanelProps {
   book: Book;
   onProgressSaved: (newCurrentPage: number) => Promise<void>;
+  onJournalEntrySaved?: (entry: BookJournalEntryRecord) => void;
   onCancel: () => void;
   onEntryComposerOpenChange: (open: boolean) => void;
   onSavingChange: (saving: boolean) => void;
@@ -42,7 +43,7 @@ async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: 
 }
 
 export default function ReadingProgressPanel({
-  book, onProgressSaved, onCancel, onEntryComposerOpenChange, onSavingChange,
+  book, onProgressSaved, onJournalEntrySaved, onCancel, onEntryComposerOpenChange, onSavingChange,
 }: ReadingProgressPanelProps) {
   const { user } = useAuth();
   const errorId = useId();
@@ -98,7 +99,8 @@ export default function ReadingProgressPanel({
         setPendingLog(readingLog);
       }
       if (savedProgressNote) {
-        await attachNoteToReadingLog(savedProgressNote, readingLog);
+        const updatedNote = await attachNoteToReadingLog(savedProgressNote, readingLog);
+        onJournalEntrySaved?.(updatedNote);
         setSavedProgressNote(null);
       }
       await onProgressSaved(readingLog.current_page);
@@ -166,7 +168,12 @@ export default function ReadingProgressPanel({
                       heading="Add entry"
                       hideEntitySelector
                       onCancel={() => toggleNoteEditor(false)}
-                      onSaved={note => { if ("book_id" in note) setSavedProgressNote(note); }}
+                      onSaved={note => {
+                        if ("book_id" in note) {
+                          setSavedProgressNote(note);
+                          onJournalEntrySaved?.(note);
+                        }
+                      }}
                       onSubmitSaved={() => toggleNoteEditor(false)}
                     />
                   </Suspense>

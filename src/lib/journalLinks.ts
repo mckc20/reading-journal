@@ -59,6 +59,13 @@ export function journalRouteForPublicId(publicId: string): string {
   return `/journal/${encodeURIComponent(publicId)}`;
 }
 
+export const BOOK_JOURNAL_HASH = "#book-detail-journal";
+
+export function bookJournalHref(bookId: string, params?: URLSearchParams): string {
+  const path = `/books/${encodeURIComponent(bookId)}`;
+  return params?.size ? `${path}?${params}` : `${path}${BOOK_JOURNAL_HASH}`;
+}
+
 export function extractJournalEntryPublicIds(markdown: string): string[] {
   const ids = new Set<string>();
   const linkPattern = /\[[^\]\n]+]\(([^)\s]+)\)/g;
