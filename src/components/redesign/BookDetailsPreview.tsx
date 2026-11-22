@@ -81,7 +81,12 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
           <BookCover className="rj-detail-cover" src={book.cover} title={book.title} paused={book.status === 'Paused'} showFallbackTitle />
         </div>
         <div className="rj-detail-summary">
-          <div className="rj-detail-title-row"><h1 id={`${id}-title`}>{book.title}</h1><Button variant="ghost" size="icon-lg" aria-label={book.favorite ? 'Remove from Favorites' : 'Add to Favorites'} aria-pressed={!!book.favorite} onClick={onToggleFavorite}><Heart aria-hidden="true" className={book.favorite ? 'size-[26px] fill-favorite text-favorite' : 'size-[26px]'} /></Button></div>
+          <div className="rj-detail-title-row">
+            <Button variant="ghost" size="icon-lg" aria-label={book.favorite ? 'Remove from Favorites' : 'Add to Favorites'} aria-pressed={!!book.favorite} onClick={onToggleFavorite}>
+              <Heart aria-hidden="true" className={book.favorite ? 'size-[22px] fill-favorite text-favorite' : 'size-[22px]'} />
+            </Button>
+            <h1 id={`${id}-title`}>{book.title}</h1>
+          </div>
           <p className="rj-detail-author">{book.author}</p>
           <div className="rj-detail-status-row"><BookStatus status={book.status} />{book.rating != null && <div className="rj-detail-rating"><BookRating rating={book.rating} /><span aria-hidden="true">{book.rating} / 5</span></div>}</div>
           <div className="rj-detail-position"><p aria-label="Reading position">{book.currentPage}{book.totalPages && book.totalPages > 0 ? ` / ${book.totalPages}` : ''} pages</p>{progress != null && <span>{progress}%</span>}</div>
