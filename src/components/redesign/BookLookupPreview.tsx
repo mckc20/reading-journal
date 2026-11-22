@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BookCover } from '@/components/reading-journal/BookCover';
+import { BookLookupModeSwitch } from './BookFormFields';
 import type { BookLookupMode, BookLookupResult } from './bookFormTypes';
 
 export function BookLookupPreview({ onLookup, onScanISBN, onApply, onBusyChange }: {
@@ -48,7 +49,7 @@ export function BookLookupPreview({ onLookup, onScanISBN, onApply, onBusyChange 
     finally { if (request === sequence.current) { setBusy(false); onBusyChange(false); } }
   }
   return <section className="rj-book-lookup" aria-label="Find book details">
-    <fieldset className="rj-lookup-modes"><legend>Search by</legend>{(['isbn', 'title'] as const).map(value => <label key={value}><input type="radio" name={`${id}-mode`} checked={mode === value} onChange={() => { reset(); setMode(value); setQuery(''); }} />{value === 'isbn' ? 'ISBN' : 'Book title'}</label>)}</fieldset>
+    <BookLookupModeSwitch mode={mode} onChange={value => { reset(); setMode(value); setQuery(''); }} />
     {mode === 'isbn' && <Button type="button" variant="outline" className="rj-lookup-scan" disabled={!onScanISBN || busy} onClick={() => void scan()}><ScanBarcode aria-hidden="true" />Scan ISBN barcode</Button>}
     <Label htmlFor={`${id}-query`} className="sr-only">{mode === 'isbn' ? 'ISBN to look up' : 'Book title to search'}</Label>
     <div className="rj-lookup-query"><Input id={`${id}-query`} type="search" value={query} placeholder={mode === 'isbn' ? 'Enter ISBN' : 'Enter a book title'} onChange={event => { reset(); setQuery(event.target.value); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void lookup(); } }} /><Button type="button" disabled={!onLookup || !query.trim() || busy} onClick={() => void lookup()}><Search aria-hidden="true" />{mode === 'isbn' ? 'Look up' : 'Search books'}</Button></div>

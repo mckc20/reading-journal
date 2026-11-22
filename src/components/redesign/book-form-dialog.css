@@ -12,9 +12,6 @@
 .rj-creation-book-scroll { min-height: 0; flex: 1 1 auto; }
 .rj-creation-book-scroll [data-slot='scroll-area-viewport'] { overscroll-behavior: contain; }
 .rj-creation-book-fields { padding: 24px; }
-.rj-creation-lookup { padding: 16px; border-radius: 18px; background: var(--rj-warm, var(--surface-sunken)); }
-.rj-creation-lookup [data-slot='tabs-trigger'][data-state='active'] { background: var(--rj-rose-light); color: var(--foreground); box-shadow: none; }
-.rj-creation-secondary { padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--rj-warm, var(--surface-sunken)); }
 .rj-creation-upload { border-radius: 14px; box-shadow: none; }
 .rj-creation-dialog .rj-book-form-heading [data-slot='button'],
 .rj-creation-actions [data-slot='button'] { min-height: 44px; }

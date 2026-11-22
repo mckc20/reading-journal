@@ -1,11 +1,8 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo, type FormEvent } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { BookOpen, ChevronRight, ImagePlus, ScanBarcode } from "lucide-react";
-import AddAuthorDialog from "@/components/AddAuthorDialog";
-import AuthorMultiSelect from "@/components/AuthorMultiSelect";
+import { BookOpen, ImagePlus, ScanBarcode, Search } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
-import GenreMultiSelect from "@/components/GenreMultiSelect";
 import {
   fetchBookByISBN,
   searchBooksByTitle,
@@ -13,7 +10,9 @@ import {
 } from "@/lib/bookLookup";
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
 import { Dialog } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookLookupModeSwitch, BookFormTagField, mergeBookNames } from "@/components/redesign/BookFormFields";
+import { BookCover } from "@/components/reading-journal/BookCover";
+import "@/components/redesign/book-form.css";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +27,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
-import { useAuth } from "@/context";
+import { useAuth, useAuthorsContext } from "@/context";
 import { createWishlistItem, updateWishlistItem } from "@/lib/wishlist";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
-import { mapGenreLabelsToIds } from "@/lib/genres";
+import { getGenrePathLabel, isGenreRoot, mapGenreLabelsToIds } from "@/lib/genres";
 import {
   formatPublicationDateInput,
   parsePublicationDateInput,
@@ -123,6 +122,7 @@ export default function AddBookDialog({
   const { addBook, reload: reloadBooks } = useBooksContext();
   const { user } = useAuth();
   const { genres } = useGenresContext();
+  const { authors: catalogAuthors } = useAuthorsContext();
   const { series, addSeries } = useSeries();
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -133,8 +133,8 @@ export default function AddBookDialog({
   const [addingNewSeries, setAddingNewSeries] = useState(false);
   const [isCreatingSeries, setIsCreatingSeries] = useState(false);
   const [pendingSeriesSelectionId, setPendingSeriesSelectionId] = useState<string | null>(null);
-  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
-  const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
+  const [authorQuery, setAuthorQuery] = useState("");
+  const [genreQuery, setGenreQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recommendationPrefillRef = useRef<string | null>(null);
   const recommendationGenresPrefillRef = useRef<string | null>(null);
@@ -169,6 +169,21 @@ export default function AddBookDialog({
     defaultValues: getInitialFormValues(initialSeriesId, initialVolumeNumber),
   });
 
+  const genreOptions = useMemo(() => {
+    const selectable = genres.filter(genre => genre.is_system && !isGenreRoot(genre));
+    const counts = new Map<string, number>();
+    for (const genre of selectable) {
+      const key = genre.name.toLocaleLowerCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return selectable.map(genre => ({
+      id: genre.id,
+      label: (counts.get(genre.name.toLocaleLowerCase()) ?? 0) > 1
+        ? getGenrePathLabel(genre.id, genres)
+        : genre.name,
+    }));
+  }, [genres]);
+
   const status = watch("status");
   const seriesId = watch("series_id");
   const selectableSeries = series.filter((item) =>
@@ -176,8 +191,12 @@ export default function AddBookDialog({
   );
 
   useEffect(() => {
-    if (open) setSecondaryInformationOpen(false);
-  }, [open]);
+    if (open) {
+      setSecondaryInformationOpen(Boolean(initialBook));
+      setAuthorQuery("");
+      setGenreQuery("");
+    }
+  }, [initialBook, open]);
 
   // Revoke object URL on unmount / change
   useEffect(() => {
@@ -283,10 +302,10 @@ export default function AddBookDialog({
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(null);
     setCoverPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleImportMethodChange(value: string) {
-    if (value !== "isbn" && value !== "title") return;
+  function handleImportMethodChange(value: ImportMethod) {
     setImportMethod(value);
     setShowScanner(false);
     setIsbnError(null);
@@ -338,6 +357,8 @@ export default function AddBookDialog({
       setScannedIsbn(isbn.trim());
       setMetadataSource(bookData.metadataSource);
       setMetadataSourceUrl(bookData.metadataSourceUrl);
+      setAuthorQuery("");
+      setGenreQuery("");
       setValue("title", bookData.title);
       setValue("authors", bookData.authors, {
         shouldDirty: true,
@@ -400,6 +421,8 @@ export default function AddBookDialog({
     setTitleSearchHasSearched(false);
     setTitleSearchError(null);
 
+    setAuthorQuery("");
+    setGenreQuery("");
     setValue("title", result.title);
     setValue("authors", result.authors, {
       shouldDirty: true,
@@ -448,37 +471,46 @@ export default function AddBookDialog({
     }
   }
 
-  function handleCreateAuthor(initialName: string) {
-    setAuthorDialogInitialName(initialName);
-    setAuthorDialogOpen(true);
+  function addAuthors() {
+    if (!authorQuery.trim()) return;
+    setValue("authors", mergeBookNames(watch("authors"), authorQuery), { shouldDirty: true });
+    setAuthorQuery("");
+    clearErrors("authors");
   }
 
-  function handleSavedAuthor(authorName: string) {
-    const currentAuthors = watch("authors");
-    const nextAuthors = Array.from(
-      new Map(
-        [...currentAuthors, authorName]
-          .map((name) => name.trim())
-          .filter(Boolean)
-          .map((name) => [name.toLowerCase(), name] as const),
-      ).values(),
-    );
-    setValue("authors", nextAuthors, {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
+  function addGenres() {
+    const query = genreQuery.trim().toLocaleLowerCase();
+    if (!query) return true;
+
+    const genre = genreOptions.find(option => option.label.toLocaleLowerCase() === query);
+    if (!genre) {
+      setError("genres", { message: "Choose a genre from the catalog." });
+      return false;
+    }
+
+    setValue("genres", [...new Set([...watch("genres"), genre.id])], { shouldDirty: true });
+    setGenreQuery("");
+    clearErrors("genres");
+    return true;
+  }
+
+  function submitForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting || !addGenres()) return;
+    addAuthors();
+    void handleSubmit(onSubmit)(event);
   }
 
   async function onSubmit(values: FormValues) {
     try {
-      const authors = values.authors.map((author) => author.trim()).filter(Boolean);
+      const authors = mergeBookNames(values.authors, "");
       if (authors.length === 0) {
         setError("authors", { message: "At least one author is required" });
         return;
       }
       const parsedPublicationDate = parsePublicationDateInput(values.publication_date);
       if (values.publication_date.trim() && !parsedPublicationDate) {
+        setSecondaryInformationOpen(true);
         setError("publication_date", {
           message: "Use a four-digit year, like 2020.",
         });
@@ -495,6 +527,7 @@ export default function AddBookDialog({
       }
       const parsedPrice = values.price.trim() ? Number(values.price) : null;
       if (addToWishlist && values.price.trim() && (!Number.isFinite(parsedPrice) || parsedPrice! < 0)) {
+        setSecondaryInformationOpen(true);
         setError("price", { message: "Enter a price of zero or more." });
         return;
       }
@@ -503,6 +536,7 @@ export default function AddBookDialog({
           const url = new URL(values.purchase_url.trim());
           if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
         } catch {
+          setSecondaryInformationOpen(true);
           setError("purchase_url", { message: "Enter a valid web link, including https://." });
           return;
         }
@@ -660,33 +694,15 @@ export default function AddBookDialog({
         icon={BookOpen}
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="rj-book-form">
+        <form onSubmit={submitForm} className="rj-book-form">
           <ScrollArea className="rj-creation-book-scroll">
-            <div className="rj-creation-book-fields space-y-4">
-              <div className="rj-creation-lookup space-y-3">
-                <div className="flex items-center gap-3">
-                  <p className="shrink-0 text-sm font-medium text-foreground">Search by</p>
-                  <Tabs
-                    value={importMethod}
-                    onValueChange={handleImportMethodChange}
-                    className="min-w-0 flex-1"
-                  >
-                    <TabsList className="w-full">
-                      <TabsTrigger
-                        value="isbn"
-                        disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
-                      >
-                        ISBN
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="title"
-                        disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
-                      >
-                        Book title
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
+            <div className="rj-creation-book-fields rj-book-form-fields">
+              <section className="rj-book-lookup" aria-label="Find book details">
+                <BookLookupModeSwitch
+                  mode={importMethod}
+                  onChange={handleImportMethodChange}
+                  disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
+                />
 
                 {importMethod === "isbn" ? (
                   <>
@@ -701,15 +717,17 @@ export default function AddBookDialog({
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full gap-2"
+                          className="rj-lookup-scan"
                           onClick={() => { setShowScanner(true); setIsbnError(null); }}
                           disabled={isbnStatus === "looking-up"}
                         >
                           <ScanBarcode className="h-4 w-4" />
                           Scan ISBN barcode
                         </Button>
-                        <div className="flex gap-2">
+                        <div className="rj-lookup-query">
                           <Input
+                            aria-label="ISBN to look up"
+                            type="search"
                             placeholder="Enter ISBN"
                             value={manualIsbn}
                             onChange={(e) => setManualIsbn(e.target.value)}
@@ -722,12 +740,10 @@ export default function AddBookDialog({
                           />
                           <Button
                             type="button"
-                            size="sm"
-                            className="h-9"
                             disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
                             onClick={() => handleIsbnLookup(manualIsbn)}
                           >
-                            Look up
+                            <Search aria-hidden="true" />Look up
                           </Button>
                         </div>
                       </div>
@@ -743,10 +759,12 @@ export default function AddBookDialog({
                   </>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex gap-2">
+                    <div className="rj-lookup-query">
                       <Input
                         id="title-search"
-                        placeholder="Enter book title"
+                        type="search"
+                        aria-label="Book title to search"
+                        placeholder="Enter a book title"
                         value={titleQuery}
                         onChange={(e) => setTitleQuery(e.target.value)}
                         onKeyDown={(e) => {
@@ -759,12 +777,10 @@ export default function AddBookDialog({
                       />
                       <Button
                         type="button"
-                        size="sm"
-                        className="h-9"
                         disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
                         onClick={() => void handleTitleSearch()}
                       >
-                        {titleSearchStatus === "searching" ? "Looking up…" : "Look up"}
+                        <Search aria-hidden="true" />Search books
                       </Button>
                     </div>
 
@@ -787,127 +803,73 @@ export default function AddBookDialog({
                       )}
 
                     {titleSearchResults.length > 0 && (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {titleSearchResults.map((result) => (
-                          <button
-                            key={result.id}
-                            type="button"
-                            className="flex min-w-0 items-center gap-3 rounded-lg border bg-surface p-2 text-left transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-60"
-                            onClick={() => void handleTitleResultSelect(result)}
-                            disabled={isApplyingTitleResult}
-                          >
-                            <div className="flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                              {result.coverUrl ? (
-                                <img
-                                  src={result.coverUrl}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <ImagePlus className="h-4 w-4 text-muted-foreground/50" />
-                              )}
-                            </div>
-                            <span className="min-w-0 space-y-0.5">
-                              <span className="block truncate text-sm font-medium">{result.title}</span>
-                              <span className="block truncate text-xs text-muted-foreground">
-                                {result.authors.join(", ")}
-                              </span>
-                              <span className="block truncate text-xs text-muted-foreground">
-                                {[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ") ||
-                                  "Edition details unavailable"}
-                              </span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                      <>
+                        <p className="rj-book-form-hint">Using a result replaces the book metadata below. Status, source and series stay as you set them.</p>
+                        <ul className="rj-lookup-results" aria-label="Book search results">
+                          {titleSearchResults.map(result => (
+                            <li key={result.id}>
+                              <BookCover src={result.coverUrl} title={result.title} decorative />
+                              <div>
+                                <strong>{result.title}</strong>
+                                <p>{result.authors.join(", ")}</p>
+                                {(result.publicationDate || result.isbn) && (
+                                  <small>{[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ")}</small>
+                                )}
+                                <Button type="button" variant="outline" aria-label={`Use ${result.title}`}
+                                  onClick={() => void handleTitleResultSelect(result)} disabled={isApplyingTitleResult}>
+                                  Use these details
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </div>
                 )}
-              </div>
+              </section>
+              <p className="rj-book-form-hint">Title and author are required.</p>
 
-              {/* Cover, title, authors, and genres match the Edit book layout. */}
-              <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
-                <div className="md:row-span-3 md:self-start">
-                <label
-                  htmlFor="cover-upload"
-                  className="rj-creation-upload group relative flex aspect-[2/3] w-[min(7rem,38vw)] cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
-                >
-                  {coverPreview ? (
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <ImagePlus className="h-6 w-6 text-muted-foreground/50" />
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                    <ImagePlus className="h-5 w-5 text-white" />
-                  </div>
-                </label>
-                <input
-                  id="cover-upload"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                />
-                {coverFile && <p className="mt-2 truncate text-xs text-muted-foreground">{coverFile.name}</p>}
+              <div className="rj-book-form-primary">
+                <div className="rj-book-cover-editor">
+                  <label className="rj-book-cover-upload">
+                    <input type="file" accept="image/*" className="sr-only" aria-label="Book cover" ref={fileInputRef} onChange={handleFileChange} />
+                    <BookCover src={coverPreview} title={watch("title") || "New book"} decorative />
+                    <span><ImagePlus size={18} aria-hidden="true" />{coverPreview ? "Change cover" : "Add cover"}</span>
+                  </label>
+                  {coverPreview && <Button type="button" variant="ghost" onClick={clearCoverSelection}>Remove cover</Button>}
+                  {coverFile && <p className="rj-book-form-hint truncate">{coverFile.name}</p>}
                 </div>
-
-                <div className="min-w-0 space-y-4">
-                  {/* Title */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="title">Title *</Label>
-                    <Input
-                      id="title"
-                      {...register("title", { required: "Title is required" })}
-                      aria-invalid={!!errors.title}
-                    />
-                    {errors.title && (
-                      <p className="text-xs text-destructive">{errors.title.message}</p>
-                    )}
+                <div className="rj-book-form-identity">
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" {...register("title", { required: "Title is required" })} aria-required="true"
+                      aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? "add-book-title-error" : undefined} />
+                    {errors.title && <p id="add-book-title-error" className="rj-book-form-error">{errors.title.message}</p>}
                   </div>
 
-                  {/* Authors */}
-                  <div className="space-y-1.5">
-                    <Label>Authors *</Label>
-                    <Controller
-                      name="authors"
-                      control={control}
-                      rules={{
-                        validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
-                      }}
-                      render={({ field }) => (
-                        <AuthorMultiSelect
-                          value={field.value ?? []}
-                          onChange={field.onChange}
-                          onCreateNew={handleCreateAuthor}
-                        />
-                      )}
-                    />
-                  {errors.authors && (
-                      <p className="text-xs text-destructive">{errors.authors.message}</p>
-                    )}
-                  </div>
+                  <BookFormTagField kind="authors" query={authorQuery}
+                    selected={mergeBookNames(watch("authors"), "").map(label => ({ id: label, label }))}
+                    options={Array.from(new Set(catalogAuthors.map(author => author.name)))}
+                    onQueryChange={query => { setAuthorQuery(query); clearErrors("authors"); }}
+                    onAdd={addAuthors}
+                    onRemove={name => setValue("authors", mergeBookNames(watch("authors"), "").filter(author => author !== name), { shouldDirty: true })}
+                    error={errors.authors?.message} />
 
-                  <div className="space-y-1.5">
-                    <Label>Genres</Label>
-                    <Controller
-                      name="genres"
-                      control={control}
-                      render={({ field }) => (
-                        <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />
-                      )}
-                    />
-                  </div>
+                  <BookFormTagField kind="genres" query={genreQuery} catalogOnly
+                    selected={watch("genres").map(id => genreOptions.find(option => option.id === id)
+                      ?? { id, label: genres.find(genre => genre.id === id)?.name ?? "Unavailable genre" })}
+                    options={genreOptions.map(option => option.label)}
+                    onQueryChange={query => { setGenreQuery(query); clearErrors("genres"); }}
+                    onAdd={addGenres}
+                    onRemove={id => setValue("genres", watch("genres").filter(genreId => genreId !== id), { shouldDirty: true })}
+                    error={errors.genres?.message} />
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="order-0 space-y-1.5">
-                    <Label>Status</Label>
+              <div className="rj-book-form-grid">
+                <div className="rj-book-form-field">
+                    <Label htmlFor="add-book-status">Reading status</Label>
                     <Controller
                       name="status"
                       control={control}
@@ -924,7 +886,7 @@ export default function AddBookDialog({
                             field.onChange(value as BookStatus);
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger id="add-book-status">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -939,277 +901,262 @@ export default function AddBookDialog({
                       )}
                     />
                 </div>
-
-              {/* Language */}
-              <div className="order-1 space-y-1.5">
-                <Label>Language</Label>
-                <Controller
-                  name="language"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select language" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Not set</SelectItem>
-                        {(["German", "Spanish", "English"] as BookLanguage[]).map((l) => (
-                          <SelectItem key={l} value={l}>
-                            {l}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              <div className="rj-creation-secondary order-12 space-y-3 sm:col-span-2">
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 text-base font-medium text-foreground transition-colors hover:text-primary"
-                  onClick={() => setSecondaryInformationOpen((current) => !current)}
-                  aria-expanded={secondaryInformationOpen}
-                >
-                  <ChevronRight className={`h-[1.125rem] w-[1.125rem] transition-transform ${secondaryInformationOpen ? "rotate-90" : ""}`} />
-                  Secondary Information
-                </button>
-
-                {secondaryInformationOpen && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="publication_date">Publication year</Label>
-                      <Input
-                        id="publication_date"
-                        placeholder="YYYY"
-                        inputMode="numeric"
-                        maxLength={4}
-                        aria-invalid={!!errors.publication_date}
-                        {...register("publication_date", {
-                          onChange: () => clearErrors("publication_date"),
-                        })}
-                      />
-                      {errors.publication_date && (
-                        <p className="text-xs text-destructive">
-                          {errors.publication_date.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                  <Label>Format</Label>
+                <div className="rj-book-form-field">
+                  <Label htmlFor="add-book-language">Language</Label>
                   <Controller
-                    name="format"
+                    name="language"
                     control={control}
                     render={({ field }) => (
                       <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select format" />
+                        <SelectTrigger id="add-book-language">
+                          <SelectValue placeholder="Select language" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">Not set</SelectItem>
-                          {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
-                            (f) => (
-                              <SelectItem key={f} value={f}>
-                                {f}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                    </div>
-
-                    <div className="space-y-1.5">
-                  <Label>Source</Label>
-                  <Controller
-                    name="source"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Not set</SelectItem>
-                          {SOURCE_OPTIONS.map((source) => (
-                            <SelectItem key={source} value={source}>
-                              {source}
+                          {(["German", "Spanish", "English"] as BookLanguage[]).map((l) => (
+                            <SelectItem key={l} value={l}>
+                              {l}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   />
+                </div>
+                <div className="rj-book-form-field">
+                  <Label htmlFor="total_pages">Total pages</Label>
+                  <Input
+                    id="total_pages"
+                    type="number"
+                    min={1}
+                    {...register("total_pages")}
+                    aria-describedby="add-book-pages-hint"
+                  />
+                  <p id="add-book-pages-hint" className="rj-book-form-hint">Leave blank if unknown.</p>
+                </div>
+                {/* Series */}
+                <div className="rj-book-form-field">
+                  <Label htmlFor="add-book-series">Series</Label>
+                  <Controller
+                    name="series_id"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || "__none__"}
+                        onValueChange={(v) => {
+                          if (v === "__new__") {
+                            setAddingNewSeries(true);
+                          } else if (v === "__none__") {
+                            field.onChange("");
+                          } else {
+                            field.onChange(v);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="add-book-series">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {selectableSeries.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__new__">+ Add new series…</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {addingNewSeries && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Input
+                        placeholder="Series name"
+                        value={newSeriesName}
+                        onChange={(e) => setNewSeriesName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddNewSeries())}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleAddNewSeries}
+                        disabled={isCreatingSeries || !newSeriesName.trim()}
+                      >
+                        {isCreatingSeries ? "Adding..." : "Add"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={isCreatingSeries}
+                        onClick={() => setAddingNewSeries(false)}
+                      >
+                        Cancel
+                      </Button>
                     </div>
+                  )}
+                </div>
 
-                    <div className="space-y-1.5">
-                      <Label>ISBN</Label>
-                      <Input value={scannedIsbn ?? manualIsbn} readOnly placeholder="Scanned or looked up ISBN" />
-                    </div>
+                {/* Volume number (conditional) */}
+                {seriesId && seriesId !== "__new__" && (
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="volume_number">Volume number</Label>
+                    <Input
+                      id="volume_number"
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      {...register("volume_number")}
+                    />
+                    {errors.volume_number && (
+                      <p className="text-xs text-destructive">{errors.volume_number.message}</p>
+                    )}
+                  </div>
+                )}
+                {/* Current progress (Reading only) */}
+                {!addToWishlist && status === "Reading" && (
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="current_page">Current page</Label>
+                    <Input
+                      id="current_page"
+                      type="number"
+                      min={0}
+                      {...register("current_page")}
+                    />
+                  </div>
+                )}
 
-                    {addToWishlist && <>
-                      <div className="space-y-1.5 sm:max-w-[12rem]">
-                        <Label htmlFor="price">Price</Label>
-                        <Input id="price" type="number" min="0" step="0.01" inputMode="decimal" {...register("price")} />
-                        {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="purchase_url">Purchase link</Label>
-                        <Input id="purchase_url" type="url" placeholder="https://…" {...register("purchase_url")} />
-                        {errors.purchase_url && <p className="text-xs text-destructive">{errors.purchase_url.message}</p>}
-                      </div>
-                    </>}
+                {/* Dates (conditional) */}
+                {!addToWishlist && showDateStarted && (
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="date_started">Date started</Label>
+                    <Input id="date_started" type="date" {...register("date_started")} />
+                  </div>
+                )}
+                {!addToWishlist && showDateFinished && (
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="date_finished">Date finished</Label>
+                    <Input id="date_finished" type="date" {...register("date_finished")} />
                   </div>
                 )}
               </div>
 
-              <div className="order-12 space-y-1.5 sm:col-span-2">
+              <details className="rj-book-form-details" open={secondaryInformationOpen}
+                onToggle={event => setSecondaryInformationOpen(event.currentTarget.open)}>
+                <summary>Secondary Information <span>Optional details</span></summary>
+                {secondaryInformationOpen && (
+                  <div className="rj-book-form-secondary">
+                    <div className="rj-book-form-grid">
+                      <div className="rj-book-form-field">
+                        <Label htmlFor="publication_date">Publication year</Label>
+                        <Input
+                          id="publication_date"
+                          placeholder="YYYY"
+                          inputMode="numeric"
+                          maxLength={4}
+                          aria-invalid={!!errors.publication_date}
+                          {...register("publication_date", {
+                            onChange: () => clearErrors("publication_date"),
+                          })}
+                        />
+                        {errors.publication_date && (
+                          <p className="text-xs text-destructive">
+                            {errors.publication_date.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rj-book-form-field">
+                        <Label htmlFor="add-book-format">Format</Label>
+                        <Controller
+                          name="format"
+                          control={control}
+                          render={({ field }) => (
+                            <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                              <SelectTrigger id="add-book-format">
+                                <SelectValue placeholder="Select format" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Not set</SelectItem>
+                                {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
+                                  (f) => (
+                                    <SelectItem key={f} value={f}>
+                                      {f}
+                                    </SelectItem>
+                                  )
+                                )}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
+                      <div className="rj-book-form-field">
+                        <Label htmlFor="add-book-source">Source</Label>
+                        <Controller
+                          name="source"
+                          control={control}
+                          render={({ field }) => (
+                            <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
+                              <SelectTrigger id="add-book-source">
+                                <SelectValue placeholder="Select source" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Not set</SelectItem>
+                                {SOURCE_OPTIONS.map((source) => (
+                                  <SelectItem key={source} value={source}>
+                                    {source}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
+                      <div className="rj-book-form-field">
+                        <Label htmlFor="add-book-isbn">ISBN</Label>
+                        <Input id="add-book-isbn" value={scannedIsbn ?? manualIsbn} readOnly placeholder="Scanned or looked up ISBN" />
+                      </div>
+
+                      {addToWishlist && <>
+                        <div className="rj-book-form-field">
+                          <Label htmlFor="price">Price</Label>
+                          <Input id="price" type="number" min="0" step="0.01" inputMode="decimal" {...register("price")} />
+                          {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+                        </div>
+                        <div className="rj-book-form-field">
+                          <Label htmlFor="purchase_url">Purchase link</Label>
+                          <Input id="purchase_url" type="url" placeholder="https://…" {...register("purchase_url")} />
+                          {errors.purchase_url && <p className="text-xs text-destructive">{errors.purchase_url.message}</p>}
+                        </div>
+                      </>}
+                    </div>
+
+                  </div>
+                )}
+              </details>
+
+              <div className="rj-book-form-field">
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" rows={5} {...register("description")} />
               </div>
 
-              {/* Pages */}
-              <div className="order-2 space-y-1.5">
-                <Label htmlFor="total_pages">Total pages</Label>
-                <Input
-                  id="total_pages"
-                  type="number"
-                  min={1}
-                  {...register("total_pages")}
-                />
-              </div>
-
-              {/* Current progress (Reading only) */}
-              {!addToWishlist && status === "Reading" && (
-                <div className="order-7 space-y-1.5">
-                  <Label htmlFor="current_page">Current page</Label>
-                  <Input
-                    id="current_page"
-                    type="number"
-                    min={0}
-                    {...register("current_page")}
-                  />
-                </div>
-              )}
-
-              {/* Dates (conditional) */}
-              {!addToWishlist && showDateStarted && (
-                <div className="order-8 space-y-1.5">
-                  <Label htmlFor="date_started">Date started</Label>
-                  <Input id="date_started" type="date" {...register("date_started")} />
-                </div>
-              )}
-              {!addToWishlist && showDateFinished && (
-                <div className="order-9 space-y-1.5">
-                  <Label htmlFor="date_finished">Date finished</Label>
-                  <Input id="date_finished" type="date" {...register("date_finished")} />
-                </div>
-              )}
-
-              {/* Series */}
-              <div className="order-10 space-y-1.5">
-                <Label>Series</Label>
-                <Controller
-                  name="series_id"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value || "__none__"}
-                      onValueChange={(v) => {
-                        if (v === "__new__") {
-                          setAddingNewSeries(true);
-                        } else if (v === "__none__") {
-                          field.onChange("");
-                        } else {
-                          field.onChange(v);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {selectableSeries.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="__new__">+ Add new series…</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {addingNewSeries && (
-                  <div className="flex gap-2 mt-1">
-                    <Input
-                      placeholder="Series name"
-                      value={newSeriesName}
-                      onChange={(e) => setNewSeriesName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddNewSeries())}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleAddNewSeries}
-                      disabled={isCreatingSeries || !newSeriesName.trim()}
-                    >
-                      {isCreatingSeries ? "Adding..." : "Add"}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={isCreatingSeries}
-                      onClick={() => setAddingNewSeries(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Volume number (conditional) */}
-              {seriesId && seriesId !== "__new__" && (
-                <div className="order-11 space-y-1.5 sm:max-w-[10rem]">
-                  <Label htmlFor="volume_number">Volume number</Label>
-                  <Input
-                    id="volume_number"
-                    type="number"
-                    min={0.01}
-                    step="0.01"
-                    {...register("volume_number")}
-                  />
-                  {errors.volume_number && (
-                    <p className="text-xs text-destructive">{errors.volume_number.message}</p>
-                  )}
-                </div>
-              )}
-
               {/* Root error */}
               {errors.root && (
-                <p className="order-[13] text-sm text-destructive">{errors.root.message}</p>
+                <p className="rj-book-form-error" role="alert">{errors.root.message}</p>
               )}
-              </div>
             </div>
           </ScrollArea>
 
           <SaveCancelBar
             mode="creation-dialog"
-            onCancel={() => onOpenChange(false)}
+            onCancel={() => handleOpenChange(false)}
             saving={isSubmitting}
             saveLabel={initialBook ? "Save Changes" : "Add Book"}
           />
         </form>
       </CreationDialogContent>
-      <AddAuthorDialog
-        open={authorDialogOpen}
-        onOpenChange={setAuthorDialogOpen}
-        initialName={authorDialogInitialName}
-        onSaved={(author) => handleSavedAuthor(author.name)}
-      />
     </Dialog>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { BookOpen, ImagePlus, Plus, X } from 'lucide-react';
+import { BookOpen, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,10 +7,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { formatPublicationDateInput, parsePublicationDateInput } from '@/lib/publicationDate';
 import type { BookFormat, BookLanguage, BookSource, BookStatus } from '@/types';
+import { BookFormTagField, mergeBookNames } from './BookFormFields';
 import { BookLookupPreview } from './BookLookupPreview';
 import type { BookFormDraft, BookLookupMode, BookLookupResult } from './bookFormTypes';
 import './redesign.css';
-import './book-form-preview.css';
+import './book-form.css';
 
 export type { BookFormDraft, BookLookupResult, BookLookupMode } from './bookFormTypes';
 export interface BookFormPreviewProps {
@@ -30,7 +31,6 @@ const statuses: BookStatus[] = ['Wishlist', 'To Read', 'Up Next', 'Reading', 'Pa
 const formats: BookFormat[] = ['eBook', 'Audiobook', 'Paperback', 'Hardcover'];
 const sources: BookSource[] = ['Owned', 'Family', 'Friends', 'Library'];
 const languages: BookLanguage[] = ['German', 'Spanish', 'English'];
-const names = (value: string) => value.split(';').map(item => item.trim()).filter(Boolean).filter((item, index, all) => all.findIndex(other => other.toLocaleLowerCase() === item.toLocaleLowerCase()) === index);
 
 /** Caller owns lookup, scanner and persistence. No account clients are imported. */
 export function BookFormPreview({ open, mode = 'add', initialBook, onOpenChange, onSave, returnFocusTo, onLookup, onScanISBN, authorOptions = [], genreOptions = [], seriesOptions = [] }: BookFormPreviewProps) {
@@ -74,8 +74,8 @@ export function BookFormPreview({ open, mode = 'add', initialBook, onOpenChange,
     event.preventDefault();
     if (savingRef.current || lookupBusy || coverLoading) return;
     const next: Record<string, string> = {};
-    const authors = names(`${draft.authors};${authorInput}`);
-    const genres = names(`${draft.genres};${genreInput}`);
+    const authors = mergeBookNames(draft.authors.split(';'), authorInput);
+    const genres = mergeBookNames(draft.genres.split(';'), genreInput);
     if (!draft.title.trim()) next.title = 'Enter a book title.';
     if (!authors.length) next.authors = 'Enter at least one author.';
     if (draft.totalPages && (!Number.isSafeInteger(Number(draft.totalPages)) || Number(draft.totalPages) < 1)) next.totalPages = 'Enter a positive whole number of pages, or leave this blank.';
@@ -113,11 +113,13 @@ export function BookFormPreview({ open, mode = 'add', initialBook, onOpenChange,
     const author = kind === 'authors';
     const value = author ? authorInput : genreInput;
     const setValue = author ? setAuthorInput : setGenreInput;
-    const selected = names(draft[kind]);
-    const add = () => { change(kind, names(`${draft[kind]};${value}`).join('; ')); setValue(''); };
-    return <div className="rj-book-form-field"><Label htmlFor={`${id}-${kind}`}>{author ? 'Author' : 'Genres'}</Label><div className="rj-book-tags">{selected.map(name => <span key={name}>{name}<button type="button" aria-label={`Remove ${author ? 'author' : 'genre'} ${name}`} onClick={() => change(kind, selected.filter(item => item !== name).join('; '))}><X size={14} aria-hidden="true" /></button></span>)}</div>
-      <div className="rj-book-tag-input"><Input id={`${id}-${kind}`} name={kind} list={`${id}-${kind}-options`} value={value} placeholder={author ? 'Choose or type an author' : 'Choose or type a genre'} onChange={event => { setValue(event.target.value); setErrors(current => ({ ...current, [kind]: '' })); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} aria-required={author} aria-invalid={!!errors[kind]} aria-describedby={errors[kind] ? `${id}-${kind}-error` : `${id}-${kind}-hint`} /><Button type="button" variant="outline" aria-label={author ? 'Add author' : 'Add genre'} disabled={!value.trim()} onClick={add}><Plus aria-hidden="true" />Add</Button></div>
-      <datalist id={`${id}-${kind}-options`}>{(author ? authorOptions : genreOptions).filter(name => !selected.includes(name)).map(name => <option key={name} value={name} />)}</datalist><p id={`${id}-${kind}-hint`} className="rj-book-form-hint">{author ? 'Add one or more authors. Separate names with a semicolon (;).' : 'Add genres to organize this book.'}</p>{errorFor(kind)}</div>;
+    const selected = mergeBookNames([], draft[kind]);
+    return <BookFormTagField kind={kind} query={value}
+      selected={selected.map(label => ({ id: label, label }))}
+      options={author ? authorOptions : genreOptions} error={errors[kind]}
+      onQueryChange={query => { setValue(query); setErrors(current => ({ ...current, [kind]: '' })); }}
+      onAdd={() => { change(kind, mergeBookNames(selected, value).join('; ')); setValue(''); }}
+      onRemove={name => change(kind, selected.filter(item => item !== name).join('; '))} />;
   }
   return <Dialog open={open} onOpenChange={value => { if (!value) close(); }}>
     <DialogContent className="rj-redesign rj-book-form-dialog" showCloseButton={false} onCloseAutoFocus={event => { if (returnFocusTo) { event.preventDefault(); returnFocusTo.focus(); } }} onEscapeKeyDown={event => { if (savingRef.current) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()}>
