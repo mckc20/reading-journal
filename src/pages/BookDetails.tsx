@@ -60,7 +60,7 @@ import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
-import { useDominantImageColor } from "@/hooks/useDominantImageColor";
+import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
@@ -185,7 +185,7 @@ function BookDetailSheet() {
 
     const animation = sheet.animate(
       [{ transform: getComputedStyle(sheet).transform }, { transform: "translateY(100%)" }],
-      { duration: 260, easing: "cubic-bezier(.35, 0, .75, 1)", fill: "forwards" },
+      { duration: 165, easing: "cubic-bezier(.25, .35, .65, 1)", fill: "forwards" },
     );
     closingAnimation.current = animation;
     void animation.finished.then(leave, () => {
@@ -334,7 +334,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
-  const coverColor = useDominantImageColor(book?.cover_url, { fallbackColor: "", mostCommon: true });
+  const coverColor = useBookHeroColor(book?.cover_url);
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const linkedGenres = useMemo(() => {
     if (!book?.selected_genres?.length) return [];
@@ -894,8 +894,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
       <section className="rj-detail-hero" aria-labelledby="book-detail-title">
         <div
           className="rj-detail-cover-stage"
-          data-cover-color={coverColor ? true : undefined}
-          style={coverColor ? { "--book-detail-cover-color": coverColor } as CSSProperties : undefined}
+          style={{ "--book-detail-hero-color": coverColor } as CSSProperties}
         >
           <div className="rj-detail-topline">
             <CloseBookDetailButton onClose={onClose} />
@@ -958,7 +957,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                 aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
                 aria-pressed={isFavorite}
               >
-                <Heart className={isFavorite ? "fill-favorite text-favorite" : undefined} />
+                <Heart aria-hidden="true" className={isFavorite ? "size-[26px] fill-favorite text-favorite" : "size-[26px]"} />
               </Button>
             </div>
 
