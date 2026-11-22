@@ -2,17 +2,18 @@ import type { ComponentProps } from "react";
 import { X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import "./book-form-dialog.css";
 
-interface CreationDialogContentProps extends Pick<ComponentProps<typeof DialogContent>, "children" | "onCloseAutoFocus"> {
+interface CreationDialogContentProps extends Pick<ComponentProps<typeof DialogContent>, "children" | "className" | "onCloseAutoFocus"> {
   title: string;
   description: string;
   icon: LucideIcon;
 }
 
-export function CreationDialogContent({ title, description, icon: Icon, children, onCloseAutoFocus }: CreationDialogContentProps) {
+export function CreationDialogContent({ title, description, icon: Icon, className, children, onCloseAutoFocus }: CreationDialogContentProps) {
   return (
-    <DialogContent className="rj-book-form-dialog rj-creation-dialog" showCloseButton={false} onCloseAutoFocus={onCloseAutoFocus}>
+    <DialogContent className={cn("rj-book-form-dialog rj-creation-dialog", className)} showCloseButton={false} onCloseAutoFocus={onCloseAutoFocus}>
       <header className="rj-book-form-heading">
         <span className="rj-book-form-icon" aria-hidden="true"><Icon size={24} /></span>
         <div>

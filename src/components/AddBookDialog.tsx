@@ -689,6 +689,7 @@ export default function AddBookDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
+        className={initialBook ? undefined : "rj-add-book-dialog"}
         title={initialBook ? "Edit Wishlist Item" : "Add Book"}
         description="Find a book or fill in the details yourself."
         icon={BookOpen}
