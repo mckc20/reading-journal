@@ -35,7 +35,6 @@ const Genres = lazy(() => import("@/pages/Genres"));
 const AllGenres = lazy(() => import("@/pages/AllGenres"));
 const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
-const BookAnalytics = lazy(() => import("@/pages/BookAnalytics"));
 const BookAnnotations = lazy(() => import("@/pages/BookAnnotations"));
 const Changelog = lazy(() => import("@/pages/Changelog"));
 const Help = lazy(() => import("@/pages/Help"));
@@ -114,7 +113,7 @@ export const router = createBrowserRouter([
           { path: "/genres", element: <Navigate to="/library/genres" replace /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
-          { path: "/books/:bookId/analytics", element: lazyRoute(<BookAnalytics />) },
+          { path: "/books/:bookId/analytics", element: <Navigate to=".." relative="path" replace /> },
           { path: "/books/:bookId/journal", element: lazyRoute(<BookAnnotations />) },
           { path: "/books/:bookId/annotations", element: lazyRoute(<BookAnnotations />) },
           { path: "/changelog", element: lazyRoute(<Changelog />) },

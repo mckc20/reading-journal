@@ -80,10 +80,10 @@
 @media (max-width: 767px) {
   .rj-app--book-detail {
     --app-header-height: 0px;
+    --app-bottom-nav-space: env(safe-area-inset-bottom);
     background: var(--surface-sunken);
   }
-  .rj-app--book-detail .rj-app-header { min-height: 0; border: 0; }
-  .rj-app--book-detail :is(.rj-brand, .rj-header-actions) { display: none; }
+  .rj-app--book-detail :is(.rj-app-header-wrap, .rj-floating-add) { display: none; }
 }
 
 @media (min-width: 768px) {

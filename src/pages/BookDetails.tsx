@@ -6,18 +6,15 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type TouchEvent,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   ArrowUpRight,
   BookOpen,
-  Calendar,
-  CalendarCheck,
-  CalendarClock,
   ChevronDown,
   ChevronRight,
-  Clock,
   Heart,
   ImagePlus,
   Info,
@@ -25,9 +22,7 @@ import {
   PauseCircle,
   RefreshCw,
   Star,
-  TrendingUp,
   Trash2,
-  type LucideIcon,
 } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
@@ -42,7 +37,7 @@ import {
   buildBookLibraryFilterPath,
   MetadataLink,
 } from "@/components/LinkedMetadata";
-import ProgressOverTimeChart from "@/components/ProgressOverTimeChart";
+import BookReadingProgress from "@/components/BookReadingProgress";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Badge } from "@/components/ui/badge";
@@ -66,16 +61,6 @@ import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
-import {
-  formatCalendarSpan,
-  formatPagesPerHour,
-  formatTotalReadingTime,
-  getCalendarPagesPerDay,
-  getEstimatedFinish,
-  getPagesPerHour,
-  getReadingDuration,
-  sumReadingMinutes,
-} from "@/lib/bookAnalytics";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
 import { duplicateBookRecord } from "@/lib/duplication";
@@ -137,12 +122,7 @@ const STATUS_OPTIONS: BookStatus[] = [
 ];
 
 const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
-
-type ProgressStat = {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-};
+const BOOK_DETAIL_SHEET_MEDIA = "(max-width: 767px)";
 
 function bookToFormValues(book: Book): FormValues {
   return {
@@ -166,26 +146,6 @@ function bookToFormValues(book: Book): FormValues {
   };
 }
 
-function formatDateForDisplay(value?: string | null): string {
-  if (!value) return "Not set";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatDateObjectForDisplay(value: Date | null): string {
-  if (!value) return "Not available";
-  return value.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function getPublicationYear(value?: string | null): string | null {
   const [year] = (value ?? "").split("-");
   return year && /^\d{4}$/.test(year) ? year : null;
@@ -201,9 +161,12 @@ function BookDetailSheet() {
   const navigate = useNavigate();
   const sheetRef = useRef<HTMLElement>(null);
   const closingAnimation = useRef<Animation | null>(null);
+  const swipeStart = useRef<{ x: number; y: number; id: number } | null>(null);
 
   useEffect(() => {
-    sheetRef.current?.focus({ preventScroll: true });
+    if (window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches) {
+      sheetRef.current?.focus({ preventScroll: true });
+    }
     return () => closingAnimation.current?.cancel();
   }, []);
 
@@ -219,7 +182,8 @@ function BookDetailSheet() {
     }
 
     const sheet = sheetRef.current;
-    if (!sheet || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!sheet || !window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       leave();
       return;
     }
@@ -235,8 +199,41 @@ function BookDetailSheet() {
     });
   }
 
+  function handleSwipeStart(event: TouchEvent<HTMLElement>) {
+    swipeStart.current = null;
+    const { currentTarget, target, touches } = event;
+    if (!window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches ||
+      currentTarget.scrollTop > 0 ||
+      touches.length !== 1 ||
+      !(target instanceof Element) ||
+      !currentTarget.contains(target) ||
+      target.closest("button, a, input, select, textarea, summary, [role='dialog'], [data-book-detail-editor]")) return;
+
+    const touch = touches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY, id: touch.identifier };
+  }
+
+  function handleSwipeEnd(event: TouchEvent<HTMLElement>) {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || event.currentTarget.scrollTop > 0) return;
+    const touch = Array.from(event.changedTouches).find(({ identifier }) => identifier === start.id);
+    if (!touch) return;
+
+    const distance = touch.clientY - start.y;
+    if (distance >= 80 && distance > 1.25 * Math.abs(touch.clientX - start.x)) close();
+  }
+
   return (
-    <section className="rj-book-detail-sheet" ref={sheetRef} tabIndex={-1} aria-label="Book details">
+    <section
+      className="rj-book-detail-sheet"
+      ref={sheetRef}
+      tabIndex={-1}
+      aria-label="Book details"
+      onTouchStart={handleSwipeStart}
+      onTouchEnd={handleSwipeEnd}
+      onTouchCancel={() => { swipeStart.current = null; }}
+    >
       <BookDetailsContent onClose={close} />
     </section>
   );
@@ -244,9 +241,12 @@ function BookDetailSheet() {
 
 function CloseBookDetailButton({ onClose }: { onClose: () => void }) {
   return (
-    <Button type="button" variant="ghost" size="icon-lg" className="size-11" aria-label="Close book details" onClick={onClose}>
-      <ChevronDown className="size-6" aria-hidden="true" />
-    </Button>
+    <>
+      <Button type="button" variant="ghost" size="icon-lg" className="size-11 md:hidden" aria-label="Close book details" onClick={onClose}>
+        <ChevronDown className="size-6" aria-hidden="true" />
+      </Button>
+      <BackButton fallbackTo="/library" className="hidden min-h-11 min-w-11 md:inline-flex" />
+    </>
   );
 }
 
@@ -298,6 +298,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const coverPreviewUrlRef = useRef<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
+  const [logsAttempt, setLogsAttempt] = useState(0);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
@@ -373,7 +374,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [bookId]);
+  }, [bookId, logsAttempt]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -401,32 +402,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
 
   const watchedSeriesId = watch("series_id");
   const progressPercent = book ? getBookProgress(book.current_page, book.total_pages) : null;
-  const totalReadingMinutes = useMemo(() => sumReadingMinutes(readingLogs), [readingLogs]);
-  const readingDuration = useMemo(
-    () =>
-      getReadingDuration({
-        dateStarted: book?.date_started,
-        dateFinished: book?.date_finished,
-        pausePeriods: book?.pause_periods,
-      }),
-    [book?.date_finished, book?.date_started, book?.pause_periods],
-  );
-  const daysReading =
-    readingDuration.isAvailable && readingDuration.span
-      ? formatCalendarSpan(readingDuration.span)
-      : "Not set";
-  const estimatedFinish = useMemo(
-    () =>
-      getEstimatedFinish({
-        status: book?.status ?? "To Read",
-        currentPage: book?.current_page,
-        totalPages: book?.total_pages,
-        logs: readingLogs,
-        pausePeriods: book?.pause_periods,
-      }),
-    [book?.current_page, book?.pause_periods, book?.status, book?.total_pages, readingLogs],
-  );
-
   const authorSummaries = useMemo(
     () => buildAuthorSummaries(authors, books, journalEntries, wishlistBooks),
     [authors, books, journalEntries, wishlistBooks],
@@ -773,7 +748,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
 
   if (isEditMode) {
     return (
-      <div className="rj-detail-page space-y-6">
+      <div className="rj-detail-page space-y-6" data-book-detail-editor>
         <BackButton
           fallbackTo="/library"
           className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
@@ -826,122 +801,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const isReading = book.status === "Reading";
   const readingActionLabel = book.status === "Finished" ? "Reread" : "Start Reading";
   const hasSecondaryMetadata = Boolean(book.format || book.language || publicationYear || book.source || book.isbn);
-  const hasReadingLogs = readingLogs.length > 0;
-  // Only use date-based stats after a successful fetch confirms there are no logs.
-  const hasNoReadingLogs = !logsLoading && !logsError && !hasReadingLogs;
-  const hasStartedReading = isReading || isPaused || book.status === "Finished" || book.status === "DNF";
-  const useDateBasedStats = hasNoReadingLogs && hasStartedReading;
-  const calendarPagesPerDay = useDateBasedStats
-    ? getCalendarPagesPerDay({
-        pages: book.status === "Finished" ? totalPages : currentPage,
-        dateStarted: book.date_started,
-        dateEnded: book.date_finished,
-        pausePeriods: book.pause_periods,
-      })
-    : null;
-  const calendarPaceLabel = calendarPagesPerDay === null
-    ? "Not available"
-    : `${calendarPagesPerDay.toFixed(1)} pages/day`;
-  const readingTimeStat: ProgressStat = {
-    icon: Clock,
-    label: useDateBasedStats
-      ? "Total Reading Duration"
-      : book.status === "Finished" ? "Total Reading Time" : "Time Reading",
-    value: useDateBasedStats ? daysReading : formatTotalReadingTime(totalReadingMinutes),
-  };
-  const readingPaceStat: ProgressStat = {
-    icon: TrendingUp,
-    label: useDateBasedStats
-      ? "Reading Pace"
-      : book.status === "Finished" ? "Average Speed" : "Current Speed",
-    value: useDateBasedStats
-      ? calendarPaceLabel
-      : formatPagesPerHour(
-          getPagesPerHour({
-            pages: book.status === "Finished" ? totalPages : currentPage,
-            readingMinutes: totalReadingMinutes,
-          }),
-        ),
-  };
-  const readingProgressStats: ProgressStat[] =
-    isReading
-      ? [
-          {
-            icon: Calendar,
-            label: "Started On",
-            value: formatDateForDisplay(book.date_started),
-          },
-          {
-            icon: CalendarClock,
-            label: "Estimated Finish",
-            value:
-              estimatedFinish.isAvailable && estimatedFinish.finishDate
-                ? formatDateObjectForDisplay(estimatedFinish.finishDate)
-                : "Not available",
-          },
-          readingTimeStat,
-          readingPaceStat,
-        ]
-      : isPaused
-        ? [
-            {
-              icon: Calendar,
-              label: "Started On",
-              value: formatDateForDisplay(book.date_started),
-            },
-            readingPaceStat,
-            readingTimeStat,
-            {
-              icon: CalendarClock,
-              label: "Estimated Finish",
-              value:
-                estimatedFinish.isAvailable && estimatedFinish.finishDate
-                  ? formatDateObjectForDisplay(estimatedFinish.finishDate)
-                  : "Not available",
-            },
-          ]
-      : book.status === "Finished"
-        ? [
-            {
-              icon: Calendar,
-              label: "Started On",
-              value: formatDateForDisplay(book.date_started),
-            },
-            {
-              icon: CalendarCheck,
-              label: "Finished On",
-              value: formatDateForDisplay(book.date_finished),
-            },
-            readingTimeStat,
-            readingPaceStat,
-          ]
-        : [
-            {
-              icon: Calendar,
-              label: "Started On",
-              value: formatDateForDisplay(book.date_started),
-            },
-            {
-              icon: TrendingUp,
-              label: "Current Page",
-              value: `${currentPage} / ${totalPages || "-"}`,
-            },
-            readingTimeStat,
-            useDateBasedStats ? readingPaceStat : {
-              icon: Calendar,
-              label: "Days Reading",
-              value: daysReading,
-            },
-          ];
-  const summaryStats: ProgressStat[] = [];
-  if (book.date_finished) {
-    summaryStats.push({ icon: CalendarCheck, label: "Finished on", value: formatDateForDisplay(book.date_finished) });
-  } else if (book.date_started) {
-    summaryStats.push({ icon: Calendar, label: "Started on", value: formatDateForDisplay(book.date_started) });
-  }
-  if (totalReadingMinutes > 0) {
-    summaryStats.push({ icon: Clock, label: "Reading time", value: formatTotalReadingTime(totalReadingMinutes) });
-  }
   const description = book.description?.trim() || "";
   return (
     <div className="rj-detail-page">
@@ -1259,50 +1118,19 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         <section aria-labelledby="book-detail-progress">
           <div className="rj-detail-section-heading">
             <h2 id="book-detail-progress">Reading Progress</h2>
-            {!logsLoading && !logsError && hasReadingLogs && (
-              <Button asChild variant="ghost">
-                <Link to={`/books/${book.id}/analytics`} aria-label="View more reading analytics">
-                  View more <ArrowUpRight aria-hidden="true" />
-                </Link>
-              </Button>
-            )}
           </div>
 
           {logsLoading ? (
             <LoadingIndicator label="Loading reading progress…" />
           ) : logsError ? (
-            <p className="text-sm text-destructive" role="alert">{logsError}</p>
+            <div className="space-y-3">
+              <p className="text-sm text-destructive" role="alert">{logsError}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setLogsAttempt((attempt) => attempt + 1)}>
+                Retry
+              </Button>
+            </div>
           ) : (
-            <>
-              {summaryStats.length > 0 ? (
-                <dl className="rj-detail-stats">
-                  {summaryStats.map(({ icon: Icon, label, value }) => (
-                    <div key={label}>
-                      <dt><Icon aria-hidden="true" />{label}</dt>
-                      <dd>{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <p className="rj-detail-quiet">Your reading sessions will appear here.</p>
-              )}
-              {(hasStartedReading || hasReadingLogs || book.date_started || book.date_finished || currentPage > 0) && (
-                <details className="rj-detail-metadata">
-                  <summary>More reading stats</summary>
-                  <ProgressStatsStrip stats={readingProgressStats} />
-                  {hasReadingLogs && (
-                    <div className="my-4 space-y-3">
-                      <h3 className="text-sm font-medium">Progress over time</h3>
-                      <ProgressOverTimeChart
-                        logs={readingLogs}
-                        totalPages={book.total_pages}
-                        pausePeriods={book.pause_periods}
-                      />
-                    </div>
-                  )}
-                </details>
-              )}
-            </>
+            <BookReadingProgress book={book} logs={readingLogs} />
           )}
         </section>
 
@@ -1352,43 +1180,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </section>
-      </div>
-    </div>
-  );
-}
-
-function ProgressStatsStrip({ stats }: { stats: ProgressStat[] }) {
-  return (
-    <div className="grid overflow-hidden rounded-xl border bg-card sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => (
-        <ProgressStatItem
-          key={stat.label}
-          icon={stat.icon}
-          label={stat.label}
-          value={stat.value}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ProgressStatItem({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-4 border-b p-4 sm:border-r sm:[&:nth-child(2n)]:border-r-0 lg:border-b-0 lg:[&:nth-child(2n)]:border-r lg:last:border-r-0">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center text-primary">
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 truncate text-sm font-medium">{value}</p>
       </div>
     </div>
   );
