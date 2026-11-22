@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import { ArrowUpRight, BookOpen, CalendarDays, ChevronDown, Clock3, Heart, MoreHorizontal, NotebookPen, Pencil } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { BookCover } from '@/components/reading-journal/BookCover';
 import { BookProgress, getBookProgress } from '@/components/reading-journal/BookProgress';
 import { BookStatus } from '@/components/reading-journal/BookStatus';
 import BookRating from '@/components/reading-journal/BookRating';
+import { useDominantImageColor } from '@/hooks/useDominantImageColor';
 import type { BookStatus as Status } from '@/types';
 import type { HomeBook } from './HomeCards';
 import { HomeShell, type CreateDestination, type HomeDestination } from './HomeShell';
@@ -46,6 +47,7 @@ export interface BookDetailsPreviewProps {
 /** Presentational workshop page. Status and persistence belong to the caller. */
 export function BookDetailsPreview({ book, entries, notice, onReadingAction, onClose, onEdit, onAddEntry, onToggleFavorite, onViewAnalytics, onOpenJournal, ...shell }: BookDetailsPreviewProps) {
   const id = useId();
+  const coverColor = useDominantImageColor(book.cover, { fallbackColor: "", mostCommon: true });
   const [expanded, setExpanded] = useState(false);
   const action = book.status === 'Reading' ? 'Update Progress' : book.status === 'Paused' ? 'Resume' : book.status === 'Finished' ? 'Reread' : 'Start Reading';
   const progress = getBookProgress(book.currentPage, book.totalPages);
@@ -63,7 +65,11 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
   return <div className="rj-redesign"><HomeShell {...shell} activeDestination="Library">
     <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby={`${id}-title`}>
-        <div className="rj-detail-cover-stage">
+        <div
+          className="rj-detail-cover-stage"
+          data-cover-color={coverColor ? true : undefined}
+          style={coverColor ? { "--book-detail-cover-color": coverColor } as CSSProperties : undefined}
+        >
           <div className="rj-detail-topline">
             <Button variant="ghost" size="icon-lg" onClick={onClose} aria-label="Close book details"><ChevronDown aria-hidden="true" /></Button>
             <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon-lg" aria-label="More book actions"><MoreHorizontal aria-hidden="true" /></Button></DropdownMenu.Trigger>

@@ -1,15 +1,16 @@
-import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { getJournalEntryTags, type JournalTimelineEntry } from "@/lib/journal";
 import { visibleJournalTags } from "@/lib/journalTags";
+import { renderNoteMarkdownToHtml } from "@/lib/noteFormatting";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 interface JournalEntryCardProps {
   entry: JournalTimelineEntry;
   date: string;
+  onRead: (trigger: HTMLButtonElement) => void;
   actions?: ReactNode;
   showTags?: boolean;
 }
@@ -25,6 +26,33 @@ export function formatJournalDate(value: string): string {
 
 export function JournalEntryDate({ date }: { date: string }) {
   return <time dateTime={date} className="mb-2 block text-xs text-muted-foreground">{formatJournalDate(date)}</time>;
+}
+
+export function JournalEntryExcerpt({ markdown }: { markdown: string }) {
+  const text = useMemo(() => {
+    const template = document.createElement("template");
+    const html = renderNoteMarkdownToHtml(markdown);
+    template.innerHTML = html.replace(/<br\s*\/?>|<\/(?:p|li|h[1-6]|pre|blockquote)>/gi, "$&\n");
+    return template.content.textContent?.replace(/[^\S\n]+/g, " ").replace(/\n\s*\n/g, "\n").trim();
+  }, [markdown]);
+
+  if (!text) return null;
+  return <p className="line-clamp-3 whitespace-pre-line break-words text-[13px] leading-5">{text}</p>;
+}
+
+export function JournalEntryReadButton({ date, onRead }: {
+  date: string;
+  onRead: (trigger: HTMLButtonElement) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Read journal entry, ${formatJournalDate(date)}`}
+      aria-haspopup="dialog"
+      className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-ring"
+      onClick={(event) => onRead(event.currentTarget)}
+    />
+  );
 }
 
 function titleForEntry(entry: JournalTimelineEntry): ReactNode {
@@ -64,7 +92,7 @@ function mediaForEntry(entry: JournalTimelineEntry) {
   return [];
 }
 
-export default function JournalEntryCard({ entry, date, actions, showTags = true }: JournalEntryCardProps) {
+export default function JournalEntryCard({ entry, date, onRead, actions, showTags = true }: JournalEntryCardProps) {
   const tags = visibleJournalTags(getJournalEntryTags(entry));
   const title = titleForEntry(entry);
   const media = mediaForEntry(entry);
@@ -76,6 +104,7 @@ export default function JournalEntryCard({ entry, date, actions, showTags = true
         actions ? "pr-24" : "pr-4",
       )}
     >
+      <JournalEntryReadButton date={date} onRead={onRead} />
       {actions && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
           {actions}
@@ -90,10 +119,10 @@ export default function JournalEntryCard({ entry, date, actions, showTags = true
           className={cn(actions && "pr-8")}
           attribution={attributionForEntry(entry) ? `- ${attributionForEntry(entry)}` : null}
         >
-          <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
+          <JournalEntryExcerpt markdown={contentForEntry(entry)} />
         </QuoteBlock>
       ) : (
-        <FormattedNoteContent markdown={contentForEntry(entry)} className="line-clamp-4 text-sm leading-6" />
+        <JournalEntryExcerpt markdown={contentForEntry(entry)} />
       )}
 
       {media.length > 0 && (
@@ -101,6 +130,7 @@ export default function JournalEntryCard({ entry, date, actions, showTags = true
           markdown=""
           media={media}
           thumbnail
+          interactiveMedia={false}
           visibleMediaLimit={1}
           mediaClassName="mb-0 mt-3"
           imageClassName="h-24 rounded object-cover"

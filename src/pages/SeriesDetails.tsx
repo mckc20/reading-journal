@@ -310,9 +310,7 @@ function SeriesJournalSection({
           <JournalTimeline
             entries={journalEntries}
             layout="cards"
-            previewMode={{
-              getEntryHref: (entry) => `/series/${series.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
-            }}
+            previewMode
             emptyMessage="Series journal entries will appear here."
             onEntryUpdated={(entry) => {
               if (entry.source === "series_note") {

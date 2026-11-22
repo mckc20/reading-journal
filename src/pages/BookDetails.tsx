@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -59,6 +60,7 @@ import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
+import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
@@ -332,6 +334,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+  const coverColor = useDominantImageColor(book?.cover_url, { fallbackColor: "", mostCommon: true });
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const linkedGenres = useMemo(() => {
     if (!book?.selected_genres?.length) return [];
@@ -889,7 +892,11 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   return (
     <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby="book-detail-title">
-        <div className="rj-detail-cover-stage">
+        <div
+          className="rj-detail-cover-stage"
+          data-cover-color={coverColor ? true : undefined}
+          style={coverColor ? { "--book-detail-cover-color": coverColor } as CSSProperties : undefined}
+        >
           <div className="rj-detail-topline">
             <CloseBookDetailButton onClose={onClose} />
             <DetailActionsMenu

@@ -19,6 +19,7 @@ interface JournalEntryMediaContentProps {
   thumbnail?: boolean;
   visibleMediaLimit?: number;
   interactiveLinks?: boolean;
+  interactiveMedia?: boolean;
 }
 
 export function JournalMediaFigure({
@@ -84,6 +85,7 @@ export default function JournalEntryMediaContent({
   thumbnail = false,
   visibleMediaLimit,
   interactiveLinks = true,
+  interactiveMedia = true,
 }: JournalEntryMediaContentProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null);
 
@@ -122,7 +124,7 @@ export default function JournalEntryMediaContent({
                 className={mediaClassName}
                 imageClassName={imageClassName}
                 captionClassName={captionClassName}
-                onClick={() => setActiveMediaIndex(sortedMedia.findIndex((mediaItem) => mediaItem.id === item.id))}
+                onClick={interactiveMedia ? () => setActiveMediaIndex(sortedMedia.findIndex((mediaItem) => mediaItem.id === item.id)) : undefined}
               />
             ))}
           </div>

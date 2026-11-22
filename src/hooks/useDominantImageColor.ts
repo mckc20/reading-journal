@@ -17,30 +17,30 @@ type HslColor = {
   lightness: number;
 };
 
-export function useDominantImageColor(imageUrl?: string | null): string {
-  const [color, setColor] = useState(FALLBACK_COLOR);
+export function useDominantImageColor(
+  imageUrl?: string | null,
+  { fallbackColor = FALLBACK_COLOR, mostCommon = false }: { fallbackColor?: string; mostCommon?: boolean } = {},
+): string {
+  const [sample, setSample] = useState<{ imageUrl: string; mostCommon: boolean; color: string | null } | null>(null);
 
   useEffect(() => {
-    if (!imageUrl) {
-      setColor(FALLBACK_COLOR);
-      return;
-    }
+    if (!imageUrl) return;
 
     let cancelled = false;
     const image = new Image();
+    const finish = (color: string | null) => {
+      if (!cancelled) setSample({ imageUrl, mostCommon, color });
+    };
 
     image.crossOrigin = "anonymous";
     image.onload = () => {
       try {
-        const nextColor = getDominantImageColor(image);
-        if (!cancelled) setColor(nextColor ?? FALLBACK_COLOR);
+        finish(getDominantImageColor(image, mostCommon));
       } catch {
-        if (!cancelled) setColor(FALLBACK_COLOR);
+        finish(null);
       }
     };
-    image.onerror = () => {
-      if (!cancelled) setColor(FALLBACK_COLOR);
-    };
+    image.onerror = () => finish(null);
     image.src = imageUrl;
 
     return () => {
@@ -48,12 +48,14 @@ export function useDominantImageColor(imageUrl?: string | null): string {
       image.onload = null;
       image.onerror = null;
     };
-  }, [imageUrl]);
+  }, [imageUrl, mostCommon]);
 
-  return color;
+  return sample && sample.imageUrl === imageUrl && sample.mostCommon === mostCommon
+    ? sample.color ?? fallbackColor
+    : fallbackColor;
 }
 
-function getDominantImageColor(image: HTMLImageElement): string | null {
+function getDominantImageColor(image: HTMLImageElement, mostCommon: boolean): string | null {
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
 
@@ -72,6 +74,9 @@ function getDominantImageColor(image: HTMLImageElement): string | null {
   context.drawImage(image, 0, 0, width, height);
 
   const pixels = context.getImageData(0, 0, width, height).data;
+  if (mostCommon) {
+    return findDominantColor(pixels, { maxLightness: 1, requireSaturation: false, mostCommon: true });
+  }
   const preferredColor = findDominantColor(pixels, {
     maxLightness: 0.78,
     requireSaturation: true,
@@ -85,7 +90,7 @@ function getDominantImageColor(image: HTMLImageElement): string | null {
 
 function findDominantColor(
   pixels: Uint8ClampedArray,
-  options: { maxLightness: number; requireSaturation: boolean },
+  options: { maxLightness: number; requireSaturation: boolean; mostCommon?: boolean },
 ): string | null {
   const buckets = new Map<string, ColorBucket>();
 
@@ -98,7 +103,7 @@ function findDominantColor(
     const blue = pixels[index + 2];
     const { saturation, lightness } = rgbToHsl(red, green, blue);
 
-    if (lightness < 0.06 || lightness > options.maxLightness) continue;
+    if ((!options.mostCommon && lightness < 0.06) || lightness > options.maxLightness) continue;
     if (options.requireSaturation && saturation < 0.12) continue;
 
     const bucketKey = [
@@ -125,7 +130,9 @@ function findDominantColor(
   }
 
   const dominantBucket = Array.from(buckets.values()).sort(
-    (first, second) => second.score - first.score || second.count - first.count,
+    (first, second) => options.mostCommon
+      ? second.count - first.count || second.score - first.score
+      : second.score - first.score || second.count - first.count,
   )[0];
 
   if (!dominantBucket) return null;

@@ -28,7 +28,7 @@ import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
 import { AppHeading } from "@/components/design";
 import FormattedNoteContent from "@/components/FormattedNoteContent";
 import JournalEntryMediaContent from "@/components/JournalEntryMediaContent";
-import JournalEntryCard, { formatJournalDate, JournalEntryDate } from "@/components/JournalEntryCard";
+import JournalEntryCard, { formatJournalDate, JournalEntryDate, JournalEntryExcerpt, JournalEntryReadButton } from "@/components/JournalEntryCard";
 import QuoteBlock from "@/components/QuoteBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,9 +98,7 @@ interface JournalTimelineProps {
   sortMode?: "entry-date" | "date-added" | "book-progress";
   selectedEntryId?: string | null;
   initialEntryLimit?: number;
-  previewMode?: {
-    getEntryHref: (entry: JournalTimelineEntry) => string;
-  };
+  previewMode?: boolean;
   inlineComposer?: {
     open: boolean;
     entity: { type: "Book"; id: string } | { type: "Series"; id: string } | { type: "Author"; id: string };
@@ -269,6 +267,7 @@ function isEntityOwnedEntry(entry: JournalTimelineEntry): boolean {
 }
 
 function displayEntryTitle(entry: JournalTimelineEntry): ReactNode | null {
+  if (isGeneratedBookEntry(entry)) return entry.label;
   const title = reviewBookTitle(entry);
   if (hasReviewTag(entry) && title) {
     return (
@@ -1309,6 +1308,7 @@ function ListJournalEntry({
   onToggleHidden,
   onEdit,
   onDelete,
+  onRead,
   parentContextLabel,
   allowAttach = true,
   indented = false,
@@ -1325,6 +1325,7 @@ function ListJournalEntry({
   onToggleHidden: (entry: JournalTimelineEntry) => void;
   onEdit: (entry: ManualJournalTimelineEntry) => void;
   onDelete: (entry: ManualJournalTimelineEntry) => void;
+  onRead: (trigger: HTMLButtonElement) => void;
   parentContextLabel?: string | null;
   allowAttach?: boolean;
   indented?: boolean;
@@ -1336,6 +1337,7 @@ function ListJournalEntry({
         indented && "ml-6",
       )}
     >
+      <JournalEntryReadButton date={entryDate(entry)} onRead={onRead} />
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/notebook:opacity-100 sm:group-focus-within/notebook:opacity-100">
         <TimelineTopActions
           entry={entry}
@@ -1354,7 +1356,7 @@ function ListJournalEntry({
       </div>
       <div className="min-w-0 break-words pr-16">
         <JournalEntryDate date={entryDate(entry)} />
-        <NotebookEntryContent entry={entry} />
+        <NotebookEntryContent entry={entry} compact />
         <NotebookEntryMeta entry={entry} parentContextLabel={parentContextLabel} />
         <JournalEntryBacklinks backlinks={backlinks} />
       </div>
@@ -1373,7 +1375,7 @@ function JournalEntryBacklinks({ backlinks }: { backlinks: JournalBacklink[] }) 
           <Link
             key={backlink.publicId}
             to={backlink.href}
-            className="block rounded-md py-1 text-sm transition-colors hover:text-primary"
+            className="relative z-[2] block rounded-md py-1 text-sm transition-colors hover:text-primary"
           >
             <span className="flex min-w-0 items-center gap-1.5 font-medium">
               <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1389,40 +1391,62 @@ function JournalEntryBacklinks({ backlinks }: { backlinks: JournalBacklink[] }) 
   );
 }
 
-function NotebookEntryContent({ entry }: { entry: ManualJournalTimelineEntry }) {
+function NotebookEntryContent({
+  entry,
+  compact = false,
+  showTitle = true,
+  textClassName = "text-sm leading-6",
+}: {
+  entry: ManualJournalTimelineEntry;
+  compact?: boolean;
+  showTitle?: boolean;
+  textClassName?: string;
+}) {
   const note = getManualNote(entry);
   const title = displayEntryTitle(entry);
+  const media = getManualNoteMedia(entry);
+  const content = compact ? (
+    <>
+      <JournalEntryExcerpt markdown={note.content} />
+      {media.length > 0 && (
+        <JournalEntryMediaContent
+          markdown=""
+          media={media}
+          thumbnail
+          interactiveMedia={false}
+          visibleMediaLimit={1}
+          className="mt-3"
+          imageClassName="h-20 rounded object-cover"
+          captionClassName="line-clamp-1 text-xs"
+        />
+      )}
+    </>
+  ) : (
+    <JournalEntryMediaContent
+      markdown={note.content}
+      media={media}
+      className={textClassName}
+      imageClassName="max-h-96"
+    />
+  );
 
   if (entry.type === "passage") {
     return (
       <QuoteBlock
-        attribution={
-          note.attribution ? (
-            <span className="font-serif italic">- {note.attribution}</span>
-          ) : null
-        }
+        attribution={note.attribution ? <span className="font-serif italic">- {note.attribution}</span> : null}
+        attributionClassName={compact ? "text-xs" : undefined}
         className="gap-x-2"
-        markClassName="text-muted-foreground/40"
+        markClassName={cn("text-muted-foreground/40", compact && "text-2xl")}
       >
-        <JournalEntryMediaContent
-          markdown={note.content}
-          media={getManualNoteMedia(entry)}
-          className="text-base leading-8 text-foreground"
-          imageClassName="max-h-96"
-        />
+        {content}
       </QuoteBlock>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {title && <AppHeading level={3} as="h3">{title}</AppHeading>}
-      <JournalEntryMediaContent
-        markdown={note.content}
-        media={getManualNoteMedia(entry)}
-        className="text-base leading-8 text-foreground"
-        imageClassName="max-h-96"
-      />
+    <div className="space-y-2">
+      {showTitle && title && <AppHeading level={4} as="h3" className={compact ? "text-sm" : undefined}>{title}</AppHeading>}
+      {content}
     </div>
   );
 }
@@ -2096,6 +2120,10 @@ export default function JournalTimeline({
 }: JournalTimelineProps) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [readingEntry, setReadingEntry] = useState<JournalTimelineEntry | null>(null);
+  const [readerOpen, setReaderOpen] = useState(false);
+  const readerTitleRef = useRef<HTMLHeadingElement>(null);
+  const readerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(Boolean(selectedEntryId));
   const [editingEntry, setEditingEntry] = useState<ManualJournalTimelineEntry | null>(null);
   const [composerParentEntry, setComposerParentEntry] = useState<ManualJournalTimelineEntry | null>(null);
@@ -2877,6 +2905,19 @@ export default function JournalTimeline({
     );
   }
 
+  function readEntry(entry: JournalTimelineEntry, trigger: HTMLButtonElement) {
+    readerTriggerRef.current = trigger;
+    setReadingEntry(entry);
+    setReaderOpen(true);
+  }
+
+  const readingText = readingEntry && isGeneratedBookEntry(readingEntry)
+    ? readingEntry.description ?? ""
+    : readingEntry ? entryContentText(readingEntry) : "";
+  const readerTextClassName = readingText.length > 2400 || readingText.split("\n").length > 30
+    ? "text-[13px] leading-5"
+    : "text-sm leading-6";
+
   function attachedCountForEntry(entry: JournalTimelineEntry): number {
     if (isGeneratedBookEntry(entry)) {
       return getGeneratedEntryNoteTags(entry).flatMap((tag) => generatedAttachedNotesByTag.get(tag) ?? []).length;
@@ -2929,6 +2970,7 @@ export default function JournalTimeline({
                   ) : (
                     <ListJournalEntry
                       entry={entry}
+                      onRead={(trigger) => readEntry(entry, trigger)}
                       busy={busyEntryId === entry.id}
                       isHidden={isEntryHidden(entry)}
                       attachedCount={attachedCountForEntry(entry)}
@@ -2972,6 +3014,7 @@ export default function JournalTimeline({
                       ) : (
                         <ListJournalEntry
                           entry={reply}
+                          onRead={(trigger) => readEntry(reply, trigger)}
                           busy={busyEntryId === reply.id}
                           isHidden={isEntryHidden(reply)}
                           backlinks={backlinksByPublicId.get(getJournalEntryPublicId(reply) ?? "") ?? []}
@@ -3041,17 +3084,18 @@ export default function JournalTimeline({
                     }}
                   />
                 ) : previewMode ? (
-                  <Link
-                    to={previewMode.getEntryHref(entry)}
-                    className="block h-full rounded-lg outline-none transition-colors hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <JournalEntryCard entry={entry} date={entryDate(entry)} showTags={false} />
-                  </Link>
+                  <JournalEntryCard
+                    entry={entry}
+                    date={entryDate(entry)}
+                    onRead={(trigger) => readEntry(entry, trigger)}
+                    showTags={false}
+                  />
                 ) : (
                   <div className="relative h-full">
                     <JournalEntryCard
                       entry={entry}
                       date={entryDate(entry)}
+                      onRead={(trigger) => readEntry(entry, trigger)}
                       showTags
                       actions={
                         <JournalEntryActionsMenu
@@ -3250,7 +3294,26 @@ export default function JournalTimeline({
           </Button>
           {hiddenSectionOpen && (
             <div className="mt-3 space-y-4 rounded-lg border border-dashed p-3">
-              {splitEntries.hidden.map((entry, index) => (
+              {splitEntries.hidden.map((entry, index) => layout === "list" && isManualEntry(entry) ? (
+                <ListJournalEntry
+                  key={entry.id}
+                  entry={entry}
+                  onRead={(trigger) => readEntry(entry, trigger)}
+                  busy={busyEntryId === entry.id}
+                  isHidden
+                  attachedCount={attachedCountForEntry(entry)}
+                  backlinks={backlinksByPublicId.get(getJournalEntryPublicId(entry) ?? "") ?? []}
+                  onToggleSaved={(item) => void handleToggleSaved(item)}
+                  onReply={startReply}
+                  onAttach={startAttaching}
+                  onUnattach={requestUnattachNote}
+                  onToggleHidden={toggleEntryHidden}
+                  onEdit={startEditing}
+                  onDelete={requestTimelineDelete}
+                  parentContextLabel={parentContextLabelsByEntryId.get(entry.id)}
+                  allowAttach={(timelineRepliesByParentId[entry.sourceId]?.length ?? 0) === 0}
+                />
+              ) : (
                 <TimelineRow
                   key={entry.id}
                   entry={entry}
@@ -3274,6 +3337,51 @@ export default function JournalTimeline({
           )}
         </div>
       )}
+
+      <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
+        <DialogContent
+          className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            readerTitleRef.current?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            readerTriggerRef.current?.focus({ preventScroll: true });
+          }}
+        >
+          {readingEntry && (
+            <>
+              <header className="shrink-0 border-b px-5 py-4 pr-12">
+                <DialogTitle ref={readerTitleRef} tabIndex={-1} className="break-words">
+                  {displayEntryTitle(readingEntry) ?? (readingEntry.type === "passage" ? "Quote" : "Journal entry")}
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-xs">
+                  {formatJournalDate(entryDate(readingEntry))}
+                </DialogDescription>
+              </header>
+              <div
+                className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4 [overflow-wrap:anywhere]"
+                onClickCapture={(event) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  const href = event.target instanceof Element ? event.target.closest("a")?.getAttribute("href") : null;
+                  if (href?.startsWith("/") && !href.startsWith("//")) setReaderOpen(false);
+                }}
+              >
+                {isManualEntry(readingEntry) ? (
+                  <>
+                    <NotebookEntryContent entry={readingEntry} showTitle={false} textClassName={readerTextClassName} />
+                    <NotebookEntryMeta entry={readingEntry} parentContextLabel={parentContextLabelsByEntryId.get(readingEntry.id)} />
+                    <JournalEntryBacklinks backlinks={backlinksByPublicId.get(getJournalEntryPublicId(readingEntry) ?? "") ?? []} />
+                  </>
+                ) : (
+                  <FormattedNoteContent markdown={readingText} className={readerTextClassName} />
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(attachingEntry)}

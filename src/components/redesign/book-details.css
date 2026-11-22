@@ -36,7 +36,18 @@
 
 .rj-detail-page { max-width: 1000px; margin-inline: auto; }
 .rj-detail-hero { display: grid; gap: 26px; }
-.rj-detail-cover-stage { position: relative; display: flex; justify-content: center; padding: 54px 24px 0; border-radius: 24px; background: linear-gradient(var(--rj-light-yellow, var(--rj-gold)) 0%, var(--rj-light-yellow, var(--rj-gold)) 88%, transparent 88%); }
+.rj-detail-cover-stage {
+  --book-detail-hero-color: var(--rj-rose-light);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 54px 24px 0;
+  border-radius: 24px;
+  background: linear-gradient(var(--book-detail-hero-color) 0 88%, transparent 88%);
+}
+.rj-detail-cover-stage[data-cover-color] {
+  --book-detail-hero-color: color-mix(in srgb, var(--book-detail-cover-color) 38%, var(--background));
+}
 .rj-detail-topline { position: absolute; inset: 8px 10px auto; display: flex; justify-content: space-between; gap: 12px; z-index: 1; }
 .rj-detail-cover { width: 144px; border-radius: 10px; box-shadow: 0 5px 15px #21150f18; }
 .rj-detail-summary { min-width: 0; }
