@@ -15,7 +15,6 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  Heart,
   ImagePlus,
   Info,
   NotebookPen,
@@ -45,6 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BookCover } from "@/components/reading-journal/BookCover";
+import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
 import "@/components/redesign/book-details.css";
 import {
@@ -947,19 +947,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
               </p>
             )}
 
-            <div className="rj-detail-title-row">
-              <h1 id="book-detail-title">{book.title}</h1>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={toggleFavorite}
-                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                aria-pressed={isFavorite}
-              >
-                <Heart aria-hidden="true" className={isFavorite ? "size-[22px] fill-favorite text-favorite" : "size-[22px]"} />
-              </Button>
-            </div>
+            <BookDetailTitle id="book-detail-title" title={book.title} favorite={isFavorite} onToggleFavorite={toggleFavorite} />
 
             <p className="rj-detail-author break-words">
               {book.authors.map((author, index) => (
