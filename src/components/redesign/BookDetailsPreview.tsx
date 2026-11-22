@@ -53,7 +53,12 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onB
   const longDescription = Boolean(description && description.length > 240);
   const latestEntry = entries[0];
   const hasReadingSummary = Boolean(book.startedOn || book.finishedOn || book.readingMinutes != null);
-  const metadata = [['Source', book.source], ['Published', book.publicationYear]] as const;
+  const metadata = [
+    ['Format', book.format],
+    ['Language', book.language],
+    ['Source', book.source],
+    ['Published', book.publicationYear],
+  ] as const;
 
   return <div className="rj-redesign"><HomeShell {...shell} activeDestination="Library">
     <div className="rj-detail-page">
@@ -83,7 +88,7 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onB
       <div className="rj-detail-body">
         <section className="rj-detail-about" aria-labelledby={`${id}-about`}>
           <h2 id={`${id}-about`}>About this book</h2>
-          {(book.genres.length > 0 || book.format || book.language) && <div className="rj-detail-tags">{book.genres.slice(0, 3).map(genre => <span key={genre}>{genre}</span>)}{book.format && <span>{book.format}</span>}{book.language && <span>{book.language}</span>}</div>}
+          {book.genres.length > 0 && <div className="rj-detail-tags">{book.genres.slice(0, 3).map(genre => <span key={genre}>{genre}</span>)}</div>}
           <p id={`${id}-description`}>{description ? longDescription && !expanded ? `${description.slice(0, 240).trimEnd()}…` : description : 'No description yet.'}</p>
           {longDescription && <Button variant="ghost" className="rj-detail-text-action" aria-expanded={expanded} aria-controls={`${id}-description`} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show less' : 'Show more'}</Button>}
           {(metadata.some(([, value]) => value != null) || book.genres.length > 3) && <details className="rj-detail-metadata"><summary>More book details</summary><dl>{metadata.filter(([, value]) => value != null).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{book.genres.length > 3 && <div><dt>All genres</dt><dd>{book.genres.join(', ')}</dd></div>}</dl></details>}

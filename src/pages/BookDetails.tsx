@@ -31,7 +31,6 @@ import {
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BackButton from "@/components/BackButton";
-import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
@@ -94,7 +93,6 @@ import {
   formatPublicationDateInput,
   parsePublicationDateInput,
 } from "@/lib/publicationDate";
-import { bookHasGenreName, getBookGenreNames, getMostPopularMatchingGenre } from "@/lib/recommendations";
 import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import {
   getTodayLocalDate,
@@ -374,39 +372,10 @@ export default function BookDetails() {
     [book?.current_page, book?.pause_periods, book?.status, book?.total_pages, readingLogs],
   );
 
-  const relatedByAuthor = useMemo(() => {
-    if (!book) return [];
-    const authors = new Set(book.authors.map((author) => author.toLowerCase()));
-    return books
-      .filter(
-        (item) =>
-          item.id !== book.id &&
-          item.authors.some((author) => authors.has(author.toLowerCase())),
-      )
-      .slice(0, 3);
-  }, [book, books]);
-
   const authorSummaries = useMemo(
     () => buildAuthorSummaries(authors, books, journalEntries, wishlistBooks),
     [authors, books, journalEntries, wishlistBooks],
   );
-
-  const exploreGenre = useMemo(
-    () => (book ? getMostPopularMatchingGenre(getBookGenreNames(book), books) : null),
-    [book, books],
-  );
-
-  const relatedByGenre = useMemo(() => {
-    if (!book || !exploreGenre) return [];
-    return books
-      .filter(
-        (item) =>
-          item.id !== book.id &&
-          bookHasGenreName(item, exploreGenre) &&
-          !relatedByAuthor.some((authorBook) => authorBook.id === item.id),
-      )
-      .slice(0, 3);
-  }, [book, books, exploreGenre, relatedByAuthor]);
 
   function exitEditMode() {
     if (!book) return;
@@ -800,7 +769,7 @@ export default function BookDetails() {
   const isPaused = book.status === "Paused";
   const isReading = book.status === "Reading";
   const readingActionLabel = book.status === "Finished" ? "Reread" : "Start Reading";
-  const hasSecondaryMetadata = Boolean(publicationYear || book.source || book.isbn);
+  const hasSecondaryMetadata = Boolean(book.format || book.language || publicationYear || book.source || book.isbn);
   const hasReadingLogs = readingLogs.length > 0;
   // Only use date-based stats after a successful fetch confirms there are no logs.
   const hasNoReadingLogs = !logsLoading && !logsError && !hasReadingLogs;
@@ -1009,18 +978,16 @@ export default function BookDetails() {
                     Paused
                   </Badge>
                 ) : (
-                  <Select value={book.status} onValueChange={(value) => handleStatusChange(value as BookStatus)}>
-                    <SelectTrigger aria-label="Reading status" className="rounded-full bg-card">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    aria-label="Reading status"
+                    className="min-h-11 rounded-xl border border-input bg-surface px-3 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    value={book.status}
+                    onChange={(event) => void handleStatusChange(event.currentTarget.value as BookStatus)}
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
                 )}
               </div>
               <div className="rj-detail-rating">
@@ -1198,12 +1165,6 @@ export default function BookDetails() {
                   : book.genre_paths?.map((path) => (
                       <span key={path}>{formatGenrePathForDisplay(path)}</span>
                     ))}
-                {book.format && (
-                  <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>{book.format}</MetadataLink>
-                )}
-                {book.language && (
-                  <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>{book.language}</MetadataLink>
-                )}
               </div>
             }
           />
@@ -1211,6 +1172,16 @@ export default function BookDetails() {
             <details className="rj-detail-metadata">
               <summary>More book details</summary>
               <dl>
+                {book.format && (
+                  <SecondaryMetadataRow label="Format" value={
+                    <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>{book.format}</MetadataLink>
+                  } />
+                )}
+                {book.language && (
+                  <SecondaryMetadataRow label="Language" value={
+                    <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>{book.language}</MetadataLink>
+                  } />
+                )}
                 {book.source && (
                   <SecondaryMetadataRow label="Source" value={
                     <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>{book.source}</MetadataLink>
@@ -1325,35 +1296,6 @@ export default function BookDetails() {
             </div>
           )}
         </section>
-
-        <section className="space-y-4">
-          <AppHeading level={2}>
-            More to <span className="font-serif italic">Explore</span>
-          </AppHeading>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <RelatedBooksGroup
-              title={
-                <>
-                  More by{" "}
-                  <span className="font-serif italic">{book.authors[0] ?? "this author"}</span>
-                </>
-              }
-              books={relatedByAuthor}
-            />
-            <RelatedBooksGroup
-              title={
-                exploreGenre ? (
-                  <>
-                    More in <span className="font-serif italic">{exploreGenre}</span>
-                  </>
-                ) : (
-                  "More in this genre"
-                )
-              }
-              books={relatedByGenre}
-            />
-          </div>
-        </section>
       </div>
     </div>
   );
@@ -1407,31 +1349,6 @@ function SecondaryMetadataRow({
     <div>
       <dt>{label}</dt>
       <dd>{value}</dd>
-    </div>
-  );
-}
-
-function RelatedBooksGroup({ title, books }: { title: React.ReactNode; books: Book[] }) {
-  const navigate = useNavigate();
-
-  return (
-    <div className="rounded-xl border p-4">
-      <AppHeading level={4} as="h3">{title}</AppHeading>
-      {books.length === 0 ? (
-        <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          No matches in your library yet.
-        </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {books.slice(0, 3).map((book) => (
-            <CoverOnlyBookCard
-              key={book.id}
-              book={book}
-              onBook={(item) => navigate(`/books/${item.id}`)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
