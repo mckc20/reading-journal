@@ -948,6 +948,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             )}
 
             <div className="rj-detail-title-row">
+              <h1 id="book-detail-title">{book.title}</h1>
               <Button
                 type="button"
                 variant="ghost"
@@ -958,7 +959,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
               >
                 <Heart aria-hidden="true" className={isFavorite ? "size-[22px] fill-favorite text-favorite" : "size-[22px]"} />
               </Button>
-              <h1 id="book-detail-title">{book.title}</h1>
             </div>
 
             <p className="rj-detail-author break-words">

@@ -82,10 +82,10 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
         </div>
         <div className="rj-detail-summary">
           <div className="rj-detail-title-row">
+            <h1 id={`${id}-title`}>{book.title}</h1>
             <Button variant="ghost" size="icon-lg" aria-label={book.favorite ? 'Remove from Favorites' : 'Add to Favorites'} aria-pressed={!!book.favorite} onClick={onToggleFavorite}>
               <Heart aria-hidden="true" className={book.favorite ? 'size-[22px] fill-favorite text-favorite' : 'size-[22px]'} />
             </Button>
-            <h1 id={`${id}-title`}>{book.title}</h1>
           </div>
           <p className="rj-detail-author">{book.author}</p>
           <div className="rj-detail-status-row"><BookStatus status={book.status} />{book.rating != null && <div className="rj-detail-rating"><BookRating rating={book.rating} /><span aria-hidden="true">{book.rating} / 5</span></div>}</div>
