@@ -24,6 +24,7 @@ import { DropdownMenu } from "radix-ui";
 import { CreateLauncher } from "@/components/redesign/HomeShell";
 import "@/components/redesign/redesign.css";
 import "@/components/redesign/app-theme.css";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Button } from "@/components/ui/button";
 import { AuthorsProvider } from "@/context/AuthorsContext";
 import { BooksProvider } from "@/context/BooksContext";
@@ -268,7 +269,8 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
           <img src={readingJournalLogo} alt="" />
           <span>Reading Journal</span>
         </Link>
-        <nav className="rj-navigation" aria-label="Primary navigation">
+        <nav className="rj-navigation rj-tab-track" aria-label="Primary navigation">
+          <SlidingIndicator />
           {primaryNavLinks.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} aria-current={activeRoute === to ? "page" : undefined}>
               <Icon size={22} aria-hidden="true" />
@@ -411,7 +413,7 @@ function NotificationsMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-5rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="rj-menu-motion absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-5rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popover)]"
         >
           <div className="border-b px-3 py-2.5">
             <p className="text-sm font-medium">Notifications</p>

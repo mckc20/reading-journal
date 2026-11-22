@@ -1,3 +1,4 @@
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
@@ -86,6 +87,7 @@ function getOldestLogMonth(logs: ReadingLog[], fallback: Date): Date {
 }
 
 export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const columnWidthPx = 16;
   const currentMonthStart = useMemo(() => startOfMonth(new Date()), []);
   const latestWindowStart = useMemo(
@@ -196,7 +198,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
 
       {hasAnyReading ? (
         <div className="space-y-3">
-          <div className="overflow-x-auto pb-2">
+          <div {...motion} className="overflow-x-auto pb-2">
             <div className="min-w-[860px]">
               <div className="grid grid-cols-[auto_1fr] gap-2 text-xs text-muted-foreground">
                 <div />
@@ -224,7 +226,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
 
                 <div className="grid auto-cols-max grid-flow-col gap-1">
                   {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="grid grid-rows-7 gap-1">
+                    <div key={`${activeWindowStart.getTime()}-${weekIndex}`} className="rj-chart-point grid grid-rows-7 gap-1" style={{ animationDelay: `${weekIndex / weeks.length * 225}ms` }}>
                       {week.map((cell) => {
                         const title =
                           cell.trackedMinutes > 0

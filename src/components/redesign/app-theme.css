@@ -64,7 +64,7 @@
 .rj-app .rj-navigation { bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rj-app .rj-navigation a:hover { background: var(--surface-hover); }
 .rj-app .rj-navigation a svg { color: currentColor; }
-.rj-app .rj-navigation a[aria-current='page'] { background: var(--secondary); font-weight: 650; }
+.rj-app .rj-navigation a[aria-current='page'] { background: transparent; font-weight: 650; }
 .rj-app .rj-floating-add { z-index: 35; }
 .rj-app .rj-skip-link { position: fixed; }
 .rj-app-content { width: 100%; max-width: 1200px; margin-inline: auto; padding: 20px 20px 64px; }
@@ -89,6 +89,7 @@
 @media (min-width: 768px) {
   .rj-app-theme { --app-header-height: 150px; --app-bottom-nav-space: 0px; }
   .rj-app .rj-app-header { grid-template-rows: 68px auto; }
+  .rj-app .rj-navigation.rj-tab-track { position: relative; bottom: auto; }
   .rj-app-content { padding: 32px 28px 72px; }
   .rj-app-home-shelves:has([aria-labelledby='up-next']) {
     grid-template-columns: minmax(0, 1fr) minmax(240px, .6fr);

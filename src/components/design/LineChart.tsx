@@ -1,7 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design/Typography";
 import ChartTooltip from "@/components/design/ChartTooltip";
 import type { ChartDatum } from "@/components/design/VerticalBarChart";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { cn } from "@/lib/utils";
 
 interface LineChartProps {
@@ -24,7 +25,8 @@ export default function LineChart({
   const timeline = variant === "timeline";
   const gradientId = `line-chart-fill-${useId().replace(/:/g, "")}`;
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
+  const motion = useChartEntrance<HTMLDivElement>();
+  const chartRef = motion.ref;
   useEffect(() => {
     if (activeKey === null) return;
     const dismissOutside = (event: PointerEvent) => {
@@ -39,7 +41,7 @@ export default function LineChart({
       document.removeEventListener("pointerdown", dismissOutside);
       document.removeEventListener("keydown", dismissEscape);
     };
-  }, [activeKey]);
+  }, [activeKey, chartRef]);
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const yAxisMax = maxValue > 0 ? maxValue : 1;
   const yTicks = [yAxisMax, yAxisMax / 2, 0];
@@ -75,7 +77,7 @@ export default function LineChart({
       : "";
 
   return (
-    <div ref={chartRef} className={timeline ? "space-y-3" : "rounded-lg bg-muted/20 p-4"}>
+    <div {...motion} className={timeline ? "space-y-3" : "rounded-lg bg-muted/20 p-4"}>
       {title ? timeline ? <h4 className="text-sm font-medium">{title}</h4> : <AppHeading level={4}>{title}</AppHeading> : null}
       {data.length === 0 || maxValue <= 0 ? (
         <div className={timeline ? "rounded-md border bg-background/80 p-3 text-sm text-muted-foreground" : "mt-4 flex min-h-36 items-center justify-center rounded-lg bg-muted/20 px-4 text-center text-sm text-muted-foreground"}>
@@ -105,7 +107,7 @@ export default function LineChart({
                   )}
 
                   <svg
-                    className="absolute inset-0 z-[2] overflow-visible"
+                    className="rj-chart-line absolute inset-0 z-[2] overflow-visible"
                     width="100%"
                     height={chartHeight}
                     viewBox={`0 0 100 ${chartHeight}`}
@@ -136,8 +138,8 @@ export default function LineChart({
                     <button
                       key={point.key}
                       type="button"
-                      className="absolute z-[3] flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                      style={{ left: `${point.x}%`, top: `${point.y}px` }}
+                      className="rj-chart-point absolute z-[3] flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      style={{ left: `${point.x}%`, top: `${point.y}px`, animationDelay: `${point.x * 4}ms` }}
                       onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveKey(point.key); }}
                       onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveKey(null); }}
                       onPointerDown={(event) => {

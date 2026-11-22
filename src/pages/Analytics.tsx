@@ -19,6 +19,7 @@ import {
   StatCard as SharedStatCard,
   VerticalBarChart,
 } from "@/components/design";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
@@ -192,6 +193,7 @@ function SimpleBarChart({
       highlightKey={highlightKey}
       showAllXLabels={showAllXLabels}
       showEmptySeries={unit === "books"}
+      animationKey={unit}
     />
   );
 }
@@ -606,19 +608,17 @@ export default function Analytics() {
               data={monthlyTrendChart.data}
               unit={monthlyTrendChart.unit}
               action={
-                <div className="inline-flex rounded-md bg-background p-1">
-                  {(["books", "pages", "minutes"] as MonthlyTrendMetric[]).map((metric) => (
-                    <Button
-                      key={metric}
-                      type="button"
-                      variant={monthlyTrendMetric === metric ? "default" : "ghost"}
-                      size="xs"
-                      onClick={() => setMonthlyTrendMetric(metric)}
-                    >
-                      {metric === "minutes" ? "Time" : metric[0].toUpperCase() + metric.slice(1)}
-                    </Button>
-                  ))}
-                </div>
+                <SegmentedControl<MonthlyTrendMetric>
+                  label="Reading trend metric"
+                  value={monthlyTrendMetric}
+                  onChange={setMonthlyTrendMetric}
+                  size="xs"
+                  options={[
+                    { value: "books", label: "Books" },
+                    { value: "pages", label: "Pages" },
+                    { value: "minutes", label: "Time" },
+                  ]}
+                />
               }
             />}
           </Section>

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Calendar, CalendarClock, ChevronRight, Clock, type LucideIcon } from "lucide-react";
 import ProgressOverTimeChart, { type ProgressOverTimeChartMode } from "@/components/ProgressOverTimeChart";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -178,20 +179,7 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
             <h3 id="book-timeline-heading" className="text-sm font-medium">
               {chartModes.find(({ value }) => value === chartMode)?.label} over time
             </h3>
-            <div className="inline-flex rounded-md bg-card p-1" role="group" aria-label="Chart metric">
-              {chartModes.map(({ value, label }) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant={chartMode === value ? "default" : "ghost"}
-                  size="sm"
-                  aria-pressed={chartMode === value}
-                  onClick={() => setChartMode(value)}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
+            <SegmentedControl label="Chart metric" value={chartMode} options={chartModes} onChange={setChartMode} />
           </div>
           <ProgressOverTimeChart
             key={chartMode}

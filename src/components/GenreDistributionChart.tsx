@@ -8,6 +8,7 @@ import {
   OTHERS_GENRE_CHART_COLOR,
 } from "@/lib/genreChartColors";
 import { getGenrePath, isGenreRoot } from "@/lib/genres";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { cn } from "@/lib/utils";
 import type { Book, Genre } from "@/types";
 
@@ -250,6 +251,7 @@ function formatOthersPreview(others: ParentGenreDatum["others"]): string | null 
 
 export default function GenreDistributionChart({ books, genres = [], loading = false, error = null }: GenreDistributionChartProps) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const motion = useChartEntrance<HTMLDivElement>();
   const [includeSubgenres, setIncludeSubgenres] = useState(false);
 
   const { data, booksWithGenre, totalGenreAssignments } = useMemo(
@@ -307,12 +309,13 @@ export default function GenreDistributionChart({ books, genres = [], loading = f
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
         <div className="mx-auto w-full max-w-[26rem]">
-          <div className="relative">
+          <div {...motion} className="relative">
             <svg
+              key={String(includeSubgenres)}
               viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
               role="img"
               aria-label="Donut chart showing book counts by genre"
-              className="h-auto w-full"
+              className="rj-chart-distribution h-auto w-full"
             >
               <circle
                 cx={CHART_SIZE / 2}

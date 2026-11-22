@@ -157,7 +157,7 @@ export default function Search() {
             </Button>
 
             {filtersOpen && (
-              <div className="absolute right-0 top-11 z-20 w-64 rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg">
+              <div className="rj-menu-motion absolute right-0 top-11 z-20 w-64 rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg">
                 <div className="flex items-center justify-between gap-2 border-b pb-2">
                   <p className="px-1 text-xs font-medium text-muted-foreground">
                     Search properties

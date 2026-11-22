@@ -33,6 +33,7 @@ import BackButton from "@/components/BackButton";
 import OverflowMenu from "@/components/OverflowMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { selectionLabel } from "@/lib/selectionLabels";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -519,11 +520,12 @@ function LibraryViewModeSwitcher({
   onDisplayChange: (display: LibraryDisplay) => void;
 }) {
   return (
-    <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+    <div role="group" aria-label="Book view" className="rj-view-switch rj-tab-track flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+      <SlidingIndicator />
       <Button
         type="button"
         size="icon-sm"
-        variant={display === "grid" ? "secondary" : "ghost"}
+        variant="ghost"
         aria-label="Grid view"
         aria-pressed={display === "grid"}
         onClick={() => onDisplayChange("grid")}
@@ -533,7 +535,7 @@ function LibraryViewModeSwitcher({
       <Button
         type="button"
         size="icon-sm"
-        variant={display === "table" ? "secondary" : "ghost"}
+        variant="ghost"
         aria-label="List view"
         aria-pressed={display === "table"}
         onClick={() => onDisplayChange("table")}

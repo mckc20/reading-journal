@@ -27,6 +27,7 @@ import {
 import { AppHeading, HeadingDescription } from "@/components/design";
 import SetPasswordDialog from "@/components/SetPasswordDialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -1716,7 +1717,8 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTab }) {
       className="-mx-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
       aria-label="Settings sections"
     >
-      <div className="flex min-w-max gap-1 rounded-lg bg-muted p-1 md:min-w-0">
+      <div className="rj-tab-track rj-settings-tabs flex min-w-max gap-1 rounded-lg bg-muted p-1 md:min-w-0">
+        <SlidingIndicator />
         {settingsTabs.map(({ value, label, icon: Icon }) => {
           const active = value === activeTab;
 
@@ -1724,13 +1726,10 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTab }) {
             <Button
               key={value}
               type="button"
-              variant={active ? "secondary" : "ghost"}
+              variant="ghost"
               size="sm"
               asChild
-              className={cn(
-                "flex-1 justify-center",
-                active && "bg-background shadow-sm hover:bg-background",
-              )}
+              className="flex-1 justify-center"
             >
               <Link to={`/settings/${value}`} aria-current={active ? "page" : undefined}>
                 <Icon className="h-4 w-4" aria-hidden="true" />

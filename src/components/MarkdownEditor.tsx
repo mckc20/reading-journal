@@ -350,7 +350,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
             {calloutMenuOpen && (
-              <div className="rj-markdown-callout-menu absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
+              <div className="rj-menu-motion rj-markdown-callout-menu absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
                 {CALLOUT_OPTIONS.map(({ Icon, ...option }) => (
                   <button
                     key={option.type}

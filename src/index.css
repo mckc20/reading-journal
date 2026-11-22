@@ -4,6 +4,7 @@
 @import "@fontsource-variable/google-sans-flex";
 @import "@fontsource-variable/lora";
 @import "@fontsource-variable/lora/wght-italic.css";
+@import "./motion.css";
 
 @keyframes wrap-up-slide-in {
   from { opacity: 0; transform: translateX(calc(var(--wrap-up-slide-direction) * 100%)); }

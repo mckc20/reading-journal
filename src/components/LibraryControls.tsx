@@ -6,7 +6,7 @@ import { collectionSelectClassName, collectionSelectFieldClassName } from "@/com
 import { DropdownMenu } from "radix-ui";
 import { cn } from "@/lib/utils";
 
-const collectionMenuClassName = "z-50 max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-lg border border-input bg-background p-1 text-sm text-foreground shadow-sm";
+const collectionMenuClassName = "rj-menu-motion z-50 max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-lg border border-input bg-background p-1 text-sm text-foreground shadow-sm";
 const collectionMenuItemClassName = "relative flex min-h-8 w-full cursor-default items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground";
 
 export function FilterSelect({ label, value, options, onChange, emptyLabel = "All", triggerClassName, disabled = false }: {

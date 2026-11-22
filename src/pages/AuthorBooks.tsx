@@ -6,6 +6,7 @@ import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import BookTimeline, { type BookTimelineItem } from "@/components/BookTimeline";
 import { AppHeading, HeadingDescription } from "@/components/design";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -276,11 +277,12 @@ export default function AuthorBooks() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <div className="flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+            <div role="group" aria-label="Book view" className="rj-view-switch rj-tab-track flex rounded-lg border bg-background p-0.5 dark:bg-input/30">
+              <SlidingIndicator />
               <Button
                 type="button"
                 size="icon-sm"
-                variant={display === "cards" ? "secondary" : "ghost"}
+                variant="ghost"
                 aria-label="Cards view"
                 aria-pressed={display === "cards"}
                 onClick={() =>
@@ -297,7 +299,7 @@ export default function AuthorBooks() {
               <Button
                 type="button"
                 size="icon-sm"
-                variant={display === "timeline" ? "secondary" : "ghost"}
+                variant="ghost"
                 aria-label="Timeline view"
                 aria-pressed={display === "timeline"}
                 onClick={() =>

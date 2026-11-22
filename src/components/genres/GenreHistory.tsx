@@ -2,6 +2,8 @@ import { useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { AppHeading, HeadingDescription } from "@/components/design";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { Button } from "@/components/ui/button";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { buildGenreHistory, getDefaultHistoryGenre, getGenreHistoryOptions, getHistoryWindowBounds } from "@/lib/genreHistory";
@@ -44,6 +46,7 @@ export default function GenreHistory({ books, genres }: GenreHistoryProps) {
 
 function HistoryChart({ books, genres, genre }: { books: Book[]; genres: Genre[]; genre: Genre }) {
   const panelId = useId();
+  const motion = useChartEntrance<HTMLDivElement>();
   const currentYear = new Date().getFullYear();
   const [endYear, setEndYear] = useState(currentYear);
   const [view, setView] = useState<"enjoyment" | "count">("enjoyment");
@@ -87,10 +90,12 @@ function HistoryChart({ books, genres, genre }: { books: Book[]; genres: Genre[]
 
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div role="group" aria-label="History measurement" className="flex flex-wrap gap-1">
-        <Button size="sm" variant={enjoyment ? "default" : "outline"} aria-pressed={enjoyment} onClick={() => setView("enjoyment")}>Enjoyment</Button>
-        <Button size="sm" variant={!enjoyment ? "default" : "outline"} aria-pressed={!enjoyment} onClick={() => setView("count")}>Books read</Button>
-      </div>
+      <SegmentedControl
+        label="History measurement"
+        value={view}
+        options={[{ value: "enjoyment", label: "Enjoyment" }, { value: "count", label: "Books read" }]}
+        onChange={setView}
+      />
       <div className="flex items-center gap-2">
         <Button size="icon" variant="ghost" aria-label="Show one year earlier" disabled={history.earliestYear === null || endYear <= bounds.minEndYear} onClick={() => moveWindow(-1)}><ChevronLeft aria-hidden="true" className="h-4 w-4" /></Button>
         <span className="text-sm tabular-nums" aria-live="polite">{endYear - 4}–{endYear}</span>
@@ -107,10 +112,10 @@ function HistoryChart({ books, genres, genre }: { books: Book[]; genres: Genre[]
     }}>
       <div aria-hidden="true" className="relative h-[200px] text-right text-xs text-muted-foreground">{ticks.map((tick, index) => <span key={tick} className="absolute right-0 -translate-y-1/2" style={{ top: 10 + index / (ticks.length - 1) * 180 }}>{tick}</span>)}</div>
       <div className="min-w-0">
-        <div className="relative h-[200px] overflow-hidden">
+        <div {...motion} className="relative h-[200px] overflow-hidden">
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 inset-y-2.5 flex flex-col justify-between">{ticks.map((tick) => <div key={tick} className="border-t border-border/60" />)}</div>
           <div className="absolute inset-0 transition-transform duration-350 ease-in-out motion-reduce:transition-none" style={timelineStyle} data-genre-timeline>
-          {enjoyment && <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 200" preserveAspectRatio="none">
+          {enjoyment && <svg aria-hidden="true" className="rj-chart-line pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 200" preserveAspectRatio="none">
             {history.years.slice(1).map((entry, index) => {
               const previous = history.years[index];
               return entry.averageRating !== null && previous.averageRating !== null
@@ -127,8 +132,8 @@ function HistoryChart({ books, genres, genre }: { books: Book[]; genres: Genre[]
               aria-expanded={selectedYear === entry.year} aria-controls={panelId}
               onClick={() => setSelectedYear((year) => year === entry.year ? null : entry.year)}
               className={cn("absolute inset-y-0 min-w-0 rounded-md hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selectedYear === entry.year && "bg-primary/10 ring-1 ring-primary/40", selected && entry.year !== selected.year && "pointer-events-none")}>
-              {enjoyment ? entry.averageRating !== null && <span aria-hidden="true" className="absolute left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary" style={{ top: ratingY(entry.averageRating) }} />
-                : <span aria-hidden="true" className="absolute bottom-2.5 left-1/2 w-[55%] max-w-10 -translate-x-1/2 rounded-t-sm bg-primary/75" style={{ height: entry.finishedCount / maxCount * 180 }} />}
+              {enjoyment ? entry.averageRating !== null && <span aria-hidden="true" className="rj-chart-point absolute left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary" style={{ top: ratingY(entry.averageRating), animationDelay: `${Math.max(0, yearPosition(entry.year)) * 4}ms` }} />
+                : <span aria-hidden="true" className="rj-chart-bar absolute bottom-2.5 left-1/2 w-[55%] max-w-10 -translate-x-1/2 rounded-t-sm bg-primary/75" style={{ height: entry.finishedCount / maxCount * 180 }} />}
             </button>)}
           </div>
           {selected && <div id={panelId} className="absolute inset-y-0 left-0 right-[20%] z-10 mr-2 animate-in fade-in-0 bg-background duration-350 motion-reduce:animate-none">

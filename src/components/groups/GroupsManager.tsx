@@ -1297,7 +1297,7 @@ export function GroupsManager() {
         {attachmentPicker && (
           <div
             ref={attachmentPickerRef}
-            className="absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[40rem]"
+            data-side="top" className="rj-menu-motion absolute right-3 bottom-full left-3 z-40 mb-2 flex overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-[var(--shadow-popover)] sm:left-auto sm:w-[40rem]"
             style={{ height: `min(${attachmentPickerHeight}px, calc(100dvh - 9rem))` }}
             onPointerDown={(event) => event.stopPropagation()}
           >
@@ -1963,7 +1963,7 @@ export function GroupsManager() {
 
       {messageActionMenu && actionMenuMessage && (
         <div
-          className="fixed z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="rj-menu-motion fixed z-50 w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]"
           style={{
             left: Math.min(messageActionMenu.x, window.innerWidth - 190),
             top: Math.min(messageActionMenu.y, window.innerHeight - 176),

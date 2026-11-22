@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design/Typography";
 import ChartTooltip from "@/components/design/ChartTooltip";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { cn } from "@/lib/utils";
 
 export interface ChartDatum {
@@ -22,6 +23,7 @@ interface VerticalBarChartProps {
   showAllXLabels?: boolean;
   yAxisClassName?: string;
   showEmptySeries?: boolean;
+  animationKey?: string;
 }
 
 export default function VerticalBarChart({
@@ -34,7 +36,9 @@ export default function VerticalBarChart({
   showAllXLabels = false,
   yAxisClassName = "grid-cols-[3rem_1fr]",
   showEmptySeries = false,
+  animationKey,
 }: VerticalBarChartProps) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const yAxisMax = maxValue > 0 ? maxValue : showEmptySeries ? 2 : 1;
@@ -61,7 +65,7 @@ export default function VerticalBarChart({
   );
 
   return (
-    <div className="rounded-lg bg-muted/20 p-4">
+    <div {...motion} className="rounded-lg bg-muted/20 p-4">
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           {title ? <AppHeading level={4}>{title}</AppHeading> : <span />}
@@ -100,7 +104,7 @@ export default function VerticalBarChart({
                   )}
 
                   <div className="relative grid h-full w-full items-end" style={gridStyle}>
-                    {data.map((point) => {
+                    {data.map((point, index) => {
                       const barHeight = getBarHeight(point.value);
                       const highlighted = point.key === highlightKey;
 
@@ -116,11 +120,12 @@ export default function VerticalBarChart({
                           aria-label={`${point.label}: ${point.displayValue ?? formatValue(point.value)}`}
                         >
                           <div
+                            key={animationKey}
                             className={cn(
-                              "w-[70%] max-w-8 rounded-t-sm transition-colors group-hover:bg-primary",
+                              "rj-chart-bar w-[70%] max-w-8 rounded-t-sm transition-colors group-hover:bg-primary",
                               highlighted ? "bg-rating" : "bg-primary/85",
                             )}
-                            style={{ height: `${barHeight}px` }}
+                            style={{ height: `${barHeight}px`, animationDelay: `${index / data.length * 150}ms` }}
                           />
                         </button>
                       );

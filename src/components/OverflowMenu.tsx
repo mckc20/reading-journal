@@ -44,7 +44,7 @@ export default function OverflowMenu({ label, children, className, portal = true
       ref={menuRef}
       role="menu"
       className={cn(
-        "z-50 w-48 rounded-lg border bg-popover p-1 shadow-md",
+        "rj-menu-motion z-50 w-48 rounded-lg border bg-popover p-1 shadow-md",
         portal ? "fixed" : "absolute right-0 top-full mt-2",
       )}
       style={portal ? position ?? undefined : undefined}

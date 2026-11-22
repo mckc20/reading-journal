@@ -1,9 +1,10 @@
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
 import { BarChart3, BookOpen, CalendarDays, Clock3, PauseCircle, Podium, Timer, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 import type { SeriesStats } from "@/lib/seriesDetails";
@@ -111,36 +112,6 @@ function BookThumbnail({ book }: { book: Book }) {
   );
 }
 
-function SegmentedControl<TValue extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: TValue;
-  options: Array<{ value: TValue; label: string }>;
-  onChange: (value: TValue) => void;
-}) {
-  return (
-    <div className="inline-flex flex-wrap gap-1">
-      {options.map((option) => (
-        <Button
-          key={option.value}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-7 rounded-md px-2.5 text-xs font-medium",
-            option.value === value && "bg-primary/80 text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground",
-          )}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
 function StatsBarChart({
   rows,
   emptyLabel,
@@ -152,6 +123,7 @@ function StatsBarChart({
   title?: string;
   unframed?: boolean;
 }) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const maximumValue = Math.max(...rows.map((row) => row.value), 0);
 
   return (
@@ -160,8 +132,8 @@ function StatsBarChart({
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className={cn(unframed ? "divide-y divide-border" : "space-y-4")}>
-          {rows.map((row) => (
+        <div {...motion} className={cn(unframed ? "divide-y divide-border" : "space-y-4")}>
+          {rows.map((row, index) => (
             <div
               key={row.book.id}
               className={cn(
@@ -174,8 +146,8 @@ function StatsBarChart({
               </Link>
               <div className="h-3 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${maximumValue > 0 ? Math.max((row.value / maximumValue) * 100, 3) : 0}%` }}
+                  className="rj-chart-bar rj-chart-bar-horizontal h-full rounded-full bg-primary"
+                  style={{ width: `${maximumValue > 0 ? Math.max((row.value / maximumValue) * 100, 3) : 0}%`, animationDelay: `${index / rows.length * 150}ms` }}
                 />
               </div>
               <p className="text-sm tabular-nums text-muted-foreground sm:text-right">{row.formattedValue}</p>
@@ -287,6 +259,7 @@ function SeriesRankingPodium({
   emptyLabel: string;
   getTieKey?: (row: { book: Book; value: number }) => string | number;
 }) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const rankingGroups = getRankingGroups(rows, getTieKey);
   const first = rankingGroups[0];
   const second = rankingGroups[1];
@@ -299,8 +272,8 @@ function SeriesRankingPodium({
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <div className="space-y-4 overflow-visible">
-          <div className="overflow-visible">
+        <div {...motion} className="space-y-4 overflow-visible">
+          <div className="rj-chart-podium overflow-visible">
             <div className="grid grid-cols-3 items-end gap-2 overflow-visible sm:gap-4">
               <PodiumColumn group={second} formatValue={formatValue} />
               <PodiumColumn group={first} formatValue={formatValue} />
@@ -463,6 +436,7 @@ export function SeriesAnalyticsFull({
             </p>
           </div>
           <SegmentedControl<SpeedChartMode>
+            label="Book comparison metric"
             value={paceMode}
             onChange={setPaceMode}
             options={[
@@ -472,6 +446,7 @@ export function SeriesAnalyticsFull({
           />
         </div>
         <StatsBarChart
+          key={paceMode}
           rows={paceRows}
           unframed
           emptyLabel={
@@ -494,6 +469,7 @@ export function SeriesAnalyticsFull({
             </p>
           </div>
           <SegmentedControl<RankingMode>
+            label="Book ranking metric"
             value={rankingMode}
             onChange={setRankingMode}
             options={[
@@ -504,6 +480,7 @@ export function SeriesAnalyticsFull({
           />
         </div>
         <SeriesRankingPodium
+          key={rankingMode}
           rows={ranking.rows}
           formatValue={ranking.formatValue}
           emptyLabel={ranking.emptyLabel}

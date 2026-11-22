@@ -554,8 +554,9 @@ function JournalEntryActionsMenu({
       {open && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[2147483647] w-64 rounded-2xl border border-border/80 bg-popover p-2 text-popover-foreground shadow-xl"
+          className="rj-menu-motion fixed z-[2147483647] w-64 rounded-2xl border border-border/80 bg-popover p-2 text-popover-foreground shadow-xl"
           data-placement={menuPlacement}
+          data-side={menuPlacement}
           style={{
             left: menuPosition?.left ?? 0,
             top: menuPosition?.top ?? 0,

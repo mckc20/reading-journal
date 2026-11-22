@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from "react";
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { PauseCircle } from "lucide-react";
 import { VerticalBarChart } from "@/components/design";
 import ChartTooltip from "@/components/design/ChartTooltip";
@@ -118,6 +119,7 @@ export default function ProgressOverTimeChart({
   pausePeriods = [],
   mode = "progress",
 }: ProgressOverTimeChartProps) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const gradientId = `timeline-fill-${useId().replace(/:/g, "")}`;
   const progressTimeline = useMemo(
@@ -255,7 +257,7 @@ export default function ProgressOverTimeChart({
   }
 
   return (
-    <div className={isSpeedMode ? "grid grid-cols-[4.5rem_1fr] gap-2" : "grid grid-cols-[2.5rem_1fr] gap-2"}>
+    <div {...motion} className={isSpeedMode ? "grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2" : "grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2"}>
       <div className="flex h-44 flex-col justify-between text-[10px] text-muted-foreground">
         {yAxisLabels.map((label) => (
           <span key={label}>{label}</span>
@@ -308,7 +310,8 @@ export default function ProgressOverTimeChart({
             )}
 
             <svg
-              className="absolute inset-0 z-[2] overflow-visible"
+              key={mode}
+              className="rj-chart-line absolute inset-0 z-[2] overflow-visible"
               width="100%"
               height={chartHeight}
               viewBox={`0 0 100 ${chartHeight}`}
@@ -362,16 +365,17 @@ export default function ProgressOverTimeChart({
 
               return (
                 <button
-                  key={`${point.dayKey}-${point.value}-${index}`}
+                  key={`${mode}-${point.dayKey}-${point.value}-${index}`}
                   type="button"
                   className={
                     showMarker
-                      ? "absolute z-[3] h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      ? "rj-chart-point absolute z-[3] h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                       : "absolute z-[3] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   }
                   style={{
                     left: `${point.x}%`,
                     top: `${point.y}px`,
+                    animationDelay: `${Math.max(0, point.x) * 4}ms`,
                     borderColor: showMarker
                       ? "color-mix(in oklch, var(--muted) 20%, var(--background))"
                       : "transparent",
@@ -399,8 +403,11 @@ export default function ProgressOverTimeChart({
               return (
                 <span
                   key={`${point.dayKey}-label-${index}`}
-                  className="absolute w-16 -translate-x-1/2 text-center text-[10px] text-muted-foreground"
-                  style={{ left: `${x}%` }}
+                  className="absolute w-max max-w-16 whitespace-nowrap text-[10px] text-muted-foreground"
+                  style={{
+                    left: `${x}%`,
+                    transform: x === 0 ? undefined : x === 100 ? "translateX(-100%)" : "translateX(-50%)",
+                  }}
                 >
                   {shouldShow ? label : ""}
                 </span>

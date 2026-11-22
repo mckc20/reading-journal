@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppHeading, VerticalBarChart } from '@/components/design';
-import { Button } from '@/components/ui/button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { buildReportCalendar } from '@/lib/wrapUpPresentation';
 import type { MonthlyReport } from '@/lib/wrapUpReports';
 
@@ -30,21 +30,17 @@ export default function ReportActivity({ activity, monthKey }: {
       <div className="flex items-center justify-between gap-3">
         <AppHeading level={2} className="min-w-0 text-xl sm:text-2xl">Reading activity</AppHeading>
         {activity !== undefined && (
-          <div role="group" aria-label="Activity chart metric" className="inline-flex shrink-0 rounded-md bg-background p-1">
-            {(['pagesLogged', 'minutesLogged'] as const).map(key => (
-              <Button
-                key={key}
-                type="button"
-                size="xs"
-                variant={metric === key ? 'default' : 'ghost'}
-                aria-label={key === 'pagesLogged' ? 'Pages logged' : 'Minutes logged'}
-                aria-pressed={metric === key}
-                onClick={() => setMetric(key)}
-              >
-                {key === 'pagesLogged' ? 'Pages' : 'Minutes'}<span className="hidden sm:inline"> logged</span>
-              </Button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="Activity chart metric"
+            className="shrink-0 flex-nowrap bg-background"
+            value={metric}
+            size="xs"
+            onChange={setMetric}
+            options={[
+              { value: "pagesLogged", label: <>Pages<span className="hidden sm:inline"> logged</span></>, accessibleLabel: "Pages logged" },
+              { value: "minutesLogged", label: <>Minutes<span className="hidden sm:inline"> logged</span></>, accessibleLabel: "Minutes logged" },
+            ]}
+          />
         )}
       </div>
       {activity === undefined ? (
@@ -52,6 +48,7 @@ export default function ReportActivity({ activity, monthKey }: {
       ) : (
         <VerticalBarChart
           data={chartData}
+          animationKey={metric}
           showEmptySeries
           formatValue={value => `${Math.round(value)} ${metric === 'pagesLogged' ? 'pages' : 'min'}`}
         />

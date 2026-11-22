@@ -1,3 +1,4 @@
+import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { ChartScatter, Clock } from "lucide-react";
 import { useState } from "react";
 
@@ -39,6 +40,7 @@ function formatWeekStart(weekStartIso: string): string {
 }
 
 export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartProps) {
+  const motion = useChartEntrance<HTMLDivElement>();
   const [showWeeklyDots, setShowWeeklyDots] = useState(true);
 
   const highest = weekdays.highest;
@@ -98,8 +100,8 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
       </div>
 
       <div className="rounded-md border px-3 py-3">
-        <div className="grid h-56 grid-cols-7 items-end gap-2" aria-label="Median reading minutes by weekday">
-          {weekdays.all.map((day) => {
+        <div {...motion} className="grid h-56 grid-cols-7 items-end gap-2" aria-label="Median reading minutes by weekday">
+          {weekdays.all.map((day, dayIndex) => {
             const activityLabel = getActivityLabel(day, highest, lowest);
             const activityMarker = getActivityMarker(activityLabel);
             const medianMinutes = day.medianMinutesPerWeek;
@@ -140,9 +142,10 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
                     : null}
 
                   <div
-                    className="w-7 rounded-t-sm bg-primary/85 transition-colors group-hover:bg-primary"
+                    className="rj-chart-bar w-7 rounded-t-sm bg-primary/85 transition-colors group-hover:bg-primary"
                     style={{
                       height: `${columnHeight}%`,
+                      animationDelay: `${dayIndex * 25}ms`,
                     }}
                     aria-hidden="true"
                   />

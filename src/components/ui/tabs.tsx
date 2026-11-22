@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
+import { SlidingIndicator } from "@/components/ui/sliding-indicator"
 import { cn } from "@/lib/utils"
 
 function Tabs({
@@ -40,6 +41,7 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
@@ -47,9 +49,12 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(tabsListVariants({ variant }), "rj-tab-track", className)}
       {...props}
-    />
+    >
+      <SlidingIndicator />
+      {children}
+    </TabsPrimitive.List>
   )
 }
 
