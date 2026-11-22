@@ -19,7 +19,7 @@ export function SegmentedControl<Value extends string>({
   size?: "xs" | "sm";
 }) {
   return (
-    <div role="group" aria-label={label} className={cn("rj-tab-track rj-segmented-control inline-flex flex-wrap rounded-md bg-card p-1", className)}>
+    <div role="group" aria-label={label} className={cn("rj-tab-track rj-segmented-control inline-flex flex-wrap rounded-full bg-card", className)}>
       <SlidingIndicator />
       {options.map((option) => (
         <Button

@@ -32,7 +32,7 @@ export default function ReportActivity({ activity, monthKey }: {
         {activity !== undefined && (
           <SegmentedControl
             label="Activity chart metric"
-            className="shrink-0 flex-nowrap bg-background"
+            className="shrink-0 flex-nowrap"
             value={metric}
             size="xs"
             onChange={setMetric}
