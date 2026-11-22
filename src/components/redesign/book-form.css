@@ -59,12 +59,7 @@
     --rj-add-book-gutter-left: max(20px, env(safe-area-inset-left));
     --rj-add-book-gutter-right: max(20px, env(safe-area-inset-right));
   }
-  .rj-add-book-dialog :is(.rj-book-form-heading, .rj-book-form-actions) {
-    margin-left: var(--rj-add-book-gutter-left);
-    margin-right: var(--rj-add-book-gutter-right);
-    padding-inline: 0;
-  }
-  .rj-add-book-dialog .rj-creation-book-fields {
+  .rj-add-book-dialog :is(.rj-book-form-heading, .rj-book-form-actions, .rj-creation-book-fields) {
     padding-left: var(--rj-add-book-gutter-left);
     padding-right: var(--rj-add-book-gutter-right);
   }
