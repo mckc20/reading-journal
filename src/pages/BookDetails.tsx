@@ -154,7 +154,7 @@ function BookDetailSheet() {
         resetDrag();
         return;
       }
-      if (!phone.matches || settle?.playState === "running" || (scroller?.scrollTop ?? 0) > 0 ||
+      if (!phone.matches || settle?.playState === "running" || (scroller?.scrollTop ?? 0) !== 0 ||
         sheet?.getAnimations().some((animation) => animation.playState === "running") ||
         !(event.target instanceof Element) ||
         event.target.closest("button, a, input, select, textarea, summary")) return;

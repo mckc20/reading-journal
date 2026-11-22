@@ -15,7 +15,8 @@
     height: 100%;
     overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior: none;
+    /* Keep the native vertical edge effect inside the sheet. */
+    overscroll-behavior: none contain;
     padding: var(--sheet-top-padding) var(--sheet-inline-padding) calc(32px + var(--app-bottom-nav-space));
   }
   .rj-book-detail-scroll .rj-detail-cover-stage {
