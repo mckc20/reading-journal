@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type TouchEvent,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -161,17 +160,10 @@ export default function BookDetails() {
 function BookDetailSheet() {
   const navigate = useNavigate();
   const sheetRef = useRef<HTMLElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const closingAnimation = useRef<Animation | null>(null);
-  const swipeStart = useRef<{ x: number; y: number; id: number } | null>(null);
 
-  useEffect(() => {
-    if (window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches) {
-      sheetRef.current?.focus({ preventScroll: true });
-    }
-    return () => closingAnimation.current?.cancel();
-  }, []);
-
-  function close() {
+  const close = useCallback(() => {
     if (closingAnimation.current) return;
 
     function leave() {
@@ -189,53 +181,114 @@ function BookDetailSheet() {
       return;
     }
 
-    // Read the current position in case the sheet is still entering.
     const animation = sheet.animate(
       [{ transform: getComputedStyle(sheet).transform }, { transform: "translateY(100%)" }],
-      { duration: 220, easing: "ease-in", fill: "forwards" },
+      { duration: 260, easing: "cubic-bezier(.35, 0, .75, 1)", fill: "forwards" },
     );
     closingAnimation.current = animation;
     void animation.finished.then(leave, () => {
       // Leaving through browser history or navigation cancels this animation.
     });
-  }
+  }, [navigate]);
 
-  function handleSwipeStart(event: TouchEvent<HTMLElement>) {
-    swipeStart.current = null;
-    const { currentTarget, target, touches } = event;
-    if (!window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches ||
-      currentTarget.scrollTop > 0 ||
-      touches.length !== 1 ||
-      !(target instanceof Element) ||
-      !currentTarget.contains(target) ||
-      target.closest("button, a, input, select, textarea, summary, [role='dialog'], [data-book-detail-editor]")) return;
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    const scroller = scrollerRef.current;
+    if (!sheet || !scroller) return;
+    const phone = window.matchMedia(BOOK_DETAIL_SHEET_MEDIA);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (phone.matches) sheet.focus({ preventScroll: true });
 
-    const touch = touches[0];
-    swipeStart.current = { x: touch.clientX, y: touch.clientY, id: touch.identifier };
-  }
+    let start: { x: number; y: number; id: number; dragging: boolean } | null = null;
+    let settle: Animation | null = null;
 
-  function handleSwipeEnd(event: TouchEvent<HTMLElement>) {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (!start || event.currentTarget.scrollTop > 0) return;
-    const touch = Array.from(event.changedTouches).find(({ identifier }) => identifier === start.id);
-    if (!touch) return;
+    function resetDrag() {
+      start = null;
+      settle?.cancel();
+      settle = null;
+      if (!sheet?.style.getPropertyValue("--sheet-drag-transform")) return;
+      const transform = getComputedStyle(sheet).transform;
+      sheet.style.removeProperty("--sheet-drag-transform");
+      if (!reducedMotion.matches) {
+        settle = sheet.animate([{ transform }, { transform: "none" }], {
+          duration: 220,
+          easing: "cubic-bezier(.2, .75, .25, 1)",
+        });
+      }
+    }
 
-    const distance = touch.clientY - start.y;
-    if (distance >= 80 && distance > 1.25 * Math.abs(touch.clientX - start.x)) close();
-  }
+    function onTouchStart(event: TouchEvent) {
+      if (closingAnimation.current) return;
+      if (event.touches.length !== 1) {
+        resetDrag();
+        return;
+      }
+      if (!phone.matches || settle?.playState === "running" || (scroller?.scrollTop ?? 0) > 0 ||
+        sheet?.getAnimations().some((animation) => animation.playState === "running") ||
+        !(event.target instanceof Element) ||
+        event.target.closest("button, a, input, select, textarea, summary, [data-book-detail-editor]")) return;
+
+      const touch = event.touches[0];
+      start = { x: touch.clientX, y: touch.clientY, id: touch.identifier, dragging: false };
+    }
+
+    function onTouchMove(event: TouchEvent) {
+      if (!start || !sheet) return;
+      const touch = Array.from(event.touches).find(({ identifier }) => identifier === start?.id);
+      if (!touch) return;
+      const dx = Math.abs(touch.clientX - start.x);
+      const dy = touch.clientY - start.y;
+
+      if (!start.dragging && Math.max(dx, Math.abs(dy)) < 5) return;
+      if (!start.dragging && (dy <= dx * 1.25 || (scroller?.scrollTop ?? 0) > 0 || !event.cancelable)) {
+        start = null;
+        return;
+      }
+
+      start.dragging = true;
+      if (event.cancelable) event.preventDefault();
+      if (!reducedMotion.matches) {
+        // Snap to physical pixels so the rounded edge stays crisp while held.
+        const distance = Math.min(sheet.clientHeight, Math.max(0, dy));
+        const offset = Math.round(distance * window.devicePixelRatio) / window.devicePixelRatio;
+        sheet.style.setProperty("--sheet-drag-transform", `translateY(${offset}px)`);
+      }
+    }
+
+    function onTouchEnd(event: TouchEvent) {
+      if (!start) return;
+      const touch = Array.from(event.changedTouches).find(({ identifier }) => identifier === start?.id);
+      const shouldClose = start.dragging && touch && touch.clientY - start.y >= 80;
+      if (shouldClose) {
+        start = null;
+        close();
+      } else {
+        resetDrag();
+      }
+    }
+
+    scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+    scroller.addEventListener("touchmove", onTouchMove, { passive: false });
+    scroller.addEventListener("touchend", onTouchEnd, { passive: true });
+    scroller.addEventListener("touchcancel", resetDrag, { passive: true });
+    return () => {
+      scroller.removeEventListener("touchstart", onTouchStart);
+      scroller.removeEventListener("touchmove", onTouchMove);
+      scroller.removeEventListener("touchend", onTouchEnd);
+      scroller.removeEventListener("touchcancel", resetDrag);
+      settle?.cancel();
+      if (closingAnimation.current) {
+        closingAnimation.current.cancel();
+        closingAnimation.current = null;
+      }
+    };
+  }, [close]);
 
   return (
-    <section
-      className="rj-book-detail-sheet"
-      ref={sheetRef}
-      tabIndex={-1}
-      aria-label="Book details"
-      onTouchStart={handleSwipeStart}
-      onTouchEnd={handleSwipeEnd}
-      onTouchCancel={() => { swipeStart.current = null; }}
-    >
-      <BookDetailsContent onClose={close} />
+    <section className="rj-book-detail-sheet" ref={sheetRef} tabIndex={-1} aria-label="Book details">
+      <div className="rj-book-detail-scroll" ref={scrollerRef}>
+        <BookDetailsContent onClose={close} />
+      </div>
     </section>
   );
 }

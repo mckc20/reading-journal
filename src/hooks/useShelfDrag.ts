@@ -1,4 +1,4 @@
-import { useRef, type DragEvent, type MouseEvent, type PointerEvent } from "react";
+import { useLayoutEffect, useRef, type DragEvent, type MouseEvent, type PointerEvent } from "react";
 
 const DRAG_THRESHOLD = 6;
 const MAX_EDGE_PULL = 18;
@@ -8,29 +8,48 @@ type ShelfGesture = {
   startX: number;
   startY: number;
   scrollLeft: number;
-  lastX: number;
-  lastMove: number;
-  velocity: number;
   dragging: boolean;
 };
 
-/** Drag the scroll position, with a small amount of give at either end. */
-export function useShelfDrag<T extends HTMLElement>() {
+/** Use native touch momentum on long shelves, and add gentle give to short ones. */
+export function useShelfDrag<T extends HTMLElement>(enabled = true) {
   const ref = useRef<T>(null);
   const gesture = useRef<ShelfGesture | null>(null);
   const suppressClick = useRef(false);
 
+  useLayoutEffect(() => {
+    const row = ref.current;
+    if (!row || !enabled) return;
+
+    const update = () => row.toggleAttribute("data-shelf-overflow", row.scrollWidth > row.clientWidth);
+    const resize = new ResizeObserver(update);
+    const observeCards = () => {
+      resize.disconnect();
+      resize.observe(row);
+      Array.from(row.children).forEach((card) => resize.observe(card));
+      update();
+    };
+    const changes = new MutationObserver(observeCards);
+    changes.observe(row, { childList: true });
+    observeCards();
+    return () => {
+      changes.disconnect();
+      resize.disconnect();
+      row.removeAttribute("data-shelf-overflow");
+    };
+  }, [enabled]);
+
   function handlePointerDown(event: PointerEvent<T>) {
     if (!event.isPrimary || event.button !== 0) return;
+    const row = event.currentTarget;
     suppressClick.current = false;
+    if (event.pointerType === "touch" && row.hasAttribute("data-shelf-overflow")) return;
+
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      scrollLeft: event.currentTarget.scrollLeft,
-      lastX: event.clientX,
-      lastMove: event.timeStamp,
-      velocity: 0,
+      scrollLeft: row.scrollLeft,
       dragging: false,
     };
   }
@@ -52,53 +71,39 @@ export function useShelfDrag<T extends HTMLElement>() {
       suppressClick.current = true;
       row.setPointerCapture(event.pointerId);
       row.dataset.shelfDragging = "true";
+      // Keep the first moving frame close to the card's starting position.
+      start.startX += Math.sign(dx) * DRAG_THRESHOLD;
+      start.scrollLeft = row.scrollLeft;
     }
 
-    const desired = start.scrollLeft - dx;
+    const desired = start.scrollLeft - (event.clientX - start.startX);
     const max = Math.max(0, row.scrollWidth - row.clientWidth);
     const position = Math.max(0, Math.min(max, desired));
-    const edgePull = Math.max(-MAX_EDGE_PULL, Math.min(MAX_EDGE_PULL, (position - desired) * 0.3));
-    row.scrollLeft = position;
+    const overshoot = position - desired;
+    const edgePull = MAX_EDGE_PULL * overshoot / (Math.abs(overshoot) + 28);
+    if (position !== row.scrollLeft) row.scrollLeft = position;
     row.style.setProperty("--shelf-pull", `${edgePull}px 0`);
-
-    const elapsed = event.timeStamp - start.lastMove;
-    if (elapsed > 0) start.velocity = (start.lastX - event.clientX) / elapsed;
-    start.lastX = event.clientX;
-    start.lastMove = event.timeStamp;
     event.preventDefault();
   }
 
-  function finishDrag(event: PointerEvent<T>, glide = false) {
+  function finishDrag(event: PointerEvent<T>) {
     const start = gesture.current;
     if (!start || start.pointerId !== event.pointerId) return;
     gesture.current = null;
     if (!start.dragging) return;
 
     const row = event.currentTarget;
-    const position = row.scrollLeft;
-    const pulledAtEdge = Number.parseFloat(row.style.getPropertyValue("--shelf-pull")) !== 0;
     delete row.dataset.shelfDragging;
     row.style.removeProperty("--shelf-pull");
     if (row.hasPointerCapture(event.pointerId)) row.releasePointerCapture(event.pointerId);
-
-    const canGlide = glide &&
-      event.pointerType === "touch" &&
-      !pulledAtEdge &&
-      event.timeStamp - start.lastMove < 80 &&
-      Math.abs(start.velocity) > 0.3 &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (canGlide) {
-      const distance = Math.max(-120, Math.min(120, start.velocity * 90));
-      row.scrollTo({ left: position + distance, behavior: "smooth" });
-    }
   }
 
   return {
     ref,
     onPointerDown: handlePointerDown,
     onPointerMove: handlePointerMove,
-    onPointerUp: (event: PointerEvent<T>) => finishDrag(event, true),
-    onPointerCancel: (event: PointerEvent<T>) => finishDrag(event),
+    onPointerUp: finishDrag,
+    onPointerCancel: finishDrag,
     onLostPointerCapture: (event: PointerEvent<T>) => {
       // A touch may first be captured by the card before the shelf claims it.
       if (event.target === event.currentTarget) finishDrag(event);

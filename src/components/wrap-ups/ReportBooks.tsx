@@ -35,7 +35,7 @@ function SingleBook({ book, activity }: { book: ReportBook; activity?: ReportBoo
 export default function ReportBooks({ books, activity }: { books: ReportBook[]; activity?: ReportBookActivity[] }) {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 768px)').matches);
   const carousel = books.length > (desktop ? 4 : 2);
-  const { ref: rowRef, ...drag } = useShelfDrag<HTMLUListElement>();
+  const { ref: rowRef, ...drag } = useShelfDrag<HTMLUListElement>(carousel);
   const [edges, setEdges] = useState({ left: false, right: false });
 
   useEffect(() => {

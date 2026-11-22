@@ -90,11 +90,11 @@
 .rj-progress-copy { display: block; font-size: 10px; margin-block: 16px 8px; }
 .rj-reading-card [data-slot='progress'] { background: var(--surface); }
 .rj-reading-card [data-slot='progress-indicator'] { background: var(--input); }
-.rj-shelf { display: flex; position: relative; isolation: isolate; gap: 12px; overflow-x: auto; padding: 4px 10px 12px; scroll-snap-type: x mandatory; scroll-padding-inline: 10px; scrollbar-width: none; }
+.rj-shelf { display: flex; position: relative; isolation: isolate; gap: 12px; overflow-x: auto; padding: 4px 10px 12px; scrollbar-width: none; }
 .rj-shelf::-webkit-scrollbar { display: none; }
 .rj-home-shelf-frame { position: relative; isolation: isolate; }
 .rj-home-shelf-frame::before { content: ''; position: absolute; inset: 42px 0 auto; height: 84px; background: var(--card); border-radius: 18px; z-index: -1; }
-.rj-shelf-book { flex: 0 0 96px; text-align: left; scroll-snap-align: start; align-self: flex-start; }
+.rj-shelf-book { flex: 0 0 96px; text-align: left; align-self: flex-start; }
 .rj-shelf-book > div { box-shadow: none; margin-bottom: 10px; border-radius: 5px; }
 .rj-shelf-book .rj-book-title { font-size: 12px; }
 .rj-shelf-book .rj-muted { margin-top: 5px; font-size: 10px; }

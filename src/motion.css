@@ -102,6 +102,7 @@
   touch-action: pan-y pinch-zoom;
   overscroll-behavior-x: contain;
 }
+.rj-shelf-scroll[data-shelf-overflow] { touch-action: auto; }
 .rj-shelf-scroll:focus-visible { outline-offset: -2px; }
 @media (pointer: fine) {
   .rj-shelf-scroll, .rj-shelf-scroll :is(button, a) { cursor: grab; }
@@ -116,7 +117,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .rj-shelf-scroll {
     translate: var(--shelf-pull, none);
-    transition: translate 180ms cubic-bezier(.2, .75, .25, 1);
+    transition: translate 260ms cubic-bezier(.18, .72, .25, 1);
   }
   .rj-shelf-scroll[data-shelf-dragging] { transition: none; }
 }

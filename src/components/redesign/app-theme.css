@@ -71,7 +71,6 @@
 .rj-app-messages { width: 100%; }
 .rj-app .rj-quick-progress { color: var(--rj-gold-foreground); }
 .rj-app :is(.rj-quick-books, .rj-shelf) { overflow-y: hidden; }
-.rj-app .rj-shelf:not([data-shelf-dragging]) { scroll-snap-type: x proximity; }
 .rj-app .rj-reading-card [data-slot='progress-indicator'] { background: var(--accent); }
 .rj-app .rj-shelf-book .rj-book-title { overflow-wrap: anywhere; }
 .rj-app-home-title { font-size: 1.75rem; }
@@ -79,11 +78,18 @@
 
 @media (max-width: 767px) {
   .rj-app--book-detail {
-    --app-header-height: 0px;
-    --app-bottom-nav-space: env(safe-area-inset-bottom);
     background: var(--surface-sunken);
   }
-  .rj-app--book-detail :is(.rj-app-header-wrap, .rj-floating-add) { display: none; }
+  .rj-app-theme:has(.rj-book-detail-overlay) { overflow: hidden; }
+  .rj-book-detail-overlay {
+    --app-header-height: 0px;
+    --app-bottom-nav-space: env(safe-area-inset-bottom);
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }
 
 @media (min-width: 768px) {

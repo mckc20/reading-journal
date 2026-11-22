@@ -1,6 +1,6 @@
 import LoadingDialog from "@/components/LoadingDialog";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Link, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Link, UNSAFE_LocationContext, useLocation, useMatch, useNavigate, useNavigationType, useOutlet } from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -73,6 +73,15 @@ export interface AddBookDialogLaunchOptions {
 
 type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "initialBookId" | "initialTags" | "onSaved">;
 
+const phoneLayout = "(max-width: 767px)";
+
+type AppPage = {
+  location: ReturnType<typeof useLocation>;
+  navigationType: ReturnType<typeof useNavigationType>;
+  outlet: ReturnType<typeof useOutlet>;
+  isBookDetail: boolean;
+};
+
 type NavLink = {
   to: string;
   label: string;
@@ -106,7 +115,13 @@ function getPrimaryRoute(pathname: string) {
 function AppLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const isBookDetail = Boolean(useMatch("/books/:bookId"));
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia(phoneLayout).matches);
+  const bookOverlayOpen = isBookDetail && isPhone;
+  const lastPage = useRef<AppPage | null>(null);
+  const underlayRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef<{ key: string; y: number; focus: HTMLElement | null } | null>(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
@@ -141,7 +156,28 @@ function AppLayoutContent() {
     if (!addDialogStillOpen.current) dialogReturnFocus.current?.focus();
   }
 
-  const isMessagesPage = location.pathname === "/messages";
+  const outlet = useOutlet({
+    onAddBookClick: () => openAddBook(),
+    openAddBook,
+    openAddJournalEntry,
+    setDetailEditingOpen,
+  } satisfies AppLayoutOutletContext);
+  const page = { location, navigationType, outlet, isBookDetail };
+  // Keep the previous route's outlet and location together so its scroll and local state survive the sheet.
+  const underlay = bookOverlayOpen && lastPage.current && !lastPage.current.isBookDetail ? lastPage.current : null;
+  const mainPage = bookOverlayOpen ? underlay : page;
+  const mainIsMessages = mainPage?.location.pathname === "/messages";
+
+  useLayoutEffect(() => {
+    const media = window.matchMedia(phoneLayout);
+    const update = () => setIsPhone(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!bookOverlayOpen) lastPage.current = page;
+  });
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return;
@@ -155,10 +191,32 @@ function AppLayoutContent() {
   }, []);
 
   useLayoutEffect(() => {
+    const background = underlayRef.current;
+    if (bookOverlayOpen) {
+      if (underlay && !savedScroll.current) {
+        const active = document.activeElement;
+        savedScroll.current = {
+          key: underlay.location.key,
+          y: window.scrollY,
+          focus: active instanceof HTMLElement && background?.contains(active) ? active : null,
+        };
+      }
+      if (background) background.inert = true;
+      return;
+    }
+
+    if (background) background.inert = false;
+    const previous = savedScroll.current;
+    savedScroll.current = null;
+    if (previous?.key === location.key) {
+      window.scrollTo(0, previous.y);
+      previous.focus?.focus({ preventScroll: true });
+      return;
+    }
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-  }, [location.pathname]);
+  }, [bookOverlayOpen, location.pathname, underlay]);
 
   useLayoutEffect(() => {
     // Portalled dialogs and menus inherit the same colors as the signed-in UI.
@@ -202,23 +260,25 @@ function AppLayoutContent() {
 
   return (
     <>
-      <div className={cn("rj-app min-h-svh bg-background text-foreground", isBookDetail && "rj-app--book-detail")}>
-        <a className="rj-skip-link" href="#app-content">Skip to content</a>
-        <AppHeader pathname={location.pathname} addLauncher={isMessagesPage ? addLauncher : undefined} />
-        <main
-          id="app-content"
-          tabIndex={-1}
-          className={isMessagesPage ? "rj-app-messages" : "rj-app-content"}
-        >
-          <Outlet context={{
-            onAddBookClick: () => openAddBook(),
-            openAddBook,
-            openAddJournalEntry,
-            setDetailEditingOpen,
-          } satisfies AppLayoutOutletContext} />
-        </main>
-        {!detailEditingOpen && !isMessagesPage && (
-          <div className="rj-floating-add">{addLauncher}</div>
+      <div className={cn("rj-app min-h-svh bg-background text-foreground", bookOverlayOpen && !underlay && "rj-app--book-detail")}>
+        <div ref={underlayRef}>
+          {mainPage && (
+            <UNSAFE_LocationContext.Provider value={{ location: mainPage.location, navigationType: mainPage.navigationType }}>
+              <a className="rj-skip-link" href="#app-content">Skip to content</a>
+              <AppHeader pathname={mainPage.location.pathname} addLauncher={mainIsMessages ? addLauncher : undefined} />
+              <main id="app-content" tabIndex={-1} className={mainIsMessages ? "rj-app-messages" : "rj-app-content"}>
+                {mainPage.outlet}
+              </main>
+              {(!detailEditingOpen || bookOverlayOpen) && !mainIsMessages && (
+                <div className="rj-floating-add">{addLauncher}</div>
+              )}
+            </UNSAFE_LocationContext.Provider>
+          )}
+        </div>
+        {bookOverlayOpen && (
+          <main className="rj-book-detail-overlay" aria-label="Book details">
+            {outlet}
+          </main>
         )}
       </div>
 
