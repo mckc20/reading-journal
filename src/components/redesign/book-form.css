@@ -55,19 +55,17 @@
 .rj-lookup-results small { color: var(--muted-foreground); }
 .rj-lookup-results button { justify-self: start; margin-top: 5px; }
 @media (max-width: 767px) {
-  .rj-add-book-dialog {
-    --rj-add-book-gutter-left: max(20px, env(safe-area-inset-left));
-    --rj-add-book-gutter-right: max(20px, env(safe-area-inset-right));
+  .rj-book-form-dialog.rj-add-book-dialog[data-slot='dialog-content'] {
+    inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    width: auto;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 22px;
   }
-  .rj-add-book-dialog :is(.rj-book-form-heading, .rj-book-form-actions) {
-    margin-left: var(--rj-add-book-gutter-left);
-    margin-right: var(--rj-add-book-gutter-right);
-    padding-inline: 0;
-  }
-  .rj-add-book-dialog .rj-creation-book-fields {
-    padding-left: var(--rj-add-book-gutter-left);
-    padding-right: var(--rj-add-book-gutter-right);
-  }
+  /* The dialog's outer insets already account for the safe area. */
+  .rj-add-book-dialog .rj-book-form-heading { padding-top: 18px; }
+  .rj-add-book-dialog .rj-book-form-actions { padding-bottom: 16px; }
 
   .rj-book-form-primary { grid-template-columns: 88px minmax(0, 1fr); gap: 16px; }
   .rj-book-form-identity { display: contents; }

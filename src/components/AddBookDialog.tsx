@@ -479,7 +479,7 @@ export default function AddBookDialog({
 
     const genre = genreOptions.find(option => option.label.toLocaleLowerCase() === query);
     if (!genre) {
-      setError("genres", { message: "Choose a genre from the catalog." });
+      setError("genres", { message: "Select one of the suggested genres." });
       return false;
     }
 

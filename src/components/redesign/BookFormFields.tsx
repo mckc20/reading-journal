@@ -50,6 +50,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
   const id = useId();
   const author = kind === 'authors';
   const item = author ? 'author' : 'genre';
+  const showHint = !author && !catalogOnly;
   const chosen = new Set(selected.map(value => value.label.toLocaleLowerCase()));
   const suggestions = query.trim().length >= 2
     ? options.filter(option => !chosen.has(option.toLocaleLowerCase()))
@@ -72,7 +73,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
           placeholder={catalogOnly ? 'Search genres' : `Choose or type ${author ? 'an' : 'a'} ${item}`}
           onChange={event => onQueryChange(event.target.value)}
           onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); onAdd(); } }}
-          aria-required={author} aria-invalid={Boolean(error)} aria-describedby={`${id}-${error ? 'error' : 'hint'}`} />
+          aria-required={author} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : showHint ? `${id}-hint` : undefined} />
         <Button type="button" variant="outline" aria-label={`Add ${item}`} disabled={!query.trim()} onClick={onAdd}>
           <Plus aria-hidden="true" />Add
         </Button>
@@ -80,9 +81,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
       <datalist id={`${id}-options`}>
         {suggestions.map(option => <option key={option} value={option} />)}
       </datalist>
-      <p id={`${id}-hint`} className="rj-book-form-hint">
-        {author ? 'Add one or more authors. Separate names with a semicolon (;).' : catalogOnly ? 'Choose a genre from the catalog.' : 'Add genres to organize this book.'}
-      </p>
+      {showHint && <p id={`${id}-hint`} className="rj-book-form-hint">Add genres to organize this book.</p>}
       {error && <p id={`${id}-error`} className="rj-book-form-error" role="alert">{error}</p>}
     </div>
   );
