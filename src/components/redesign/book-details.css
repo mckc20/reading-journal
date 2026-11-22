@@ -1,3 +1,31 @@
+.rj-book-detail-sheet {
+  position: fixed;
+  inset: var(--app-header-height) 0 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-bottom: var(--app-bottom-nav-space);
+  background: var(--background);
+  padding: 32px 28px 72px;
+}
+.rj-book-detail-sheet:focus { outline: none; }
+
+@media (max-width: 767px) {
+  .rj-book-detail-sheet {
+    top: calc(8px + env(safe-area-inset-top));
+    border-radius: 24px 24px 0 0;
+    padding: 16px 20px calc(32px + var(--app-bottom-nav-space));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rj-book-detail-sheet { animation: rj-book-detail-enter 300ms cubic-bezier(.2, .8, .25, 1); }
+}
+
+@keyframes rj-book-detail-enter {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
 .rj-detail-page { max-width: 1000px; margin-inline: auto; }
 .rj-detail-hero { display: grid; gap: 26px; }
 .rj-detail-cover-stage { position: relative; display: flex; justify-content: center; padding: 54px 24px 0; border-radius: 24px; background: linear-gradient(var(--rj-light-yellow, var(--rj-gold)) 0%, var(--rj-light-yellow, var(--rj-gold)) 88%, transparent 88%); }

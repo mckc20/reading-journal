@@ -1,6 +1,6 @@
 import LoadingDialog from "@/components/LoadingDialog";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -102,6 +102,7 @@ function getPrimaryRoute(pathname: string) {
 function AppLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isBookDetail = Boolean(useMatch("/books/:bookId"));
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [activeAddAction, setActiveAddAction] = useState<Exclude<AddAction, "book"> | null>(null);
@@ -184,7 +185,7 @@ function AppLayoutContent() {
 
   return (
     <>
-      <div className="rj-app min-h-svh bg-background text-foreground">
+      <div className={cn("rj-app min-h-svh bg-background text-foreground", isBookDetail && "rj-app--book-detail")}>
         <a className="rj-skip-link" href="#app-content">Skip to content</a>
         <AppHeader pathname={location.pathname} addLauncher={isMessagesPage ? addLauncher : undefined} />
         <main

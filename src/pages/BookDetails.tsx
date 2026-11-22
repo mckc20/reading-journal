@@ -15,6 +15,7 @@ import {
   Calendar,
   CalendarCheck,
   CalendarClock,
+  ChevronDown,
   ChevronRight,
   Clock,
   Heart,
@@ -192,6 +193,65 @@ function getPublicationYear(value?: string | null): string | null {
 
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
+
+  return <BookDetailSheet key={bookId} />;
+}
+
+function BookDetailSheet() {
+  const navigate = useNavigate();
+  const sheetRef = useRef<HTMLElement>(null);
+  const closingAnimation = useRef<Animation | null>(null);
+
+  useEffect(() => {
+    sheetRef.current?.focus({ preventScroll: true });
+    return () => closingAnimation.current?.cancel();
+  }, []);
+
+  function close() {
+    if (closingAnimation.current) return;
+
+    function leave() {
+      if (window.history.state?.idx > 0) {
+        navigate(-1);
+      } else {
+        navigate("/library", { replace: true });
+      }
+    }
+
+    const sheet = sheetRef.current;
+    if (!sheet || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      leave();
+      return;
+    }
+
+    // Read the current position in case the sheet is still entering.
+    const animation = sheet.animate(
+      [{ transform: getComputedStyle(sheet).transform }, { transform: "translateY(100%)" }],
+      { duration: 220, easing: "ease-in", fill: "forwards" },
+    );
+    closingAnimation.current = animation;
+    void animation.finished.then(leave, () => {
+      // Leaving through browser history or navigation cancels this animation.
+    });
+  }
+
+  return (
+    <section className="rj-book-detail-sheet" ref={sheetRef} tabIndex={-1} aria-label="Book details">
+      <BookDetailsContent onClose={close} />
+    </section>
+  );
+}
+
+function CloseBookDetailButton({ onClose }: { onClose: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="icon-lg" className="size-11" aria-label="Close book details" onClick={onClose}>
+      <ChevronDown className="size-6" aria-hidden="true" />
+    </Button>
+  );
+}
+
+function BookDetailsContent({ onClose }: { onClose: () => void }) {
+  const { bookId } = useParams<{ bookId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
@@ -260,11 +320,6 @@ export default function BookDetails() {
     reset,
     formState: { isDirty, dirtyFields, errors },
   } = useForm<FormValues>();
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    setIsProgressDialogOpen(false);
-  }, [bookId]);
 
   useEffect(() => {
     if (!book) return;
@@ -683,7 +738,10 @@ export default function BookDetails() {
 
   if (loading) {
     return (
-      <LoadingIndicator variant="page" />
+      <div className="rj-detail-page">
+        <CloseBookDetailButton onClose={onClose} />
+        <LoadingIndicator variant="page" />
+      </div>
     );
   }
 
@@ -695,6 +753,7 @@ export default function BookDetails() {
           <RefreshCw className="mr-2 h-4 w-4" />
           Try again
         </Button>
+        <CloseBookDetailButton onClose={onClose} />
       </div>
     );
   }
@@ -707,10 +766,7 @@ export default function BookDetails() {
         <p className="max-w-md text-sm text-muted-foreground">
           This book may not exist, may have been deleted, or you may not have access.
         </p>
-        <BackButton
-          fallbackTo="/library"
-          className="hover:bg-transparent hover:text-foreground/80"
-        />
+        <CloseBookDetailButton onClose={onClose} />
       </div>
     );
   }
@@ -892,7 +948,7 @@ export default function BookDetails() {
       <section className="rj-detail-hero" aria-labelledby="book-detail-title">
         <div className="rj-detail-cover-stage">
           <div className="rj-detail-topline">
-            <BackButton fallbackTo="/library" className="min-h-11 min-w-11" />
+            <CloseBookDetailButton onClose={onClose} />
             <DetailActionsMenu
               kind="book"
               label={book.title}

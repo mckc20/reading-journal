@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpen, CalendarDays, Clock3, Heart, MoreHorizontal, NotebookPen, Pencil } from 'lucide-react';
+import { ArrowUpRight, BookOpen, CalendarDays, ChevronDown, Clock3, Heart, MoreHorizontal, NotebookPen, Pencil } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
@@ -32,7 +32,7 @@ export interface BookDetailsPreviewProps {
   entries: { id: string; date: string; title: string; content: string }[];
   notice?: string;
   onReadingAction: () => void;
-  onBack: () => void;
+  onClose: () => void;
   onEdit: () => void;
   onAddEntry: () => void;
   onToggleFavorite: () => void;
@@ -44,7 +44,7 @@ export interface BookDetailsPreviewProps {
 }
 
 /** Presentational workshop page. Status and persistence belong to the caller. */
-export function BookDetailsPreview({ book, entries, notice, onReadingAction, onBack, onEdit, onAddEntry, onToggleFavorite, onViewAnalytics, onOpenJournal, ...shell }: BookDetailsPreviewProps) {
+export function BookDetailsPreview({ book, entries, notice, onReadingAction, onClose, onEdit, onAddEntry, onToggleFavorite, onViewAnalytics, onOpenJournal, ...shell }: BookDetailsPreviewProps) {
   const id = useId();
   const [expanded, setExpanded] = useState(false);
   const action = book.status === 'Reading' ? 'Update Progress' : book.status === 'Paused' ? 'Resume' : book.status === 'Finished' ? 'Reread' : 'Start Reading';
@@ -65,7 +65,7 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onB
       <section className="rj-detail-hero" aria-labelledby={`${id}-title`}>
         <div className="rj-detail-cover-stage">
           <div className="rj-detail-topline">
-            <Button variant="ghost" size="icon-lg" onClick={onBack} aria-label="Back to Library"><ArrowLeft aria-hidden="true" /></Button>
+            <Button variant="ghost" size="icon-lg" onClick={onClose} aria-label="Close book details"><ChevronDown aria-hidden="true" /></Button>
             <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon-lg" aria-label="More book actions"><MoreHorizontal aria-hidden="true" /></Button></DropdownMenu.Trigger>
               <DropdownMenu.Content className="rj-redesign rj-add-menu" align="end" sideOffset={6}>
                 <DropdownMenu.Item onSelect={onEdit}><Pencil size={16} aria-hidden="true" />Edit book</DropdownMenu.Item>

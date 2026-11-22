@@ -23,7 +23,7 @@ function BookDetailsReview({ initialBook = sampleBook, populatedJournal = true, 
   const preview = (action: string) => setNotice(`${action} — preview only.`);
   return <>
     <BookDetailsPreview book={book} entries={populatedJournal ? journal : []} notice={notice}
-      onBack={() => preview('Library')} onEdit={() => preview('Edit book')} onAddEntry={() => preview('Add journal entry')}
+      onClose={() => preview('Library')} onEdit={() => preview('Edit book')} onAddEntry={() => preview('Add journal entry')}
       onToggleFavorite={() => setBook(current => ({ ...current, favorite: !current.favorite }))}
       onViewAnalytics={() => preview('Reading analytics')} onOpenJournal={() => preview('Book journal')}
       onNavigate={preview} onCreate={destination => preview(`Create ${destination}`)} onNotifications={() => preview('Notifications')}

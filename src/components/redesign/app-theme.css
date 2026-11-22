@@ -77,6 +77,15 @@
 .rj-app-home-title { font-size: 1.75rem; }
 .rj-app-home-shelves { display: grid; grid-template-columns: minmax(0, 1fr); }
 
+@media (max-width: 767px) {
+  .rj-app--book-detail {
+    --app-header-height: 0px;
+    background: var(--surface-sunken);
+  }
+  .rj-app--book-detail .rj-app-header { min-height: 0; border: 0; }
+  .rj-app--book-detail :is(.rj-brand, .rj-header-actions) { display: none; }
+}
+
 @media (min-width: 768px) {
   .rj-app-theme { --app-header-height: 150px; --app-bottom-nav-space: 0px; }
   .rj-app .rj-app-header { grid-template-rows: 68px auto; }
