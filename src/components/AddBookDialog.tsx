@@ -976,7 +976,7 @@ export default function AddBookDialog({
                   )}
                 </section>
               )}
-              <p className="rj-book-form-hint">Title and author are required.</p>
+              {!initialBook && <p className="rj-book-form-hint">Title and author are required.</p>}
 
               <div className="rj-book-form-primary">
                 <div className="rj-book-cover-editor">
@@ -1043,6 +1043,18 @@ export default function AddBookDialog({
                   />
                   <p id="add-book-pages-hint" className="rj-book-form-hint">Leave blank if unknown.</p>
                 </div>
+                {!addToWishlist && (status === "Reading" || initialBook && ["Paused", "Finished", "DNF"].includes(status)) && (
+                  <div className="rj-book-form-field">
+                    <Label htmlFor="current_page">Current page</Label>
+                    <Input
+                      id="current_page"
+                      type="number"
+                      min={0}
+                      {...register("current_page")}
+                    />
+                  </div>
+                )}
+
                 {/* Series */}
                 <div className="rj-book-form-field">
                   <Label htmlFor="add-book-series">Series</Label>
@@ -1102,18 +1114,6 @@ export default function AddBookDialog({
                     {errors.volume_number && (
                       <p className="text-xs text-destructive">{errors.volume_number.message}</p>
                     )}
-                  </div>
-                )}
-                {/* Current progress (Reading only) */}
-                {!addToWishlist && (status === "Reading" || initialBook && ["Paused", "Finished", "DNF"].includes(status)) && (
-                  <div className="rj-book-form-field">
-                    <Label htmlFor="current_page">Current page</Label>
-                    <Input
-                      id="current_page"
-                      type="number"
-                      min={0}
-                      {...register("current_page")}
-                    />
                   </div>
                 )}
 
