@@ -28,6 +28,13 @@
 }
 .rj-creation-dialog :is([data-slot='input']:not(.sr-only, .border-0), [data-slot='select-trigger']:not([data-size='sm'])) { min-height: 44px; }
 .rj-creation-dialog [aria-invalid='true'] { border-color: var(--destructive); }
+.rj-add-entry-dialog .rj-book-form-scroll {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  touch-action: pan-y pinch-zoom;
+}
+.rj-add-entry-dialog [data-slot='select-trigger'] { max-width: 100%; }
+.rj-add-entry-dialog [data-slot='select-value'] { min-width: 0; }
 
 @media (max-width: 767px) {
   .rj-book-form-dialog[data-slot='dialog-content'] { inset: 0; transform: none; translate: none; width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
@@ -42,4 +49,7 @@
   .rj-creation-book-fields { padding: 20px; }
   .rj-creation-actions .rj-save-cancel-buttons { width: 100%; }
   .rj-creation-actions .rj-save-cancel-buttons > button { flex: 1; }
+  .rj-add-entry-dialog .rj-markdown-toolbar { position: relative; }
+  .rj-add-entry-dialog .rj-markdown-callout { position: static; }
+  .rj-add-entry-dialog .rj-markdown-callout-menu { left: auto; right: 8px; max-width: calc(100% - 16px); }
 }

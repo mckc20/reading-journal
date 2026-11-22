@@ -3,6 +3,8 @@
   --font-body: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --app-header-height: 82px;
   --app-bottom-nav-space: calc(80px + env(safe-area-inset-bottom));
+  overscroll-behavior-y: contain;
+  scroll-padding-block: var(--app-header-height) var(--app-bottom-nav-space);
 }
 
 .rj-app-theme:not(.dark) {
@@ -49,8 +51,8 @@
   outline-offset: 2px;
 }
 
-.rj-app { padding-bottom: var(--app-bottom-nav-space); }
-.rj-app-header-wrap { position: sticky; top: 0; z-index: 30; background: var(--background); }
+.rj-app { padding-block: var(--app-header-height) var(--app-bottom-nav-space); }
+.rj-app-header-wrap { position: fixed; inset: 0 0 auto; z-index: 30; background: var(--background); }
 .rj-app .rj-app-header {
   min-height: var(--app-header-height);
   margin-inline: max(16px, calc((100% - 1160px) / 2));
@@ -67,8 +69,9 @@
 .rj-app .rj-skip-link { position: fixed; }
 .rj-app-content { width: 100%; max-width: 1200px; margin-inline: auto; padding: 20px 20px 64px; }
 .rj-app-messages { width: 100%; }
-.rj-app [id='app-content'] { scroll-margin-top: var(--app-header-height); }
 .rj-app .rj-quick-progress { color: var(--rj-gold-foreground); }
+.rj-app :is(.rj-quick-books, .rj-shelf) { overflow-y: hidden; }
+.rj-app .rj-shelf { scroll-snap-type: x proximity; }
 .rj-app .rj-reading-card [data-slot='progress-indicator'] { background: var(--accent); }
 .rj-app .rj-shelf-book .rj-book-title { overflow-wrap: anywhere; }
 .rj-app-home-title { font-size: 1.75rem; }

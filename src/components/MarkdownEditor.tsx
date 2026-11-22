@@ -294,7 +294,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
 
   return (
     <div className="rounded-md border bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b p-2">
+      <div className="rj-markdown-toolbar flex flex-wrap items-center justify-between gap-2 border-b p-2">
         <div className="flex flex-wrap items-center gap-1">
           <Button type="button" variant="ghost" size="icon-sm" aria-label="Bold" title="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapSelection("**", "**", "bold text")}>
             <Bold className="h-4 w-4" />
@@ -333,7 +333,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
               </Button>
             )}
           />
-          <div className="relative">
+          <div className="rj-markdown-callout relative">
             <Button
               type="button"
               variant="ghost"
@@ -350,7 +350,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(fun
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
             {calloutMenuOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
+              <div className="rj-markdown-callout-menu absolute left-0 top-full z-50 mt-1 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-popover)]">
                 {CALLOUT_OPTIONS.map(({ Icon, ...option }) => (
                   <button
                     key={option.type}

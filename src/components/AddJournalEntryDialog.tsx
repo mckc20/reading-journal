@@ -1151,6 +1151,7 @@ export default function AddJournalEntryDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
+        className="rj-add-entry-dialog"
         title="Add journal entry"
         description="Write a note or save a quote in your journal."
         icon={NotebookPen}
