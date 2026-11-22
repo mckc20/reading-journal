@@ -788,6 +788,14 @@ export default function AddBookDialog({
     }
   }
 
+  let description = "Find a book or fill in the details yourself.";
+  if (editBook) description = "Update the book details.";
+  if (copySource) {
+    description = duplicateBooks && duplicateBooks.length > 1
+      ? `Review copy ${copyIndex + 1} of ${duplicateBooks.length}. Your copies are added when you save the last one.`
+      : "Review the details before adding this copy.";
+  }
+
   const showDateStarted = ["Reading", "Paused", "Finished", "DNF"].includes(status) || Boolean(initialBook?.date_started);
   const showDateFinished = ["Finished", "DNF"].includes(status) || Boolean(initialBook?.date_finished);
 
@@ -828,146 +836,146 @@ export default function AddBookDialog({
       <CreationDialogContent
         className="rj-add-book-dialog"
         title={editBook ? "Edit book" : "Add book"}
-        description={duplicateBooks && duplicateBooks.length > 1
-          ? `Review copy ${copyIndex + 1} of ${duplicateBooks.length}. Your copies are added when you save the last one.`
-          : "Find a book or fill in the details yourself."}
+        description={description}
         icon={BookOpen}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <form onSubmit={submitForm} className="rj-book-form">
           <ScrollArea key={copyIndex} className="rj-creation-book-scroll">
             <div className="rj-creation-book-fields rj-book-form-fields">
-              <section className="rj-book-lookup" aria-label="Find book details">
-                <BookLookupModeSwitch
-                  mode={importMethod}
-                  onChange={handleImportMethodChange}
-                  disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
-                />
+              {!initialBook && (
+                <section className="rj-book-lookup" aria-label="Find book details">
+                  <BookLookupModeSwitch
+                    mode={importMethod}
+                    onChange={handleImportMethodChange}
+                    disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
+                  />
 
-                {importMethod === "isbn" ? (
-                  <>
-                    {/* ISBN Scanner */}
-                    {showScanner ? (
-                      <BarcodeScanner
-                        onScan={handleIsbnLookup}
-                        onClose={() => setShowScanner(false)}
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="rj-lookup-scan"
-                          onClick={() => { setShowScanner(true); setIsbnError(null); }}
-                          disabled={isbnStatus === "looking-up"}
-                        >
-                          <ScanBarcode className="h-4 w-4" />
-                          Scan ISBN barcode
-                        </Button>
-                        <div className="rj-lookup-query">
-                          <Input
-                            aria-label="ISBN to look up"
-                            type="search"
-                            placeholder="Enter ISBN"
-                            value={manualIsbn}
-                            onChange={(e) => setManualIsbn(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
-                              }
-                            }}
-                          />
+                  {importMethod === "isbn" ? (
+                    <>
+                      {/* ISBN Scanner */}
+                      {showScanner ? (
+                        <BarcodeScanner
+                          onScan={handleIsbnLookup}
+                          onClose={() => setShowScanner(false)}
+                        />
+                      ) : (
+                        <div className="space-y-2">
                           <Button
                             type="button"
-                            disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
-                            onClick={() => handleIsbnLookup(manualIsbn)}
+                            variant="outline"
+                            className="rj-lookup-scan"
+                            onClick={() => { setShowScanner(true); setIsbnError(null); }}
+                            disabled={isbnStatus === "looking-up"}
                           >
-                            <Search aria-hidden="true" />Look up
+                            <ScanBarcode className="h-4 w-4" />
+                            Scan ISBN barcode
                           </Button>
+                          <div className="rj-lookup-query">
+                            <Input
+                              aria-label="ISBN to look up"
+                              type="search"
+                              placeholder="Enter ISBN"
+                              value={manualIsbn}
+                              onChange={(e) => setManualIsbn(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
+                              onClick={() => handleIsbnLookup(manualIsbn)}
+                            >
+                              <Search aria-hidden="true" />Look up
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {isbnStatus === "looking-up" && (
-                      <LoadingIndicator variant="inline" className="flex justify-center" label="Looking up book…" />
-                    )}
-
-                    {isbnError && (
-                      <p className="text-sm text-destructive text-center">{isbnError}</p>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="rj-lookup-query">
-                      <Input
-                        id="title-search"
-                        type="search"
-                        aria-label="Book title to search"
-                        placeholder="Enter a book title"
-                        value={titleQuery}
-                        onChange={(e) => setTitleQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void handleTitleSearch();
-                          }
-                        }}
-                        disabled={isApplyingTitleResult}
-                      />
-                      <Button
-                        type="button"
-                        disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
-                        onClick={() => void handleTitleSearch()}
-                      >
-                        <Search aria-hidden="true" />Search books
-                      </Button>
-                    </div>
-
-                    {titleSearchStatus === "searching" && (
-                      <LoadingIndicator variant="inline" className="flex justify-center" label="Searching book catalogs…" />
-                    )}
-
-                    {isApplyingTitleResult && <LoadingIndicator variant="inline" label="Loading book details…" />}
-
-                    {titleSearchError && (
-                      <p className="text-sm text-destructive text-center">{titleSearchError}</p>
-                    )}
-
-                    {titleSearchHasSearched &&
-                      titleSearchStatus === "idle" &&
-                      titleSearchResults.length === 0 && (
-                        <p className="text-sm text-center text-muted-foreground">
-                          No matching editions found.
-                        </p>
                       )}
 
-                    {titleSearchResults.length > 0 && (
-                      <>
-                        <p className="rj-book-form-hint">Using a result replaces the book metadata below. Status, source and series stay as you set them.</p>
-                        <ul className="rj-lookup-results" aria-label="Book search results">
-                          {titleSearchResults.map(result => (
-                            <li key={result.id}>
-                              <BookCover src={result.coverUrl} title={result.title} decorative />
-                              <div>
-                                <strong>{result.title}</strong>
-                                <p>{result.authors.join(", ")}</p>
-                                {(result.publicationDate || result.isbn) && (
-                                  <small>{[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ")}</small>
-                                )}
-                                <Button type="button" variant="outline" aria-label={`Use ${result.title}`}
-                                  onClick={() => void handleTitleResultSelect(result)} disabled={isApplyingTitleResult}>
-                                  Use these details
-                                </Button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </div>
-                )}
-              </section>
+                      {isbnStatus === "looking-up" && (
+                        <LoadingIndicator variant="inline" className="flex justify-center" label="Looking up book…" />
+                      )}
+
+                      {isbnError && (
+                        <p className="text-sm text-destructive text-center">{isbnError}</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="rj-lookup-query">
+                        <Input
+                          id="title-search"
+                          type="search"
+                          aria-label="Book title to search"
+                          placeholder="Enter a book title"
+                          value={titleQuery}
+                          onChange={(e) => setTitleQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void handleTitleSearch();
+                            }
+                          }}
+                          disabled={isApplyingTitleResult}
+                        />
+                        <Button
+                          type="button"
+                          disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
+                          onClick={() => void handleTitleSearch()}
+                        >
+                          <Search aria-hidden="true" />Search books
+                        </Button>
+                      </div>
+
+                      {titleSearchStatus === "searching" && (
+                        <LoadingIndicator variant="inline" className="flex justify-center" label="Searching book catalogs…" />
+                      )}
+
+                      {isApplyingTitleResult && <LoadingIndicator variant="inline" label="Loading book details…" />}
+
+                      {titleSearchError && (
+                        <p className="text-sm text-destructive text-center">{titleSearchError}</p>
+                      )}
+
+                      {titleSearchHasSearched &&
+                        titleSearchStatus === "idle" &&
+                        titleSearchResults.length === 0 && (
+                          <p className="text-sm text-center text-muted-foreground">
+                            No matching editions found.
+                          </p>
+                        )}
+
+                      {titleSearchResults.length > 0 && (
+                        <>
+                          <p className="rj-book-form-hint">Using a result replaces the book metadata below. Status, source and series stay as you set them.</p>
+                          <ul className="rj-lookup-results" aria-label="Book search results">
+                            {titleSearchResults.map(result => (
+                              <li key={result.id}>
+                                <BookCover src={result.coverUrl} title={result.title} decorative />
+                                <div>
+                                  <strong>{result.title}</strong>
+                                  <p>{result.authors.join(", ")}</p>
+                                  {(result.publicationDate || result.isbn) && (
+                                    <small>{[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ")}</small>
+                                  )}
+                                  <Button type="button" variant="outline" aria-label={`Use ${result.title}`}
+                                    onClick={() => void handleTitleResultSelect(result)} disabled={isApplyingTitleResult}>
+                                    Use these details
+                                  </Button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
               <p className="rj-book-form-hint">Title and author are required.</p>
 
               <div className="rj-book-form-primary">
