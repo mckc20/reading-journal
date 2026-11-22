@@ -23,8 +23,14 @@ export const AddMenu: Story = { render: () => <AddLauncher onCreate={noop} /> };
 export const AddMenuOpen: Story = {
   render: () => <AddLauncher onCreate={noop} />,
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Add' }));
-    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu');
+    const trigger = within(canvasElement).getByRole('button', { name: 'Add' });
+    const body = within(canvasElement.ownerDocument.body);
+    const pointer = userEvent.setup();
+    await pointer.pointer({ keys: '[MouseLeft>]', target: trigger });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(body.queryByRole('menu')).not.toBeInTheDocument();
+    await pointer.pointer({ keys: '[/MouseLeft]', target: trigger });
+    const menu = await body.findByRole('menu');
     await waitFor(() => expect(within(menu).getByText('Add a book', { exact: true })).toBeVisible());
     await Promise.all(menu.getAnimations({ subtree: true }).map(animation => animation.finished));
     await expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);

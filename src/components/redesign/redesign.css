@@ -142,6 +142,7 @@
 .rj-create-menu [role='menuitem'] { padding: 0; gap: 0; justify-content: flex-end; background: transparent; margin-block: 4px; }
 .rj-create-label { position: relative; z-index: 1; background: var(--rj-rose-light); border-radius: 999px 0 0 999px; padding: 5px 12px 5px 18px; font-size: 12px; margin-right: -12px; padding-right: 24px; transform-origin: right center; }
 .rj-create-icon { position: relative; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--rj-rose-light); }
+.rj-create-label, .rj-create-icon { pointer-events: none; }
 .rj-create-menu [data-highlighted] .rj-create-label, .rj-create-menu [data-highlighted] .rj-create-icon { background: var(--rj-rose); color: white; }
 /* Radix defers the root animation until placement is ready. Its start event
    supplies the real launch origin; child animations then share those offsets. */

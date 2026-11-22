@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, UserRound, Layers, type LucideIcon } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
@@ -27,9 +27,15 @@ export function CreateLauncher<Action extends string>({ options, onCreate, opens
   onCreate: (action: Action, trigger: HTMLButtonElement) => void;
   opensDialog?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(false);
+
+  function changeOpen(nextOpen: boolean) {
+    if (nextOpen) selectedRef.current = false;
+    setOpen(nextOpen);
+  }
 
   function prepareLaunch() {
     const menu = menuRef.current;
@@ -56,13 +62,24 @@ export function CreateLauncher<Action extends string>({ options, onCreate, opens
     menu.setAttribute('data-motion-ready', 'true');
   }
 
-  return <DropdownMenu.Root modal={!opensDialog} onOpenChange={open => { if (open) selectedRef.current = false; }}>
-    <DropdownMenu.Trigger asChild><Button ref={triggerRef} className="rj-add-trigger" size="icon-lg" aria-label="Add"><Plus /></Button></DropdownMenu.Trigger>
+  return <DropdownMenu.Root open={open} modal={!opensDialog} onOpenChange={changeOpen}>
+    <DropdownMenu.Trigger asChild onPointerDown={event => {
+      // Let the click finish before Radix can mount an item under the pointer.
+      if (event.button === 0 && !event.ctrlKey) event.preventDefault();
+    }}>
+      <Button ref={triggerRef} className="rj-add-trigger" size="icon-lg" aria-label="Add" onClick={event => {
+        if (!event.ctrlKey) changeOpen(!open);
+      }}><Plus /></Button>
+    </DropdownMenu.Trigger>
     {/* Keep the menu inside the theme scope; Radix still provides keyboard and focus behavior. */}
     <DropdownMenu.Content
       ref={menuRef}
       className="rj-add-menu rj-create-menu"
       side="top" align="end" sideOffset={8} collisionPadding={16}
+      onInteractOutside={event => {
+        // A click on + toggles the menu itself after the pointer is released.
+        if (triggerRef.current?.contains(event.target as Node)) event.preventDefault();
+      }}
       onCloseAutoFocus={event => { if (opensDialog && selectedRef.current) event.preventDefault(); }}
       onAnimationStart={event => {
         if (event.target === event.currentTarget && event.animationName === 'rj-create-menu-ready') prepareLaunch();
