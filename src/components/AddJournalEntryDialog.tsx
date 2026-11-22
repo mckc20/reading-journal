@@ -17,8 +17,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { AlignJustify, ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlignJustify, ImagePlus, NotebookPen, PlusCircle, Trash2, X } from "lucide-react";
+import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Input } from "@/components/ui/input";
@@ -78,7 +79,7 @@ interface JournalEntryFormProps {
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
   entryLinkTargets?: JournalLinkTarget[];
-  variant?: "dialog" | "inline";
+  variant?: "dialog" | "inline" | "creation-dialog";
   heading?: ReactNode;
   hideEntitySelector?: boolean;
   footerStart?: ReactNode;
@@ -361,6 +362,7 @@ export function JournalEntryForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const isInline = variant === "inline";
+  const isCreationDialog = variant === "creation-dialog";
   const mediaDragDisabled = uploadingImage || isSubmitting;
   const mediaSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -805,14 +807,14 @@ export function JournalEntryForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit(onSubmit)}>
-      <div className={cn(isInline ? "border-y border-border/60 bg-background" : "rounded-lg border-0")}>
+    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className={isCreationDialog ? "rj-book-form" : undefined}>
+      <div className={isCreationDialog ? "rj-book-form" : isInline ? "border-y border-border/60 bg-background" : "rounded-lg border-0"}>
             {heading && (
               <div className="border-b border-border/60 px-4 py-3">
                 <h3 className="text-sm font-medium">{heading}</h3>
               </div>
             )}
-            <div className={cn("p-4", isInline && "p-3")}>
+            <div className={isCreationDialog ? "rj-book-form-scroll" : isInline ? "p-3" : "p-4"}>
               <Label htmlFor="note-content" className="sr-only">
                 Note content
               </Label>
@@ -1109,7 +1111,7 @@ export function JournalEntryForm({
               </div>
             ) : (
               <SaveCancelBar
-                mode={isInline ? "page" : "dialog"}
+                mode={isCreationDialog ? "creation-dialog" : isInline ? "page" : "dialog"}
                 onCancel={handleCancel}
                 saving={isSubmitting}
                 saveDisabled={!content.trim()}
@@ -1148,14 +1150,15 @@ export default function AddJournalEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-4xl" onCloseAutoFocus={onCloseAutoFocus}>
-        <DialogHeader>
-          <DialogTitle className="sr-only">Add journal entry</DialogTitle>
-          <DialogDescription className="sr-only">Write a note or save a quote in your journal.</DialogDescription>
-        </DialogHeader>
-
+      <CreationDialogContent
+        title="Add journal entry"
+        description="Write a note or save a quote in your journal."
+        icon={NotebookPen}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <JournalEntryForm
           active={open}
+          variant="creation-dialog"
           initialBookId={initialBookId}
           entity={entity}
           initialEntry={initialEntry}
@@ -1177,7 +1180,7 @@ export default function AddJournalEntryDialog({
             onSubmitSaved?.(note);
           }}
         />
-      </DialogContent>
+      </CreationDialogContent>
     </Dialog>
   );
 }

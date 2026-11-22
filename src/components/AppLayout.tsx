@@ -41,17 +41,15 @@ import type { Book, ChatMessageNotification } from "@/types";
 import type { RecommendationItem } from "@/types/recommendations";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
-const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
 const AddJournalEntryDialog = lazy(() => import("./AddJournalEntryDialog"));
 
-type AddAction = "book" | "author" | "series" | "entry";
+type AddAction = "book" | "series" | "entry";
 
 const addActions = [
   { value: "book", label: "Add a book", icon: BookPlus },
   { value: "entry", label: "Add a journal entry", icon: NotebookPen },
   { value: "series", label: "Add a book series", icon: Layers },
-  { value: "author", label: "Add an author", icon: UserRound },
 ] as const;
 
 export interface AppLayoutOutletContext {
@@ -207,7 +205,7 @@ function AppLayoutContent() {
 
       <Suspense fallback={
         <LoadingDialog
-          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "author" ? "Add Author" : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
+          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
           onOpenChange={(open) => {
             if (!open) {
               addDialogStillOpen.current = false;
@@ -232,14 +230,6 @@ function AppLayoutContent() {
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
             onSaved={handleAddedBook}
             onWishlistSaved={addBookOptions?.onWishlistSaved}
-          />
-        )}
-        {activeAddAction === "author" && (
-          <AddAuthorDialog
-            onCloseAutoFocus={restoreAddDialogFocus}
-            open
-            onOpenChange={(open) => !open && setActiveAddAction(null)}
-            onSaved={(author) => navigate(`/authors/${author.id}`)}
           />
         )}
         {activeAddAction === "series" && (

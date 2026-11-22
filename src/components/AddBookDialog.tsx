@@ -1,7 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useRef, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { ChevronRight, ImagePlus, ScanBarcode } from "lucide-react";
+import { BookOpen, ChevronRight, ImagePlus, ScanBarcode } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -11,12 +11,8 @@ import {
   searchBooksByTitle,
   type BookTitleSearchResult,
 } from "@/lib/bookLookup";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
+import { Dialog } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Button } from "@/components/ui/button";
@@ -658,180 +654,183 @@ export default function AddBookDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{initialBook ? "Edit Wishlist Item" : "Add Book"}</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="min-h-0 rounded-xl border bg-card p-5">
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-4 py-1">
-              <div className="flex items-center gap-3">
-                <p className="shrink-0 text-sm font-medium text-foreground">Search by</p>
-                <Tabs
-                  value={importMethod}
-                  onValueChange={handleImportMethodChange}
-                  className="min-w-0 flex-1"
-                >
-                  <TabsList className="w-full">
-                    <TabsTrigger
-                      value="isbn"
-                      disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
-                    >
-                      ISBN
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="title"
-                      disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
-                    >
-                      Book title
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-
-              {importMethod === "isbn" ? (
-                <>
-                  {/* ISBN Scanner */}
-                  {showScanner ? (
-                    <BarcodeScanner
-                      onScan={handleIsbnLookup}
-                      onClose={() => setShowScanner(false)}
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full gap-2"
-                        onClick={() => { setShowScanner(true); setIsbnError(null); }}
-                        disabled={isbnStatus === "looking-up"}
+      <CreationDialogContent
+        title={initialBook ? "Edit Wishlist Item" : "Add Book"}
+        description="Find a book or fill in the details yourself."
+        icon={BookOpen}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="rj-book-form">
+          <ScrollArea className="rj-creation-book-scroll">
+            <div className="rj-creation-book-fields space-y-4">
+              <div className="rj-creation-lookup space-y-3">
+                <div className="flex items-center gap-3">
+                  <p className="shrink-0 text-sm font-medium text-foreground">Search by</p>
+                  <Tabs
+                    value={importMethod}
+                    onValueChange={handleImportMethodChange}
+                    className="min-w-0 flex-1"
+                  >
+                    <TabsList className="w-full">
+                      <TabsTrigger
+                        value="isbn"
+                        disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
                       >
-                        <ScanBarcode className="h-4 w-4" />
-                        Scan ISBN barcode
-                      </Button>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter ISBN"
-                          value={manualIsbn}
-                          onChange={(e) => setManualIsbn(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
-                            }
-                          }}
-                        />
+                        ISBN
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="title"
+                        disabled={isbnStatus === "looking-up" || titleSearchStatus === "searching" || isApplyingTitleResult}
+                      >
+                        Book title
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                {importMethod === "isbn" ? (
+                  <>
+                    {/* ISBN Scanner */}
+                    {showScanner ? (
+                      <BarcodeScanner
+                        onScan={handleIsbnLookup}
+                        onClose={() => setShowScanner(false)}
+                      />
+                    ) : (
+                      <div className="space-y-2">
                         <Button
                           type="button"
-                          size="sm"
-                          className="h-9"
-                          disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
-                          onClick={() => handleIsbnLookup(manualIsbn)}
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => { setShowScanner(true); setIsbnError(null); }}
+                          disabled={isbnStatus === "looking-up"}
                         >
-                          Look up
+                          <ScanBarcode className="h-4 w-4" />
+                          Scan ISBN barcode
                         </Button>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter ISBN"
+                            value={manualIsbn}
+                            onChange={(e) => setManualIsbn(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (manualIsbn.trim()) handleIsbnLookup(manualIsbn);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-9"
+                            disabled={!manualIsbn.trim() || isbnStatus === "looking-up"}
+                            onClick={() => handleIsbnLookup(manualIsbn)}
+                          >
+                            Look up
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {isbnStatus === "looking-up" && (
-                    <LoadingIndicator variant="inline" className="flex justify-center" label="Looking up book…" />
-                  )}
-
-                  {isbnError && (
-                    <p className="text-sm text-destructive text-center">{isbnError}</p>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input
-                      id="title-search"
-                      placeholder="Enter book title"
-                      value={titleQuery}
-                      onChange={(e) => setTitleQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleTitleSearch();
-                        }
-                      }}
-                      disabled={isApplyingTitleResult}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-9"
-                      disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
-                      onClick={() => void handleTitleSearch()}
-                    >
-                      {titleSearchStatus === "searching" ? "Looking up…" : "Look up"}
-                    </Button>
-                  </div>
-
-                  {titleSearchStatus === "searching" && (
-                    <LoadingIndicator variant="inline" className="flex justify-center" label="Searching book catalogs…" />
-                  )}
-
-                  {isApplyingTitleResult && <LoadingIndicator variant="inline" label="Loading book details…" />}
-
-                  {titleSearchError && (
-                    <p className="text-sm text-destructive text-center">{titleSearchError}</p>
-                  )}
-
-                  {titleSearchHasSearched &&
-                    titleSearchStatus === "idle" &&
-                    titleSearchResults.length === 0 && (
-                      <p className="text-sm text-center text-muted-foreground">
-                        No matching editions found.
-                      </p>
                     )}
 
-                  {titleSearchResults.length > 0 && (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {titleSearchResults.map((result) => (
-                        <button
-                          key={result.id}
-                          type="button"
-                          className="flex min-w-0 items-center gap-3 rounded-lg border bg-surface p-2 text-left transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-60"
-                          onClick={() => void handleTitleResultSelect(result)}
-                          disabled={isApplyingTitleResult}
-                        >
-                          <div className="flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                            {result.coverUrl ? (
-                              <img
-                                src={result.coverUrl}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <ImagePlus className="h-4 w-4 text-muted-foreground/50" />
-                            )}
-                          </div>
-                          <span className="min-w-0 space-y-0.5">
-                            <span className="block truncate text-sm font-medium">{result.title}</span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {result.authors.join(", ")}
-                            </span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ") ||
-                                "Edition details unavailable"}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
+                    {isbnStatus === "looking-up" && (
+                      <LoadingIndicator variant="inline" className="flex justify-center" label="Looking up book…" />
+                    )}
+
+                    {isbnError && (
+                      <p className="text-sm text-destructive text-center">{isbnError}</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        id="title-search"
+                        placeholder="Enter book title"
+                        value={titleQuery}
+                        onChange={(e) => setTitleQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleTitleSearch();
+                          }
+                        }}
+                        disabled={isApplyingTitleResult}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-9"
+                        disabled={!titleQuery.trim() || titleSearchStatus === "searching" || isApplyingTitleResult}
+                        onClick={() => void handleTitleSearch()}
+                      >
+                        {titleSearchStatus === "searching" ? "Looking up…" : "Look up"}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {titleSearchStatus === "searching" && (
+                      <LoadingIndicator variant="inline" className="flex justify-center" label="Searching book catalogs…" />
+                    )}
+
+                    {isApplyingTitleResult && <LoadingIndicator variant="inline" label="Loading book details…" />}
+
+                    {titleSearchError && (
+                      <p className="text-sm text-destructive text-center">{titleSearchError}</p>
+                    )}
+
+                    {titleSearchHasSearched &&
+                      titleSearchStatus === "idle" &&
+                      titleSearchResults.length === 0 && (
+                        <p className="text-sm text-center text-muted-foreground">
+                          No matching editions found.
+                        </p>
+                      )}
+
+                    {titleSearchResults.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {titleSearchResults.map((result) => (
+                          <button
+                            key={result.id}
+                            type="button"
+                            className="flex min-w-0 items-center gap-3 rounded-lg border bg-surface p-2 text-left transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-60"
+                            onClick={() => void handleTitleResultSelect(result)}
+                            disabled={isApplyingTitleResult}
+                          >
+                            <div className="flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                              {result.coverUrl ? (
+                                <img
+                                  src={result.coverUrl}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <ImagePlus className="h-4 w-4 text-muted-foreground/50" />
+                              )}
+                            </div>
+                            <span className="min-w-0 space-y-0.5">
+                              <span className="block truncate text-sm font-medium">{result.title}</span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {result.authors.join(", ")}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {[result.publicationDate?.slice(0, 4), result.isbn].filter(Boolean).join(" · ") ||
+                                  "Edition details unavailable"}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Cover, title, authors, and genres match the Edit book layout. */}
               <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
                 <div className="md:row-span-3 md:self-start">
                 <label
                   htmlFor="cover-upload"
-                  className="group relative flex aspect-[2/3] w-[min(7rem,38vw)] cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
+                  className="rj-creation-upload group relative flex aspect-[2/3] w-[min(7rem,38vw)] cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
                 >
                   {coverPreview ? (
                     <img
@@ -965,7 +964,7 @@ export default function AddBookDialog({
                 />
               </div>
 
-              <div className="order-12 space-y-3 sm:col-span-2">
+              <div className="rj-creation-secondary order-12 space-y-3 sm:col-span-2">
                 <button
                   type="button"
                   className="flex items-center gap-1.5 text-base font-medium text-foreground transition-colors hover:text-primary"
@@ -1198,13 +1197,13 @@ export default function AddBookDialog({
           </ScrollArea>
 
           <SaveCancelBar
-            mode="inline"
+            mode="creation-dialog"
             onCancel={() => onOpenChange(false)}
             saving={isSubmitting}
             saveLabel={initialBook ? "Save Changes" : "Add Book"}
           />
         </form>
-      </DialogContent>
+      </CreationDialogContent>
       <AddAuthorDialog
         open={authorDialogOpen}
         onOpenChange={setAuthorDialogOpen}

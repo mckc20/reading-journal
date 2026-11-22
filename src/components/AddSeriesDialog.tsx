@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { ImagePlus } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImagePlus, Layers } from "lucide-react";
+import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
+import { Dialog } from "@/components/ui/dialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import type { AddBookDialogLaunchOptions } from "@/components/AppLayout";
 import SeriesBooksEditor, {
@@ -198,105 +199,105 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Add Series</DialogTitle>
-          <DialogDescription>
-            Create a series entry with a description and optional banner image.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 pb-24">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="series-cover">Banner image</Label>
-                <label
-                  htmlFor="series-cover"
-                  className="group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
-                >
-                  {coverPreview ? (
-                    <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <ImagePlus className="h-6 w-6" />
-                      <span className="text-xs">Click to upload</span>
+      <CreationDialogContent
+        title="Add Series"
+        description="Create a series entry with a description and optional banner image."
+        icon={Layers}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <form onSubmit={handleSubmit} className="rj-book-form">
+          <div className="rj-book-form-scroll">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="series-cover">Banner image</Label>
+                  <label
+                    htmlFor="series-cover"
+                    className="rj-creation-upload group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
+                  >
+                    {coverPreview ? (
+                      <img src={coverPreview} alt="Series banner preview" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <ImagePlus className="h-6 w-6" />
+                        <span className="text-xs">Click to upload</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                      <ImagePlus className="h-5 w-5 text-white" />
                     </div>
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                    <ImagePlus className="h-5 w-5 text-white" />
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    id="series-cover"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleFileChange}
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-xs text-muted-foreground">
+                      {coverFile ? coverFile.name : "PNG, JPG, WEBP, or AVIF."}
+                    </p>
                   </div>
-                </label>
-                <input
-                  ref={fileInputRef}
-                  id="series-cover"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={handleFileChange}
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-xs text-muted-foreground">
-                    {coverFile ? coverFile.name : "PNG, JPG, WEBP, or AVIF."}
-                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="series-name">Series name *</Label>
+                  <Input
+                    id="series-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Series name"
+                    aria-invalid={!name.trim() && saving ? true : undefined}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="series-description">Description</Label>
+                  <Textarea
+                    id="series-description"
+                    rows={6}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="What is this series about?"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="series-name">Series name *</Label>
-                <Input
-                  id="series-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Series name"
-                  aria-invalid={!name.trim() && saving ? true : undefined}
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base font-semibold">Books in this series</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Search for books, drag by the handle, edit volume numbers, or remove books from this series.
+                  </p>
+                </div>
+                <SeriesBooksEditor
+                  rows={rows}
+                  allBooks={books}
+                  saving={saving}
+                  enableSearch
+                  emptyLabel="No books are added to this series yet."
+                  removedLabel={(count) =>
+                    `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
+                  }
+                  onRowsChange={setRows}
+                  onCreateBook={handleCreateBook}
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="series-description">Description</Label>
-                <Textarea
-                  id="series-description"
-                  rows={6}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="What is this series about?"
-                />
-              </div>
+              </section>
             </div>
-
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-base font-semibold">Books in this series</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Search for books, drag by the handle, edit volume numbers, or remove books from this series.
-                </p>
-              </div>
-              <SeriesBooksEditor
-                rows={rows}
-                allBooks={books}
-                saving={saving}
-                enableSearch
-                emptyLabel="No books are added to this series yet."
-                removedLabel={(count) =>
-                  `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
-                }
-                onRowsChange={setRows}
-                onCreateBook={handleCreateBook}
-              />
-            </section>
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <SaveCancelBar
-            mode="dialog"
+            mode="creation-dialog"
             onCancel={() => handleOpenChange(false)}
             saving={saving}
             saveDisabled={!name.trim()}
             saveLabel="Add Series"
           />
         </form>
-      </DialogContent>
+      </CreationDialogContent>
     </Dialog>
   );
 }

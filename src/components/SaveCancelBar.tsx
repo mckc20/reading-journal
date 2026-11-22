@@ -11,7 +11,7 @@ interface SaveCancelBarProps {
   saveLabel?: string;
   savingLabel?: string;
   children?: ReactNode;
-  mode?: "page" | "dialog" | "inline";
+  mode?: "page" | "dialog" | "inline" | "creation-dialog";
 }
 
 /** Shared action bar for forms that have an explicit Save/Cancel workflow. */
@@ -28,7 +28,7 @@ export default function SaveCancelBar({
 }: SaveCancelBarProps) {
   return (
     <div
-      className={cn(
+      className={mode === "creation-dialog" ? "rj-book-form-actions rj-creation-actions" : cn(
         mode === "dialog"
           ? "absolute inset-x-0 bottom-0"
           : mode === "page"
@@ -37,9 +37,9 @@ export default function SaveCancelBar({
         "z-50 border-t bg-card/95 px-4 py-3 shadow-[0_-8px_24px_oklch(0.21_0_0_/_0.08)] backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:px-5",
       )}
     >
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2">
+      <div className="rj-save-cancel-layout mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-muted-foreground">{children}</div>
-        <div className="flex w-full flex-row-reverse gap-2 sm:w-auto">
+        <div className="rj-save-cancel-buttons flex w-full flex-row-reverse gap-2 sm:w-auto">
           <Button type={onSave ? "button" : "submit"} onClick={onSave} disabled={saveDisabled || saving}>
             {saving ? savingLabel : saveLabel}
           </Button>
