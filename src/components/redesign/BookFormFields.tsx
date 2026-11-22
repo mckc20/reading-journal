@@ -5,6 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { BookLookupMode } from './bookFormTypes';
 
+export function RequiredBookFieldLabel({ htmlFor, text }: { htmlFor: string; text: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <Label htmlFor={htmlFor}>{text}</Label>
+      <span aria-hidden="true" className="text-destructive">*</span>
+    </span>
+  );
+}
+
 export function BookLookupModeSwitch({ mode, onChange, disabled }: {
   mode: BookLookupMode;
   onChange: (mode: BookLookupMode) => void;
@@ -57,7 +66,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
     : [];
   return (
     <div className="rj-book-form-field">
-      <Label htmlFor={id}>{author ? 'Author' : 'Genres'}</Label>
+      {author ? <RequiredBookFieldLabel htmlFor={id} text="Author" /> : <Label htmlFor={id}>Genres</Label>}
       <div className="rj-book-tags">
         {selected.map(({ id: value, label }) => (
           <span key={value}>

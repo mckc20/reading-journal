@@ -11,7 +11,7 @@ import {
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
 import { CoverUploadField } from "@/components/redesign/CoverUploadField";
 import { Dialog } from "@/components/ui/dialog";
-import { BookLookupModeSwitch, BookFormTagField, mergeBookNames } from "@/components/redesign/BookFormFields";
+import { BookLookupModeSwitch, BookFormTagField, mergeBookNames, RequiredBookFieldLabel } from "@/components/redesign/BookFormFields";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import "@/components/redesign/book-form.css";
 import SaveCancelBar from "@/components/SaveCancelBar";
@@ -976,8 +976,6 @@ export default function AddBookDialog({
                   )}
                 </section>
               )}
-              {!initialBook && <p className="rj-book-form-hint">Title and author are required.</p>}
-
               <div className="rj-book-form-primary">
                 <div className="rj-book-cover-editor">
                   <CoverUploadField id="cover-upload" label="Book cover" shape="cover" preview={coverPreview}
@@ -986,7 +984,7 @@ export default function AddBookDialog({
                 </div>
                 <div className="rj-book-form-identity">
                   <div className="rj-book-form-field">
-                    <Label htmlFor="title">Title</Label>
+                    <RequiredBookFieldLabel htmlFor="title" text="Title" />
                     <Input id="title" {...register("title", { validate: value => Boolean(value.trim()) || "Title is required" })} aria-required="true"
                       aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? "add-book-title-error" : undefined} />
                     {errors.title && <p id="add-book-title-error" className="rj-book-form-error">{errors.title.message}</p>}
@@ -1039,9 +1037,7 @@ export default function AddBookDialog({
                     type="number"
                     min={1}
                     {...register("total_pages")}
-                    aria-describedby="add-book-pages-hint"
                   />
-                  <p id="add-book-pages-hint" className="rj-book-form-hint">Leave blank if unknown.</p>
                 </div>
                 {!addToWishlist && (status === "Reading" || initialBook && ["Paused", "Finished", "DNF"].includes(status)) && (
                   <div className="rj-book-form-field">
