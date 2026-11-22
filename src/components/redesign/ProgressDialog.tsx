@@ -1,17 +1,14 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { BookCover } from '@/components/reading-journal/BookCover';
 import type { HomeBook } from './HomeCards';
-import { ProgressWheelPicker } from './ProgressWheelPicker';
+import { ProgressBookSummary, ProgressWheels } from './ProgressFields';
 import './redesign.css';
 
 export interface ProgressDraft { page: number; minutes?: number }
 
 function ProgressForm({ book, onSave, onClose, initialDraft }: { book: HomeBook; onSave: (draft: ProgressDraft) => Promise<void>; onClose: () => void; initialDraft?: ProgressDraft }) {
   const errorId = useId();
-  const pageLabelId = useId();
-  const timeLabelId = useId();
   const [page, setPage] = useState(initialDraft?.page ?? book.currentPage);
   const [hours, setHours] = useState(Math.floor((initialDraft?.minutes ?? 0) / 60));
   const [minutes, setMinutes] = useState((initialDraft?.minutes ?? 0) % 60);
@@ -35,26 +32,16 @@ function ProgressForm({ book, onSave, onClose, initialDraft }: { book: HomeBook;
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Progress could not be saved. Try again.'); }
     finally { setSaving(false); }
   }}>
-    <div className="rj-progress-book"><div><span className="rj-book-title">{book.title}</span><span className="rj-muted">{book.author}</span><dl className="rj-progress-page-count"><div><dt>Current page:</dt><dd>{book.currentPage}</dd></div><div><dt>Total pages:</dt><dd>{totalKnown ? book.totalPages : 'Unknown'}</dd></div></dl></div><BookCover src={book.cover} title={book.title} /></div>
-    <div role="group" aria-labelledby={pageLabelId}>
-      <p id={pageLabelId} className="rj-picker-label">To what page did you read?</p>
-      <div className="rj-picker-panel rj-page-picker-panel">
-        <ProgressWheelPicker label="To what page did you read?" value={page} min={book.currentPage} max={totalKnown ? book.totalPages! : undefined} onChange={setPage} disabled={saving} describedBy={error ? errorId : undefined} />
-      </div>
-    </div>
-    <div role="group" aria-labelledby={timeLabelId}>
-      <p id={timeLabelId} className="rj-picker-label">How long did you read?<span className="sr-only"> (optional)</span></p>
-      <div className="rj-picker-panel rj-time-picker-panel">
-        <ProgressWheelPicker label="Hours" value={hours} min={0} max={23} formatValue={value => `${value}h`} onChange={setHours} disabled={saving} />
-        <ProgressWheelPicker label="Minutes" value={minutes} min={0} max={55} step={5} formatValue={value => `${String(value).padStart(2, '0')}m`} onChange={setMinutes} disabled={saving} />
-      </div>
-    </div>
+    <ProgressBookSummary book={book} />
+    <ProgressWheels page={page} minPage={book.currentPage} maxPage={totalKnown ? book.totalPages! : undefined}
+      hours={hours} minutes={minutes} disabled={saving} errorId={error ? errorId : undefined}
+      onPageChange={setPage} onHoursChange={setHours} onMinutesChange={setMinutes} />
     {error && <p role="alert" id={errorId}>{error}</p>}
     <div className="rj-progress-footer"><Button variant="outline" type="button" disabled={saving} onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button></div>
   </form>;
 }
 
-/** Save is injected; the workshop supplies a local simulation, the app can supply its API later. */
+/** The workshop uses the same fields as the app with a simulated save. */
 export function ProgressDialog({ book, onSave, initiallyOpen = false, open: controlledOpen, onOpenChange, trigger, returnFocusTo, initialDraft }: {
   book: HomeBook; onSave: (draft: ProgressDraft) => Promise<void>; initiallyOpen?: boolean;
   open?: boolean; onOpenChange?: (open: boolean) => void; trigger?: ReactNode; returnFocusTo?: HTMLElement | null;

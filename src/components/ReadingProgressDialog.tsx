@@ -4,12 +4,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { notifyBookFinished } from "@/lib/confetti";
 import type { Book } from "@/types";
+import "@/components/redesign/redesign.css";
 
 // The panel includes the journal editor; fetch it only when the dialog opens.
 const ReadingProgressPanel = lazy(() => import("@/components/ReadingProgressPanel"));
@@ -33,6 +33,7 @@ export default function ReadingProgressDialog({
 }: ReadingProgressDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [entryComposerOpen, setEntryComposerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const isControlled = typeof open === "boolean";
   const resolvedOpen = isControlled ? open : internalOpen;
 
@@ -43,22 +44,21 @@ export default function ReadingProgressDialog({
   }
 
   return (
-    <Dialog open={resolvedOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={resolvedOpen} onOpenChange={next => { if (!saving) handleOpenChange(next); }}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
-        className={entryComposerOpen ? "sm:max-w-2xl" : "sm:max-w-md"}
+        className={entryComposerOpen ? "rj-progress-dialog rj-progress-dialog-wide" : "rj-progress-dialog"}
+        showCloseButton={!saving}
         onClick={(event) => event.stopPropagation()}
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <DialogHeader>
-          <DialogTitle>Update progress</DialogTitle>
-          <DialogDescription className="sr-only">Log reading progress for {book.title}.</DialogDescription>
-        </DialogHeader>
+        <DialogTitle>Update Progress</DialogTitle>
+        <DialogDescription className="sr-only">Record the page you reached in {book.title} and, optionally, your reading time.</DialogDescription>
         <Suspense fallback={<LoadingIndicator variant="section" label="Loading progress form…" />}>
           <ReadingProgressPanel
+            key={book.id}
             book={book}
-            defaultExpanded
-            hideTrigger
+            onSavingChange={setSaving}
             onEntryComposerOpenChange={setEntryComposerOpen}
             onCancel={() => handleOpenChange(false)}
             onProgressSaved={async (newPage) => {

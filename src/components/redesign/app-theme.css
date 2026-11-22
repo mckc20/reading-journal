@@ -1,27 +1,18 @@
 /* The signed-in app sets this on the document so portalled controls share the theme. */
 .rj-app-theme {
   --font-body: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --background: #fff;
-  --surface: #fff;
-  --surface-raised: #fff;
-  --surface-sunken: #f2f1ef;
-  --surface-hover: #f2f2f2;
-  --text-primary: #21150f;
-  --text-secondary: #6c666e;
-  --card: #f2f2f2;
-  --muted: #f2f2f2;
-  --secondary: #eee5e7;
-  --border: #e5e1dd;
-  --input: #89808a;
-  --accent: #87415b;
-  --accent-foreground: #fff;
-  --ring: #815567;
-  --rj-rose: #87415b;
-  --rj-rose-light: #ead0d3;
-  --rj-gold: #eac982;
-  --rj-gold-foreground: #21150f;
   --app-header-height: 82px;
   --app-bottom-nav-space: calc(80px + env(safe-area-inset-bottom));
+}
+
+.rj-app-theme:not(.dark) {
+  --surface-raised: var(--surface);
+  --surface-sunken: var(--rj-warm);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
+  --rj-gold-foreground: var(--foreground);
 }
 
 .rj-app-theme.dark {

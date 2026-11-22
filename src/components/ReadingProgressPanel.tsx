@@ -1,48 +1,29 @@
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { useState, useEffect, useMemo } from "react";
-import { BookOpen, History, NotebookPen } from "lucide-react";
-import { JournalEntryForm } from "@/components/AddJournalEntryDialog";
+import { ProgressBookSummary, ProgressWheels } from "@/components/redesign/ProgressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollWheelPicker } from "@/components/ui/scroll-wheel-picker";
 import { getProgressNoteDate, updateBookJournalEntryRecord } from "@/lib/bookJournal";
 import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
 import { useAuth } from "@/context/AuthContext";
 import { READING_LOG_NOTE_TAG_PREFIX, normalizeJournalTags } from "@/lib/journalTags";
 import type { Book, BookJournalEntryRecord, ReadingLog } from "@/types";
 
+const JournalEntryForm = lazy(() => import("@/components/AddJournalEntryDialog").then(module => ({ default: module.JournalEntryForm })));
+
 interface ReadingProgressPanelProps {
   book: Book;
-  onProgressSaved: (newCurrentPage: number) => void;
-  defaultExpanded?: boolean;
-  hideTrigger?: boolean;
-  onCancel?: () => void;
-  onEntryComposerOpenChange?: (open: boolean) => void;
-}
-
-function buildPageItems(min: number, max: number) {
-  const items: { value: number; label: string }[] = [];
-  for (let p = min; p <= max; p++) {
-    items.push({ value: p, label: String(p) });
-  }
-  return items;
+  onProgressSaved: (newCurrentPage: number) => Promise<void>;
+  onCancel: () => void;
+  onEntryComposerOpenChange: (open: boolean) => void;
+  onSavingChange: (saving: boolean) => void;
 }
 
 function toDateTimeLocalValue(date: Date): string {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return localDate.toISOString().slice(0, 16);
 }
-
-const HOUR_ITEMS = Array.from({ length: 7 }, (_, i) => ({
-  value: i,
-  label: `${i}h`,
-}));
-
-const MINUTE_ITEMS = Array.from({ length: 12 }, (_, i) => ({
-  value: i * 5,
-  label: `${(i * 5).toString().padStart(2, "0")}m`,
-}));
 
 async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: ReadingLog): Promise<BookJournalEntryRecord> {
   const readingLogTag = `${READING_LOG_NOTE_TAG_PREFIX}${readingLog.id}`;
@@ -61,279 +42,153 @@ async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: 
 }
 
 export default function ReadingProgressPanel({
-  book,
-  onProgressSaved,
-  defaultExpanded = false,
-  hideTrigger = false,
-  onCancel,
-  onEntryComposerOpenChange,
+  book, onProgressSaved, onCancel, onEntryComposerOpenChange, onSavingChange,
 }: ReadingProgressPanelProps) {
   const { user } = useAuth();
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const [lastLog, setLastLog] = useState<ReadingLog | null>(null);
-  const [loadingLog, setLoadingLog] = useState(true);
+  const errorId = useId();
+  const optionsId = useId();
+  const dateId = useId();
+  const [lastLog, setLastLog] = useState<ReadingLog | null>();
+  const [pendingLog, setPendingLog] = useState<ReadingLog | null>(null);
+  const [draftPage, setDraftPage] = useState<number | null>(null);
+  const [hours, setHours] = useState(0);
+  const [minutes, setMinutes] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const totalPages = book.total_pages ?? 0;
-
-  // Initial page value: start one step above current
-  const minPage = Math.max(book.current_page ?? 0, lastLog?.current_page ?? 0);
-  const startPage = Math.min(minPage + 1, totalPages);
-
-  const [selectedPage, setSelectedPage] = useState(startPage);
-  const [selectedHours, setSelectedHours] = useState(0);
-  const [selectedMinutes, setSelectedMinutes] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
   const [showLoggedAtEditor, setShowLoggedAtEditor] = useState(false);
-  const [selectedLoggedAt, setSelectedLoggedAt] = useState(() =>
-    toDateTimeLocalValue(new Date())
-  );
+  const [loggedAt, setLoggedAt] = useState(() => toDateTimeLocalValue(new Date()));
   const [showNoteEditor, setShowNoteEditor] = useState(false);
   const [savedProgressNote, setSavedProgressNote] = useState<BookJournalEntryRecord | null>(null);
+  const currentPage = Math.max(0, book.current_page ?? 0);
+  const totalPages = Math.max(0, book.total_pages ?? 0);
+  const minPage = Math.min(Math.max(currentPage, lastLog?.current_page ?? 0) + 1, totalPages);
+  const selectedPage = draftPage ?? minPage;
+  const loading = totalPages > 0 && lastLog === undefined;
+  const fieldsDisabled = saving || pendingLog !== null;
 
-  // Fetch last reading log on mount
   useEffect(() => {
+    if (totalPages === 0) return;
     let cancelled = false;
-    async function load() {
-      try {
-        const log = await fetchLastReadingLog(book.id);
-        if (!cancelled) setLastLog(log);
-      } catch {
-        // silently ignore — we'll just use book.current_page as min
-      } finally {
-        if (!cancelled) setLoadingLog(false);
-      }
-    }
-    load();
+    void fetchLastReadingLog(book.id)
+      .then(log => { if (!cancelled) setLastLog(log); })
+      .catch(() => { if (!cancelled) setLastLog(null); });
     return () => { cancelled = true; };
-  }, [book.id]);
+  }, [book.id, totalPages]);
 
-  // Reset picker values when expanding or when lastLog loads
-  useEffect(() => {
-    if (expanded) {
-      const min = Math.max(book.current_page ?? 0, lastLog?.current_page ?? 0);
-      setSelectedPage(Math.min(min + 1, totalPages));
-      setSelectedHours(0);
-      setSelectedMinutes(0);
-      setShowLoggedAtEditor(false);
-      setSelectedLoggedAt(toDateTimeLocalValue(new Date()));
-      setShowNoteEditor(false);
-      setSavedProgressNote(null);
-      onEntryComposerOpenChange?.(false);
-      setErrorMsg(null);
-    }
-  }, [expanded, lastLog, book.current_page, totalPages, onEntryComposerOpenChange]);
-
-  const pageItems = useMemo(
-    () => buildPageItems(minPage + 1, totalPages),
-    [minPage, totalPages]
-  );
-
-  async function handleSave() {
-    if (!user) return;
-    try {
-      setSaving(true);
-      setErrorMsg(null);
-      const timeMinutes = selectedHours * 60 + selectedMinutes;
-      let loggedAtIso: string | undefined;
-
-      if (showLoggedAtEditor && selectedLoggedAt) {
-        const parsedDate = new Date(selectedLoggedAt);
-        if (Number.isNaN(parsedDate.getTime())) {
-          throw new Error("Invalid date/time for progress entry");
-        }
-        loggedAtIso = parsedDate.toISOString();
-      }
-
-      const readingLog = await createReadingLog(
-        book.id,
-        user.id,
-        selectedPage,
-        timeMinutes > 0 ? timeMinutes : undefined,
-        loggedAtIso
-      );
-
-      if (savedProgressNote) {
-        await attachNoteToReadingLog(savedProgressNote, readingLog);
-      }
-
-      await onProgressSaved(selectedPage);
-      // Update lastLog locally so the min page updates
-      setLastLog(readingLog);
-      setSavedProgressNote(null);
-      setShowNoteEditor(false);
-      onEntryComposerOpenChange?.(false);
-      setExpanded(false);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to save progress");
-    } finally {
-      setSaving(false);
-    }
+  function toggleNoteEditor(open: boolean) {
+    setShowNoteEditor(open);
+    onEntryComposerOpenChange(open);
   }
 
-  if (totalPages === 0) {
-    return (
-      <div className="rounded-md border bg-background/80 px-3 py-2">
-        <p className="text-xs text-muted-foreground">
-          Set the total pages to track progress.
-        </p>
-      </div>
-    );
+  async function handleSave() {
+    if (!user || saving || loading) return;
+    setSaving(true);
+    onSavingChange(true);
+    setError(null);
+    try {
+      let readingLog = pendingLog;
+      if (!readingLog) {
+        const timestamp = showLoggedAtEditor && loggedAt ? new Date(loggedAt) : undefined;
+        if (timestamp && Number.isNaN(timestamp.getTime())) throw new Error("Invalid date/time for progress entry");
+        readingLog = await createReadingLog(
+          book.id, user.id, selectedPage, hours * 60 + minutes || undefined, timestamp?.toISOString(),
+        );
+        // If a later step fails, retry it with the log already written.
+        setPendingLog(readingLog);
+      }
+      if (savedProgressNote) {
+        await attachNoteToReadingLog(savedProgressNote, readingLog);
+        setSavedProgressNote(null);
+      }
+      await onProgressSaved(readingLog.current_page);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Progress could not be saved. Try again.");
+    } finally {
+      setSaving(false);
+      onSavingChange(false);
+    }
   }
 
   return (
-    <div className="space-y-3">
-      {loadingLog && <LoadingIndicator variant="inline" label="Loading reading progress…" />}
-      {!expanded && !hideTrigger && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loadingLog}
-          onClick={() => setExpanded(true)}
-        >
-          <BookOpen className="h-3.5 w-3.5 mr-1.5" />
-          Update progress
-        </Button>
-      )}
+    <div className="rj-progress-form">
+      <ProgressBookSummary book={{
+        id: book.id, title: book.title, author: book.authors.join(", "),
+        cover: book.cover_url, currentPage, totalPages,
+      }} />
 
-      {expanded && (
-        <div className="space-y-4 rounded-lg border bg-background/80 p-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Read up to page</Label>
-            <ScrollWheelPicker
-              items={pageItems}
-              selectedValue={selectedPage}
-              onChange={setSelectedPage}
-            />
-          </div>
+      {loading && <LoadingIndicator variant="inline" label="Loading reading progress…" />}
+      {totalPages === 0 && <p className="rj-muted">Set the total pages to track progress.</p>}
+      {!loading && totalPages > 0 && (
+        <>
+          <ProgressWheels
+            page={selectedPage}
+            minPage={minPage}
+            maxPage={totalPages}
+            hours={hours}
+            maxHours={6}
+            minutes={minutes}
+            disabled={fieldsDisabled}
+            errorId={error ? errorId : undefined}
+            onPageChange={setDraftPage}
+            onHoursChange={setHours}
+            onMinutesChange={setMinutes}
+          />
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">
-              Time spent reading (optional)
-            </Label>
-            <div className="flex gap-2">
-              <ScrollWheelPicker
-                items={HOUR_ITEMS}
-                selectedValue={selectedHours}
-                onChange={setSelectedHours}
-                className="flex-1"
-              />
-              <ScrollWheelPicker
-                items={MINUTE_ITEMS}
-                selectedValue={selectedMinutes}
-                onChange={setSelectedMinutes}
-                className="flex-1"
-              />
-            </div>
-          </div>
+          <div className="rj-progress-options">
+            <Button type="button" size="sm" variant="ghost" aria-expanded={showOptions} aria-controls={showOptions ? optionsId : undefined}
+              disabled={fieldsDisabled || showNoteEditor} onClick={() => setShowOptions(!showOptions)}>
+              More options
+            </Button>
+            {showOptions && (
+              <div id={optionsId} className="grid gap-3">
+                {showLoggedAtEditor ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor={dateId} className="text-xs">Finished at (optional)</Label>
+                    <Input id={dateId} type="datetime-local" value={loggedAt} disabled={fieldsDisabled} onChange={event => setLoggedAt(event.target.value)} />
+                  </div>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="justify-self-start" disabled={fieldsDisabled} onClick={() => setShowLoggedAtEditor(true)}>
+                    Change Finished Time
+                  </Button>
+                )}
 
-          <div className="space-y-2">
-            {!showLoggedAtEditor && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-auto px-0 text-primary hover:bg-transparent hover:text-primary/85"
-                onClick={() => setShowLoggedAtEditor(true)}
-              >
-                <History className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                Change Finished Time
-              </Button>
-            )}
-
-            {showLoggedAtEditor && (
-              <div className="space-y-1.5">
-                <Label htmlFor="progress-logged-at" className="text-xs text-muted-foreground">
-                  Finished at (optional)
-                </Label>
-                <Input
-                  id="progress-logged-at"
-                  type="datetime-local"
-                  value={selectedLoggedAt}
-                  onChange={(event) => setSelectedLoggedAt(event.target.value)}
-                />
+                {showNoteEditor ? (
+                  <Suspense fallback={<LoadingIndicator variant="inline" label="Loading entry editor…" />}>
+                    <JournalEntryForm
+                      active
+                      initialBookId={book.id}
+                      entity={{ type: "Book", id: book.id }}
+                      initialPageStart={selectedPage}
+                      initialNoteDate={getProgressNoteDate(showLoggedAtEditor, loggedAt)}
+                      preferInitialPageAndDate
+                      variant="inline"
+                      heading="Add entry"
+                      hideEntitySelector
+                      onCancel={() => toggleNoteEditor(false)}
+                      onSaved={note => { if ("book_id" in note) setSavedProgressNote(note); }}
+                      onSubmitSaved={() => toggleNoteEditor(false)}
+                    />
+                  </Suspense>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="justify-self-start" disabled={fieldsDisabled} onClick={() => toggleNoteEditor(true)}>
+                    Add Entry
+                  </Button>
+                )}
               </div>
             )}
           </div>
-
-          <div className="space-y-2">
-            {!showNoteEditor && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="border border-note/60 bg-transparent text-note hover:border-note hover:bg-transparent hover:text-note"
-                onClick={() => {
-                  setShowNoteEditor(true);
-                  onEntryComposerOpenChange?.(true);
-                }}
-              >
-                <NotebookPen className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                Add Entry
-              </Button>
-            )}
-
-            {showNoteEditor && (
-              <div className="pt-1">
-                <JournalEntryForm
-                  active={showNoteEditor}
-                  initialBookId={book.id}
-                  entity={{ type: "Book", id: book.id }}
-                  initialEntry={null}
-                  initialPageStart={selectedPage}
-                  initialNoteDate={getProgressNoteDate(showLoggedAtEditor, selectedLoggedAt)}
-                  preferInitialPageAndDate
-                  variant="inline"
-                  heading="Add entry"
-                  hideEntitySelector
-                  onCancel={() => {
-                    setShowNoteEditor(false);
-                    onEntryComposerOpenChange?.(false);
-                  }}
-                  onSaved={(note) => {
-                    if ("book_id" in note) setSavedProgressNote(note);
-                    setShowNoteEditor(false);
-                    onEntryComposerOpenChange?.(false);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          {errorMsg && (
-            <p className="text-xs text-destructive">{errorMsg}</p>
-          )}
-
-          <div className="flex gap-2 justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={saving}
-              onClick={() => {
-                if (onCancel) {
-                  onEntryComposerOpenChange?.(false);
-                  onCancel();
-                  return;
-                }
-                onEntryComposerOpenChange?.(false);
-                setExpanded(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={saving}
-              onClick={handleSave}
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        </div>
+        </>
       )}
+      {error && <p role="alert" id={errorId}>{error}</p>}
+      <div className="rj-progress-footer">
+        <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button>
+        {totalPages > 0 && (
+          <Button type="button" disabled={loading || saving || showNoteEditor} onClick={() => void handleSave()}>
+            {saving ? "Saving…" : pendingLog ? "Retry" : "Save"}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

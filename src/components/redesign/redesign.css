@@ -1,7 +1,7 @@
 @import '@fontsource-variable/dm-sans';
 
-/* PDF light direction, scoped to the workshop until the design is approved. */
-.rj-redesign {
+/* Use the workshop's original light palette in the signed-in app, too. */
+:is(.rj-redesign, .rj-app-theme:not(.dark)) {
   --font-body: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --background: #fff;
   --foreground: #21150f;
@@ -26,6 +26,8 @@
   --rj-gold: #eac982;
   --rj-light-yellow: #f5e2ba;
   --rj-warm: #f2f1ef;
+}
+.rj-redesign {
   --radius: 1rem;
   color: var(--foreground);
   background: var(--background);
@@ -191,10 +193,12 @@
 .rj-home-loading { padding-top: 20px; }
 .rj-home-loading > div { height: 160px; border-radius: 18px; background: var(--muted); margin-top: 24px; }
 .rj-aside-note { color: var(--muted-foreground); font: italic 18px/1.8 var(--font-display); padding: 30px 8px; }
-.rj-progress-dialog.rj-redesign, .rj-share-dialog.rj-redesign { border-radius: 22px; max-width: 400px; padding: 28px; gap: 24px; }
-.rj-progress-dialog h2, .rj-share-dialog h2 { font-style: italic; font-size: 26px; padding-right: 20px; }
+.rj-progress-dialog, .rj-share-dialog.rj-redesign { border-radius: 22px; max-width: 400px; padding: 28px; gap: 24px; }
+.rj-progress-dialog.rj-progress-dialog-wide { max-width: 640px; }
+.rj-progress-dialog > [data-slot='dialog-title'], .rj-share-dialog h2 { font-style: italic; font-size: 26px; padding-right: 20px; }
 .rj-progress-book { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 20px; align-items: center; margin-block: 4px 8px; }
 .rj-progress-book .rj-book-title { font-size: 16px; }
+.rj-progress-book .rj-book-title { overflow-wrap: anywhere; }
 .rj-progress-page-count { margin-top: 28px; font-size: 12px; }
 .rj-progress-page-count > div { display: flex; gap: 16px; margin-top: 6px; }
 .rj-progress-page-count dt { min-width: 80px; }
@@ -213,8 +217,11 @@
 .rj-wheel-row { display: flex; align-items: center; justify-content: center; scroll-snap-align: center; color: var(--muted-foreground); font-size: 13px; line-height: 1; cursor: pointer; user-select: none; }
 .rj-wheel-row[data-selected='true'] { color: var(--foreground); }
 .rj-progress-footer { display: flex; gap: 12px; justify-content: space-between; padding-top: 6px; }
-.rj-progress-footer [data-slot='button'] { min-width: 88px; }
+.rj-progress-footer [data-slot='button'] { min-width: 88px; min-height: 44px; }
 .rj-progress-footer [data-variant='outline'] { border-color: var(--primary); }
+.rj-progress-options { margin-block: -12px; }
+.rj-progress-options > [data-slot='button'] { margin-bottom: 4px; }
+.rj-progress-dialog .rj-wheel:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .rj-progress-form [role='alert'], .rj-share-form [role='alert'] { color: var(--destructive); font-size: 13px; }
 .rj-share-author { display: flex; gap: 12px; font-size: 13px; }
 .rj-share-preview { display: grid; grid-template-columns: minmax(0, 1fr) 70px; gap: 24px; align-items: start; }
