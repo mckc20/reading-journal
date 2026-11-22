@@ -69,11 +69,9 @@ function StatRow({ icon: Icon, label, value }: {
   value: string;
 }) {
   return (
-    <div className="relative isolate grid min-h-12 content-center pr-3 pl-[3.75rem] before:absolute before:inset-x-0 before:top-1/2 before:-z-10 before:h-9 before:-translate-y-1/2 before:rounded-lg before:bg-card">
+    <div className="relative grid min-h-16 content-center gap-1 rounded-xl bg-card py-3 pr-3 pl-16">
       <dt className="text-xs text-muted-foreground">
-        <span aria-hidden="true" className="absolute top-1/2 left-0 grid size-12 -translate-y-1/2 place-items-center rounded-lg bg-favorite/15 text-favorite">
-          <Icon className="size-5" />
-        </span>
+        <Icon aria-hidden="true" className="absolute top-1/2 left-[1.375rem] size-5 -translate-y-1/2 text-favorite" />
         {label}
       </dt>
       <dd className="text-base font-semibold leading-snug">{value}</dd>
