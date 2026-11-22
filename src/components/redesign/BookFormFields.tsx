@@ -51,6 +51,9 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
   const author = kind === 'authors';
   const item = author ? 'author' : 'genre';
   const chosen = new Set(selected.map(value => value.label.toLocaleLowerCase()));
+  const suggestions = query.trim().length >= 2
+    ? options.filter(option => !chosen.has(option.toLocaleLowerCase()))
+    : [];
   return (
     <div className="rj-book-form-field">
       <Label htmlFor={id}>{author ? 'Author' : 'Genres'}</Label>
@@ -65,7 +68,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
         ))}
       </div>
       <div className="rj-book-tag-input">
-        <Input id={id} name={kind} list={`${id}-options`} value={query}
+        <Input id={id} name={kind} list={`${id}-options`} value={query} autoComplete="off"
           placeholder={catalogOnly ? 'Search genres' : `Choose or type ${author ? 'an' : 'a'} ${item}`}
           onChange={event => onQueryChange(event.target.value)}
           onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); onAdd(); } }}
@@ -75,7 +78,7 @@ export function BookFormTagField({ kind, query, selected, options, onQueryChange
         </Button>
       </div>
       <datalist id={`${id}-options`}>
-        {options.filter(option => !chosen.has(option.toLocaleLowerCase())).map(option => <option key={option} value={option} />)}
+        {suggestions.map(option => <option key={option} value={option} />)}
       </datalist>
       <p id={`${id}-hint`} className="rj-book-form-hint">
         {author ? 'Add one or more authors. Separate names with a semicolon (;).' : catalogOnly ? 'Choose a genre from the catalog.' : 'Add genres to organize this book.'}

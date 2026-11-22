@@ -1,6 +1,6 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useRef, useState, useEffect, useMemo, type FormEvent } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { BookOpen, ImagePlus, ScanBarcode, Search } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
@@ -19,13 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useBooksContext } from "@/context/BooksContext";
 import { useAuth, useAuthorsContext } from "@/context";
 import { createWishlistItem, updateWishlistItem } from "@/lib/wishlist";
@@ -97,6 +90,9 @@ const WISHLIST_STATUS_VALUE = "Wishlist";
 function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: number): Partial<FormValues> {
   return {
     status: "To Read",
+    language: "",
+    format: "",
+    source: "",
     authors: [],
     genres: [],
     series_id: initialSeriesId ?? "",
@@ -157,7 +153,6 @@ export default function AddBookDialog({
   const titleSearchRequestIdRef = useRef(0);
   const {
     register,
-    control,
     handleSubmit,
     watch,
     setValue,
@@ -870,59 +865,24 @@ export default function AddBookDialog({
 
               <div className="rj-book-form-grid">
                 <div className="rj-book-form-field">
-                    <Label htmlFor="add-book-status">Reading status</Label>
-                    <Controller
-                      name="status"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          value={addToWishlist ? WISHLIST_STATUS_VALUE : field.value}
-                          disabled={Boolean(initialBook)}
-                          onValueChange={(value) => {
-                            if (value === WISHLIST_STATUS_VALUE) {
-                              setAddToWishlist(true);
-                              return;
-                            }
-                            setAddToWishlist(false);
-                            field.onChange(value as BookStatus);
-                          }}
-                        >
-                          <SelectTrigger id="add-book-status">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={WISHLIST_STATUS_VALUE}>Wishlist</SelectItem>
-                            {STATUS_OPTIONS.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
+                  <Label htmlFor="add-book-status">Reading status</Label>
+                  <select id="add-book-status" value={addToWishlist ? WISHLIST_STATUS_VALUE : status}
+                    disabled={Boolean(initialBook)}
+                    onChange={event => {
+                      const nextStatus = event.currentTarget.value as BookStatus;
+                      setAddToWishlist(nextStatus === WISHLIST_STATUS_VALUE);
+                      if (nextStatus !== WISHLIST_STATUS_VALUE) setValue("status", nextStatus, { shouldDirty: true });
+                    }}>
+                    <option value={WISHLIST_STATUS_VALUE}>Wishlist</option>
+                    {STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                  </select>
                 </div>
                 <div className="rj-book-form-field">
                   <Label htmlFor="add-book-language">Language</Label>
-                  <Controller
-                    name="language"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                        <SelectTrigger id="add-book-language">
-                          <SelectValue placeholder="Select language" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Not set</SelectItem>
-                          {(["German", "Spanish", "English"] as BookLanguage[]).map((l) => (
-                            <SelectItem key={l} value={l}>
-                              {l}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                  <select id="add-book-language" {...register("language")}>
+                    <option value="">Not set</option>
+                    {["German", "Spanish", "English"].map(option => <option key={option}>{option}</option>)}
+                  </select>
                 </div>
                 <div className="rj-book-form-field">
                   <Label htmlFor="total_pages">Total pages</Label>
@@ -938,37 +898,15 @@ export default function AddBookDialog({
                 {/* Series */}
                 <div className="rj-book-form-field">
                   <Label htmlFor="add-book-series">Series</Label>
-                  <Controller
-                    name="series_id"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) => {
-                          if (v === "__new__") {
-                            setAddingNewSeries(true);
-                          } else if (v === "__none__") {
-                            field.onChange("");
-                          } else {
-                            field.onChange(v);
-                          }
-                        }}
-                      >
-                        <SelectTrigger id="add-book-series">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {selectableSeries.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__new__">+ Add new series…</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                  <select id="add-book-series" value={seriesId || ""} onChange={event => {
+                    const nextSeries = event.currentTarget.value;
+                    if (nextSeries === "__new__") setAddingNewSeries(true);
+                    else setValue("series_id", nextSeries, { shouldDirty: true });
+                  }}>
+                    <option value="">None</option>
+                    {selectableSeries.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    <option value="__new__">+ Add new series…</option>
+                  </select>
                   {addingNewSeries && (
                     <div className="flex flex-wrap gap-2 mt-1">
                       <Input
@@ -1069,50 +1007,18 @@ export default function AddBookDialog({
 
                       <div className="rj-book-form-field">
                         <Label htmlFor="add-book-format">Format</Label>
-                        <Controller
-                          name="format"
-                          control={control}
-                          render={({ field }) => (
-                            <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                              <SelectTrigger id="add-book-format">
-                                <SelectValue placeholder="Select format" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">Not set</SelectItem>
-                                {(["eBook", "Audiobook", "Paperback", "Hardcover"] as BookFormat[]).map(
-                                  (f) => (
-                                    <SelectItem key={f} value={f}>
-                                      {f}
-                                    </SelectItem>
-                                  )
-                                )}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
+                        <select id="add-book-format" {...register("format")}>
+                          <option value="">Not set</option>
+                          {["eBook", "Audiobook", "Paperback", "Hardcover"].map(option => <option key={option}>{option}</option>)}
+                        </select>
                       </div>
 
                       <div className="rj-book-form-field">
                         <Label htmlFor="add-book-source">Source</Label>
-                        <Controller
-                          name="source"
-                          control={control}
-                          render={({ field }) => (
-                            <Select value={field.value || "__none__"} onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}>
-                              <SelectTrigger id="add-book-source">
-                                <SelectValue placeholder="Select source" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">Not set</SelectItem>
-                                {SOURCE_OPTIONS.map((source) => (
-                                  <SelectItem key={source} value={source}>
-                                    {source}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
+                        <select id="add-book-source" {...register("source")}>
+                          <option value="">Not set</option>
+                          {SOURCE_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                        </select>
                       </div>
 
                       <div className="rj-book-form-field">

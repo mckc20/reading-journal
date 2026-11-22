@@ -42,6 +42,20 @@ export const Populated: Story = { args: { populated: true } };
 export const EditBook: Story = { args: { mode: 'edit' } };
 export const Wishlist: Story = { args: { populated: true, initialStatus: 'Wishlist' } };
 export const Reading: Story = { args: { populated: true, initialStatus: 'Reading' } };
+export const SuggestionThreshold: Story = { play: async ({ canvasElement }) => {
+  const dialog = await dialogFor(canvasElement);
+  for (const [label, prefix, suggestion] of [['Author', 'Er', 'Erin Morgenstern'], ['Genres', 'Fa', 'Fantasy']]) {
+    const field = dialog.getByLabelText(label) as HTMLInputElement;
+    await userEvent.click(field);
+    await expect(field.list?.options.length).toBe(0);
+    await userEvent.type(field, prefix[0]);
+    await expect(field.list?.options.length).toBe(0);
+    await userEvent.type(field, prefix[1]);
+    await expect(Array.from(field.list?.options ?? [], option => option.value)).toContain(suggestion);
+    await userEvent.keyboard('{Backspace}');
+    await expect(field.list?.options.length).toBe(0);
+  }
+} };
 export const ISBNLookup: Story = { play: async ({ canvasElement }) => {
   const dialog = await dialogFor(canvasElement);
   await userEvent.selectOptions(dialog.getByLabelText('Reading status'), 'Up Next');
