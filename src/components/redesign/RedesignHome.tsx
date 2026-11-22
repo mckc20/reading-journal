@@ -15,22 +15,25 @@ function HomeSection({ title, children }: { title: string; children: ReactNode }
 
 export function QuickProgress({ books, selectedId, onSelect, onRead, onChangeDate, onSession, onEditLogs }: {
   books: HomeBook[]; selectedId: string; onSelect: (id: string) => void;
-  onRead: (book: HomeBook) => void; onChangeDate: (book: HomeBook) => void; onSession: (book: HomeBook) => void; onEditLogs: (book: HomeBook) => void;
+  onRead: (book: HomeBook, trigger: HTMLButtonElement) => void;
+  onChangeDate?: (book: HomeBook) => void;
+  onSession?: (book: HomeBook) => void;
+  onEditLogs?: (book: HomeBook) => void;
 }) {
   const selected = books.find(book => book.id === selectedId) ?? books[0];
   return <div className="rj-quick-container"><section className="rj-quick-progress" aria-label="Quick reading progress">
-    <div className="rj-quick-copy"><h1>How’s your<br />reading going?</h1>
-      <div className="rj-quick-actions"><Button onClick={() => selected && onRead(selected)} disabled={!selected}><span className="rj-read-label">Update Progress</span></Button>
-        <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button className="rj-more-reading-trigger" variant="outline" size="icon-lg" aria-label="More reading actions" disabled={!selected}><MoreHorizontal /></Button></DropdownMenu.Trigger>
+    <div className="rj-quick-copy"><h1 className="rj-quick-title">How’s your<br />reading going?</h1>
+      <div className="rj-quick-actions"><Button onClick={event => selected && onRead(selected, event.currentTarget)} disabled={!selected}><span className="rj-read-label">Update Progress</span></Button>
+        {(onChangeDate || onSession || onEditLogs) && <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button className="rj-more-reading-trigger" variant="outline" size="icon-lg" aria-label="More reading actions" disabled={!selected}><MoreHorizontal /></Button></DropdownMenu.Trigger>
           <DropdownMenu.Content className="rj-add-menu" sideOffset={8} align="start" collisionPadding={12}>
-            <DropdownMenu.Item onSelect={() => selected && onChangeDate(selected)}><CalendarDays size={16} />Change date</DropdownMenu.Item>
-            <DropdownMenu.Item onSelect={() => selected && onSession(selected)}><Clock3 size={16} />Log a session</DropdownMenu.Item>
-            <DropdownMenu.Item onSelect={() => selected && onEditLogs(selected)}><ClipboardPen size={16} />Edit logs</DropdownMenu.Item>
+            {onChangeDate && <DropdownMenu.Item onSelect={() => selected && onChangeDate(selected)}><CalendarDays size={16} />Change date</DropdownMenu.Item>}
+            {onSession && <DropdownMenu.Item onSelect={() => selected && onSession(selected)}><Clock3 size={16} />Log a session</DropdownMenu.Item>}
+            {onEditLogs && <DropdownMenu.Item onSelect={() => selected && onEditLogs(selected)}><ClipboardPen size={16} />Edit logs</DropdownMenu.Item>}
           </DropdownMenu.Content>
-        </DropdownMenu.Root>
+        </DropdownMenu.Root>}
       </div>
     </div>
-    <QuickBookCarousel books={books} selectedId={selected?.id} onSelect={onSelect} onActivate={id => { const book = books.find(item => item.id === id); if (book) onRead(book); }} />
+    <QuickBookCarousel books={books} selectedId={selected?.id} onSelect={onSelect} onActivate={(id, trigger) => { const book = books.find(item => item.id === id); if (book) onRead(book, trigger); }} />
   </section></div>;
 }
 

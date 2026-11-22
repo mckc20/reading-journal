@@ -24,6 +24,7 @@ interface BookCoverProps {
   className?: string;
   imageClassName?: string;
   showFallbackTitle?: boolean;
+  decorative?: boolean;
 }
 
 /** The shared visual treatment for every book-cover image and fallback. */
@@ -38,10 +39,12 @@ export function BookCover({
   className,
   imageClassName,
   showFallbackTitle = false,
+  decorative = false,
 }: BookCoverProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   return (
     <div
+      aria-hidden={decorative || undefined}
       className={cn(
         "relative aspect-[2/3] overflow-hidden rounded-md bg-muted shadow-md",
         sizeClasses[size],

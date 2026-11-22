@@ -32,7 +32,7 @@ export default function SaveCancelBar({
         mode === "dialog"
           ? "absolute inset-x-0 bottom-0"
           : mode === "page"
-            ? "fixed inset-x-0 bottom-[4.25rem] md:bottom-0"
+            ? "fixed inset-x-0 bottom-[var(--app-bottom-nav-space,0px)]"
             : "-mx-5 -mb-5",
         "z-50 border-t bg-card/95 px-4 py-3 shadow-[0_-8px_24px_oklch(0.21_0_0_/_0.08)] backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:px-5",
       )}

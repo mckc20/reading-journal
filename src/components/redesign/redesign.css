@@ -53,7 +53,7 @@
 .rj-quick-container { container-type: inline-size; min-width: 0; }
 .rj-quick-progress { background: var(--rj-gold); border-radius: 16px; display: grid; grid-template-columns: 152px minmax(0, 1fr); min-height: 146px; gap: 8px; padding: 14px 0 14px 18px; overflow: hidden; }
 .rj-quick-copy { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; padding-top: 5px; }
-.rj-quick-copy h1 { font: italic 18px/1.4 var(--font-display); letter-spacing: -.3px; }
+.rj-quick-title { font: italic 18px/1.4 var(--font-display); letter-spacing: -.3px; }
 .rj-quick-actions { display: flex; align-items: center; gap: 8px; }
 /* The colored button/circle follow the PDF; transparent padding retains a 44px hit area. */
 .rj-quick-actions > [data-slot='button'] { border: 0; background: transparent; padding: 0; min-height: 44px; position: relative; }
@@ -181,9 +181,9 @@
   .rj-create-menu[data-state='open']:not([data-motion-ready]) .rj-create-label { opacity: 1; }
 }
 .rj-navigation { position: fixed; left: 16px; right: 16px; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 20; display: flex; justify-content: space-around; background: var(--card); border: 0; border-radius: 16px 16px 48px 48px; padding: 10px 6px; }
-.rj-navigation button { min-width: 48px; min-height: 48px; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; font-size: 10px; color: var(--muted-foreground); border-radius: 12px; }
-.rj-navigation button svg { color: var(--input); }
-.rj-navigation button[aria-current='page'] { color: var(--foreground); }
+.rj-navigation :is(button, a) { min-width: 48px; min-height: 48px; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; font-size: 10px; color: var(--muted-foreground); border-radius: 12px; }
+.rj-navigation :is(button, a) svg { color: var(--input); }
+.rj-navigation :is(button, a)[aria-current='page'] { color: var(--foreground); }
 .rj-desktop-goal { display: none; min-width: 0; }
 .rj-skip-link { position: absolute; top: -100px; left: 20px; z-index: 80; padding: 12px; background: var(--background); }
 .rj-skip-link:focus { top: 8px; }
@@ -278,11 +278,11 @@
 .rj-pdf-reference .rj-home-shell main { order: 1; width: 100%; padding: 18px 18px 0; }
 .rj-pdf-reference .rj-floating-add { position: static; order: 2; align-self: flex-end; margin: 12px 18px 0; }
 .rj-pdf-reference .rj-navigation { position: static; order: 3; width: auto; margin: 24px 16px 0; padding: 10px 6px; border-radius: 16px 16px 48px 48px; }
-.rj-pdf-reference .rj-navigation button { flex-direction: column; gap: 4px; padding: 0; font-size: 10px; }
+.rj-pdf-reference .rj-navigation :is(button, a) { flex-direction: column; gap: 4px; padding: 0; font-size: 10px; }
 /* Standalone stories can be narrow inside a wide browser: size the widget by its container. */
 @container (min-width: 600px) {
   .rj-quick-progress { grid-template-columns: minmax(260px, 1fr) minmax(0, 1fr); padding: 28px; gap: 24px; }
-  .rj-quick-copy h1 { font-size: 36px; }
+  .rj-quick-title { font-size: 36px; }
   .rj-quick-carousel { --rj-quick-cover-width: 96px; }
 }
 @media (min-width: 768px) {
@@ -292,7 +292,7 @@
   .rj-home-shell { padding: 0 28px 40px; }
   .rj-home-shell main { padding: 32px 0; }
   .rj-navigation { position: static; grid-column: 1 / -1; grid-row: 2; width: max-content; max-width: 100%; margin: 0 auto 12px; border-radius: 999px; }
-  .rj-navigation button { flex-direction: row; gap: 8px; font-size: 13px; padding: 8px 12px; }
+  .rj-navigation :is(button, a) { flex-direction: row; gap: 8px; font-size: 13px; padding: 8px 12px; }
   .rj-floating-add { bottom: 30px; }
   .rj-home-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .6fr); gap: 32px; }
   .rj-mobile-goal { display: none; }
@@ -302,6 +302,6 @@
 @media (min-width: 1024px) {
   .rj-app-header { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .rj-navigation { grid-column: 2; grid-row: 1; margin: 0; padding: 4px 8px; }
-  .rj-navigation button { gap: 6px; padding: 8px; }
+  .rj-navigation :is(button, a) { gap: 6px; padding: 8px; }
   .rj-header-actions { grid-column: 3; }
 }

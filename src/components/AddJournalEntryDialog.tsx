@@ -18,7 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { AlignJustify, ImagePlus, PlusCircle, Trash2, X } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,8 @@ interface AddJournalEntryDialogProps {
   replaceSystemTagPrefixes?: string[];
   entryLinkTargets?: JournalLinkTarget[];
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
+  onSubmitSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 interface JournalEntryFormProps {
@@ -1137,6 +1139,8 @@ export default function AddJournalEntryDialog({
   replaceSystemTagPrefixes = [],
   entryLinkTargets = [],
   onSaved,
+  onSubmitSaved,
+  onCloseAutoFocus,
 }: AddJournalEntryDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
@@ -1144,9 +1148,10 @@ export default function AddJournalEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-4xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto gap-0 p-0 sm:max-w-4xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle className="sr-only">Add journal entry</DialogTitle>
+          <DialogDescription className="sr-only">Write a note or save a quote in your journal.</DialogDescription>
         </DialogHeader>
 
         <JournalEntryForm
@@ -1169,6 +1174,7 @@ export default function AddJournalEntryDialog({
           onSubmitSaved={(note) => {
             onSaved?.(note);
             onOpenChange(false);
+            onSubmitSaved?.(note);
           }}
         />
       </DialogContent>

@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, UserRound, Layers } from 'lucide-react';
+import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, UserRound, Layers, type LucideIcon } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/rj-logo-transparent.png';
@@ -12,9 +12,24 @@ const destinations = [
   { name: 'Profile', icon: UserRound },
 ] as const;
 
+const createOptions = [
+  { value: 'book', label: 'Add a book', icon: BookPlus },
+  { value: 'entry', label: 'Add a journal entry', icon: NotebookPen },
+  { value: 'series', label: 'Add a book series', icon: Layers },
+] as const;
+
 export function AddLauncher({ onCreate }: { onCreate: (destination: CreateDestination) => void }) {
+  return <CreateLauncher options={createOptions} onCreate={onCreate} />;
+}
+
+export function CreateLauncher<Action extends string>({ options, onCreate, opensDialog = false }: {
+  options: readonly { value: Action; label: string; icon: LucideIcon }[];
+  onCreate: (action: Action, trigger: HTMLButtonElement) => void;
+  opensDialog?: boolean;
+}) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef(false);
 
   function prepareLaunch() {
     const menu = menuRef.current;
@@ -41,19 +56,28 @@ export function AddLauncher({ onCreate }: { onCreate: (destination: CreateDestin
     menu.setAttribute('data-motion-ready', 'true');
   }
 
-  return <DropdownMenu.Root>
+  return <DropdownMenu.Root modal={!opensDialog} onOpenChange={open => { if (open) selectedRef.current = false; }}>
     <DropdownMenu.Trigger asChild><Button ref={triggerRef} className="rj-add-trigger" size="icon-lg" aria-label="Add"><Plus /></Button></DropdownMenu.Trigger>
     {/* Keep the menu inside the theme scope; Radix still provides keyboard and focus behavior. */}
     <DropdownMenu.Content
       ref={menuRef}
       className="rj-add-menu rj-create-menu"
       side="top" align="end" sideOffset={8} collisionPadding={16}
+      onCloseAutoFocus={event => { if (opensDialog && selectedRef.current) event.preventDefault(); }}
       onAnimationStart={event => {
         if (event.target === event.currentTarget && event.animationName === 'rj-create-menu-ready') prepareLaunch();
       }}
     >
-      {([{ value: 'book', label: 'Add a book', icon: BookPlus }, { value: 'entry', label: 'Add a journal entry', icon: NotebookPen }, { value: 'series', label: 'Add a book series', icon: Layers }] as const).map(item =>
-        <DropdownMenu.Item key={item.value} onSelect={() => onCreate(item.value)}><span className="rj-create-label">{item.label}</span><span className="rj-create-icon"><item.icon size={22} /></span></DropdownMenu.Item>)}
+      {options.map(item => (
+        <DropdownMenu.Item key={item.value} onSelect={() => {
+          if (!triggerRef.current) return;
+          selectedRef.current = true;
+          onCreate(item.value, triggerRef.current);
+        }}>
+          <span className="rj-create-label">{item.label}</span>
+          <span className="rj-create-icon"><item.icon size={22} /></span>
+        </DropdownMenu.Item>
+      ))}
     </DropdownMenu.Content>
   </DropdownMenu.Root>;
 }

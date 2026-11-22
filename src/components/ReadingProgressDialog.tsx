@@ -3,6 +3,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -15,10 +16,11 @@ const ReadingProgressPanel = lazy(() => import("@/components/ReadingProgressPane
 
 interface ReadingProgressDialogProps {
   book: Book;
-  trigger: ReactNode;
+  trigger?: ReactNode;
   onProgressSaved: (newCurrentPage: number) => Promise<void> | void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 export default function ReadingProgressDialog({
@@ -27,6 +29,7 @@ export default function ReadingProgressDialog({
   onProgressSaved,
   open,
   onOpenChange,
+  onCloseAutoFocus,
 }: ReadingProgressDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [entryComposerOpen, setEntryComposerOpen] = useState(false);
@@ -41,13 +44,15 @@ export default function ReadingProgressDialog({
 
   return (
     <Dialog open={resolvedOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         className={entryComposerOpen ? "sm:max-w-2xl" : "sm:max-w-md"}
         onClick={(event) => event.stopPropagation()}
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <DialogHeader>
           <DialogTitle>Update progress</DialogTitle>
+          <DialogDescription className="sr-only">Log reading progress for {book.title}.</DialogDescription>
         </DialogHeader>
         <Suspense fallback={<LoadingIndicator variant="section" label="Loading progress form…" />}>
           <ReadingProgressPanel

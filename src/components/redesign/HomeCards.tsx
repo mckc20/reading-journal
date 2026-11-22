@@ -20,7 +20,7 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
   const progress = getBookProgress(book.currentPage, book.totalPages);
   return (
     <button className="rj-reading-card" onClick={() => onOpen(book)}>
-      <BookCover src={book.cover} title={book.title} size="fill" showFallbackTitle />
+      <BookCover src={book.cover} title={book.title} size="fill" showFallbackTitle decorative />
       <span className="rj-reading-card-copy">
         <span className="rj-book-title">{book.title}</span>
         <span className="rj-muted">{book.author}</span>
@@ -33,11 +33,12 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
 }
 
 export function BookShelf({ books, onOpen, showStatus = true }: { books: HomeBook[]; onOpen: (book: HomeBook) => void; showStatus?: boolean }) {
-  return <div className="rj-shelf" tabIndex={0} aria-label="Books; scroll for more">
+  return <div className="rj-shelf" tabIndex={0} role="group" aria-label="Books">
     {books.map(book => <button key={book.id} className="rj-shelf-book" onClick={() => onOpen(book)}>
-      <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle />
+      <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle decorative />
       <span className="rj-book-title">{book.title}</span>
       <span className="rj-muted">{book.author}</span>
+      {showStatus && book.status && <span className="sr-only">{book.status}</span>}
     </button>)}
   </div>;
 }

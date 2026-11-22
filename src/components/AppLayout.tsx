@@ -1,33 +1,35 @@
 import LoadingDialog from "@/components/LoadingDialog";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Bell,
-  BookOpen,
+  BookPlus,
+  Clock3,
   Compass,
   Home,
   Library,
-  LibraryBig,
+  Layers,
   Menu,
   MessageSquare,
-  Plus,
+  NotebookPen,
   Search,
   Settings,
   Sparkles,
   UserRound,
-  X,
-  createLucideIcon,
   type LucideIcon,
 } from "lucide-react";
 import readingJournalLogo from "@/assets/rj-logo-transparent.png";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { DropdownMenu } from "radix-ui";
+import { CreateLauncher } from "@/components/redesign/HomeShell";
+import "@/components/redesign/redesign.css";
+import "@/components/redesign/app-theme.css";
 import { Button } from "@/components/ui/button";
 import { AuthorsProvider } from "@/context/AuthorsContext";
 import { BooksProvider } from "@/context/BooksContext";
 import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
-import { useAuth, useProfile, useUserSettings } from "@/context";
+import { useAuth, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
@@ -41,18 +43,16 @@ import type { RecommendationItem } from "@/types/recommendations";
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
 const AddAuthorDialog = lazy(() => import("./AddAuthorDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
+const AddJournalEntryDialog = lazy(() => import("./AddJournalEntryDialog"));
 
-type AddAction = "book" | "author" | "series";
+type AddAction = "book" | "author" | "series" | "entry";
 
-const addActions: Array<{
-  key: AddAction;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { key: "book", label: "Book", icon: BookOpen },
-  { key: "author", label: "Author", icon: UserRound },
-  { key: "series", label: "Series", icon: LibraryBig },
-];
+const addActions = [
+  { value: "book", label: "Add a book", icon: BookPlus },
+  { value: "entry", label: "Add a journal entry", icon: NotebookPen },
+  { value: "series", label: "Add a book series", icon: Layers },
+  { value: "author", label: "Add an author", icon: UserRound },
+] as const;
 
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
@@ -80,73 +80,34 @@ type NavLink = {
 const primaryNavLinks: NavLink[] = [
   { to: "/", label: "Home", icon: Home },
   { to: "/library", label: "Library", icon: Library },
-  { to: "/discover", label: "Discover", icon: Compass },
+  { to: "/library/journal", label: "Journal", icon: NotebookPen },
+  { to: "/statistics", label: "Insights", icon: BarChart3 },
+  { to: "/profile", label: "Profile", icon: UserRound },
 ];
 
-const RotateCcwClock = createLucideIcon("rotate-ccw-clock", [
-  ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
-  ["path", { d: "M3 3v5h5", key: "1xhq8a" }],
-  ["path", { d: "M12 7v5l4 2", key: "1fdv2h" }],
-]);
-
-const drawerNavLinks: NavLink[] = [
-  { to: "/statistics", label: "Reading Statistics", icon: BarChart3 },
-  { to: "/reading-history", label: "Reading History", icon: RotateCcwClock },
+const moreNavLinks: NavLink[] = [
+  { to: "/search", label: "Search", icon: Search },
+  { to: "/discover", label: "Discover", icon: Compass },
+  { to: "/reading-history", label: "Reading History", icon: Clock3 },
   { to: "/wrap-ups", label: "Wrap-Ups", icon: Sparkles },
   { to: "/messages", label: "Messages", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-function isActiveRoute(pathname: string, search: string, to: string): boolean {
-  const [targetPathname, targetSearch = ""] = to.split("?");
-
-  if (targetPathname === "/") return pathname === "/";
-  if (pathname !== targetPathname && !pathname.startsWith(`${targetPathname}/`)) {
-    return false;
-  }
-
-  const targetParams = new URLSearchParams(targetSearch);
-  const targetView = targetParams.get("view");
-
-  if (!targetView) return pathname === targetPathname;
-
-  const currentParams = new URLSearchParams(search);
-  const currentView = currentParams.get("view") ?? "all";
-  return currentView === targetView;
-}
-
-function getDisplayName(
-  profile: ReturnType<typeof useProfile>["profile"],
-  email?: string | null,
-): string {
-  if (profile?.display_name?.trim()) return profile.display_name.trim();
-
-  const name = [profile?.first_name, profile?.last_name]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" ");
-
-  return name || email || "Profile";
+function getPrimaryRoute(pathname: string) {
+  if (pathname === "/" || pathname === "/statistics") return pathname;
+  if (pathname === "/library/journal" || pathname.startsWith("/journal/")) return "/library/journal";
+  if (pathname === "/profile" || pathname.startsWith("/profiles/")) return "/profile";
+  if (/^\/(library|books|series|authors|genres)(?:\/|$)/.test(pathname)) return "/library";
 }
 
 function AppLayoutContent() {
-  const { user } = useAuth();
-  const { profile } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [addMenuHasBeenInteracted, setAddMenuHasBeenInteracted] = useState(false);
-  const [activeAddAction, setActiveAddAction] = useState<AddAction | null>(null);
-  const [, setDetailEditingOpen] = useState(false);
-  const [drawerPinned, setDrawerPinned] = useState(false);
-  const [drawerHovered, setDrawerHovered] = useState(false);
-  const drawerOpen = drawerPinned || drawerHovered;
-  const desktopAddButtonRef = useRef<HTMLButtonElement>(null);
-  const desktopAddMenuRef = useRef<HTMLDivElement>(null);
-  const mobileAddButtonRef = useRef<HTMLButtonElement>(null);
-  const mobileAddMenuRef = useRef<HTMLDivElement>(null);
+  const [activeAddAction, setActiveAddAction] = useState<Exclude<AddAction, "book"> | null>(null);
+  const [detailEditingOpen, setDetailEditingOpen] = useState(false);
   const addDialogStillOpen = useRef(false);
   const dialogReturnFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -157,11 +118,7 @@ function AppLayoutContent() {
     const active = document.activeElement;
     // When one add form launches another, keep the opener outside the closing dialog.
     if (active instanceof HTMLElement && active.closest('[role="dialog"]') && dialogReturnFocus.current?.isConnected) return;
-    // Add-menu entries disappear when selected, so return to the visible Add button.
-    const fromMenu = desktopAddMenuRef.current?.contains(active) || mobileAddMenuRef.current?.contains(active);
-    dialogReturnFocus.current = fromMenu
-      ? (desktopAddButtonRef.current?.getClientRects().length ? desktopAddButtonRef.current : mobileAddButtonRef.current)
-      : active instanceof HTMLElement ? active : null;
+    dialogReturnFocus.current = active instanceof HTMLElement ? active : null;
   }
 
   function restoreAddDialogFocus(event: Event) {
@@ -170,7 +127,6 @@ function AppLayoutContent() {
     if (!addDialogStillOpen.current) dialogReturnFocus.current?.focus();
   }
 
-  const displayName = getDisplayName(profile, user?.email);
   const isMessagesPage = location.pathname === "/messages";
 
   useEffect(() => {
@@ -190,55 +146,17 @@ function AppLayoutContent() {
     document.body.scrollTop = 0;
   }, [location.pathname]);
 
-  useEffect(() => {
-    if (!addMenuOpen) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      const clickedInsideAddMenu = [
-        desktopAddButtonRef,
-        desktopAddMenuRef,
-        mobileAddButtonRef,
-        mobileAddMenuRef,
-      ].some((ref) => ref.current?.contains(target));
-
-      if (clickedInsideAddMenu) {
-        return;
-      }
-      setAddMenuOpen(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setAddMenuOpen(false);
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [addMenuOpen]);
+  useLayoutEffect(() => {
+    // Portalled dialogs and menus inherit the same colors as the signed-in UI.
+    const root = document.documentElement;
+    root.classList.add("rj-app-theme");
+    return () => root.classList.remove("rj-app-theme");
+  }, []);
 
   function openAddBook(options?: AddBookDialogLaunchOptions) {
     rememberDialogOpener();
     setAddBookOptions(options);
     setAddBookOpen(true);
-  }
-
-  function changeAddMenuOpen(open: boolean) {
-    setAddMenuHasBeenInteracted(true);
-    setAddMenuOpen(open);
-  }
-
-  function closeDrawer() {
-    setDrawerPinned(false);
-    setDrawerHovered(false);
-  }
-
-  function toggleDrawer() {
-    if (drawerPinned) closeDrawer();
-    else setDrawerPinned(true);
   }
 
   function closeAddBook(open: boolean) {
@@ -254,85 +172,42 @@ function AppLayoutContent() {
     }
   }
 
-  function openAddDialog(action: AddAction) {
-    setAddMenuOpen(false);
+  function openAddDialog(action: AddAction, trigger: HTMLButtonElement) {
+    dialogReturnFocus.current = trigger;
     if (action === "book") {
-      openAddBook();
-      return;
+      setAddBookOptions(undefined);
+      setAddBookOpen(true);
+    } else {
+      setActiveAddAction(action);
     }
-    rememberDialogOpener();
-    setActiveAddAction(action);
   }
+
+  const addLauncher = <CreateLauncher options={addActions} onCreate={openAddDialog} opensDialog />;
 
   return (
     <>
-      <div className="min-h-svh bg-background text-foreground">
-        <AppHeader
-          pathname={location.pathname}
-          search={location.search}
-          profile={profile}
-          email={user?.email}
-          displayName={displayName}
-          drawerOpen={drawerOpen}
-          addMenuOpen={addMenuOpen}
-          addMenuHasBeenInteracted={addMenuHasBeenInteracted}
-          addButtonRef={desktopAddButtonRef}
-          addMenuRef={desktopAddMenuRef}
-          onToggleDrawer={toggleDrawer}
-          onCloseDrawer={closeDrawer}
-          onAddMenuOpenChange={changeAddMenuOpen}
-          onSelectAddAction={openAddDialog}
-        />
-
-        <SideDrawer
-          open={drawerOpen}
-          pathname={location.pathname}
-          search={location.search}
-          onToggleOpen={toggleDrawer}
-          onClose={closeDrawer}
-          onHoverOpenChange={setDrawerHovered}
-        />
-
+      <div className="rj-app min-h-svh bg-background text-foreground">
+        <a className="rj-skip-link" href="#app-content">Skip to content</a>
+        <AppHeader pathname={location.pathname} addLauncher={isMessagesPage ? addLauncher : undefined} />
         <main
-          className={cn(
-            isMessagesPage
-              ? "w-full max-w-none flex-1 px-0 pt-16 pb-16 transition-[padding] duration-200 md:pb-0"
-              : "mx-auto w-full max-w-7xl flex-1 px-5 pt-21 pb-28 transition-[padding] duration-200 sm:px-8 md:py-8 md:pt-24 md:pr-10 lg:pr-12",
-            drawerOpen
-              ? isMessagesPage
-                ? "md:pl-64"
-                : "md:pl-72 md:[--detail-bg-left-offset:7.75rem] lg:[--detail-bg-left-offset:7.5rem]"
-              : isMessagesPage
-                ? "md:pl-16"
-                : "md:pl-24 md:[--detail-bg-left-offset:1.75rem] lg:[--detail-bg-left-offset:1.5rem]",
-          )}
+          id="app-content"
+          tabIndex={-1}
+          className={isMessagesPage ? "rj-app-messages" : "rj-app-content"}
         >
-          <Outlet
-            context={
-              {
-                onAddBookClick: () => openAddBook(),
-                openAddBook,
-                setDetailEditingOpen,
-              } satisfies AppLayoutOutletContext
-            }
-          />
+          <Outlet context={{
+            onAddBookClick: () => openAddBook(),
+            openAddBook,
+            setDetailEditingOpen,
+          } satisfies AppLayoutOutletContext} />
         </main>
-
-        <MobileBottomNav
-          pathname={location.pathname}
-          search={location.search}
-          addMenuOpen={addMenuOpen}
-          addMenuHasBeenInteracted={addMenuHasBeenInteracted}
-          addButtonRef={mobileAddButtonRef}
-          addMenuRef={mobileAddMenuRef}
-          onAddMenuOpenChange={changeAddMenuOpen}
-          onSelectAddAction={openAddDialog}
-        />
+        {!detailEditingOpen && !isMessagesPage && (
+          <div className="rj-floating-add">{addLauncher}</div>
+        )}
       </div>
 
       <Suspense fallback={
         <LoadingDialog
-          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "author" ? "Add Author" : "Add Series"}
+          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "author" ? "Add Author" : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
           onOpenChange={(open) => {
             if (!open) {
               addDialogStillOpen.current = false;
@@ -376,6 +251,14 @@ function AppLayoutContent() {
             onSaved={(series) => navigate(`/series/${series.id}`)}
           />
         )}
+        {activeAddAction === "entry" && (
+          <AddJournalEntryDialog
+            onCloseAutoFocus={restoreAddDialogFocus}
+            open
+            onOpenChange={(open) => !open && setActiveAddAction(null)}
+            onSubmitSaved={(entry) => navigate(entry.public_id ? `/journal/${entry.public_id}` : "/library/journal")}
+          />
+        )}
       </Suspense>
 
       <ReleaseNotesDialog />
@@ -384,231 +267,49 @@ function AppLayoutContent() {
   );
 }
 
-function AppHeader({
-  pathname,
-  search,
-  profile,
-  email,
-  displayName,
-  drawerOpen,
-  addMenuOpen,
-  addMenuHasBeenInteracted,
-  addButtonRef,
-  addMenuRef,
-  onToggleDrawer,
-  onCloseDrawer,
-  onAddMenuOpenChange,
-  onSelectAddAction,
-}: {
-  pathname: string;
-  search: string;
-  profile: ReturnType<typeof useProfile>["profile"];
-  email?: string | null;
-  displayName: string;
-  drawerOpen: boolean;
-  addMenuOpen: boolean;
-  addMenuHasBeenInteracted: boolean;
-  addButtonRef: RefObject<HTMLButtonElement>;
-  addMenuRef: RefObject<HTMLDivElement>;
-  onToggleDrawer: () => void;
-  onCloseDrawer: () => void;
-  onAddMenuOpenChange: (open: boolean) => void;
-  onSelectAddAction: (action: AddAction) => void;
-}) {
-  return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 h-16 border-b border-border/80 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:left-16",
-      )}
-    >
-      <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-8 lg:px-10">
-        <div className="flex min-w-0 items-center gap-2">
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="md:hidden"
-            aria-label={drawerOpen ? "Close menu" : "Open menu"}
-            aria-expanded={drawerOpen}
-            onClick={onToggleDrawer}
-          >
-            {drawerOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-          <Link
-            to="/"
-            className={cn(
-              "flex min-w-0 items-center gap-3 font-heading font-medium text-foreground",
-              drawerOpen ? "md:hidden" : "md:flex",
-            )}
-            aria-label="Reading Journal home"
-            onClick={onCloseDrawer}
-          >
-            <img
-              src={readingJournalLogo}
-              alt=""
-              className="h-8 w-8 shrink-0 object-contain"
-              aria-hidden="true"
-            />
-            <span className="sr-only truncate text-sm md:not-sr-only">Reading Journal</span>
-          </Link>
-        </div>
+function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
+  const activeRoute = getPrimaryRoute(pathname);
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-          {primaryNavLinks.map((link) => (
-            <TopNavLink
-              key={link.to}
-              link={link}
-              active={isActiveRoute(pathname, search, link.to)}
-            />
+  return (
+    <div className="rj-app-header-wrap">
+      <header className="rj-app-header">
+        <Link to="/" className="rj-brand" aria-label="Reading Journal home">
+          <img src={readingJournalLogo} alt="" />
+          <span>Reading Journal</span>
+        </Link>
+        <nav className="rj-navigation" aria-label="Primary navigation">
+          {primaryNavLinks.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} aria-current={activeRoute === to ? "page" : undefined}>
+              <Icon size={22} aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
           ))}
         </nav>
-
-        <div className="flex min-w-0 items-center justify-end gap-1">
-          <DesktopAddButtonMenu
-            buttonRef={addButtonRef}
-            menuRef={addMenuRef}
-            open={addMenuOpen}
-            hasBeenInteracted={addMenuHasBeenInteracted}
-            onOpenChange={onAddMenuOpenChange}
-            onSelect={onSelectAddAction}
-          />
-          <Button size="icon" variant="ghost" asChild>
-            <Link to="/search" aria-label="Search">
-              <Search className="h-5 w-5" />
-            </Link>
-          </Button>
+        <div className="rj-header-actions">
+          {addLauncher}
           <NotificationsMenu />
-          <Link
-            to="/profile"
-            className="flex rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/35"
-            aria-label={`Open profile for ${displayName}`}
-          >
-            <ProfileAvatar profile={profile} email={email} className="h-9 w-9 text-sm" />
-          </Link>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button size="icon-lg" variant="ghost" aria-label="More navigation">
+                <Menu aria-hidden="true" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content className="rj-add-menu" align="end" sideOffset={8} collisionPadding={12}>
+                {moreNavLinks.map(({ to, label, icon: Icon }) => (
+                  <DropdownMenu.Item key={to} asChild>
+                    <Link to={to} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
+                      <Icon size={18} aria-hidden="true" />
+                      {label}
+                    </Link>
+                  </DropdownMenu.Item>
+                ))}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
-      </div>
-    </header>
-  );
-}
-
-function SideDrawer({
-  open,
-  pathname,
-  search,
-  onToggleOpen,
-  onClose,
-  onHoverOpenChange,
-}: {
-  open: boolean;
-  pathname: string;
-  search: string;
-  onToggleOpen: () => void;
-  onClose: () => void;
-  onHoverOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <>
-      {open && (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm md:hidden"
-          aria-label="Close menu"
-          onClick={onClose}
-        />
-      )}
-      <aside
-        className={cn(
-          "fixed bottom-0 left-0 top-0 z-[60] flex flex-col border-r border-border bg-background transition-all duration-200",
-          "md:block",
-          open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-          open ? "w-72 md:w-64" : "w-16",
-          open ? "md:z-[60]" : "md:z-40",
-        )}
-        onPointerEnter={(event) => {
-          if (event.pointerType === "mouse" && window.matchMedia("(min-width: 768px)").matches) {
-            onHoverOpenChange(true);
-          }
-        }}
-        onPointerLeave={(event) => {
-          if (event.pointerType === "mouse") onHoverOpenChange(false);
-        }}
-        aria-label="Side navigation"
-      >
-        <div
-          className={cn(
-            "flex shrink-0 px-2",
-            open ? "h-16 items-center gap-2" : "h-16 items-center justify-center",
-          )}
-        >
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="shrink-0"
-            aria-label={open ? "Collapse menu" : "Expand menu"}
-            aria-expanded={open}
-            onClick={onToggleOpen}
-          >
-            {open ? <X className="h-5 w-5 md:hidden" /> : null}
-            <Menu className={cn("h-5 w-5", open && "hidden md:block")} />
-          </Button>
-          {open && (
-            <Link
-              to="/"
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-2 font-heading font-medium text-foreground transition-colors hover:text-primary"
-              aria-label="Reading Journal home"
-              onClick={onClose}
-            >
-              <img
-                src={readingJournalLogo}
-                alt=""
-                className="h-8 w-8 shrink-0 object-contain"
-                aria-hidden="true"
-              />
-              <span className="truncate text-sm">Reading Journal</span>
-            </Link>
-          )}
-        </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1 px-2 py-4">
-          {drawerNavLinks.map((link) => {
-            const active = isActiveRoute(pathname, search, link.to);
-            const Icon = link.icon;
-
-            return (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={cn(
-                  "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors hover:bg-surface-hover",
-                  active ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-                  !open && "md:justify-center md:px-0",
-                )}
-                aria-label={link.label}
-                title={!open ? link.label : undefined}
-                onClick={onClose}
-              >
-                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span className={cn("truncate", !open && "md:sr-only")}>{link.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-    </>
-  );
-}
-
-function TopNavLink({ link, active }: { link: NavLink; active: boolean }) {
-  return (
-    <Link
-      to={link.to}
-      className={cn(
-        "relative px-4 py-5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-        active && "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary",
-      )}
-    >
-      {link.label}
-    </Link>
+      </header>
+    </div>
   );
 }
 
@@ -700,7 +401,7 @@ function NotificationsMenu() {
     <div ref={menuRef} className="relative">
       <Button
         type="button"
-        size="icon"
+        size="icon-lg"
         variant="ghost"
         aria-label="Notifications"
         aria-haspopup="menu"
@@ -719,7 +420,7 @@ function NotificationsMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popover)]"
+          className="absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-5rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-[var(--shadow-popover)]"
         >
           <div className="border-b px-3 py-2.5">
             <p className="text-sm font-medium">Notifications</p>
@@ -752,203 +453,6 @@ function NotificationsMenu() {
         </div>
       )}
     </div>
-  );
-}
-
-function AddMenuPanel({
-  onSelect,
-  animateOptions = false,
-}: {
-  onSelect: (action: AddAction) => void;
-  animateOptions?: boolean;
-}) {
-  return (
-    <>
-      <div className="mb-1 px-2 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        Add
-      </div>
-      <div className="space-y-1">
-        {addActions.map(({ key, label, icon: Icon }, index) => (
-          <button
-            key={key}
-            type="button"
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-hover",
-              animateOptions && "animate-mobile-add-option",
-            )}
-            style={animateOptions ? { animationDelay: `${300 + index * 60}ms` } : undefined}
-            onClick={() => onSelect(key)}
-          >
-            <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            {label}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function DesktopAddButtonMenu({
-  open,
-  hasBeenInteracted,
-  onOpenChange,
-  onSelect,
-  buttonRef,
-  menuRef,
-}: {
-  open: boolean;
-  hasBeenInteracted: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelect: (action: AddAction) => void;
-  buttonRef: RefObject<HTMLButtonElement>;
-  menuRef: RefObject<HTMLDivElement>;
-}) {
-  const pointerIsHovering = useRef(false);
-
-  return (
-    <div
-      className="relative hidden md:block"
-      onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse") return;
-        pointerIsHovering.current = true;
-        onOpenChange(true);
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType !== "mouse") return;
-        pointerIsHovering.current = false;
-        if (!event.currentTarget.contains(document.activeElement)) onOpenChange(false);
-      }}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget) && !pointerIsHovering.current) {
-          onOpenChange(false);
-        }
-      }}
-    >
-      <Button
-        ref={buttonRef}
-        type="button"
-        size="icon-lg"
-        className="rounded-full"
-        aria-label="Add"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => onOpenChange(pointerIsHovering.current || !open)}
-      >
-        <Plus
-          className={cn("size-5", open ? "animate-mobile-add-spin-open" : hasBeenInteracted ? "animate-mobile-add-spin-close" : undefined)}
-          aria-hidden="true"
-        />
-      </Button>
-      {open && (
-        <div
-          ref={menuRef}
-          // The padding bridges the gap so moving into the menu keeps it open.
-          className="absolute right-0 top-full z-50 w-52 pt-3"
-        >
-          <div className="animate-desktop-add-dropdown origin-top-right overflow-hidden rounded-xl border border-border bg-popover p-2 shadow-[var(--shadow-popover)]">
-            <AddMenuPanel onSelect={onSelect} animateOptions={open} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MobileBottomNav({
-  pathname,
-  search,
-  addMenuOpen,
-  addMenuHasBeenInteracted,
-  addButtonRef,
-  addMenuRef,
-  onAddMenuOpenChange,
-  onSelectAddAction,
-}: {
-  pathname: string;
-  search: string;
-  addMenuOpen: boolean;
-  addMenuHasBeenInteracted: boolean;
-  addButtonRef: RefObject<HTMLButtonElement>;
-  addMenuRef: RefObject<HTMLDivElement>;
-  onAddMenuOpenChange: (open: boolean) => void;
-  onSelectAddAction: (action: AddAction) => void;
-}) {
-  const pointerIsHovering = useRef(false);
-
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      {primaryNavLinks.map(({ to, label, icon: Icon }) => {
-        const active = isActiveRoute(pathname, search, to);
-        return (
-          <Link
-            key={to}
-            to={to}
-            className={cn(
-              "flex flex-1 flex-col items-center gap-1 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] transition-colors",
-              active ? "text-primary" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="h-5 w-5" />
-            {label}
-          </Link>
-        );
-      })}
-      <div
-        className="relative flex flex-1 items-center justify-center"
-        onPointerEnter={(event) => {
-          if (event.pointerType !== "mouse") return;
-          pointerIsHovering.current = true;
-          onAddMenuOpenChange(true);
-        }}
-        onPointerLeave={(event) => {
-          if (event.pointerType !== "mouse") return;
-          pointerIsHovering.current = false;
-          if (!event.currentTarget.contains(document.activeElement)) onAddMenuOpenChange(false);
-        }}
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget) && !pointerIsHovering.current) {
-            onAddMenuOpenChange(false);
-          }
-        }}
-      >
-        <div
-          ref={addMenuRef}
-          aria-hidden={!addMenuOpen}
-          className={cn(
-            "absolute bottom-full right-2 w-52 pb-2",
-            !addMenuOpen && "pointer-events-none hidden",
-          )}
-        >
-          <div className={cn("origin-bottom-right rounded-xl border border-border bg-popover p-2 text-popover-foreground shadow-[var(--shadow-popover)]", addMenuOpen && "animate-mobile-add-dropup")}>
-            <AddMenuPanel onSelect={onSelectAddAction} animateOptions={addMenuOpen} />
-          </div>
-        </div>
-        <button
-          ref={addButtonRef}
-          type="button"
-          className={cn(
-            "flex w-full flex-col items-center gap-1 py-3 text-[0.68rem] font-semibold uppercase tracking-[0.08em] transition-colors",
-            addMenuOpen ? "text-primary" : "text-muted-foreground hover:text-foreground",
-          )}
-          aria-label="Add"
-          aria-haspopup="menu"
-          aria-expanded={addMenuOpen}
-          onClick={() => onAddMenuOpenChange(pointerIsHovering.current || !addMenuOpen)}
-        >
-          <Plus
-            className={cn(
-              "h-5 w-5",
-              addMenuOpen
-                ? "animate-mobile-add-spin-open"
-                : addMenuHasBeenInteracted
-                  ? "animate-mobile-add-spin-close"
-                  : undefined,
-            )}
-          />
-          Add
-        </button>
-      </div>
-    </nav>
   );
 }
 

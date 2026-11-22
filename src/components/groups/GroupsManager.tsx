@@ -2020,7 +2020,7 @@ export function GroupsManager() {
 
       <div
         ref={messagesLayoutRef}
-        className="grid h-[calc(100svh-8rem)] min-h-0 overflow-hidden lg:h-[calc(100svh-4rem)] lg:grid-cols-[var(--chat-list-width)_var(--panel-resize-handle-width)_minmax(0,1fr)]"
+        className="grid h-[calc(100svh-var(--app-header-height)-var(--app-bottom-nav-space))] min-h-0 overflow-hidden lg:grid-cols-[var(--chat-list-width)_var(--panel-resize-handle-width)_minmax(0,1fr)]"
         style={{
           "--chat-list-width": `${panelWidths.chats}px`,
           "--panel-resize-handle-width": `${PANEL_RESIZE_HANDLE_WIDTH}px`,

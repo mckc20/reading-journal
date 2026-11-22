@@ -6,7 +6,7 @@ interface QuickBookCarouselProps {
   books: HomeBook[];
   selectedId?: string;
   onSelect: (id: string) => void;
-  onActivate: (id: string) => void;
+  onActivate: (id: string, trigger: HTMLButtonElement) => void;
 }
 
 /** Covers scroll beneath one stationary selection frame, including at either end. */
@@ -80,7 +80,7 @@ export function QuickBookCarousel({ books, selectedId, onSelect, onActivate }: Q
       const target = book.offsetLeft + book.offsetWidth / 2 - scroller.clientWidth / 2;
       if (Math.abs(scroller.scrollLeft - target) < 1) {
         cancelActivation();
-        activateRef.current(id);
+        activateRef.current(id, book);
       } else {
         activationFrame.current = requestAnimationFrame(openWhenCentered);
       }
@@ -183,7 +183,7 @@ export function QuickBookCarousel({ books, selectedId, onSelect, onActivate }: Q
         aria-pressed={selectedId === book.id}
         onClick={() => activate(book.id)}
         onFocus={event => { if (!pointerFocusRef.current && !movingFocusRef.current && event.currentTarget.matches(':focus-visible')) select(book.id, 'auto'); }}
-      ><BookCover src={book.cover} title={book.title} showFallbackTitle /></button>) : <p>Start a book to log your next chapter.</p>}
+      ><BookCover src={book.cover} title={book.title} showFallbackTitle decorative /></button>) : <p>Start a book to log your next chapter.</p>}
     </div>
     {books.length > 0 && <div className="rj-quick-selection-frame" aria-hidden="true" />}
   </div>;
