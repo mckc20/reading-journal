@@ -3,6 +3,7 @@ import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { BookProgress, getBookProgress } from '@/components/reading-journal/BookProgress';
+import { useShelfDrag } from '@/hooks/useShelfDrag';
 import type { BookStatus } from '@/types';
 
 /** Presentation data only: these components do not fetch or save account data. */
@@ -33,14 +34,20 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
 }
 
 export function BookShelf({ books, onOpen, showStatus = true }: { books: HomeBook[]; onOpen: (book: HomeBook) => void; showStatus?: boolean }) {
-  return <div className="rj-shelf" tabIndex={0} role="group" aria-label="Books">
-    {books.map(book => <button key={book.id} className="rj-shelf-book" onClick={() => onOpen(book)}>
-      <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle decorative />
-      <span className="rj-book-title">{book.title}</span>
-      <span className="rj-muted">{book.author}</span>
-      {showStatus && book.status && <span className="sr-only">{book.status}</span>}
-    </button>)}
-  </div>;
+  const drag = useShelfDrag<HTMLDivElement>();
+
+  return (
+    <div className="rj-shelf-frame rj-home-shelf-frame">
+      <div {...drag} className="rj-shelf rj-shelf-scroll" tabIndex={0} role="group" aria-label="Books">
+        {books.map(book => <button key={book.id} type="button" className="rj-shelf-book" onClick={() => onOpen(book)}>
+          <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle decorative />
+          <span className="rj-book-title">{book.title}</span>
+          <span className="rj-muted">{book.author}</span>
+          {showStatus && book.status && <span className="sr-only">{book.status}</span>}
+        </button>)}
+      </div>
+    </div>
+  );
 }
 
 export interface ReadingGoal { year: number; completed: number; target: number }

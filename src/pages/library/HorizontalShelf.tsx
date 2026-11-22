@@ -1,6 +1,7 @@
-import { Children, useEffect, useRef, useState, type ReactNode, type WheelEvent } from "react";
+import { Children, useEffect, useState, type ReactNode, type WheelEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useShelfDrag } from "@/hooks/useShelfDrag";
 import { cn } from "@/lib/utils";
 
 interface HorizontalShelfProps {
@@ -12,7 +13,7 @@ interface HorizontalShelfProps {
 /** Shared scrolling and arrow controls for every library shelf. */
 export default function HorizontalShelf({ title, children, className }: HorizontalShelfProps) {
   const itemCount = Children.count(children);
-  const rowRef = useRef<HTMLDivElement>(null);
+  const { ref: rowRef, ...drag } = useShelfDrag<HTMLDivElement>();
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -88,14 +89,17 @@ export default function HorizontalShelf({ title, children, className }: Horizont
         </Button>
       )}
 
-      <div
-        ref={rowRef}
-        aria-label={`${title} shelf`}
-        className={cn("isolate -mx-1 flex items-start gap-3 overflow-x-auto overflow-y-hidden px-1 py-3 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
-        onScroll={updateScrollButtons}
-        onWheel={handleRowWheel}
-      >
-        {children}
+      <div className="rj-shelf-frame -mx-1">
+        <div
+          {...drag}
+          ref={rowRef}
+          aria-label={`${title} shelf`}
+          className={cn("rj-shelf-scroll isolate flex items-start gap-3 overflow-x-auto overflow-y-hidden px-1 py-3 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+          onScroll={updateScrollButtons}
+          onWheel={handleRowWheel}
+        >
+          {children}
+        </div>
       </div>
 
       {canScrollRight && (

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import BookCardContent, { bookCardBaseClassName, bookCardInteractiveClassName } from '@/components/BookCardContent';
 import { Button } from '@/components/ui/button';
+import { useShelfDrag } from '@/hooks/useShelfDrag';
 import { cn } from '@/lib/utils';
 import { validCalendarDate } from '@/lib/wrapUpArchive';
 import type { ReportBook, ReportBookActivity } from '@/lib/wrapUpReports';
@@ -34,7 +35,7 @@ function SingleBook({ book, activity }: { book: ReportBook; activity?: ReportBoo
 export default function ReportBooks({ books, activity }: { books: ReportBook[]; activity?: ReportBookActivity[] }) {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 768px)').matches);
   const carousel = books.length > (desktop ? 4 : 2);
-  const rowRef = useRef<HTMLUListElement>(null);
+  const { ref: rowRef, ...drag } = useShelfDrag<HTMLUListElement>();
   const [edges, setEdges] = useState({ left: false, right: false });
 
   useEffect(() => {
@@ -81,11 +82,12 @@ export default function ReportBooks({ books, activity }: { books: ReportBook[]; 
 
   const bookList = (
     <ul
+      {...(carousel ? drag : undefined)}
       ref={rowRef}
       aria-label="Books you read"
       tabIndex={carousel ? 0 : undefined}
       className={cn(carousel
-        ? '-mx-1 flex min-w-0 gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth motion-reduce:scroll-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+        ? 'rj-shelf-scroll flex min-w-0 gap-3 overflow-x-auto overflow-y-hidden px-1 py-1 overscroll-x-contain scroll-smooth motion-reduce:scroll-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         : 'grid grid-cols-[repeat(2,minmax(0,7rem))] gap-5 md:grid-cols-[repeat(4,minmax(0,9rem))]')}
       onScroll={carousel ? updateEdges : undefined}
       onKeyDown={carousel ? event => {
@@ -115,7 +117,7 @@ export default function ReportBooks({ books, activity }: { books: ReportBook[]; 
         className="absolute left-0 top-[88px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm md:top-[112px]"
         aria-label="Scroll books left" onClick={() => scroll(-1)}
       ><ChevronLeft className="h-4 w-4" aria-hidden="true" /></Button>}
-      {bookList}
+      <div className="rj-shelf-frame -mx-1">{bookList}</div>
       {edges.right && <Button
         type="button" variant="outline" size="icon-sm"
         className="absolute right-0 top-[88px] z-10 -translate-y-1/2 rounded-full bg-background shadow-sm md:top-[112px]"

@@ -96,3 +96,27 @@
     opacity: 1;
   }
 }
+
+.rj-shelf-frame { overflow-x: clip; }
+.rj-shelf-scroll {
+  touch-action: pan-y pinch-zoom;
+  overscroll-behavior-x: contain;
+}
+.rj-shelf-scroll:focus-visible { outline-offset: -2px; }
+@media (pointer: fine) {
+  .rj-shelf-scroll, .rj-shelf-scroll :is(button, a) { cursor: grab; }
+}
+.rj-shelf-scroll[data-shelf-dragging],
+.rj-shelf-scroll[data-shelf-dragging] :is(button, a) { cursor: grabbing; }
+.rj-shelf-scroll[data-shelf-dragging] {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rj-shelf-scroll {
+    translate: var(--shelf-pull, none);
+    transition: translate 180ms cubic-bezier(.2, .75, .25, 1);
+  }
+  .rj-shelf-scroll[data-shelf-dragging] { transition: none; }
+}
