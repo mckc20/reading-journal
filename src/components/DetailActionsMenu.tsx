@@ -23,8 +23,8 @@ interface DetailActionsMenuProps {
   pauseTitle?: string;
   pauseDescription?: string;
   onResume?: () => void;
-  onEdit?: () => void;
-  onDuplicate?: () => void;
+  onEdit?: (trigger?: HTMLElement) => void;
+  onDuplicate?: (trigger?: HTMLElement) => void;
   onWishlist?: () => void;
   onDelete: (deleteLinkedBooks?: boolean) => void | Promise<void>;
   onSendAttachment: () => void;
@@ -96,7 +96,7 @@ export default function DetailActionsMenu({
       <OverflowMenu label="More actions" className={cn(
           "h-8 w-8 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-transparent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
           buttonClassName,
-        )}>{(close) => <>
+        )}>{(close, trigger) => <>
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
@@ -140,7 +140,7 @@ export default function DetailActionsMenu({
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
                 close();
-                onEdit();
+                onEdit(trigger);
               }}
             >
               <Pencil className="h-4 w-4" />
@@ -153,7 +153,7 @@ export default function DetailActionsMenu({
               className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
               onClick={() => {
                 close();
-                onDuplicate();
+                onDuplicate(trigger);
               }}
             >
               <Copy className="h-4 w-4" />

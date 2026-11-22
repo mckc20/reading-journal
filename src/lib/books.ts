@@ -247,7 +247,7 @@ export async function fetchBooks(): Promise<Book[]> {
   return ((data ?? []) as LegacyAuthorBookRow[]).map((row) => normalizeBook(row));
 }
 
-export type BookInsert = Omit<Book, "created_at">;
+export type BookInsert = BookUpdate & Pick<Book, "id" | "user_id" | "title" | "authors" | "status" | "is_favorite">;
 
 export type SeriesInput = {
   name: string;
@@ -512,7 +512,7 @@ export async function deleteBook(id: string): Promise<void> {
 // ── Cover Storage ──────────────────────────────────────────────────────────
 
 /** Delete only owned uploads with no remaining references, including wishlist copies. */
-async function deleteUnreferencedCover(userId: string, coverUrl: string): Promise<void> {
+export async function deleteUnreferencedCover(userId: string, coverUrl: string): Promise<void> {
   let url: URL;
   try { url = new URL(coverUrl); } catch { return; }
   const prefix = `/storage/v1/object/public/covers/${userId}/`;

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface OverflowMenuProps {
   label: string;
-  children: (close: () => void) => ReactNode;
+  children: (close: () => void, trigger: HTMLButtonElement | undefined) => ReactNode;
   className?: string;
   portal?: boolean;
 }
@@ -49,7 +49,7 @@ export default function OverflowMenu({ label, children, className, portal = true
       )}
       style={portal ? position ?? undefined : undefined}
     >
-      {children(() => setOpen(false))}
+      {children(() => setOpen(false), buttonRef.current ?? undefined)}
     </div>
   ) : null;
 

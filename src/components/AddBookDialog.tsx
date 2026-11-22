@@ -21,8 +21,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBooksContext } from "@/context/BooksContext";
-import { useAuth, useAuthorsContext } from "@/context";
-import { createWishlistItem, updateWishlistItem } from "@/lib/wishlist";
+import { useAuth, useAuthorsContext, useUserSettings } from "@/context";
+import { createWishlistItem } from "@/lib/wishlist";
+import { deleteUnreferencedCover, updateBook, uploadCover } from "@/lib/books";
+import { BookCopyCleanupError, saveBookCopies, type BookCopyDraft } from "@/lib/duplication";
+import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
+import { getTodayLocalDate } from "@/lib/utils";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import { getGenrePathLabel, isGenreRoot, mapGenreLabelsToIds } from "@/lib/genres";
@@ -38,6 +42,7 @@ import type {
   BookSource,
   BookFormat,
   BookMetadataSource,
+  BookUpdate,
 } from "@/types";
 import type { RecommendationItem } from "@/types/recommendations";
 
@@ -70,7 +75,10 @@ interface AddBookDialogProps {
   initialRecommendation?: RecommendationItem;
   initialCatalogBook?: BookTitleSearchResult;
   initiallyAddToWishlist?: boolean;
-  initialBook?: Book;
+  editBook?: Book;
+  duplicateBooks?: Book[];
+  onCopiesSaved?: (books: Book[]) => void;
+  onCancel?: () => void;
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
 }
@@ -87,20 +95,59 @@ const STATUS_OPTIONS: BookStatus[] = [
 
 const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
 const WISHLIST_STATUS_VALUE = "Wishlist";
+const DRAFT_SERIES = "__draft_series__";
 
-function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: number): Partial<FormValues> {
+function getInitialFormValues(initialSeriesId?: string, initialVolumeNumber?: number): FormValues {
   return {
+    title: "",
     status: "To Read",
     language: "",
     format: "",
     source: "",
     authors: [],
     genres: [],
+    total_pages: "",
+    current_page: "",
+    publication_date: "",
+    description: "",
+    date_started: "",
+    date_finished: "",
     series_id: initialSeriesId ?? "",
     volume_number: initialVolumeNumber ? String(initialVolumeNumber) : "",
     price: "",
     purchase_url: "",
   };
+}
+
+function getBookFormValues(book: Book, duplicate: boolean): FormValues {
+  return {
+    title: duplicate ? `Copy of ${book.title}` : book.title,
+    authors: book.authors,
+    genres: book.genre_ids ?? [],
+    status: book.status,
+    language: book.language ?? "",
+    format: book.format ?? "",
+    source: book.source ?? "",
+    total_pages: book.total_pages?.toString() ?? "",
+    current_page: book.current_page?.toString() ?? "",
+    publication_date: formatPublicationDateInput(book.publication_date),
+    description: book.description ?? "",
+    date_started: book.date_started ?? "",
+    date_finished: book.date_finished ?? "",
+    series_id: book.series_id ?? "",
+    volume_number: book.volume_number?.toString() ?? "",
+    price: book.price?.toString() ?? "",
+    purchase_url: book.purchase_url ?? "",
+  };
+}
+
+function changedBookFields(book: Book, fields: BookUpdate): BookUpdate {
+  return Object.fromEntries(Object.entries(fields).filter(([key, next]) => {
+    const previous = book[key as keyof Book];
+    return Array.isArray(next)
+      ? JSON.stringify(previous ?? []) !== JSON.stringify(next)
+      : (previous ?? null) !== next;
+  }));
 }
 
 export default function AddBookDialog({
@@ -112,18 +159,31 @@ export default function AddBookDialog({
   initialRecommendation,
   initialCatalogBook,
   initiallyAddToWishlist = false,
-  initialBook,
+  editBook,
+  duplicateBooks,
+  onCopiesSaved,
+  onCancel,
   onSaved,
   onWishlistSaved,
 }: AddBookDialogProps) {
   const { addBook, reload: reloadBooks } = useBooksContext();
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const { genres } = useGenresContext();
   const { authors: catalogAuthors } = useAuthorsContext();
   const { series, addSeries } = useSeries();
+  const [copyIndex, setCopyIndex] = useState(0);
+  const copySource = duplicateBooks?.[copyIndex];
+  const initialBook = editBook ?? copySource;
+  const isLastCopy = !duplicateBooks || copyIndex === duplicateBooks.length - 1;
+  const copyDrafts = useRef<BookCopyDraft[]>([]);
+  const copyPreference = (settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries;
+  const [copyJournal, setCopyJournal] = useState(true);
+  const [draftSeriesName, setDraftSeriesName] = useState("");
+  const [copyCleanupFailed, setCopyCleanupFailed] = useState(false);
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [addToWishlist, setAddToWishlist] = useState(initiallyAddToWishlist);
+  const [addToWishlist, setAddToWishlist] = useState(initialBook ? initialBook.status === "Wishlist" : initiallyAddToWishlist);
   const [secondaryInformationOpen, setSecondaryInformationOpen] = useState(false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [newSeriesName, setNewSeriesName] = useState("");
@@ -151,6 +211,7 @@ export default function AddBookDialog({
   const [titleSearchHasSearched, setTitleSearchHasSearched] = useState(false);
   const [isApplyingTitleResult, setIsApplyingTitleResult] = useState(false);
   const titleSearchRequestIdRef = useRef(0);
+  const coverRequestId = useRef(0);
   const {
     register,
     handleSubmit,
@@ -161,7 +222,7 @@ export default function AddBookDialog({
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: getInitialFormValues(initialSeriesId, initialVolumeNumber),
+    defaultValues: initialBook ? getBookFormValues(initialBook, Boolean(copySource)) : getInitialFormValues(initialSeriesId, initialVolumeNumber),
   });
 
   const genreOptions = useMemo(() => {
@@ -196,9 +257,11 @@ export default function AddBookDialog({
   // Revoke object URL on unmount / change
   useEffect(() => {
     return () => {
-      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
     };
   }, [coverPreview]);
+
+  useEffect(() => () => { coverRequestId.current += 1; }, []);
 
   useEffect(() => {
     if (!pendingSeriesSelectionId) return;
@@ -214,36 +277,25 @@ export default function AddBookDialog({
   }, [pendingSeriesSelectionId, series, setValue, clearErrors]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || initialBook) return;
     setValue("series_id", initialSeriesId ?? "");
     setValue("volume_number", initialVolumeNumber ? String(initialVolumeNumber) : "");
-  }, [initialSeriesId, initialVolumeNumber, open, setValue]);
+  }, [initialBook, initialSeriesId, initialVolumeNumber, open, setValue]);
 
   useEffect(() => {
     if (!open || !initialBook) return;
 
-    reset({
-      ...getInitialFormValues(),
-      title: initialBook.title,
-      authors: initialBook.authors ?? [],
-      genres: initialBook.genre_ids ?? [],
-      language: initialBook.language ?? "",
-      format: initialBook.format ?? "",
-      total_pages: initialBook.total_pages ? String(initialBook.total_pages) : "",
-      publication_date: initialBook.publication_date ? formatPublicationDateInput(initialBook.publication_date) : "",
-      description: initialBook.description ?? "",
-      series_id: initialBook.series_id ?? "",
-      volume_number: initialBook.volume_number != null ? String(initialBook.volume_number) : "",
-      price: initialBook.price != null ? String(initialBook.price) : "",
-      purchase_url: initialBook.purchase_url ?? "",
-    });
-    setAddToWishlist(true);
+    reset(getBookFormValues(initialBook, Boolean(copySource)));
+    setAddToWishlist(initialBook.status === "Wishlist");
+    setCopyJournal(true);
+    setDraftSeriesName("");
+    setManualIsbn("");
     setScannedIsbn(initialBook.isbn ?? null);
     setMetadataSource(initialBook.metadata_source ?? null);
     setMetadataSourceUrl(initialBook.metadata_source_url ?? null);
     setCoverFile(null);
     setCoverPreview(initialBook.cover_url ?? null);
-  }, [initialBook, open, reset]);
+  }, [copySource, initialBook, open, reset]);
 
   useEffect(() => {
     if (!open || !initialRecommendation) return;
@@ -286,13 +338,13 @@ export default function AddBookDialog({
   }, [initialCatalogBook, genres, open, setValue]);
 
   function handleFileChange(file: File) {
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    coverRequestId.current += 1;
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   }
 
   function clearCoverSelection() {
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    coverRequestId.current += 1;
     setCoverFile(null);
     setCoverPreview(null);
   }
@@ -314,10 +366,12 @@ export default function AddBookDialog({
       return;
     }
 
+    const requestId = ++coverRequestId.current;
     try {
       const res = await fetch(coverUrl);
       if (!res.ok) throw new Error("Cover request failed");
       const blob = await res.blob();
+      if (requestId !== coverRequestId.current) return;
       if (blob.size <= 1000) throw new Error("Cover response was empty");
 
       const file = new File([blob], `cover-${fileLabel}.jpg`, {
@@ -327,7 +381,7 @@ export default function AddBookDialog({
       setCoverFile(file);
       setCoverPreview(URL.createObjectURL(file));
     } catch {
-      if (clearWhenMissing) clearCoverSelection();
+      if (clearWhenMissing && requestId === coverRequestId.current) clearCoverSelection();
     }
   }
 
@@ -335,9 +389,6 @@ export default function AddBookDialog({
     setShowScanner(false);
     setIsbnStatus("looking-up");
     setIsbnError(null);
-    setMetadataSource(null);
-    setMetadataSourceUrl(null);
-
     try {
       const bookData = await fetchBookByISBN(isbn.trim());
       if (!bookData) {
@@ -446,6 +497,14 @@ export default function AddBookDialog({
     const trimmedSeriesName = newSeriesName.trim();
     if (!trimmedSeriesName || isCreatingSeries) return;
 
+    if (copySource) {
+      setDraftSeriesName(trimmedSeriesName);
+      setValue("series_id", DRAFT_SERIES);
+      setNewSeriesName("");
+      setAddingNewSeries(false);
+      return;
+    }
+
     setIsCreatingSeries(true);
     try {
       const created = await addSeries(addToWishlist
@@ -488,7 +547,7 @@ export default function AddBookDialog({
 
   function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting || !addGenres()) return;
+    if (isSubmitting || copyCleanupFailed || isCreatingSeries || isApplyingTitleResult || isbnStatus === "looking-up" || !addGenres()) return;
     addAuthors();
     void handleSubmit(onSubmit)(event);
   }
@@ -518,6 +577,7 @@ export default function AddBookDialog({
         return;
       }
       const parsedPrice = values.price.trim() ? Number(values.price) : null;
+      const isbn = scannedIsbn?.trim() || null;
       if (addToWishlist && values.price.trim() && (!Number.isFinite(parsedPrice) || parsedPrice! < 0)) {
         setSecondaryInformationOpen(true);
         setError("price", { message: "Enter a price of zero or more." });
@@ -533,7 +593,88 @@ export default function AddBookDialog({
           return;
         }
       }
-      if (initialBook || addToWishlist) {
+      if (initialBook) {
+        if (!user) throw new Error("Not authenticated");
+        const status = addToWishlist ? "Wishlist" : values.status;
+        const statusChanged = status !== initialBook.status;
+        const fields = {
+          title: values.title === initialBook.title ? initialBook.title : values.title.trim(),
+          authors,
+          genre_ids: values.genres,
+          language: values.language || null,
+          format: values.format || null,
+          source: values.source || null,
+          status,
+          total_pages: values.total_pages ? Number(values.total_pages) : null,
+          current_page: values.current_page ? Number(values.current_page) : null,
+          date_started: values.date_started || (editBook && statusChanged && status === "Reading" ? getTodayLocalDate() : null),
+          date_finished: values.date_finished || (editBook && statusChanged && status === "Finished" ? getTodayLocalDate() : null),
+          publication_date: initialBook.publication_date && values.publication_date === formatPublicationDateInput(initialBook.publication_date)
+            ? initialBook.publication_date : parsedPublicationDate?.date ?? null,
+          description: values.description === (initialBook.description ?? "") ? initialBook.description ?? null : values.description.trim() || null,
+          isbn,
+          metadata_source: metadataSource,
+          metadata_source_url: metadataSourceUrl,
+          series_id: values.series_id === DRAFT_SERIES ? null : values.series_id || null,
+          volume_number: parsedVolumeNumber,
+          price: addToWishlist ? parsedPrice : initialBook.price ?? null,
+          purchase_url: addToWishlist ? values.purchase_url.trim() || null : initialBook.purchase_url ?? null,
+          cover_url: coverFile ? initialBook.cover_url ?? null : coverPreview,
+        } satisfies BookUpdate;
+
+        if (copySource) {
+          const draft: BookCopyDraft = {
+            sourceId: copySource.id,
+            fields: {
+              ...fields,
+              rating: copySource.status === "Wishlist" ? null : copySource.rating ?? null,
+              is_favorite: copySource.status !== "Wishlist" && copySource.is_favorite,
+            },
+            coverFile: coverFile ?? undefined,
+            newSeriesName: values.series_id === DRAFT_SERIES ? draftSeriesName : undefined,
+            copyJournalEntries: copyPreference === "ask" ? copyJournal : copyPreference === "always",
+          };
+          if (!isLastCopy) {
+            copyDrafts.current.push(draft);
+            titleSearchRequestIdRef.current += 1;
+            setTitleQuery("");
+            setTitleSearchResults([]);
+            setTitleSearchStatus("idle");
+            setTitleSearchHasSearched(false);
+            setTitleSearchError(null);
+            setIsbnError(null);
+            setIsbnStatus("idle");
+            setShowScanner(false);
+            setAddingNewSeries(false);
+            setNewSeriesName("");
+            setCopyIndex(copyIndex + 1);
+            return;
+          }
+          const copies = await saveBookCopies(user.id, [...copyDrafts.current, draft]);
+          await reloadBooks();
+          if (onCopiesSaved) onCopiesSaved(copies);
+          else onSaved?.(copies[0]);
+        } else {
+          const patch = changedBookFields(initialBook, fields);
+          let uploadedCover: string | undefined;
+          let updated = initialBook;
+          try {
+            if (coverFile) {
+              uploadedCover = await uploadCover(user.id, crypto.randomUUID(), coverFile);
+              patch.cover_url = uploadedCover;
+            }
+            if (Object.keys(patch).length) updated = await updateBook(initialBook.id, patch);
+          } catch (error) {
+            if (uploadedCover) await deleteUnreferencedCover(user.id, uploadedCover).catch(() => {});
+            throw error;
+          }
+          await reloadBooks();
+          onSaved?.(updated);
+        }
+        onOpenChange(false);
+        return;
+      }
+      if (addToWishlist) {
         if (!user) throw new Error("Not authenticated");
         const wishlistInput = {
           title: values.title, authors, genre_ids: values.genres,
@@ -541,14 +682,13 @@ export default function AddBookDialog({
           language: (values.language as BookLanguage) || null, format: (values.format as BookFormat) || null,
           total_pages: values.total_pages ? Number(values.total_pages) : null,
           publication_date: parsedPublicationDate?.date ?? null, description: values.description.trim() || null,
-          isbn: scannedIsbn || null, metadata_source: metadataSource || null, metadata_source_url: metadataSourceUrl || null,
+          isbn, metadata_source: metadataSource || null, metadata_source_url: metadataSourceUrl || null,
           series_id: values.series_id || null, volume_number: parsedVolumeNumber,
           price: parsedPrice, purchase_url: values.purchase_url.trim() || null,
-          cover_url: coverFile ? initialBook?.cover_url ?? null : coverPreview,
+          cover_url: coverFile ? null : coverPreview,
         };
         try {
-          if (initialBook) await updateWishlistItem(initialBook, wishlistInput, coverFile ?? undefined);
-          else await createWishlistItem(user.id, wishlistInput, coverFile ?? undefined);
+          await createWishlistItem(user.id, wishlistInput, coverFile ?? undefined);
         } catch (error) {
           if (error && typeof error === "object" && "item" in error) { await reloadBooks(); onWishlistSaved?.(); }
           throw error;
@@ -577,7 +717,7 @@ export default function AddBookDialog({
           date_finished: values.date_finished || undefined,
           series_id: values.series_id || undefined,
           volume_number: parsedVolumeNumber ?? undefined,
-          isbn: scannedIsbn || undefined,
+          isbn: isbn ?? undefined,
           metadata_source: metadataSource || undefined,
           metadata_source_url: metadataSourceUrl || undefined,
           is_favorite: false,
@@ -634,21 +774,26 @@ export default function AddBookDialog({
       setIsApplyingTitleResult(false);
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof BookCopyCleanupError) {
+        setCopyCleanupFailed(true);
+        await reloadBooks();
+      }
       const message =
         err instanceof Error
           ? err.message
           : typeof err === "object" && err !== null && "message" in err
           ? String((err as { message: unknown }).message)
-          : "Failed to add book";
+          : editBook ? "Failed to save changes" : "Failed to add book";
       setError("root", { message });
     }
   }
 
-  const showDateStarted = ["Reading", "Finished", "DNF"].includes(status);
-  const showDateFinished = ["Finished", "DNF"].includes(status);
+  const showDateStarted = ["Reading", "Paused", "Finished", "DNF"].includes(status) || Boolean(initialBook?.date_started);
+  const showDateFinished = ["Finished", "DNF"].includes(status) || Boolean(initialBook?.date_finished);
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
+      if (isSubmitting || isCreatingSeries) return;
       titleSearchRequestIdRef.current += 1;
       reset({
         ...getInitialFormValues(initialSeriesId, initialVolumeNumber),
@@ -663,7 +808,6 @@ export default function AddBookDialog({
       setScannedIsbn(null);
       setMetadataSource(null);
       setMetadataSourceUrl(null);
-      titleSearchRequestIdRef.current += 1;
       setTitleQuery("");
       setTitleSearchResults([]);
       setTitleSearchStatus("idle");
@@ -674,6 +818,7 @@ export default function AddBookDialog({
       setNewSeriesName("");
       setIsCreatingSeries(false);
       setPendingSeriesSelectionId(null);
+      onCancel?.();
     }
     onOpenChange(nextOpen);
   }
@@ -681,14 +826,16 @@ export default function AddBookDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
-        className={initialBook ? undefined : "rj-add-book-dialog"}
-        title={initialBook ? "Edit Wishlist Item" : "Add Book"}
-        description="Find a book or fill in the details yourself."
+        className="rj-add-book-dialog"
+        title={editBook ? "Edit book" : "Add book"}
+        description={duplicateBooks && duplicateBooks.length > 1
+          ? `Review copy ${copyIndex + 1} of ${duplicateBooks.length}. Your copies are added when you save the last one.`
+          : "Find a book or fill in the details yourself."}
         icon={BookOpen}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <form onSubmit={submitForm} className="rj-book-form">
-          <ScrollArea className="rj-creation-book-scroll">
+          <ScrollArea key={copyIndex} className="rj-creation-book-scroll">
             <div className="rj-creation-book-fields rj-book-form-fields">
               <section className="rj-book-lookup" aria-label="Find book details">
                 <BookLookupModeSwitch
@@ -832,7 +979,7 @@ export default function AddBookDialog({
                 <div className="rj-book-form-identity">
                   <div className="rj-book-form-field">
                     <Label htmlFor="title">Title</Label>
-                    <Input id="title" {...register("title", { required: "Title is required" })} aria-required="true"
+                    <Input id="title" {...register("title", { validate: value => Boolean(value.trim()) || "Title is required" })} aria-required="true"
                       aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? "add-book-title-error" : undefined} />
                     {errors.title && <p id="add-book-title-error" className="rj-book-form-error">{errors.title.message}</p>}
                   </div>
@@ -860,7 +1007,6 @@ export default function AddBookDialog({
                 <div className="rj-book-form-field">
                   <Label htmlFor="add-book-status">Reading status</Label>
                   <select id="add-book-status" value={addToWishlist ? WISHLIST_STATUS_VALUE : status}
-                    disabled={Boolean(initialBook)}
                     onChange={event => {
                       const nextStatus = event.currentTarget.value as BookStatus;
                       setAddToWishlist(nextStatus === WISHLIST_STATUS_VALUE);
@@ -868,6 +1014,7 @@ export default function AddBookDialog({
                     }}>
                     <option value={WISHLIST_STATUS_VALUE}>Wishlist</option>
                     {STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                    {initialBook?.status === "Paused" && <option>Paused</option>}
                   </select>
                 </div>
                 <div className="rj-book-form-field">
@@ -894,10 +1041,14 @@ export default function AddBookDialog({
                   <select id="add-book-series" value={seriesId || ""} onChange={event => {
                     const nextSeries = event.currentTarget.value;
                     if (nextSeries === "__new__") setAddingNewSeries(true);
-                    else setValue("series_id", nextSeries, { shouldDirty: true });
+                    else {
+                      setValue("series_id", nextSeries, { shouldDirty: true });
+                      if (!nextSeries) setValue("volume_number", "", { shouldDirty: true });
+                    }
                   }}>
                     <option value="">None</option>
                     {selectableSeries.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {draftSeriesName && <option value={DRAFT_SERIES}>{draftSeriesName}</option>}
                     <option value="__new__">+ Add new series…</option>
                   </select>
                   {addingNewSeries && (
@@ -946,7 +1097,7 @@ export default function AddBookDialog({
                   </div>
                 )}
                 {/* Current progress (Reading only) */}
-                {!addToWishlist && status === "Reading" && (
+                {!addToWishlist && (status === "Reading" || initialBook && ["Paused", "Finished", "DNF"].includes(status)) && (
                   <div className="rj-book-form-field">
                     <Label htmlFor="current_page">Current page</Label>
                     <Input
@@ -1016,7 +1167,16 @@ export default function AddBookDialog({
 
                       <div className="rj-book-form-field">
                         <Label htmlFor="add-book-isbn">ISBN</Label>
-                        <Input id="add-book-isbn" value={scannedIsbn ?? manualIsbn} readOnly placeholder="Scanned or looked up ISBN" />
+                        <Input
+                          id="add-book-isbn"
+                          value={scannedIsbn ?? ""}
+                          placeholder="Enter, scan or look up an ISBN"
+                          onChange={event => {
+                            setScannedIsbn(event.currentTarget.value);
+                            setMetadataSource(null);
+                            setMetadataSourceUrl(null);
+                          }}
+                        />
                       </div>
 
                       {addToWishlist && <>
@@ -1042,6 +1202,13 @@ export default function AddBookDialog({
                 <Textarea id="description" rows={5} {...register("description")} />
               </div>
 
+              {copySource && copyPreference === "ask" && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={copyJournal} onChange={event => setCopyJournal(event.currentTarget.checked)} />
+                  Copy journal entries
+                </label>
+              )}
+
               {/* Root error */}
               {errors.root && (
                 <p className="rj-book-form-error" role="alert">{errors.root.message}</p>
@@ -1053,7 +1220,9 @@ export default function AddBookDialog({
             mode="creation-dialog"
             onCancel={() => handleOpenChange(false)}
             saving={isSubmitting}
-            saveLabel={initialBook ? "Save Changes" : "Add Book"}
+            cancelDisabled={isCreatingSeries}
+            saveDisabled={copyCleanupFailed || isCreatingSeries || isApplyingTitleResult || isbnStatus === "looking-up"}
+            saveLabel={editBook ? "Save changes" : isLastCopy ? "Add book" : "Next book"}
           />
         </form>
       </CreationDialogContent>

@@ -1,14 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { createBook, updateBook, deleteBook, fetchBooks, uploadCover, type BookInsert } from "@/lib/books";
 import type { Book, BookUpdate } from "@/types";
-import { wishlistDuplicateInput } from "@/lib/wishlistLogic";
-import { duplicateBookRecord, type DuplicateOptions } from "@/lib/duplication";
 export { findWishlistDuplicates, normalizedIsbn, normalizeWishlistText, wishlistCsv, wishlistDuplicateInput } from "@/lib/wishlistLogic";
 
-type NullableWishlistField = "language" | "format" | "total_pages" | "isbn" | "series_id" | "volume_number";
-export type WishlistInput = Pick<Book, "title" | "authors"> &
-  Partial<Omit<BookUpdate, NullableWishlistField>> &
-  { [K in NullableWishlistField]?: Book[K] | null };
+export type WishlistInput = BookUpdate & Pick<Book, "title" | "authors">;
 
 export async function fetchWishlist(): Promise<Book[]> {
   return (await fetchBooks()).filter((book) => book.status === "Wishlist");
@@ -27,21 +22,9 @@ async function saveCover(book: Book, file?: File): Promise<Book> {
 
 export async function createWishlistItem(userId: string, input: WishlistInput, coverFile?: File): Promise<Book> {
   // PostgreSQL uses NULL to clear optional values; normalized Book fields use undefined.
-  const book = await createBook({ ...input, id: crypto.randomUUID(), user_id: userId, status: "Wishlist", is_favorite: input.is_favorite ?? false } as BookInsert);
+  const payload: BookInsert = { ...input, id: crypto.randomUUID(), user_id: userId, status: "Wishlist", is_favorite: input.is_favorite ?? false };
+  const book = await createBook(payload);
   return saveCover(book, coverFile);
-}
-
-export async function updateWishlistItem(item: Book, input: WishlistInput, coverFile?: File): Promise<Book> {
-  return saveCover(await updateBook(item.id, input as BookUpdate), coverFile);
-}
-
-export async function duplicateWishlistItem(item: Book, options: DuplicateOptions = { copyJournalEntries: false }): Promise<Book> {
-  return duplicateBookRecord({
-    ...wishlistDuplicateInput(item),
-    id: item.id,
-    title: item.title,
-    created_at: item.created_at,
-  }, item.user_id, options);
 }
 
 export async function removeWishlistItem(item: Book): Promise<void> {

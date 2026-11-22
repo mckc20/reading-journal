@@ -6,31 +6,21 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type CSSProperties,
 } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   ChevronDown,
-  ChevronRight,
-  ImagePlus,
   Info,
   NotebookPen,
   PauseCircle,
   RefreshCw,
   Star,
-  Trash2,
 } from "lucide-react";
-import AddAuthorDialog from "@/components/AddAuthorDialog";
-import AuthorMultiSelect from "@/components/AuthorMultiSelect";
 import BackButton from "@/components/BackButton";
-import SaveCancelBar from "@/components/SaveCancelBar";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
-import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
-import GenreMultiSelect from "@/components/GenreMultiSelect";
 import JournalTimeline from "@/components/JournalTimeline";
 import {
   buildBookLibraryFilterPath,
@@ -41,31 +31,19 @@ import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
 import "@/components/redesign/book-details.css";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { useAuth, useUserSettings } from "@/context";
+import { useAuth } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
-import { fetchReadingLogsForBook, uploadCover } from "@/lib/books";
-import { duplicateBookRecord } from "@/lib/duplication";
-import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
+import { fetchReadingLogsForBook } from "@/lib/books";
 import { moveBookToWishlist } from "@/lib/wishlist";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
@@ -78,42 +56,16 @@ import {
 import { BOOK_JOURNAL_HASH } from "@/lib/journalLinks";
 import {
   formatPublicationDateForDisplay,
-  formatPublicationDateInput,
-  parsePublicationDateInput,
 } from "@/lib/publicationDate";
-import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import {
   getTodayLocalDate,
 } from "@/lib/utils";
 import type {
   Book,
-  BookFormat,
-  BookLanguage,
   BookJournalEntryRecord,
-  BookSource,
   BookStatus,
   ReadingLog,
 } from "@/types";
-
-interface FormValues {
-  title: string;
-  authors: string[];
-  status: BookStatus;
-  genres: string[];
-  isbn: string;
-  language: BookLanguage | "";
-  format: BookFormat | "";
-  source: BookSource | "";
-  total_pages: string;
-  publication_date: string;
-  description: string;
-  date_started: string;
-  date_finished: string;
-  series_id: string;
-  volume_number: string;
-  price: string;
-  purchase_url: string;
-}
 
 const STATUS_OPTIONS: BookStatus[] = [
   "To Read",
@@ -123,30 +75,7 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
-const SOURCE_OPTIONS: BookSource[] = ["Owned", "Family", "Friends", "Library"];
 const BOOK_DETAIL_SHEET_MEDIA = "(max-width: 767px)";
-
-function bookToFormValues(book: Book): FormValues {
-  return {
-    title: book.title,
-    authors: book.authors,
-    status: book.status,
-    genres: book.genre_ids ?? [],
-    isbn: book.isbn ?? "",
-    language: book.language ?? "",
-    format: book.format ?? "",
-    source: book.source ?? "",
-    total_pages: book.total_pages?.toString() ?? "",
-    publication_date: formatPublicationDateInput(book.publication_date),
-    description: book.description ?? "",
-    date_started: book.date_started ?? "",
-    date_finished: book.date_finished ?? "",
-    series_id: book.series_id ?? "",
-    volume_number: book.volume_number?.toString() ?? "",
-    price: book.price?.toString() ?? "",
-    purchase_url: book.purchase_url ?? "",
-  };
-}
 
 function getPublicationYear(value?: string | null): string | null {
   const [year] = (value ?? "").split("-");
@@ -228,7 +157,7 @@ function BookDetailSheet() {
       if (!phone.matches || settle?.playState === "running" || (scroller?.scrollTop ?? 0) > 0 ||
         sheet?.getAnimations().some((animation) => animation.playState === "running") ||
         !(event.target instanceof Element) ||
-        event.target.closest("button, a, input, select, textarea, summary, [data-book-detail-editor]")) return;
+        event.target.closest("button, a, input, select, textarea, summary")) return;
 
       const touch = event.touches[0];
       start = { x: touch.clientX, y: touch.clientY, id: touch.identifier, dragging: false };
@@ -310,7 +239,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const { bookId } = useParams<{ bookId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { openAddJournalEntry, setDetailEditingOpen } = useOutletContext<AppLayoutOutletContext>();
+  const { openAddJournalEntry, openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedEntryId = searchParams.get("entry");
@@ -318,7 +247,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const hasJournalAnchor = location.hash === BOOK_JOURNAL_HASH;
   const addEntryButtonRef = useRef<HTMLButtonElement>(null);
   const journalSectionRef = useRef<HTMLElement>(null);
-  const { settings } = useUserSettings();
   const {
     books,
     wishlistBooks,
@@ -351,14 +279,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
   const [showRatingGuide, setShowRatingGuide] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
-  const [removeCover, setRemoveCover] = useState(false);
-  const coverPreviewUrlRef = useRef<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [logsAttempt, setLogsAttempt] = useState(0);
@@ -368,52 +289,14 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [journalEntriesError, setJournalEntriesError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [authorDialogOpen, setAuthorDialogOpen] = useState(false);
-  const [authorDialogInitialName, setAuthorDialogInitialName] = useState("");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const { authors } = useAuthorsContext();
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    setError,
-    clearErrors,
-    reset,
-    formState: { isDirty, dirtyFields, errors },
-  } = useForm<FormValues>();
-
   useEffect(() => {
     if (!book) return;
     setIsFavorite(book.is_favorite);
     setLocalRating(book.rating ?? null);
-    setIsEditMode(false);
     setErrorMsg(null);
-    clearCoverDraft();
-    reset(bookToFormValues(book));
-  }, [book, reset]);
-
-  useEffect(() => {
-    if (!book || location.state?.openEdit !== true) return;
-    setIsEditMode(true);
-    navigate(location.pathname, { replace: true, state: null });
-  }, [book, location.pathname, location.state, navigate]);
-
-  useEffect(() => {
-    return () => {
-      if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    setDetailEditingOpen(isEditMode);
-
-    return () => {
-      setDetailEditingOpen(false);
-    };
-  }, [isEditMode, setDetailEditingOpen]);
+  }, [book]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -469,30 +352,11 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     };
   }, [bookId]);
 
-  const watchedSeriesId = watch("series_id");
   const progressPercent = book ? getBookProgress(book.current_page, book.total_pages) : null;
   const authorSummaries = useMemo(
     () => buildAuthorSummaries(authors, books, journalEntries, wishlistBooks),
     [authors, books, journalEntries, wishlistBooks],
   );
-
-  function exitEditMode() {
-    if (!book) return;
-    clearCoverDraft();
-    reset(bookToFormValues(book));
-    setErrorMsg(null);
-    setIsEditMode(false);
-  }
-
-  function clearCoverDraft() {
-    if (coverPreviewUrlRef.current) {
-      URL.revokeObjectURL(coverPreviewUrlRef.current);
-      coverPreviewUrlRef.current = null;
-    }
-    setCoverFile(null);
-    setCoverPreviewUrl(null);
-    setRemoveCover(false);
-  }
 
   async function toggleFavorite() {
     if (!book) return;
@@ -526,7 +390,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     try {
       setErrorMsg(null);
       await updateBook(book.id, payload);
-      reset(bookToFormValues({ ...book, ...payload }));
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to update status");
     }
@@ -552,162 +415,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
-    if (!book) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
-    setCoverFile(file);
-    setRemoveCover(false);
-    const nextPreviewUrl = URL.createObjectURL(file);
-    coverPreviewUrlRef.current = nextPreviewUrl;
-    setCoverPreviewUrl(nextPreviewUrl);
-    event.currentTarget.value = "";
-  }
-
-  function handleRemoveCover() {
-    clearCoverDraft();
-    setRemoveCover(Boolean(book?.cover_url));
-  }
-
-  function handleCreateAuthor(initialName: string) {
-    setAuthorDialogInitialName(initialName);
-    setAuthorDialogOpen(true);
-  }
-
-  function handleSavedAuthor(authorName: string) {
-    const currentAuthors = watch("authors") ?? [];
-    const nextAuthors = Array.from(
-      new Map(
-        [...currentAuthors, authorName]
-          .map((name) => name.trim())
-          .filter(Boolean)
-          .map((name) => [name.toLowerCase(), name] as const),
-      ).values(),
-    );
-    setValue("authors", nextAuthors, {
-      shouldDirty: true,
-      shouldTouch: true,
-      shouldValidate: true,
-    });
-  }
-
-  const authorDialog = (
-    <AddAuthorDialog
-      open={authorDialogOpen}
-      onOpenChange={setAuthorDialogOpen}
-      initialName={authorDialogInitialName}
-      onSaved={(author) => handleSavedAuthor(author.name)}
-    />
-  );
-
-  async function onSubmit(values: FormValues) {
-    if (!book || !user) return;
-    const payload: Partial<Book> = {};
-
-    if (dirtyFields.title) payload.title = values.title.trim();
-    if (dirtyFields.authors) {
-      const authors = values.authors.map((author) => author.trim()).filter(Boolean);
-      if (authors.length === 0) {
-        setErrorMsg("At least one author is required");
-        return;
-      }
-      payload.authors = authors;
-    }
-    if (dirtyFields.genres) {
-      payload.genre_ids = values.genres;
-    }
-    if (dirtyFields.status) {
-      payload.status = values.status;
-      // Match the status control in the read view without replacing dates entered below.
-      if (values.status === "Reading" && !values.date_started) payload.date_started = getTodayLocalDate();
-      if (values.status === "Finished" && !values.date_finished) payload.date_finished = getTodayLocalDate();
-    }
-    if (dirtyFields.isbn) {
-      payload.isbn = values.isbn.trim() || undefined;
-      payload.metadata_source = null;
-      payload.metadata_source_url = null;
-    }
-    if (dirtyFields.language) payload.language = (values.language as BookLanguage) || undefined;
-    if (dirtyFields.format) payload.format = (values.format as BookFormat) || undefined;
-    if (dirtyFields.source) payload.source = (values.source as BookSource) || undefined;
-    if (dirtyFields.total_pages) {
-      payload.total_pages = values.total_pages ? Number(values.total_pages) : undefined;
-    }
-    if (dirtyFields.publication_date) {
-      const parsedPublicationDate = parsePublicationDateInput(values.publication_date);
-      if (values.publication_date.trim() && !parsedPublicationDate) {
-        setError("publication_date", {
-          message: "Use a four-digit year, like 2020.",
-        });
-        return;
-      }
-      payload.publication_date = parsedPublicationDate?.date ?? null;
-    }
-    if (dirtyFields.description) payload.description = values.description.trim() || undefined;
-    if (dirtyFields.date_started) payload.date_started = values.date_started || undefined;
-    if (dirtyFields.date_finished) payload.date_finished = values.date_finished || undefined;
-    if (dirtyFields.series_id) payload.series_id = values.series_id || undefined;
-    if (dirtyFields.volume_number) {
-      const parsedVolumeNumber = values.volume_number
-        ? parseVolumeNumberInput(values.volume_number)
-        : null;
-      if (values.volume_number && parsedVolumeNumber === null) {
-        setError("volume_number", {
-          message: "Use a positive number with at most two decimal places.",
-        });
-        return;
-      }
-      payload.volume_number = parsedVolumeNumber ?? undefined;
-    }
-
-    if (values.status === "Wishlist" && dirtyFields.price) {
-      const price = values.price.trim() ? Number(values.price) : null;
-      if (price !== null && (!Number.isFinite(price) || price < 0)) {
-        setError("price", { message: "Enter a non-negative price." });
-        return;
-      }
-      payload.price = price;
-    }
-    if (values.status === "Wishlist" && dirtyFields.purchase_url) {
-      const url = values.purchase_url.trim();
-      if (url) {
-        try {
-          if (!["http:", "https:"].includes(new URL(url).protocol)) throw new Error();
-        } catch {
-          setError("purchase_url", { message: "Enter a valid web link, including https://." });
-          return;
-        }
-      }
-      payload.purchase_url = url || null;
-    }
-
-    if (Object.keys(payload).length === 0 && !coverFile && !removeCover) return;
-
-    try {
-      setSaving(true);
-      setErrorMsg(null);
-      setUploadingCover(Boolean(coverFile));
-
-      if (coverFile) {
-        payload.cover_url = await uploadCover(user.id, crypto.randomUUID(), coverFile);
-      } else if (removeCover) {
-        payload.cover_url = null;
-      }
-
-      await updateBook(book.id, payload);
-      clearCoverDraft();
-      reset(values);
-      setIsEditMode(false);
-      if (values.status === "Wishlist") navigate("/library/wishlist");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to save changes");
-    } finally {
-      setSaving(false);
-      setUploadingCover(false);
-    }
-  }
-
   async function handleDelete() {
     if (!book) return;
     try {
@@ -726,30 +433,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
-  }
-
-  async function duplicateCurrentBook(options: DuplicateOptions) {
-    if (!book || !user) return;
-    try {
-      setErrorMsg(null);
-      const duplicate = await duplicateBookRecord(book, user.id, options);
-      setDuplicateOpen(false);
-      await reload();
-      navigate(`/books/${duplicate.id}`, { state: { openEdit: true } });
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Failed to duplicate book");
-    }
-  }
-
-  function openDuplicateDialog() {
-    if (!book || !user) return;
-    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
-    const resolved = resolveDuplicateOptions("book", library.duplicate_journal_entries, library.duplicate_books);
-    if (resolved.needsDialog) {
-      setDuplicateOpen(true);
-      return;
-    }
-    void duplicateCurrentBook(resolved.options);
   }
 
   const visibleJournalEntries = useMemo(
@@ -778,7 +461,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     }, trigger);
   }, [bookId, openAddJournalEntry, rememberSavedEntry, user]);
 
-  const journalAvailable = Boolean(book) && !loading && !error && !isEditMode;
+  const journalAvailable = Boolean(book) && !loading && !error;
   useEffect(() => {
     if (!journalAvailable || !wantsJournalEditor || !user) return;
     launchJournalEditor(addEntryButtonRef.current ?? undefined, searchParams.get("tag") === "review" ? ["review"] : undefined);
@@ -833,55 +516,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     );
   }
 
-  if (isEditMode) {
-    return (
-      <div className="rj-detail-page space-y-6" data-book-detail-editor>
-        <BackButton
-          fallbackTo="/library"
-          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
-          onClick={exitEditMode}
-        />
-
-        <div className="relative z-10 space-y-2">
-          <AppHeading level={1} as="h1">Edit book</AppHeading>
-          <p className="text-sm text-muted-foreground">Update the book details shown in your library.</p>
-        </div>
-
-        {errorMsg && (
-          <div className="relative z-10 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            {errorMsg}
-          </div>
-        )}
-
-        <div className="relative z-10">
-          <EditDetailsForm
-            bookTitle={book.title}
-            coverUrl={book.cover_url}
-            coverPreviewUrl={coverPreviewUrl}
-            control={control}
-            register={register}
-            handleSubmit={handleSubmit}
-            onSubmit={onSubmit}
-            onCancel={exitEditMode}
-            saving={saving}
-            isDirty={isDirty}
-            hasStagedCover={Boolean(coverFile)}
-            hasCoverRemoval={removeCover}
-            errors={errors}
-            series={series}
-            watchedSeriesId={watchedSeriesId}
-            clearPublicationDateError={() => clearErrors("publication_date")}
-            uploadingCover={uploadingCover}
-            handleCoverChange={handleCoverChange}
-            onRemoveCover={handleRemoveCover}
-            onCreateAuthor={handleCreateAuthor}
-          />
-        </div>
-        {authorDialog}
-      </div>
-    );
-  }
-
   const currentPage = book.current_page ?? 0;
   const totalPages = book.total_pages ?? 0;
   const isPaused = book.status === "Paused";
@@ -904,11 +538,8 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
               shareAttachmentLabel="Send the book as attachment in a chat"
               onPause={isReading ? () => void handlePause() : undefined}
               onResume={isPaused ? () => void handleResume() : undefined}
-              onEdit={() => {
-                setErrorMsg(null);
-                setIsEditMode(true);
-              }}
-              onDuplicate={openDuplicateDialog}
+              onEdit={(trigger) => openAddBook({ editBook: book }, trigger)}
+              onDuplicate={(trigger) => openAddBook({ duplicateBooks: [book] }, trigger)}
               onWishlist={() => {
                 if (!confirm("Move this book to your wishlist? It will leave your library, but its journal and reading data will be kept.")) return;
                 void moveBookToWishlist(book).then(async () => {
@@ -1138,16 +769,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         description="Add a message, then pick the chat you want to send this book to."
         onSent={() => setShareStatus("Book sent to chat.")}
       />
-      <DuplicateOptionsDialog
-        open={duplicateOpen}
-        kind="book"
-        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
-        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
-        onOpenChange={setDuplicateOpen}
-        onConfirm={duplicateCurrentBook}
-      />
-      {authorDialog}
-
       <div className="rj-detail-body">
         <div>
           <AboutSection
@@ -1269,321 +890,6 @@ function SecondaryMetadataRow({
     <div>
       <dt>{label}</dt>
       <dd>{value}</dd>
-    </div>
-  );
-}
-
-function EditDetailsForm({
-  bookTitle,
-  coverUrl,
-  coverPreviewUrl,
-  control,
-  register,
-  handleSubmit,
-  onSubmit,
-  onCancel,
-  saving,
-  isDirty,
-  hasStagedCover,
-  hasCoverRemoval,
-  errors,
-  series,
-  watchedSeriesId,
-  clearPublicationDateError,
-  uploadingCover,
-  handleCoverChange,
-  onRemoveCover,
-  onCreateAuthor,
-}: {
-  bookTitle: string;
-  coverUrl?: string | null;
-  coverPreviewUrl?: string | null;
-  control: ReturnType<typeof useForm<FormValues>>["control"];
-  register: ReturnType<typeof useForm<FormValues>>["register"];
-  handleSubmit: ReturnType<typeof useForm<FormValues>>["handleSubmit"];
-  onSubmit: (values: FormValues) => Promise<void>;
-  onCancel: () => void;
-  saving: boolean;
-  isDirty: boolean;
-  hasStagedCover: boolean;
-  hasCoverRemoval: boolean;
-  errors: ReturnType<typeof useForm<FormValues>>["formState"]["errors"];
-  series: { id: string; name: string; is_wishlist_only?: boolean }[];
-  watchedSeriesId: string;
-  clearPublicationDateError: () => void;
-  uploadingCover: boolean;
-  handleCoverChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onRemoveCover: () => void;
-  onCreateAuthor: (initialName: string) => void;
-}) {
-  const activeCoverUrl = coverPreviewUrl ?? (hasCoverRemoval ? null : coverUrl);
-
-  const [secondaryInformationOpen, setSecondaryInformationOpen] = useState(false);
-  const status = useWatch({ control, name: "status" });
-
-  useEffect(() => {
-    if (errors.publication_date || errors.price || errors.purchase_url) setSecondaryInformationOpen(true);
-  }, [errors.publication_date, errors.price, errors.purchase_url]);
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border bg-card p-5 pb-28 md:pb-24">
-      <div className="grid gap-5 md:grid-cols-[7.5rem_minmax(0,1fr)] lg:grid-cols-[8.5rem_minmax(0,1fr)]">
-        <div className="md:row-span-3 md:self-start">
-          <label
-            htmlFor="cover-change"
-            className="group relative block w-[min(7rem,38vw)] aspect-[2/3] cursor-pointer overflow-hidden rounded-xl border bg-muted shadow-sm sm:w-28 md:w-full"
-          >
-            {activeCoverUrl ? (
-              <img src={activeCoverUrl} alt={bookTitle} className="block h-full w-full object-cover object-top" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <ImagePlus className="h-8 w-8 text-muted-foreground/40" />
-              </div>
-            )}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-              {uploadingCover ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <ImagePlus className="h-5 w-5 text-white" />
-              )}
-            </div>
-            <input
-              id="cover-change"
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={handleCoverChange}
-              disabled={saving || uploadingCover}
-            />
-          </label>
-          {coverPreviewUrl && <p className="mt-2 text-xs text-muted-foreground">New cover staged for save.</p>}
-          {activeCoverUrl && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="mt-1 h-8 w-8 text-destructive hover:text-destructive"
-              aria-label="Remove cover"
-              disabled={saving || uploadingCover}
-              onClick={onRemoveCover}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
-        <div className="min-w-0 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-title">Title</Label>
-            <Input id="detail-title" {...register("title", { required: true })} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Authors</Label>
-            <Controller
-              name="authors"
-              control={control}
-              rules={{
-                validate: (value) => (value?.length ?? 0) > 0 || "At least one author is required",
-              }}
-              render={({ field }) => (
-                <AuthorMultiSelect
-                  value={field.value ?? []}
-                  onChange={field.onChange}
-                  onCreateNew={onCreateAuthor}
-                />
-              )}
-            />
-            {errors.authors && <p className="text-xs text-destructive">{errors.authors.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Genres</Label>
-            <Controller
-              name="genres"
-              control={control}
-              render={({ field }) => <GenreMultiSelect value={field.value ?? []} onChange={field.onChange} />}
-            />
-          </div>
-        </div>
-
-        <div className="md:col-span-2 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-status">Status</Label>
-            <Controller
-              name="status"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={saving}>
-                  <SelectTrigger id="detail-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["Wishlist", ...STATUS_OPTIONS, ...(field.value === "Paused" ? ["Paused"] : [])].map((option) => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          <SelectField control={control} name="language" label="Language" options={["German", "Spanish", "English"]} />
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-total-pages">Total pages</Label>
-            <Input id="detail-total-pages" type="number" min={1} {...register("total_pages")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-date-started">Date started</Label>
-            <Input id="detail-date-started" type="date" {...register("date_started")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="detail-date-finished">Date finished</Label>
-            <Input id="detail-date-finished" type="date" {...register("date_finished")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Series</Label>
-            <Controller
-              name="series_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  value={field.value || "__none__"}
-                  onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {series.filter((item) => !item.is_wishlist_only || item.id === watchedSeriesId).map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-
-          {watchedSeriesId && (
-            <div className="space-y-1.5 sm:max-w-[10rem]">
-              <Label htmlFor="detail-volume-number">Volume number</Label>
-              <Input id="detail-volume-number" type="number" min={0.01} step="0.01" {...register("volume_number")} />
-              {errors.volume_number && (
-                <p className="text-xs text-destructive">{errors.volume_number.message}</p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-3 sm:col-span-2">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-base font-medium text-foreground transition-colors hover:text-primary"
-              onClick={() => setSecondaryInformationOpen((current) => !current)}
-              aria-expanded={secondaryInformationOpen}
-              aria-controls="detail-secondary-information"
-            >
-              <ChevronRight className={`h-[1.125rem] w-[1.125rem] transition-transform ${secondaryInformationOpen ? "rotate-90" : ""}`} aria-hidden="true" />
-              Secondary Information
-            </button>
-            {secondaryInformationOpen && (
-              <div id="detail-secondary-information" className="grid gap-4 sm:grid-cols-2">
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="detail-publication-date">Publication year</Label>
-                  <Input
-                    id="detail-publication-date"
-                    placeholder="YYYY"
-                    inputMode="numeric"
-                    maxLength={4}
-                    aria-invalid={!!errors.publication_date}
-                    {...register("publication_date", { onChange: clearPublicationDateError })}
-                  />
-                  {errors.publication_date && <p className="text-xs text-destructive">{errors.publication_date.message}</p>}
-                </div>
-
-                <SelectField control={control} name="format" label="Format" options={["eBook", "Audiobook", "Paperback", "Hardcover"]} />
-
-                <SelectField control={control} name="source" label="Source" options={SOURCE_OPTIONS} />
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="detail-isbn">ISBN</Label>
-                  <Input id="detail-isbn" inputMode="numeric" autoComplete="off" {...register("isbn")} />
-                </div>
-                {status === "Wishlist" && <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="detail-price">Price</Label>
-                    <Input id="detail-price" type="number" min="0" step="0.01" {...register("price")} />
-                    {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="detail-purchase-url">Purchase link</Label>
-                    <Input id="detail-purchase-url" type="url" {...register("purchase_url")} />
-                    {errors.purchase_url && <p className="text-xs text-destructive">{errors.purchase_url.message}</p>}
-                  </div>
-                </>}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="detail-description">Description</Label>
-            <Textarea id="detail-description" rows={6} {...register("description")} />
-          </div>
-        </div>
-      </div>
-
-      <SaveCancelBar
-        onCancel={onCancel}
-        saving={saving}
-        saveDisabled={!isDirty && !hasStagedCover && !hasCoverRemoval}
-        saveLabel="Save Changes"
-        savingLabel="Saving..."
-      />
-    </form>
-  );
-}
-
-function SelectField({
-  control,
-  name,
-  label,
-  options,
-}: {
-  control: ReturnType<typeof useForm<FormValues>>["control"];
-  name: "language" | "format" | "source";
-  label: string;
-  options: string[];
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => (
-          <Select
-            value={field.value || "__none__"}
-            onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Not set" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Not set</SelectItem>
-              {options.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      />
     </div>
   );
 }

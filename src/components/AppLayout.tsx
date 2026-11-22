@@ -55,9 +55,8 @@ const addActions = [
 
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
-  openAddBook: (options?: AddBookDialogLaunchOptions) => void;
+  openAddBook: (options?: AddBookDialogLaunchOptions, trigger?: HTMLElement) => void;
   openAddJournalEntry: (options?: AddJournalEntryLaunchOptions, trigger?: HTMLElement) => void;
-  setDetailEditingOpen: (open: boolean) => void;
 }
 
 export interface AddBookDialogLaunchOptions {
@@ -66,7 +65,10 @@ export interface AddBookDialogLaunchOptions {
   initialRecommendation?: RecommendationItem;
   initialCatalogBook?: BookTitleSearchResult;
   initiallyAddToWishlist?: boolean;
-  initialBook?: Book;
+  editBook?: Book;
+  duplicateBooks?: Book[];
+  onCopiesSaved?: (books: Book[]) => void;
+  onCancel?: () => void;
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
 }
@@ -126,7 +128,6 @@ function AppLayoutContent() {
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
   const [activeAddAction, setActiveAddAction] = useState<Exclude<AddAction, "book"> | null>(null);
-  const [detailEditingOpen, setDetailEditingOpen] = useState(false);
   const addDialogStillOpen = useRef(false);
   const dialogReturnFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -160,7 +161,6 @@ function AppLayoutContent() {
     onAddBookClick: () => openAddBook(),
     openAddBook,
     openAddJournalEntry,
-    setDetailEditingOpen,
   } satisfies AppLayoutOutletContext);
   const page = { location, navigationType, outlet, isBookDetail };
   // Keep the previous route's outlet and location together so its scroll and local state survive the sheet.
@@ -225,8 +225,8 @@ function AppLayoutContent() {
     return () => root.classList.remove("rj-app-theme");
   }, []);
 
-  function openAddBook(options?: AddBookDialogLaunchOptions) {
-    rememberDialogOpener();
+  function openAddBook(options?: AddBookDialogLaunchOptions, trigger?: HTMLElement) {
+    rememberDialogOpener(trigger);
     setAddBookOptions(options);
     setAddBookOpen(true);
   }
@@ -240,7 +240,8 @@ function AppLayoutContent() {
     const launchOptions = addBookOptions;
     launchOptions?.onSaved?.(book);
     if (!launchOptions?.onSaved) {
-      navigate(`/books/${book.id}`);
+      if (book.status === "Wishlist") navigate("/library/wishlist");
+      else if (!launchOptions?.editBook) navigate(`/books/${book.id}`);
     }
   }
 
@@ -269,7 +270,7 @@ function AppLayoutContent() {
               <main id="app-content" tabIndex={-1} className={mainIsMessages ? "rj-app-messages" : "rj-app-content"}>
                 {mainPage.outlet}
               </main>
-              {(!detailEditingOpen || bookOverlayOpen) && !mainIsMessages && (
+              {!mainIsMessages && (
                 <div className="rj-floating-add">{addLauncher}</div>
               )}
             </UNSAFE_LocationContext.Provider>
@@ -284,10 +285,11 @@ function AppLayoutContent() {
 
       <Suspense fallback={
         <LoadingDialog
-          title={addBookOpen ? (addBookOptions?.initialBook ? "Edit Wishlist Item" : "Add Book") : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
+          title={addBookOpen ? (addBookOptions?.editBook ? "Edit book" : "Add book") : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
           onOpenChange={(open) => {
             if (!open) {
               addDialogStillOpen.current = false;
+              addBookOptions?.onCancel?.();
               closeAddBook(false);
               setActiveAddAction(null);
             }
@@ -304,7 +306,10 @@ function AppLayoutContent() {
             initialRecommendation={addBookOptions?.initialRecommendation}
             initialCatalogBook={addBookOptions?.initialCatalogBook}
             initiallyAddToWishlist={addBookOptions?.initiallyAddToWishlist}
-            initialBook={addBookOptions?.initialBook}
+            editBook={addBookOptions?.editBook}
+            duplicateBooks={addBookOptions?.duplicateBooks}
+            onCopiesSaved={addBookOptions?.onCopiesSaved}
+            onCancel={addBookOptions?.onCancel}
             initialSeriesId={addBookOptions?.initialSeriesId}
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
             onSaved={handleAddedBook}

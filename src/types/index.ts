@@ -109,7 +109,11 @@ export interface BookPausePeriod {
   created_at: string;
 }
 
-export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at">>;
+type NullableBookField = "current_page" | "total_pages" | "date_started" | "date_finished"
+  | "language" | "source" | "format" | "isbn" | "series_id" | "volume_number";
+
+export type BookUpdate = Partial<Omit<Book, "id" | "user_id" | "created_at" | NullableBookField>> &
+  { [Field in NullableBookField]?: Book[Field] | null };
 
 export type JournalEntryLabel = "quote" | "review" | "note";
 

@@ -13,7 +13,7 @@ import {
 } from "@/lib/librarySorting";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   ChevronRight,
@@ -31,7 +31,6 @@ import {
 import { AppHeading, HeadingDescription } from "@/components/design";
 import BackButton from "@/components/BackButton";
 import OverflowMenu from "@/components/OverflowMenu";
-import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { selectionLabel } from "@/lib/selectionLabels";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Button } from "@/components/ui/button";
@@ -54,14 +53,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useUserSettings } from "@/context";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchReadingLogs } from "@/lib/books";
 import { fetchAllBookJournalEntryRecords, formatBookJournalEntryRecordPageRange } from "@/lib/bookJournal";
-import { duplicateBookRecord } from "@/lib/duplication";
 import { runBulkOperation } from "@/lib/bulkManagement";
-import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import {
   buildMultiValueGroups,
   buildNoteGroups,
@@ -80,6 +76,7 @@ import BookCard from "@/components/BookCard";
 import BookShelf from "@/pages/library/BookShelf";
 import ContinueReadingCard from "@/pages/library/ContinueReadingCard";
 import ShelfCarousel from "@/pages/library/ShelfCarousel";
+import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import type { Book, BookJournalEntryRecord, BookStatus, BookUpdate, ReadingLog, Series } from "@/types";
 
 type LibraryView =
@@ -1425,7 +1422,7 @@ function MyBooksOverview({
 
 export default function Library() {
   const { books, loading: booksLoading, error, reload, updateBook, deleteBook } = useBooksContext();
-  const { settings } = useUserSettings();
+  const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { series, loading: seriesLoading } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(false);
@@ -1472,7 +1469,6 @@ export default function Library() {
   const [genreInput, setGenreInput] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [bulkGenresOpen, setBulkGenresOpen] = useState(false);
@@ -1735,35 +1731,16 @@ export default function Library() {
     }
   }
 
-  async function duplicateSelectedBooks(options: DuplicateOptions) {
-    const selectedBooks = managementBooks.filter((book) => selectedBookIds.has(book.id));
-    if (selectedBooks.length === 0) return;
-
-    setBulkSaving(true);
-    setBulkError(null);
-    const result = await runBulkOperation(
-      selectedBooks,
-      (book) => ({ id: book.id, label: book.title }),
-      (book) => duplicateBookRecord(book, book.user_id, options).then(() => undefined),
-    );
-    setBulkSaving(false);
-    setDuplicateOpen(false);
-    await reload();
-    if (result.failures.length > 0) {
-      setBulkError(`Could not duplicate: ${result.failures.map((failure) => failure.label).join(", ")}.`);
-    }
-  }
-
   function openDuplicateDialog() {
     const selectedBooks = managementBooks.filter((book) => selectedBookIds.has(book.id));
     if (selectedBooks.length === 0) return;
-    const library = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
-    const resolved = resolveDuplicateOptions("book", library.duplicate_journal_entries, library.duplicate_books);
-    if (resolved.needsDialog) {
-      setDuplicateOpen(true);
-      return;
-    }
-    void duplicateSelectedBooks(resolved.options);
+    openAddBook({
+      duplicateBooks: selectedBooks,
+      onCopiesSaved: () => {
+        setBulkError(null);
+        setSelectedBookIds(new Set());
+      },
+    });
   }
 
   const latestReadTimesByBook = useMemo(
@@ -2060,15 +2037,6 @@ export default function Library() {
           </section>
         </>
       )}
-      <DuplicateOptionsDialog
-        open={duplicateOpen}
-        kind="book"
-        selectedCount={selectedBookIds.size}
-        journalPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_journal_entries}
-        booksPreference={(settings?.library ?? DEFAULT_LIBRARY_SETTINGS).duplicate_books}
-        onOpenChange={setDuplicateOpen}
-        onConfirm={duplicateSelectedBooks}
-      />
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>

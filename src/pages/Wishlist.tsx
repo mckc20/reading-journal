@@ -5,10 +5,7 @@ import { BookOpen, ChevronRight, Copy, Download, ExternalLink, Loader2, Pencil, 
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import OverflowMenu from "@/components/OverflowMenu";
-import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { selectionLabel } from "@/lib/selectionLabels";
-import { useUserSettings } from "@/context";
-import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import { BookCover } from "@/components/reading-journal";
 import { PageHeader, EmptyState } from "@/components/reading-journal";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { pruneSelectedIds, runBulkOperation, toggleAllVisibleIds } from "@/lib/bulkManagement";
-import { acquireWishlistItem, duplicateWishlistItem, removeWishlistItem, wishlistCsv } from "@/lib/wishlist";
+import { acquireWishlistItem, removeWishlistItem, wishlistCsv } from "@/lib/wishlist";
 import type { Book } from "@/types";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 
@@ -223,8 +220,6 @@ function WishlistCollectionView({
 }
 
 export default function Wishlist() {
-  const { settings } = useUserSettings();
-  const libraryPreferences = settings?.library ?? DEFAULT_LIBRARY_SETTINGS;
   const { wishlistBooks: items, loading, error: booksError, reload: reloadBooks } = useBooksContext();
   const { series } = useSeries();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
@@ -236,8 +231,6 @@ export default function Wishlist() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [duplicateItem, setDuplicateItem] = useState<Book | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wishlistSort = normalizeWishlistSort(searchParams.get("sort"));
@@ -306,59 +299,25 @@ export default function Wishlist() {
 
   function openDuplicateDialog() {
     if (!selectedPending.length) return;
-    setDuplicateItem(null);
-    const preferences = libraryPreferences;
-    const resolved = resolveDuplicateOptions("book", preferences.duplicate_journal_entries, preferences.duplicate_books);
-    if (resolved.needsDialog) setDuplicateOpen(true);
-    else void duplicateSelected(resolved.options);
+    openAddBook({
+      duplicateBooks: selectedPending,
+      onCopiesSaved: () => {
+        setError(null);
+        setManaging(false);
+        setSelectedIds(new Set());
+      },
+    });
   }
 
   function openItemDuplicateDialog(item: Book) {
     setSelected(null);
-    setDuplicateItem(item);
-    const resolved = resolveDuplicateOptions("book", libraryPreferences.duplicate_journal_entries, libraryPreferences.duplicate_books);
-    if (resolved.needsDialog) setDuplicateOpen(true);
-    else void duplicateSingleItem(item, resolved.options);
-  }
-
-  async function duplicateSingleItem(item: Book, options: DuplicateOptions) {
-    setSaving(item.id);
-    setError(null);
-    try {
-      const copy = await duplicateWishlistItem(item, options);
-      await load();
-      setDuplicateOpen(false);
-      setDuplicateItem(null);
-      edit(copy);
-    } catch (duplicateError) {
-      setDuplicateOpen(false);
-      setDuplicateItem(null);
-      setSelected(item);
-      setError(getWishlistErrorMessage(duplicateError, "Could not duplicate this wish."));
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  async function duplicateSelected(options: DuplicateOptions) {
-    if (!selectedPending.length) return;
-    setBulkSaving(true);
-    setError(null);
-    const result = await runBulkOperation(
-      selectedPending,
-      (item) => ({ id: item.id, label: item.title }),
-      (item) => duplicateWishlistItem(item, options).then(() => undefined),
-    );
-    await load();
-    setBulkSaving(false);
-    setDuplicateOpen(false);
-    if (result.failures.length > 0) {
-      setError(`Could not duplicate: ${result.failures.map((failure) => failure.label).join(", ")}.`);
-      setSelectedIds(new Set(result.failures.map((failure) => failure.id)));
-      return;
-    }
-    setManaging(false);
-    setSelectedIds(new Set());
+    openAddBook({
+      duplicateBooks: [item],
+      onCancel: () => setSelected(item),
+      onSaved: (copy) => {
+        if (copy.status !== "Wishlist") navigate(`/books/${copy.id}`);
+      },
+    });
   }
 
   async function addSelectedToLibrary() {
@@ -443,8 +402,12 @@ export default function Wishlist() {
   function edit(item: Book) {
     setSelected(null);
     openAddBook({
-      initialBook: item,
-      onWishlistSaved: () => { void load(); },
+      editBook: item,
+      onCancel: () => setSelected(item),
+      onSaved: (book) => {
+        if (book.status === "Wishlist") setSelected(book);
+        else navigate(`/books/${book.id}`);
+      },
     });
   }
 
@@ -643,21 +606,7 @@ export default function Wishlist() {
         </DialogContent>}
       </Dialog>
 
-      <DuplicateOptionsDialog
-        open={duplicateOpen}
-        kind="book"
-        selectedCount={duplicateItem ? undefined : selectedPending.length}
-        journalPreference={libraryPreferences.duplicate_journal_entries}
-        booksPreference={libraryPreferences.duplicate_books}
-        onOpenChange={(open) => {
-          setDuplicateOpen(open);
-          if (!open && duplicateItem && !saving) {
-            setSelected(duplicateItem);
-            setDuplicateItem(null);
-          }
-        }}
-        onConfirm={(options) => duplicateItem ? duplicateSingleItem(duplicateItem, options) : duplicateSelected(options)}
-      />
+
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>

@@ -1,5 +1,8 @@
 import { createAuthor, type AuthorInput } from "@/lib/authors";
-import { createBook, type BookInsert, createSeries, type SeriesInput } from "@/lib/books";
+import {
+  createBook, type BookInsert, createSeries, type SeriesInput,
+  deleteBook, deleteSeries, deleteUnreferencedCover, uploadCover,
+} from "@/lib/books";
 import { supabase } from "@/lib/supabase";
 import type { Author, Book, Series } from "@/types";
 
@@ -19,6 +22,14 @@ const JOURNAL_TABLES: Record<JournalSource, { table: JournalTable; foreignKey: "
 
 function copyName(value: string): string {
   return `Copy of ${value}`;
+}
+
+export interface BookCopyDraft {
+  sourceId: string;
+  fields: Omit<BookInsert, "id" | "user_id">;
+  coverFile?: File;
+  newSeriesName?: string;
+  copyJournalEntries: boolean;
 }
 
 function cleanBookPayload(book: Book, userId: string, id: string, overrides: Partial<Book> = {}): BookInsert {
@@ -121,6 +132,58 @@ export async function duplicateBookRecord(
     await copyJournalEntries("book_note", book.id, duplicate.id, userId);
   }
   return duplicate;
+}
+
+export class BookCopyCleanupError extends Error {
+  constructor() {
+    super("Some changes from this save could not be undone. Check your library before trying again.");
+  }
+}
+
+/** Save only after every draft has been reviewed, and undo this batch's writes if a save fails. */
+export async function saveBookCopies(userId: string, drafts: BookCopyDraft[]): Promise<Book[]> {
+  const attemptedIds: string[] = [];
+  const createdSeriesIds: string[] = [];
+  const uploadedCovers: string[] = [];
+  const copies: Book[] = [];
+
+  try {
+    for (const { fields, coverFile, newSeriesName, sourceId, copyJournalEntries: shouldCopyJournal } of drafts) {
+      const id = crypto.randomUUID();
+      let coverUrl = fields.cover_url;
+      if (coverFile) {
+        coverUrl = await uploadCover(userId, id, coverFile);
+        uploadedCovers.push(coverUrl);
+      }
+
+      let seriesId = fields.series_id;
+      if (newSeriesName) {
+        const series = await createSeries(userId, { name: newSeriesName, is_wishlist_only: fields.status === "Wishlist" });
+        seriesId = series.id;
+        createdSeriesIds.push(seriesId);
+      }
+
+      attemptedIds.push(id);
+      const copy = await createBook({ ...fields, id, user_id: userId, cover_url: coverUrl, series_id: seriesId });
+      if (shouldCopyJournal) await copyJournalEntries("book_note", sourceId, copy.id, userId);
+      copies.push(copy);
+    }
+    return copies;
+  } catch (error) {
+    try {
+      if (attemptedIds.length > 0) {
+        const { data, error: lookupError } = await supabase.from("books").select("id").in("id", attemptedIds);
+        if (lookupError) throw lookupError;
+        for (const book of data ?? []) await deleteBook(book.id);
+      }
+      for (const seriesId of createdSeriesIds) await deleteSeries(seriesId);
+    } catch {
+      throw new BookCopyCleanupError();
+    } finally {
+      await Promise.allSettled(uploadedCovers.map((url) => deleteUnreferencedCover(userId, url)));
+    }
+    throw error;
+  }
 }
 
 export async function duplicateAuthorRecord(
