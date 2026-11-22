@@ -10,7 +10,7 @@ import type { BookStatus as Status } from '@/types';
 import type { HomeBook } from './HomeCards';
 import { HomeShell, type CreateDestination, type HomeDestination } from './HomeShell';
 import './redesign.css';
-import './book-details-preview.css';
+import './book-details.css';
 
 export interface DetailPreviewBook extends HomeBook {
   status: Status;
@@ -56,7 +56,7 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onB
   const metadata = [['Source', book.source], ['Published', book.publicationYear]] as const;
 
   return <div className="rj-redesign"><HomeShell {...shell} activeDestination="Library">
-    <div className="rj-detail-preview">
+    <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby={`${id}-title`}>
         <div className="rj-detail-cover-stage">
           <div className="rj-detail-topline">

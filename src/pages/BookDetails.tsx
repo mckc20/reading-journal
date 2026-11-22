@@ -6,12 +6,11 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type CSSProperties,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
-  ArrowRight,
+  ArrowUpRight,
   BookOpen,
   Calendar,
   CalendarCheck,
@@ -25,8 +24,6 @@ import {
   PauseCircle,
   RefreshCw,
   Star,
-  Languages,
-  Tags,
   TrendingUp,
   Trash2,
   type LucideIcon,
@@ -52,7 +49,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
+import { BookCover } from "@/components/reading-journal/BookCover";
+import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
+import "@/components/redesign/book-details.css";
 import {
   Select,
   SelectContent,
@@ -66,7 +65,6 @@ import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
-import { useDominantImageColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import {
   formatCalendarSpan,
@@ -100,7 +98,6 @@ import { bookHasGenreName, getBookGenreNames, getMostPopularMatchingGenre } from
 import { parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import {
   getTodayLocalDate,
-  cn,
 } from "@/lib/utils";
 import type {
   Book,
@@ -190,13 +187,6 @@ function formatDateObjectForDisplay(value: Date | null): string {
   });
 }
 
-function getProgressPercent(book: Book): number {
-  const currentPage = book.current_page ?? 0;
-  const totalPages = book.total_pages ?? 0;
-  if (totalPages <= 0) return 0;
-  return Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)));
-}
-
 function getPublicationYear(value?: string | null): string | null {
   const [year] = (value ?? "").split("-");
   return year && /^\d{4}$/.test(year) ? year : null;
@@ -224,10 +214,6 @@ export default function BookDetails() {
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
-  const dominantCoverColor = useDominantImageColor(book?.cover_url);
-  const detailBackgroundStyle = {
-    "--detail-image-color": dominantCoverColor,
-  } as CSSProperties;
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const linkedGenres = useMemo(() => {
     if (!book?.selected_genres?.length) return [];
@@ -361,7 +347,7 @@ export default function BookDetails() {
   }, [bookId]);
 
   const watchedSeriesId = watch("series_id");
-  const progressPercent = book ? getProgressPercent(book) : 0;
+  const progressPercent = book ? getBookProgress(book.current_page, book.total_pages) : null;
   const totalReadingMinutes = useMemo(() => sumReadingMinutes(readingLogs), [readingLogs]);
   const readingDuration = useMemo(
     () =>
@@ -717,12 +703,12 @@ export default function BookDetails() {
       ),
     [book?.title, journalEntries],
   );
-  const previewJournalEntries = useMemo(
+  const visibleJournalEntries = useMemo(
     () =>
       sortJournalEntries([
         ...quoteJournalEntries,
         ...thoughtJournalEntries,
-      ]).slice(0, 4),
+      ]),
     [quoteJournalEntries, thoughtJournalEntries],
   );
 
@@ -762,8 +748,7 @@ export default function BookDetails() {
 
   if (isEditMode) {
     return (
-      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
-        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
+      <div className="rj-detail-page space-y-6">
         <BackButton
           fallbackTo="/library"
           className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
@@ -923,70 +908,61 @@ export default function BookDetails() {
               value: daysReading,
             },
           ];
+  const summaryStats: ProgressStat[] = [];
+  if (book.date_finished) {
+    summaryStats.push({ icon: CalendarCheck, label: "Finished on", value: formatDateForDisplay(book.date_finished) });
+  } else if (book.date_started) {
+    summaryStats.push({ icon: Calendar, label: "Started on", value: formatDateForDisplay(book.date_started) });
+  }
+  if (totalReadingMinutes > 0) {
+    summaryStats.push({ icon: Clock, label: "Reading time", value: formatTotalReadingTime(totalReadingMinutes) });
+  }
   const description = book.description?.trim() || "";
   return (
-    <div className="relative isolate -mt-5 space-y-8 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
-      <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <BackButton fallbackTo="/library" />
-
-        <DetailActionsMenu
-          kind="book"
-          label={book.title}
-          shareAttachmentLabel="Send the book as attachment in a chat"
-          onPause={isReading ? () => void handlePause() : undefined}
-          onResume={isPaused ? () => void handleResume() : undefined}
-          onEdit={() => {
-            setErrorMsg(null);
-            setIsEditMode(true);
-          }}
-          onDuplicate={openDuplicateDialog}
-          onWishlist={() => {
-            if (!confirm("Move this book to your wishlist? It will leave your library, but its journal and reading data will be kept.")) return;
-            void moveBookToWishlist(book).then(async () => {
-              await reload();
-              navigate("/library/wishlist");
-            }).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not move to wishlist"));
-          }}
-          onDelete={handleDelete}
-          onSendAttachment={openAttachmentPicker}
-          deleteTitle="Delete this book?"
-          deleteDescription="Are you sure you want to delete this book? This cannot be undone."
-          buttonClassName="hover:bg-background/20 hover:text-foreground aria-expanded:bg-background/25 aria-expanded:text-foreground"
-        />
-      </div>
-
-      <section className="relative z-10 grid gap-6 md:grid-cols-[240px_1fr] md:items-start">
-        <div className="mx-auto w-full max-w-[240px]">
-          <div
-            className={cn(
-              "relative block aspect-[2/3] overflow-hidden rounded-xl border bg-muted shadow-sm",
-              isPaused && "opacity-70",
-            )}
-          >
-            {book.cover_url ? (
-              <img
-                src={book.cover_url}
-                alt={book.title}
-                className={cn("block h-full w-full object-cover object-top", isPaused && "grayscale")}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-              </div>
-            )}
-            {isPaused && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-                <PauseCircle className="h-8 w-8 text-muted-foreground" />
-              </div>
-            )}
+    <div className="rj-detail-page">
+      <section className="rj-detail-hero" aria-labelledby="book-detail-title">
+        <div className="rj-detail-cover-stage">
+          <div className="rj-detail-topline">
+            <BackButton fallbackTo="/library" className="min-h-11 min-w-11" />
+            <DetailActionsMenu
+              kind="book"
+              label={book.title}
+              shareAttachmentLabel="Send the book as attachment in a chat"
+              onPause={isReading ? () => void handlePause() : undefined}
+              onResume={isPaused ? () => void handleResume() : undefined}
+              onEdit={() => {
+                setErrorMsg(null);
+                setIsEditMode(true);
+              }}
+              onDuplicate={openDuplicateDialog}
+              onWishlist={() => {
+                if (!confirm("Move this book to your wishlist? It will leave your library, but its journal and reading data will be kept.")) return;
+                void moveBookToWishlist(book).then(async () => {
+                  await reload();
+                  navigate("/library/wishlist");
+                }).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not move to wishlist"));
+              }}
+              onDelete={handleDelete}
+              onSendAttachment={openAttachmentPicker}
+              deleteTitle="Delete this book?"
+              deleteDescription="Are you sure you want to delete this book? This cannot be undone."
+              buttonClassName="size-11 hover:bg-background/30 aria-expanded:bg-background/30"
+            />
           </div>
+          <BookCover
+            className="rj-detail-cover"
+            imageClassName="object-top"
+            src={book.cover_url}
+            title={book.title}
+            paused={isPaused}
+            showFallbackTitle
+          />
         </div>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
+        <div className="rj-detail-summary">
+          <div>
             {seriesName && (
-              <p className="font-heading text-base italic leading-tight text-muted-foreground sm:text-lg">
+              <p className="mb-2 break-words font-heading text-sm italic text-muted-foreground sm:text-base">
                 <Link
                   to={`/series/${book.series_id}`}
                   className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -997,23 +973,21 @@ export default function BookDetails() {
               </p>
             )}
 
-            <div className="flex items-start gap-3">
-              <AppHeading level={1}>{book.title}</AppHeading>
-              <button
+            <div className="rj-detail-title-row">
+              <h1 id="book-detail-title">{book.title}</h1>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-lg"
                 onClick={toggleFavorite}
                 aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                className="mt-2 shrink-0 rounded p-1 transition-colors hover:bg-background/20"
+                aria-pressed={isFavorite}
               >
-                <Heart
-                  className={`h-5 w-5 ${
-                    isFavorite ? "fill-favorite text-favorite" : "text-muted-foreground"
-                  }`}
-                />
-              </button>
+                <Heart className={isFavorite ? "fill-favorite text-favorite" : undefined} />
+              </Button>
             </div>
 
-            <p className="text-lg text-muted-foreground">
+            <p className="rj-detail-author break-words">
               {book.authors.map((author, index) => (
                 <Fragment key={author}>
                   {index > 0 ? ", " : ""}
@@ -1027,110 +1001,109 @@ export default function BookDetails() {
               ))}
             </p>
 
-            <div className="mt-4 flex flex-wrap items-center gap-1">
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => handleRating(n)}
-                    aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
-                    className="rounded p-0.5 transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`h-5 w-5 ${
-                        localRating && n <= localRating
-                          ? "fill-rating text-rating"
-                          : "text-muted-foreground"
-                      }`}
-                    />
-                  </button>
-                ))}
-              </div>
-              <div className="relative ml-2 flex items-center">
-                <button
-                  type="button"
-                  aria-label="Show rating guide"
-                  aria-expanded={showRatingGuide}
-                  aria-describedby={showRatingGuide ? "rating-guide-tooltip" : undefined}
-                  onClick={() => setShowRatingGuide((current) => !current)}
-                  className="rounded-full p-0.5 text-muted-foreground/65 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                >
-                  <Info className="h-3.5 w-3.5" />
-                </button>
-                {showRatingGuide && (
-                  <div
-                    id="rating-guide-tooltip"
-                    role="tooltip"
-                    className="absolute top-full right-0 z-20 mt-2 w-72 rounded-lg border border-border/70 bg-popover p-3 text-xs text-muted-foreground/75 shadow-sm sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
-                  >
-                    <div className="space-y-1.5">
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">♥︎</span>
-                        <span>One of the best books I’ve ever read</span>
-                      </p>
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">★★★★★</span>
-                        <span>Loved it</span>
-                      </p>
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">★★★★☆</span>
-                        <span>Really enjoyed it</span>
-                      </p>
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">★★★☆☆</span>
-                        <span>Liked it, but didn’t wow me</span>
-                      </p>
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">★★☆☆☆</span>
-                        <span>Meh, had issues</span>
-                      </p>
-                      <p className="flex gap-2">
-                        <span className="shrink-0 text-muted-foreground/70">★☆☆☆☆</span>
-                        <span>Not for me</span>
-                      </p>
-                    </div>
-                  </div>
+            <div className="rj-detail-status-row relative">
+              <div>
+                {isPaused ? (
+                  <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                    <PauseCircle className="h-3.5 w-3.5" />
+                    Paused
+                  </Badge>
+                ) : (
+                  <Select value={book.status} onValueChange={(value) => handleStatusChange(value as BookStatus)}>
+                    <SelectTrigger aria-label="Reading status" className="rounded-full bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
-            </div>
-
-            <div className="mt-3">
-              {isPaused ? (
-                <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
-                  <PauseCircle className="h-3.5 w-3.5" />
-                  Paused
-                </Badge>
-              ) : (
-                <Select value={book.status} onValueChange={(value) => handleStatusChange(value as BookStatus)}>
-                  <SelectTrigger className="h-10 w-40 bg-muted/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <div className="rj-detail-rating">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handleRating(n)}
+                      aria-label={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                      aria-pressed={localRating === n}
+                      className="grid size-7 place-items-center rounded transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-5 w-5 ${
+                          localRating && n <= localRating
+                            ? "fill-rating text-rating"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    aria-label="Show rating guide"
+                    aria-expanded={showRatingGuide}
+                    aria-describedby={showRatingGuide ? "rating-guide-tooltip" : undefined}
+                    onClick={() => setShowRatingGuide((current) => !current)}
+                    className="rounded-full p-0.5 text-muted-foreground/65 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                  {showRatingGuide && (
+                    <div
+                      id="rating-guide-tooltip"
+                      role="tooltip"
+                      className="absolute left-0 top-full z-20 mt-2 w-72 max-w-full rounded-lg border bg-popover p-3 text-xs text-muted-foreground shadow-sm"
+                    >
+                      <div className="space-y-1.5">
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">♥︎</span>
+                          <span>One of the best books I’ve ever read</span>
+                        </p>
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">★★★★★</span>
+                          <span>Loved it</span>
+                        </p>
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">★★★★☆</span>
+                          <span>Really enjoyed it</span>
+                        </p>
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">★★★☆☆</span>
+                          <span>Liked it, but didn’t wow me</span>
+                        </p>
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">★★☆☆☆</span>
+                          <span>Meh, had issues</span>
+                        </p>
+                        <p className="flex gap-2">
+                          <span className="shrink-0 text-muted-foreground/70">★☆☆☆☆</span>
+                          <span>Not for me</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="w-full max-w-[780px] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>
-                {currentPage} / {totalPages || "-"} pages
-              </span>
-              <span>{progressPercent}%</span>
-            </div>
-            <Progress value={progressPercent} className="h-2" />
+          <div className="rj-detail-position">
+            <p>{currentPage}{totalPages > 0 ? ` / ${totalPages}` : ""} pages</p>
+            {progressPercent !== null && <span>{progressPercent}%</span>}
           </div>
+          <BookProgress currentPage={currentPage} totalPages={book.total_pages} />
 
-          <div className="flex flex-wrap gap-2">
+          <div className="rj-detail-actions">
             {isPaused ? (
               <Button type="button" onClick={() => void handleResume()}>
+                <BookOpen aria-hidden="true" />
                 Resume
               </Button>
             ) : isReading ? (
@@ -1156,7 +1129,7 @@ export default function BookDetails() {
                   const data = await fetchReadingLogsForBook(book.id);
                   setReadingLogs(data);
                 }}
-                trigger={<Button type="button">Update Progress</Button>}
+                trigger={<Button type="button"><BookOpen aria-hidden="true" />Update Progress</Button>}
               />
             ) : (
               <Button
@@ -1166,12 +1139,13 @@ export default function BookDetails() {
                   setIsProgressDialogOpen(true);
                 }}
               >
+                <BookOpen aria-hidden="true" />
                 {readingActionLabel}
               </Button>
             )}
             <Button asChild type="button" variant="outline">
               <Link to={`/books/${book.id}/journal?new=1`}>
-                <NotebookPen className="mr-1.5 h-4 w-4" />
+                <NotebookPen aria-hidden="true" />
                 Add entry
               </Link>
             </Button>
@@ -1180,13 +1154,13 @@ export default function BookDetails() {
       </section>
 
       {errorMsg && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="rj-detail-notice text-sm text-destructive" role="alert">
           {errorMsg}
         </div>
       )}
 
       {shareStatus && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+        <div className="rj-detail-notice text-sm" role="status">
           {shareStatus}
         </div>
       )}
@@ -1209,221 +1183,178 @@ export default function BookDetails() {
       />
       {authorDialog}
 
-      {!isEditMode && (
-        <>
-          <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
-            <AboutSection
-              title={
-                <>
-                  <span className="font-serif italic">About</span> this book
-                </>
-              }
-              titleContent={
-                <div className="grid gap-4 pb-2 pt-1 sm:grid-cols-3">
-                  <div>
-                    <PrimaryMetadataHeading icon={Tags} title="Genres" />
-                    <div className="mt-1.5">
-                      {linkedGenres.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {linkedGenres.map(({ genre, slug }) => (
-                            <Badge key={genre.id} variant="outline" className="max-w-full font-normal" asChild>
-                              <Link to={`/genres/${slug}`}>{genre.name}</Link>
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : book.genre_paths?.length ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {book.genre_paths.map((path) => (
-                            <Badge key={path} variant="outline" className="max-w-full font-normal">
-                              {formatGenrePathForDisplay(path)}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Not set</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <PrimaryMetadataHeading icon={Languages} title="Language" />
-                    <p className="mt-1.5 text-base">
-                      {book.language ? (
-                        <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>
-                          {book.language}
-                        </MetadataLink>
-                      ) : (
-                        <span className="text-muted-foreground">Not set</span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <PrimaryMetadataHeading icon={BookOpen} title="Format" />
-                    <p className="mt-1.5 text-base">
-                      {book.format ? (
-                        <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>
-                          {book.format}
-                        </MetadataLink>
-                      ) : (
-                        <span className="text-muted-foreground">Not set</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              }
-              text={description}
-              emptyText=""
-              clampClassName="line-clamp-6"
-            />
-
-            {hasSecondaryMetadata && (
-              <div className="rounded-xl border p-5 lg:mt-12">
-                <div className="divide-y divide-border">
-                  {book.source && (
-                    <SecondaryMetadataRow
-                      label="Source"
-                      value={
-                        <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>
-                          {book.source}
-                        </MetadataLink>
-                      }
-                    />
-                  )}
-                  {publicationYear && (
-                    <SecondaryMetadataRow
-                      label="Publication Date"
-                      value={
-                        <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
-                          {formatPublicationDateForDisplay(book.publication_date)}
-                        </MetadataLink>
-                      }
-                    />
-                  )}
-                  {book.isbn && <SecondaryMetadataRow label="ISBN" value={book.isbn} />}
-                </div>
+      <div className="rj-detail-body">
+        <div>
+          <AboutSection
+            className="rj-detail-description"
+            title="About this book"
+            text={description}
+            titleContent={
+              <div className="rj-detail-tags">
+                {linkedGenres.length > 0
+                  ? linkedGenres.map(({ genre, slug }) => (
+                      <Link key={genre.id} to={`/genres/${slug}`}>{genre.name}</Link>
+                    ))
+                  : book.genre_paths?.map((path) => (
+                      <span key={path}>{formatGenrePathForDisplay(path)}</span>
+                    ))}
+                {book.format && (
+                  <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>{book.format}</MetadataLink>
+                )}
+                {book.language && (
+                  <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>{book.language}</MetadataLink>
+                )}
               </div>
-            )}
-          </section>
+            }
+          />
+          {hasSecondaryMetadata && (
+            <details className="rj-detail-metadata">
+              <summary>More book details</summary>
+              <dl>
+                {book.source && (
+                  <SecondaryMetadataRow label="Source" value={
+                    <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>{book.source}</MetadataLink>
+                  } />
+                )}
+                {publicationYear && (
+                  <SecondaryMetadataRow label="Publication Date" value={
+                    <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
+                      {formatPublicationDateForDisplay(book.publication_date)}
+                    </MetadataLink>
+                  } />
+                )}
+                {book.isbn && <SecondaryMetadataRow label="ISBN" value={book.isbn} />}
+              </dl>
+            </details>
+          )}
+        </div>
 
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <AppHeading level={2}>
-                Reading <span className="font-serif italic">Progress</span>
-              </AppHeading>
-              {!logsLoading && !logsError && hasReadingLogs && (
-                <Button asChild variant="link" className="px-0">
-                  <Link to={`/books/${book.id}/analytics`}>
-                    View more
-                    <ArrowRight className="ml-1.5 h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-            </div>
-            <ProgressStatsStrip stats={readingProgressStats} />
-
-            {!hasNoReadingLogs && (
-              <div className="rounded-xl pt-2">
-                <p className="text-sm font-medium">Progress over time</p>
-                <div className="mt-3">
-                  {logsLoading ? (
-                    <LoadingIndicator />
-                  ) : logsError ? (
-                    <p className="text-sm text-destructive">{logsError}</p>
-                  ) : (
-                    <ProgressOverTimeChart
-                      logs={readingLogs}
-                      totalPages={book.total_pages}
-                      pausePeriods={book.pause_periods}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <AppHeading level={2}>
-                <span className="font-serif italic">Journal</span>
-              </AppHeading>
-              <Button asChild variant="link" className="px-0">
-                <Link to={`/books/${book.id}/journal`} className="text-primary">
-                  Open journal
-                  <ArrowRight className="ml-1.5 h-4 w-4" />
+        <section aria-labelledby="book-detail-progress">
+          <div className="rj-detail-section-heading">
+            <h2 id="book-detail-progress">Reading Progress</h2>
+            {!logsLoading && !logsError && hasReadingLogs && (
+              <Button asChild variant="ghost">
+                <Link to={`/books/${book.id}/analytics`} aria-label="View more reading analytics">
+                  View more <ArrowUpRight aria-hidden="true" />
                 </Link>
               </Button>
-            </div>
-
-            {journalEntriesLoading || logsLoading ? (
-              <LoadingIndicator label="Loading journal entries…" announce={!logsLoading} />
-            ) : journalEntriesError ? (
-              <p className="text-sm text-destructive">{journalEntriesError}</p>
-            ) : logsError ? (
-              <p className="text-sm text-destructive">{logsError}</p>
-            ) : (
-              previewJournalEntries.length === 0 ? (
-                <div className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                  No journal entries yet.
-                </div>
-              ) : (
-                <JournalTimeline
-                  entries={previewJournalEntries}
-                  layout="cards"
-                  previewMode={{
-                    getEntryHref: (entry) => `/books/${book.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
-                  }}
-                  emptyMessage="No journal entries yet."
-                  onEntryUpdated={(entry) => {
-                    if (entry.source !== "book_note") return;
-                    setJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-                  }}
-                  onEntryDeleted={(entry) => {
-                    setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
-                  }}
-                />
-              )
             )}
-          </section>
+          </div>
 
-          <section className="space-y-4">
-            <AppHeading level={2}>
-              More to <span className="font-serif italic">Explore</span>
-            </AppHeading>
-            <div className="grid gap-5 lg:grid-cols-3">
-              <RelatedBooksGroup
-                title={
-                  <>
-                    More by{" "}
-                    <span className="font-serif italic">{book.authors[0] ?? "this author"}</span>
-                  </>
-                }
-                books={relatedByAuthor}
+          {logsLoading ? (
+            <LoadingIndicator label="Loading reading progress…" />
+          ) : logsError ? (
+            <p className="text-sm text-destructive" role="alert">{logsError}</p>
+          ) : (
+            <>
+              {summaryStats.length > 0 ? (
+                <dl className="rj-detail-stats">
+                  {summaryStats.map(({ icon: Icon, label, value }) => (
+                    <div key={label}>
+                      <dt><Icon aria-hidden="true" />{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="rj-detail-quiet">Your reading sessions will appear here.</p>
+              )}
+              {(hasStartedReading || hasReadingLogs || book.date_started || book.date_finished || currentPage > 0) && (
+                <details className="rj-detail-metadata">
+                  <summary>More reading stats</summary>
+                  <ProgressStatsStrip stats={readingProgressStats} />
+                  {hasReadingLogs && (
+                    <div className="my-4 space-y-3">
+                      <h3 className="text-sm font-medium">Progress over time</h3>
+                      <ProgressOverTimeChart
+                        logs={readingLogs}
+                        totalPages={book.total_pages}
+                        pausePeriods={book.pause_periods}
+                      />
+                    </div>
+                  )}
+                </details>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="rj-detail-journal" aria-labelledby="book-detail-journal">
+          <div className="rj-detail-section-heading">
+            <h2 id="book-detail-journal">Journal</h2>
+            <Button asChild variant="ghost">
+              <Link to={`/books/${book.id}/journal`}>
+                Open journal <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </Button>
+          </div>
+
+          {journalEntriesLoading ? (
+            <LoadingIndicator label="Loading journal entries…" />
+          ) : journalEntriesError ? (
+            <p className="text-sm text-destructive" role="alert">{journalEntriesError}</p>
+          ) : visibleJournalEntries.length > 0 ? (
+            <>
+              <JournalTimeline
+                entries={visibleJournalEntries.slice(0, 1)}
+                layout="cards"
+                className="rj-detail-journal-preview"
+                previewMode={{
+                  getEntryHref: (entry) => `/books/${book.id}/journal?entry=${encodeURIComponent(entry.sourceId)}`,
+                }}
+                emptyMessage="No journal entries yet."
+                onEntryUpdated={(entry) => {
+                  if (entry.source !== "book_note") return;
+                  setJournalEntries((current) => sortBookJournalEntryRecords([entry.bookJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
+                }}
+                onEntryDeleted={(entry) => {
+                  setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
+                }}
               />
-              <RelatedBooksGroup
-                title={
-                  exploreGenre ? (
-                    <>
-                      More in <span className="font-serif italic">{exploreGenre}</span>
-                    </>
-                  ) : (
-                    "More in this genre"
-                  )
-                }
-                books={relatedByGenre}
-              />
-              <div className="rounded-xl border p-4">
-                <AppHeading level={4} as="h3">
-                  You Might Also <span className="font-serif italic">Like</span>
-                </AppHeading>
-                <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                  Recommendations coming later.
-                </div>
-              </div>
+              {visibleJournalEntries.length > 1 && (
+                <p className="rj-detail-entry-count">{visibleJournalEntries.length} journal entries</p>
+              )}
+            </>
+          ) : (
+            <div className="rj-detail-empty">
+              <NotebookPen aria-hidden="true" />
+              <p>A place for your thoughts</p>
+              <Button asChild variant="outline" className="mt-4">
+                <Link to={`/books/${book.id}/journal?new=1`}>Write your first entry</Link>
+              </Button>
             </div>
-          </section>
-        </>
-      )}
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <AppHeading level={2}>
+            More to <span className="font-serif italic">Explore</span>
+          </AppHeading>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <RelatedBooksGroup
+              title={
+                <>
+                  More by{" "}
+                  <span className="font-serif italic">{book.authors[0] ?? "this author"}</span>
+                </>
+              }
+              books={relatedByAuthor}
+            />
+            <RelatedBooksGroup
+              title={
+                exploreGenre ? (
+                  <>
+                    More in <span className="font-serif italic">{exploreGenre}</span>
+                  </>
+                ) : (
+                  "More in this genre"
+                )
+              }
+              books={relatedByGenre}
+            />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -1465,21 +1396,6 @@ function ProgressStatItem({
   );
 }
 
-function PrimaryMetadataHeading({
-  icon: Icon,
-  title,
-}: {
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      {title}
-    </h3>
-  );
-}
-
 function SecondaryMetadataRow({
   label,
   value,
@@ -1488,9 +1404,9 @@ function SecondaryMetadataRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-baseline">
-      <p className="font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">{label}</p>
-      <p className="min-w-0 text-sm">{value}</p>
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
