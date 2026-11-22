@@ -1,10 +1,155 @@
 # Redesign workshop
 
+## Page plans — 21 November
+
+Journal, Insights and Profile now have local prototypes (see below). The latest slice implemented Insights; the earlier entries retain their historical scope. For a new session, read `AGENTS.md`, `.playwright-mcp/REDESIGN-HANDOFF.md` and the relevant standalone plan:
+
+- [Journal: writing-first entry cards](redesign-journal-plan.md), including book-related and independent entries without a timeline.
+- [Insights: habits, self-exploration and achievements](redesign-insights-plan.md), with goals proposed here.
+- [Profile: reader identity and manual favorites](redesign-profile-plan.md), including a first-login favorites form and later editing. Automatic favorites were explicitly rejected.
+
+The plans distinguish confirmed requirements from layout/behavior proposals and keep implementation scoped to local Storybook simulations.
+
 Run `npm run storybook` and open http://localhost:6006. Choose **Redesign → Home → Single Book** or **Several Books**. Run `npm run build-storybook` to generate the standalone `storybook-static/` preview; this directory is ignored by Git.
 
 For visual comparison, start with **Redesign → PDF Reference → Home**. This board stays 390px wide even in a wide Storybook canvas and reproduces the PDF's section order and independent examples. **Components → Reading Widget PDF Reference** matches the three-cover widget separately. Ordinary Home stories keep responsive layouts and fixed navigation.
 
 Storybook uses the existing React/Vite/Tailwind configuration. Its setup follows the [official React/Vite integration](https://storybook.js.org/docs/get-started/frameworks/react-vite). Development telemetry is disabled. No Supabase configuration or login is required for these stories.
+
+## Insights workshop — 22 November
+
+Open **Redesign → Insights → Overview** at [the local preview](http://127.0.0.1:6006/?path=/story/redesign-insights--overview). The latest request selected Insights; Journal and Profile were already implemented. Existing workshop components, including HomeShell, were not edited in this slice. Port 6006 already had Storybook running and was reused.
+
+`InsightsPreview.tsx` and `insights-preview.css` reuse HomeShell, Button, Dialog and EmptyState. The five reader questions guide rhythm, finished-book genres/author/series returns, ratings, neutral book journeys, then achievements. Rhythm leads with three summary values, one chart and two observations that open supporting values. The chart uses visible labels and numbers, without hover or color as the only source of information. Details focus the title, trap keyboard focus, scroll internally, keep Back stationary and restore the originating button on Back/Escape.
+
+Reversible presentation proposals: October 2026 as the initial period, a year-to-date alternative through 22 November, Europe/Vienna calendar boundaries, horizontal bars, and one/two-column exploration below/above 768px. No custom dates or arbitrary period calculations. `insightsFixtures.ts` supplies complete fictional summaries for each period; selection changes the chart, observations, coverage, genres, ratings and journeys together. These are display fixtures, not calculations against book records. All names and prose are fictional. No production fetching or Profile favorite logic is imported.
+
+The yearly book goal sits beside a supplied milestone under achievements, visibly independent of the reporting period. Review goal reports intent only; there is no goal form, create/save flow or general goal engine. The supplied series milestone explicitly asserts a complete three-volume published list; it is not inferred from owned books. The saved September wrap-up opens a separate read-only excerpt and remains unchanged when the period changes. All wrap-ups reports archive intent; no report is generated, recalculated or overwritten.
+
+### Metric map and boundaries
+
+| Display | Prototype rule | Production feasibility / limit |
+| --- | --- | --- |
+| Recorded reading days and chart | Distinct calendar dates with positive page activity or reading minutes; dates with no records are not proof of no reading. Bucket day counts sum to the summary. | Logs supply timestamps, page positions and optional minutes. Page positions need the existing delta rules, not direct summation. This prototype supplies counts and does not recalculate them. |
+| Average timed log | Supplied mean of logs with recorded minutes; coverage shows timed/all log counts. No timed records means unavailable, not zero. | Supported by optional log minutes; a log is not necessarily a complete session. No time-of-day or psychological inference. |
+| Comparison | Month shows its supplied September day count and time average in details. Year has no unsupported prior-year comparison. | Fixture-only comparison, not a live analytics contract. |
+| Finished books and genres | Finish dates within the inclusive displayed range; one count per book per genre. Multi-genre counts may overlap. | Book dates and linked metadata exist; missing dates/categories cannot be inferred. Wishlist is excluded from the supplied analytics fixtures. |
+| Enjoyment | Current ratings of period-finished books; averages exclude unrated books and always show rated sample sizes. | Current rating is not a historical snapshot. One rating is weak evidence; no automatic Profile favorites. |
+| Author/series returns | Explicit supplied finished-book counts for the selected period. | Linked authors/series support counting; series completion also requires a reliable full volume list. |
+| Book journey | Explicit fictional start/finish and pause/DNF event dates. Elapsed start-to-finish days include both endpoints and pauses. | Dated logs/pause periods support parts of this; current DNF status alone cannot establish when a book was abandoned. No historical status or concurrent-book calculation was added. |
+| Goal / milestone | Supplied full-year finished count and target; explicitly supplied milestone evidence. | Goal types, creation/editing, milestone rules and storage need later design. |
+| Saved wrap-up | Independent supplied excerpt, not recomputed from the selected period. | Real reports are immutable saved snapshots; no production report component/data loader is connected. |
+
+Review **Sparse**, **No Data**, **Missing Time**, **No Ratings**, **Paused And DNF**, **Achieved Goal**, **Loading** and **Load Error**. Sparse shows the limitations of a single rating. No Data leaves goals/achievements accessible and says missing logs do not establish no reading. Retry locally removes the supplied error. Reload resets all simulation state. Navigation, notifications, Add, goal review and archive actions report intent only.
+
+Verification performed in desktop Chrome with Playwright:
+
+- Six interaction stories passed at 390/1440px: Period And Evidence, Compare And Return, Missing Evidence, Snapshot And Intents, Observation Details and Retry. Period changes, supporting values, both observations, missing time, no data, return focus, stable yearly goal and unchanged saved snapshot were exercised.
+- Nine display states fit 320/390/599/600/767/768/834/1023/1024/1440px without horizontal page overflow. Keyboard Enter, Tab/Shift+Tab containment, Escape/focus return, viewport bounds and stationary dialog actions/internal scrolling passed at 320/390/834/1440px. Reduced motion removes dialog animation. Overview phone/desktop screenshots were visually reviewed.
+- Twenty focused axe scans (overview/no-data/sparse/missing-time/no-ratings/achieved-goal/error/rhythm-detail/ratings-detail/snapshot × 390/1440px) reported no violations. These scans do not constitute a full accessibility audit or palette approval.
+- Representative Home, Library, Collections, Book Details, Book Form, Journal and Profile stories still render; this was a smoke check, not a rerun of all prior interactions. No console/page errors in the successful interaction/layout/keyboard checks.
+- `npm run build` and `npm run build-storybook` passed. The app build first caught an unsupported test-query option, which was removed. A browser check initially used an ambiguous heading query; it was narrowed and the keyboard/visual checks rerun successfully. The full Node suite was not rerun; no new analytics calculation engine was introduced.
+
+Limits: fictional summaries do not validate production analytics, timezone conversion or historical data coverage. Custom dates, freeform goals/plans, concurrent reading and inferred milestones are deferred. Screen readers, Safari/Firefox, dark mode, final palette/visual approval and real-device touch/software keyboards remain untested. Desktop emulation and automated scans do not replace real-device review. No production routes, auth, account data, APIs, persistence, hosting, deployment, commit/push, PR or release notes.
+
+## Profile workshop — 22 November
+
+Open **Redesign → Profile → Owner** at [the local preview](http://127.0.0.1:6006/?path=/story/redesign-profile--owner). Review **First Login**, **Visitor**, **Empty Library**, **No Series**, **Sparse Visitor**, **Long Names Missing Cover**, **Save Error** and **Pending Save** alongside it. This slice implements Profile only; Insights remains pending. Existing Home, Library, Collections, Book Details, Book Form and Journal components were not edited.
+
+`ProfilePreview.tsx` and `profile-preview.css` reuse HomeShell, Button, Dialog and BookCover. Identity and four chosen reading favorites lead. The owner has Edit profile, Settings and Preview public profile actions; one current book and an optional supplied milestone follow below. Community is quiet rather than a feed. Visitor mode shows identity, nonempty favorites and a conversation action. The public preview shows identity and nonempty favorites, with Back/Escape returning focus to its trigger. Current reading and milestones are owner-only proposals here; no production visibility or privacy rule is implied.
+
+All names, prose, catalog choices and inline SVG cover artwork are fictional. `profileFixtures.ts` supplies the four-category catalog independently of library activity. The single chosen favorite book is separate from library books marked as favorites. **Activity Keeps Chosen Favorites** changes local sample status/rating/library-favorite indicators and the current book without changing chosen Profile favorites. There is no computation or effect that populates favorites from activity.
+
+Reversible proposals: one optional favorite per category, skippable setup, favorites-only setup (identity fields appear in later Edit), native selectors with keyboard type-ahead, no series history requirement, and one/two-column favorite cards below/above 600px. Native selectors use the small supplied catalog; missing catalog items cannot be created here. A saved choice remains available when absent from the current catalog, demonstrated by the long-name fixture. Blank values stay blank, including when the library is empty. These choices and exact visitor content still need product review.
+
+**First Login** opens setup from an explicit story flag; no session or real first-login detection is read. Save accepts optional blank choices. Skip/Escape discards setup edits. Later Edit starts from the last successfully saved local values and allows replacing or clearing all four favorites, display name and bio. Display name is required; bio is optional. Cancel/Escape discards the draft. Outside taps keep the form open. Save calls an injected callback, updates the displayed profile only after success, retains failed drafts for retry and disables inputs/actions/dismissal while pending. A synchronous guard prevents duplicate requests. The form scrolls internally with stationary actions. Opening focuses the title; closing restores the actual originating edit button, falling back to Edit profile after an empty-state invitation disappears. Reload resets this entire simulation.
+
+Settings, book details, notifications, navigation, Add and conversation actions report intent only. There is no avatar upload, free-text catalog creation, real lookup, privacy editor, follower system, goal management, production route, auth integration, account data, API or persistence. Future onboarding flags, dismissal/retry rules, catalog search, storage and privacy/RLS need separate design and authorization.
+
+Verification performed in desktop Chrome with Playwright:
+
+- Nine interaction stories passed at 390 and 1440px: Setup And Reopen, Skip Setup, Edit Cancel And Clear, Replace Favorites, Failed Draft And Retry, Protect Pending Save, Public Preview And Return, Visitor Actions and Activity Keeps Chosen Favorites. No console/page errors in the successful run. Checks also covered all-blank setup save, whitespace-only display-name rejection and Settings/book-detail intents.
+- Owner/visitor/empty-library/no-series/sparse-visitor/long-name/first-login states fit 320/390/599/600/767/768/834/1023/1024/1440px without horizontal page overflow. Setup stayed within 12px viewport margins. After correcting the definition-list markup, owner/visitor/empty-library/first-login/edit/public/error states passed 14 focused axe scans at 390/1440px with no violations. This is not a full audit or overall palette approval.
+- At 320/390/834/1440px, keyboard Enter, Tab/Shift+Tab containment, native picker type-ahead, Escape/focus return and stationary form actions were checked. The public preview also fits within viewport margins, scrolls its contents internally and keeps its header/Back action stationary. Empty-state invitation focus return and reduced-motion behavior passed. Browser checks wait for dialog animations/focus restoration before subsequent actions or measurements.
+- Phone/desktop owner, setup and form screenshots, plus public-preview viewport screenshots, were visually reviewed. Representative existing Home, Library, Collections, Book Details, Book Form and Journal stories still render; this was a smoke check, not a rerun of all their interactions.
+- Final `npm run build` and `npm run build-storybook` passed. The full Node suite was not rerun for this isolated preview. Storybook was initially running on port 6006; it stopped during verification, was rechecked/restarted with the requested command and was left running.
+
+Remaining limits: desktop Chrome emulation does not establish real-device touch, native picker or software-keyboard usability. Screen-reader review, Safari/Firefox, dark mode, final palette and presentation approval remain open. Onboarding optionality/Skip, singular choices, catalog/free-text behavior and visitor visibility are proposals. Real first-login tracking, existing-user setup, account writes and privacy/RLS need separately authorized work. No production integration, hosting, deployment, commit/push, PR or release note was made.
+
+## Journal workshop — 21 November
+
+Open **Redesign → Journal → Populated** at [the local preview](http://127.0.0.1:6006/?path=/story/redesign-journal--populated). This checkpoint implemented Journal only; Profile was added in the later slice above. Existing Home, Library, Collections, Book Details and Book Form files were left untouched.
+
+`JournalPreview.tsx` and `journal-preview.css` reuse HomeShell, Button, Dialog, BookCover and EmptyState. Cards expose writing immediately, with book/series/author context below it and independent entries in the same grid. There is no timeline or book-selection gate. Fictional fixtures include an untitled independent entry, invented quote, review, missing covers and long writing. Note/Quote/Review reuse the existing `JournalEntryLabel` values; generated reading events are not writing cards.
+
+Reversible presentation choices: newest date first (stable ID tie-break), six-line excerpts, one/two/three columns at <600/600/1024px, warm neutral/gold/rose card surfaces, and visible labeled controls on every width. Journal does not adopt Library’s gesture search. Search matches only supplied journal titles, writing, attribution and related names, case-insensitively after trimming. Entry type and exact relationship filters combine with it; independent entries have their own filter. Reset clears all three controls. Search has no minimum character threshold.
+
+Read entry opens a named modal with complete plain text, preserved paragraphs, a keyboard-focusable scrolling region and stationary Back to journal action. Opening focuses the title; Escape or Back returns focus to the originating card. The selected entry remains mounted during the closing animation so its accessible name is retained. No editor is included: Write an entry and the shared Add launcher report intent, without adding an entry or claiming a save. Retry recovers locally from a supplied error. Reload resets all simulation state.
+
+Verification performed in desktop Chromium via Playwright:
+
+- Five interaction stories (**Read And Return, Search And Filter, Retry, Write Intent, Read Long Writing**) passed at 390 and 1440px, with no console errors in the final run.
+- Populated layouts fit 320/390/599/600/767/768/834/1023/1024/1440px without horizontal overflow. Empty/loading/error/no-results/independent/long-writing/missing-cover states also fit 320/834px. Phone and desktop screenshots were visually reviewed.
+- Keyboard Enter, Tab focus containment, Escape, focus return, scrollable full writing and fixed reader actions were checked at 320/390/834/1440px. Reduced motion removes the reader animation. The long reader fits within 12px viewport margins.
+- Focused axe scans of populated, empty, no-results and long-reader states at 390/1440px reported no violations. This is not a full accessibility audit and does not approve the workshop’s overall palette.
+- `npm run build` and `npm run build-storybook` passed. The full Node suite was not rerun for this isolated preview slice.
+
+Limits: plain text only, no rich-text/media/tag/visibility/sharing or editing behavior. Independent entries are a proposed preview model; current production journal records require book/series/author relationships. No persistence or schema contract was introduced. Dark mode, screen-reader usability, real-device touch/software-keyboard behavior and final visual approval remain outstanding. Automated browser checks do not replace real-device testing. No production integration, deployment, hosting, commit/push, PR or release notes.
+
+## Next-page workshop
+
+The 15 November follow-up adds three proposed page patterns using the Home visual direction. These extend the workshop; the PDF does not specify their full layouts, and they do not replace app routes.
+
+| Story group | Review first | Working sample behavior | Scope limits |
+| --- | --- | --- | --- |
+| Redesign / Book Details | Reading, Up Next, Paused, Finished, Missing Metadata, Long Description | Cover-first layout, separate About/Reading Progress/Journal, local favorite toggle, disclosure and shared progress save/cancel flows | Start/Resume changes the sample status only after Save; Cancel preserves it. Final-page completion is undecided. Edit, analytics, reread, journal creation/opening and navigation report intent. |
+| Redesign / Library | Populated, Sparse, Empty, Loading, Load Error, No Results | Title/author search, sorting, grid/list views, retry recovery and navigation to Collections | Wishlist entries are excluded. Status/source/favorite filters have been removed. Series and book opening report intent. |
+| Redesign / Collections | Default Collections, Empty, Wishlist, Favorites, Empty Collection | Eight automatic collections, counts/cover previews, opening a collection, returning to the index and scoped search | Derived from sample statuses/favorite flags; no collection records or production persistence. Wishlist is included only in its own collection. |
+| Redesign / Book Form | Add Book, Populated, Edit Book, ISBN Lookup, Title Lookup, Wishlist, Reading | Catalog search, local cover selection, authors/genres, series/volume, status/language/pages, secondary metadata, description and conditional reading/Wishlist fields | Lookup, barcode and saves use injected sample callbacks. Author/genre choices are local names, not production relation writes. No camera/network lookup or storage upload. |
+
+Book Details keeps its main reading action beneath its title and cover on phone. Library and details share HomeShell, which now accepts an active destination so Library is correctly marked in navigation. Each page has a dedicated stylesheet and keeps the existing scoped palette.
+
+Book Form uses a full-screen phone dialog and centered wider dialog. The header and actions stay outside the form's internal scroll area. Outside taps retain the draft; Cancel and Escape discard it, except during a pending save. Failure retains edits and validation focuses the first invalid field. Reopening starts from the last locally saved values. These are workshop contracts to review before persistence integration; real-device keyboard testing is still required.
+
+The new story groups are review screens, not a connected app journey. Library now connects Books and Collections locally; other destinations report intent. Their `play` checks cover progress save/cancel/resume/completion boundaries, library search/reset/sort/view switching, collection membership/navigation and form validation/save/cancel/failure/pending behavior.
+
+Follow-up verification: all 13 new interaction stories ran without browser errors after fixes. Layout checks covered 320/390/834/1440px; form checks additionally covered 767/768px, full-screen mobile bounds, internal scrolling and stationary actions. Focused axe scans of Reading details, populated Library and Edit Book reported no violations after correcting library card names. This does not replace a full accessibility audit or real-device keyboard checks. App and Storybook production builds passed; the Node suite was not rerun for these isolated preview additions.
+
+### Collection search refinement — 17 November
+
+Library navigation now contains Books, Collections and Series. Authors, Genres and the standalone Wishlist tab were removed from this row at the user's request. Isolated author/genre search-scoping examples remain available for component review.
+
+Below 768px, Library has no inline search input. Swipe up on page content to reveal a search bar above bottom navigation; swipe down hides it. A Search button provides a tap/keyboard alternative. Activating the bar opens an opaque, full-screen search view with a focused input and live results after two trimmed characters. Cancel/Escape returns to browsing without changing the desktop query. A downward swipe on the search header closes that view; results scroll independently. Search also works in empty libraries. The mobile query is a temporary search session and clears on closing; changing to a wider viewport closes it and focuses inline search.
+
+At 768px and wider, search stays inline, aligned to the right above the books. It continues searching the regular collection view without a separate screen. The former status/source/favorite filter panel is removed; sort and grid/list presentation controls remain.
+
+`CollectionSearch.tsx` accepts only the active collection's items and selection callback. Books supplies library books (excluding wishlist); title/author matching returns book records. **Redesign / Collection Search** has small Authors, Series and Genres examples plus a cross-collection check: author names never return book or series records. These samples demonstrate the reusable behavior, not full collection-page implementations. **Library / Mobile Search** checks swipe reveal/hide, the two-character threshold, results/no-results, cancel, preserved browse content and focus return. Search/reset and collection-scoping checks cover both widths. Browser-dispatched touch gestures, 320/390/767/768/834/1024/1440px layouts and a focused search-dialog axe scan passed. Real-device touch/software-keyboard review remains outstanding.
+
+### Collections page — 17 November
+
+Collections is a separate page in the workshop, reached through the tab next to Books. The index has Reading, Up Next, To Read, Paused, Finished, DNF, Wishlist and Favorites cards, with muted colored cover compositions and derived book counts. Empty collections stay visible. Clicking a card opens its books; All collections returns focus to the originating card. `LibraryBookGrid.tsx` shares book presentation with Books. The Books header has no subtitle or Add a book button.
+
+Status collections follow the canonical seven statuses. Favorites includes favorite library books; Wishlist books remain excluded from ordinary library/Favorites counts. The index searches collection names; an opened collection searches only its own books. Wishes can be found in Wishlist without leaking into Books results. No custom-collection creation, schema changes or production integration are implied.
+
+**Collections / Open Collections**, **Search Inside Wishlist** and **Library / Browse Collections** check membership, wishlist exclusion, local navigation, search scoping and return focus. Updated search and presentation stories also pass at phone/desktop widths. Layout checks cover 320/390/834/1440px without overflow; focused axe scans of the index, Wishlist and Books report no violations.
+
+### Book details inspiration refinement — 17 November
+
+The user supplied a cover-first book-detail screenshot as structural inspiration. The workshop retains its own white/pale-gold surfaces, Lora/DM Sans typography and rounded controls. Phone now has a centered larger cover on a pale-gold backdrop, Back/More actions, then title/author, favorite heart, status/rating, one compact page/percentage row and reading/Add entry actions. Wider layouts place the cover beside that summary. The cover is intentionally shorter than the reference to keep the daily action near the initial phone viewport.
+
+About, Reading Progress and Journal follow as separate sections. Genres/format/language move into About, descriptions expand only when long, and source/publication details sit in a native disclosure. Missing metadata rows are omitted. Reading Progress shows at most one date and reading time, with View more reporting the analytics destination; no speed metric or chart crowds this overview. Journal shows one excerpt and an Open journal destination. Dates/time come from explicit fictional story values, not guessed calculations; the supplied screenshot's personal journal prose is not copied.
+
+Favorite toggling, Show more/less and the Edit menu work locally alongside existing progress stories. **Explore Details** checks disclosure, expansion, favorite state and the menu. All seven detail interaction checks passed at 390/1440px; Reading/Finished/missing-data layouts fit 320/390/834/1440px without horizontal overflow. Focused axe scans passed after checking definition-list structure and action names. Production data integration and real-device keyboard testing remain outside the workshop.
+
+### Expanded Book Form — 17 November
+
+The form now covers the options in the user's Add Book screenshot. ISBN/Book title search and a Scan ISBN barcode action sit above cover/title/author/genre entry. Authors and genres support sample suggestions, additions/removals and multiple values. Status, language, total pages and series are in the main form; choosing a series reveals volume. Description stays outside the collapsible Secondary Information section, which holds publication year, format, source and ISBN. Reading status reveals current page; relevant statuses reveal start/finish dates. Wishlist adds price and purchase link. The close control, Cancel and submit actions remain visible around the internal scroll area.
+
+`BookLookupPreview.tsx` accepts injected catalog and barcode callbacks. Storybook searches a small public-book fixture catalog and returns a sample barcode without opening the camera. Selecting a result replaces bibliographic metadata/cover while preserving status, source and series; this is explicit before selection. Search failure/no-results leave manual entry available; request identifiers ignore stale results after edits, mode changes or unmounting. No API keys, Supabase clients or production book lookups are used.
+
+Local JPG/PNG/WebP selection previews a cover (up to 10 MB). The fixture wrapper retains its data URL only in memory for save/reopen review; it is not an upload or production storage contract. Authors/genres likewise remain local names, and series choices are sample IDs. Year parsing reuses the app helper. Validation checks required fields, pages/volume/year, date order and Wishlist price/link. Using lookup or loading a cover temporarily disables submission; a pending save disables all edits/dismissal. Cancelling drops unsaved metadata.
+
+Twelve form interaction stories pass at 390/1440px, covering validation/save/cancel/failure/pending plus ISBN/barcode/title lookup, lookup failure/no-results, cover/genre/series retention, Wishlist details and date order. Layout checks at 320/390/768/834/1440px show no horizontal overflow with stationary actions. Focused Add/Edit/Wishlist/lookup scans report no axe violations. Real-device camera/keyboard and live catalog/storage/persistence integration are still separate work.
 
 ## Reference and first review
 

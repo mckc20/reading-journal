@@ -58,13 +58,14 @@ export function AddLauncher({ onCreate }: { onCreate: (destination: CreateDestin
   </DropdownMenu.Root>;
 }
 
-export function HomeShell({ children, onNavigate, onCreate, onNotifications, navigationPlacement = 'responsive' }: {
+export function HomeShell({ children, onNavigate, onCreate, onNotifications, navigationPlacement = 'responsive', activeDestination = 'Home' }: {
   children: ReactNode; onNavigate: (destination: HomeDestination) => void;
   onCreate: (destination: CreateDestination) => void; onNotifications: () => void;
   navigationPlacement?: 'responsive' | 'footer';
+  activeDestination?: HomeDestination;
 }) {
   const navigation = <nav className="rj-navigation" aria-label="Main navigation">
-    {destinations.map(({ name, icon: Icon }) => <button key={name} aria-current={name === 'Home' ? 'page' : undefined} onClick={() => onNavigate(name)}><Icon size={22} aria-hidden="true" /><span>{name}</span></button>)}
+    {destinations.map(({ name, icon: Icon }) => <button key={name} aria-current={name === activeDestination ? 'page' : undefined} onClick={() => onNavigate(name)}><Icon size={22} aria-hidden="true" /><span>{name}</span></button>)}
   </nav>;
   return <div className="rj-home-shell">
     <a className="rj-skip-link" href="#redesign-home-content">Skip to content</a>
