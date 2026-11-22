@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design/Typography";
+import { ChartReferenceLegend, ChartReferenceLine } from "@/components/design/ChartReferenceLine";
 import ChartTooltip from "@/components/design/ChartTooltip";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ interface VerticalBarChartProps {
   yAxisClassName?: string;
   showEmptySeries?: boolean;
   animationKey?: string;
+  referenceLine?: { value: number; label: string };
 }
 
 export default function VerticalBarChart({
@@ -37,11 +39,13 @@ export default function VerticalBarChart({
   yAxisClassName = "grid-cols-[3rem_1fr]",
   showEmptySeries = false,
   animationKey,
+  referenceLine,
 }: VerticalBarChartProps) {
   const motion = useChartEntrance<HTMLDivElement>();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const maxValue = Math.max(...data.map((point) => point.value), 0);
   const yAxisMax = maxValue > 0 ? maxValue : showEmptySeries ? 2 : 1;
+  const showReferenceLine = referenceLine && referenceLine.value >= 0 && referenceLine.value <= yAxisMax;
   const yTicks = [yAxisMax, yAxisMax / 2, 0];
   const chartHeight = 176;
   const getBarHeight = (value: number) =>
@@ -92,6 +96,7 @@ export default function VerticalBarChart({
                     <div className="border-t border-border/50" />
                     <div className="border-t border-border/70" />
                   </div>
+                  {showReferenceLine && <ChartReferenceLine value={referenceLine.value} max={yAxisMax} />}
 
                   {activePoint && activePointIndex >= 0 && (
                     <ChartTooltip
@@ -154,6 +159,7 @@ export default function VerticalBarChart({
               </div>
             </div>
           </div>
+          {showReferenceLine && <ChartReferenceLegend label={referenceLine.label} />}
         </div>
       )}
     </div>

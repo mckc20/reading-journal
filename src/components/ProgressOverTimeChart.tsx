@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { PauseCircle } from "lucide-react";
 import { VerticalBarChart } from "@/components/design";
+import { ChartReferenceLegend, ChartReferenceLine } from "@/components/design/ChartReferenceLine";
 import ChartTooltip from "@/components/design/ChartTooltip";
 import {
   buildPagesTimeline,
@@ -67,8 +68,10 @@ function toLocalDayKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function buildSpeedTimeline(logs: ReadingLog[]): SpeedTimelinePoint[] {
+function buildSpeedTimeline(logs: ReadingLog[]): { points: SpeedTimelinePoint[]; average: number | null } {
   let previousPage = 0;
+  let timedPages = 0;
+  let timedMinutes = 0;
   const dailyTotals = new Map<string, { pages: number; minutes: number }>();
   const sortedLogs = [...logs].sort(
     (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
@@ -79,6 +82,8 @@ function buildSpeedTimeline(logs: ReadingLog[]): SpeedTimelinePoint[] {
     previousPage = log.current_page;
     if (!log.reading_time_minutes || log.reading_time_minutes <= 0) continue;
 
+    timedPages += pagesRead;
+    timedMinutes += log.reading_time_minutes;
     const dayKey = toLocalDayKey(new Date(log.logged_at));
     const current = dailyTotals.get(dayKey) ?? { pages: 0, minutes: 0 };
     dailyTotals.set(dayKey, {
@@ -88,7 +93,7 @@ function buildSpeedTimeline(logs: ReadingLog[]): SpeedTimelinePoint[] {
   }
 
   const keys = [...dailyTotals.keys()].sort();
-  if (keys.length === 0) return [];
+  if (keys.length === 0) return { points: [], average: null };
 
   const first = dayFromKey(keys[0]);
   const last = dayFromKey(keys[keys.length - 1]);
@@ -110,7 +115,7 @@ function buildSpeedTimeline(logs: ReadingLog[]): SpeedTimelinePoint[] {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  return points;
+  return { points, average: getPagesPerHour({ pages: timedPages, readingMinutes: timedMinutes }) };
 }
 
 export default function ProgressOverTimeChart({
@@ -126,7 +131,7 @@ export default function ProgressOverTimeChart({
     () => buildProgressTimeline(logs, totalPages, pausePeriods),
     [logs, pausePeriods, totalPages],
   );
-  const speedTimeline = useMemo(() => buildSpeedTimeline(logs), [logs]);
+  const { points: speedTimeline, average: averageSpeed } = useMemo(() => buildSpeedTimeline(logs), [logs]);
   const pagesData = useMemo(
     () => buildPagesTimeline(logs).map((point) => ({
       key: point.dayKey,
@@ -214,11 +219,18 @@ export default function ProgressOverTimeChart({
   }, [datePoints.length]);
 
   if (mode === "pages") {
+    const averagePace = pagesData.length > 0
+      ? pagesData.reduce((total, point) => total + point.value, 0) / pagesData.length
+      : 0;
     return (
       <VerticalBarChart
         data={pagesData}
         formatValue={(value) => `${value.toLocaleString()} pages`}
         empty="No pages read data yet."
+        referenceLine={{
+          value: averagePace,
+          label: `Average pace · ${averagePace.toLocaleString(undefined, { maximumFractionDigits: 1 })} pages/day`,
+        }}
       />
     );
   }
@@ -272,6 +284,7 @@ export default function ProgressOverTimeChart({
               <div className="border-t border-border/50" />
               <div className="border-t border-border/70" />
             </div>
+            {isSpeedMode && averageSpeed !== null && <ChartReferenceLine value={averageSpeed} max={yAxisMax} />}
 
             {pauseBands.map(({ key, startX, endX, segment }) => (
               <div
@@ -416,6 +429,11 @@ export default function ProgressOverTimeChart({
           </div>
         </div>
       </div>
+      {isSpeedMode && averageSpeed !== null && (
+        <div className="col-span-2">
+          <ChartReferenceLegend label={`Average speed · ${formatPagesPerHour(averageSpeed)}`} />
+        </div>
+      )}
     </div>
   );
 }

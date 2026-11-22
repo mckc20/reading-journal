@@ -3,7 +3,7 @@ import { Calendar, CalendarClock, ChevronRight, Clock, Flag, Hourglass, type Luc
 import ProgressOverTimeChart, { type ProgressOverTimeChartMode } from "@/components/ProgressOverTimeChart";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   formatCalendarSpan,
   formatTotalReadingTime,
@@ -13,7 +13,6 @@ import {
   parseLocalDateOnly,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
-import { cn } from "@/lib/utils";
 import type { Book, ReadingLog } from "@/types";
 
 const chartModes = [
@@ -27,51 +26,52 @@ function formatDate(date: Date | null, fallback = "Not available") {
 }
 
 function ReadingStat({
-  icon: Icon, label, value, children,
+  icon: Icon, label, value, secondary, children,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
+  secondary?: { label: string; value: string };
   children: ReactNode;
 }) {
+  const summary = secondary ? `${label}: ${value}, ${secondary.label}: ${secondary.value}` : `${label}: ${value}`;
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button type="button" className="rj-reading-stat" aria-label={`${label}: ${value}`}>
+        <button type="button" className="rj-reading-stat" aria-label={summary}>
           <Icon aria-hidden="true" />
-          <span>
-            <span className="rj-reading-stat-label">{label}</span>
-            <span className="rj-reading-stat-value">{value}</span>
+          <span className="flex flex-wrap gap-x-5 gap-y-3">
+            <span>
+              <span className="rj-reading-stat-label">{label}</span>
+              <span className="rj-reading-stat-value">{value}</span>
+            </span>
+            {secondary && (
+              <span>
+                <span className="rj-reading-stat-label">{secondary.label}</span>
+                <span className="rj-reading-stat-value">{secondary.value}</span>
+              </span>
+            )}
           </span>
           <ChevronRight aria-hidden="true" />
         </button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>{label}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto pt-11 sm:max-w-md" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">{label}</DialogTitle>
         {children}
       </DialogContent>
     </Dialog>
   );
 }
 
-const statTones = {
-  date: "bg-primary/12 text-primary",
-  time: "bg-note/15 text-note",
-  estimate: "bg-insight/15 text-insight",
-};
-
-function StatRow({ icon: Icon, tone, label, value }: {
+function StatRow({ icon: Icon, label, value }: {
   icon: LucideIcon;
-  tone: keyof typeof statTones;
   label: string;
   value: string;
 }) {
   return (
-    <div className="relative grid min-h-16 content-center gap-1 rounded-xl bg-card py-3 pr-3 pl-16">
+    <div className="relative isolate grid min-h-12 content-center pr-3 pl-[3.75rem] before:absolute before:inset-x-0 before:top-1/2 before:-z-10 before:h-9 before:-translate-y-1/2 before:rounded-lg before:bg-card">
       <dt className="text-xs text-muted-foreground">
-        <span aria-hidden="true" className={cn("absolute top-1/2 left-3 grid size-10 -translate-y-1/2 place-items-center rounded-lg", statTones[tone])}>
+        <span aria-hidden="true" className="absolute top-1/2 left-0 grid size-12 -translate-y-1/2 place-items-center rounded-lg bg-favorite/15 text-favorite">
           <Icon className="size-5" />
         </span>
         {label}
@@ -98,7 +98,7 @@ function ReadingLogDetails({ logs }: { logs: ReadingLog[] }) {
   if (entries.length === 0) return null;
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium">Reading progress entries</h3>
+      <h3 className="sr-only">Reading progress entries</h3>
       <ul className="divide-y rounded-lg border px-3">
         {(showAll ? entries : entries.slice(0, 3)).map((entry) => (
           <li key={entry.id || `${entry.logged_at}-${entry.current_page}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
@@ -126,6 +126,8 @@ function ReadingLogDetails({ logs }: { logs: ReadingLog[] }) {
 export default function BookReadingProgress({ book, logs }: { book: Book; logs: ReadingLog[] }) {
   const [chartMode, setChartMode] = useState<ProgressOverTimeChartMode>("progress");
   const startedOn = formatDate(parseLocalDateOnly(book.date_started), "Not set");
+  const finishedOn = formatDate(parseLocalDateOnly(book.date_finished), "Not set");
+  const isFinished = book.status === "Finished";
   const readingMinutes = sumReadingMinutes(logs);
   const readingTime = readingMinutes > 0 ? formatTotalReadingTime(readingMinutes) : "No time logged";
   const duration = getReadingDuration({
@@ -150,27 +152,34 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
   return (
     <div className="min-w-0 space-y-6">
       <div className="rj-reading-stats">
-        <ReadingStat icon={Calendar} label="Started on" value={startedOn}>
+        <ReadingStat
+          icon={Calendar}
+          label="Started on"
+          value={startedOn}
+          secondary={isFinished ? { label: "Finished on", value: finishedOn } : undefined}
+        >
           <dl className="space-y-2">
-            <StatRow icon={Calendar} tone="date" label="Started on" value={startedOn} />
-            <StatRow icon={Clock} tone="time" label="Reading time" value={readingTime} />
-            <StatRow icon={CalendarClock} tone="date" label="Reading duration" value={duration.span ? formatCalendarSpan(duration.span) : "Not available"} />
-            {book.date_finished && <StatRow icon={Flag} tone="date" label="Finished on" value={formatDate(parseLocalDateOnly(book.date_finished))} />}
+            <StatRow icon={Calendar} label="Started on" value={startedOn} />
+            {(isFinished || book.date_finished) && <StatRow icon={Flag} label="Finished on" value={finishedOn} />}
+            <StatRow icon={CalendarClock} label="Reading duration" value={duration.span ? formatCalendarSpan(duration.span) : "Not available"} />
+            {!isFinished && <StatRow icon={Clock} label="Reading time" value={readingTime} />}
           </dl>
+          {book.status === "Reading" && <ReadingLogDetails logs={logs} />}
         </ReadingStat>
-        <ReadingStat icon={Clock} label="Reading time" value={readingTime}>
-          <dl>
-            <StatRow icon={Clock} tone="time" label="Total logged reading time" value={readingTime} />
-          </dl>
-          <ReadingLogDetails logs={logs} />
-        </ReadingStat>
+        {book.status !== "Reading" && (
+          <ReadingStat icon={Clock} label="Reading time" value={readingTime}>
+            <dl>
+              <StatRow icon={Clock} label="Total logged reading time" value={readingTime} />
+            </dl>
+            <ReadingLogDetails logs={logs} />
+          </ReadingStat>
+        )}
         {showEstimate && (
           <ReadingStat icon={CalendarClock} label="Estimated finish" value={finishDate}>
             <dl className="space-y-2">
-              <StatRow icon={Flag} tone="estimate" label="Estimated finish" value={finishDate} />
+              <StatRow icon={Flag} label="Estimated finish" value={finishDate} />
               <StatRow
                 icon={Hourglass}
-                tone="time"
                 label="Reading time left"
                 value={estimate.remainingMinutes !== null
                   ? formatTotalReadingTime(estimate.remainingMinutes)
