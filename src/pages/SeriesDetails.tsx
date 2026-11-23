@@ -32,7 +32,6 @@ import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions 
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
-import { DetailBookAnnotations } from "@/components/redesign/DetailBookAnnotations";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
@@ -44,7 +43,8 @@ import {
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { SeriesAnalyticsOverview, SeriesAnalyticsComparison, SeriesAnalyticsRankings } from "@/components/series/SeriesAnalyticsSections";
+import { SeriesAnalyticsOverview, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
+import { SeriesBookHighlights } from "@/components/series/SeriesBookHighlights";
 import SeriesBooksEditor, {
   buildEditableSeriesBooks,
   parseVolumeInput,
@@ -643,7 +643,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
-  const [bookAnnotationsLoading, setBookAnnotationsLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
@@ -687,12 +686,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
 
   const loadJournalEntries = useCallback(async () => {
     try {
-      setBookAnnotationsLoading(true);
       setJournalEntries(await fetchAllBookJournalEntryRecords());
     } catch {
       setJournalEntries([]);
-    } finally {
-      setBookAnnotationsLoading(false);
     }
   }, []);
 
@@ -1117,11 +1113,8 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             {seriesBooks.length > 0 ? (
               <>
                 <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
+                <SeriesBookHighlights stats={seriesStats} />
                 <SeriesAnalyticsComparison stats={seriesStats} />
-                <details className="rj-detail-metadata" open={analyticsAnchored || undefined}>
-                  <summary>Book rankings</summary>
-                  <SeriesAnalyticsRankings stats={seriesStats} />
-                </details>
               </>
             ) : <p className="rj-detail-quiet text-sm">Books added to this series will appear here.</p>}
             {logsError && <p className="text-sm text-muted-foreground">Reading activity could not be loaded.</p>}
@@ -1137,11 +1130,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           onEntryUpdated={(entry) => { if (entry.source === "series_note") seriesJournal.save(entry.seriesJournalEntry); }}
           onEntryDeleted={(entry) => { if (entry.source === "series_note") seriesJournal.remove(entry.sourceId); }}
           addDisabled={!user}
-        />
-        <DetailBookAnnotations
-          books={seriesBooks}
-          notes={journalEntries.filter((note) => note.label === "quote")}
-          loading={seriesBooks.length > 0 && bookAnnotationsLoading}
         />
       </div>
       <SendAttachmentDialog

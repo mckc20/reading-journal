@@ -501,7 +501,7 @@ function JournalEntryActionsMenu({
       <button
         type="button"
         className={cn(
-          "flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
+          "rj-menu-row w-full text-left disabled:cursor-not-allowed disabled:opacity-50",
           destructive && "text-destructive hover:text-destructive",
         )}
         disabled={disabled}
@@ -543,7 +543,7 @@ function JournalEntryActionsMenu({
       {open && createPortal(
         <div
           ref={menuRef}
-          className="rj-menu-motion fixed z-[2147483647] w-64 rounded-2xl border border-border/80 bg-popover p-2 text-popover-foreground shadow-xl"
+          className="rj-add-menu fixed w-64"
           data-placement={menuPlacement}
           data-side={menuPlacement}
           style={{

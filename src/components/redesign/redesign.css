@@ -139,8 +139,9 @@
 .rj-add-trigger svg { transition: transform 320ms cubic-bezier(.22, 1, .36, 1); }
 .rj-add-trigger[aria-expanded='true'] svg { transform: rotate(45deg); }
 .rj-add-menu { z-index: 60; min-width: 190px; padding: 6px; background: var(--popover); color: var(--foreground); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 8px 30px #21150f12; font-family: var(--font-body); font-size: 14px; }
-.rj-add-menu [role='menuitem'] { min-height: 44px; display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
-.rj-add-menu [data-highlighted] { background: var(--secondary); outline: none; }
+.rj-add-menu :is([role='menuitem'], [role='menuitemcheckbox'], .rj-menu-row) { min-height: 44px; display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+.rj-add-menu :is([data-highlighted], .rj-menu-row:enabled:hover, .rj-menu-row:focus-visible) { background: var(--secondary); outline: none; }
+.rj-add-menu .rj-menu-row:disabled { cursor: not-allowed; }
 .rj-create-menu { background: transparent; padding: 0; border: 0; box-shadow: none; min-width: 0; }
 .rj-create-menu [role='menuitem'] { padding: 0; gap: 0; justify-content: flex-end; background: transparent; margin-block: 4px; }
 .rj-create-label { position: relative; z-index: 1; background: var(--rj-rose-light); border-radius: 999px 0 0 999px; padding: 5px 12px 5px 18px; font-size: 12px; margin-right: -12px; padding-right: 24px; transform-origin: right center; }

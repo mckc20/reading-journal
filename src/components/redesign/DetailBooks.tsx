@@ -70,6 +70,7 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
         {books.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <FilterSelect
+              systemMenu
               label="Status"
               value={selectedStatuses}
               options={statuses}
@@ -80,6 +81,7 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
                 : [...current, status])}
             />
             <LibrarySortingControls
+              systemMenu
               sort={sort}
               options={options.map((option) => ({
                 ...option,

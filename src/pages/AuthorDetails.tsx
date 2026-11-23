@@ -15,7 +15,6 @@ import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
-import { DetailBookAnnotations } from "@/components/redesign/DetailBookAnnotations";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
@@ -407,7 +406,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           onEntryDeleted={(entry) => { if (entry.source === "author_note") authorJournal.remove(entry.sourceId); }}
           addDisabled={!user}
         />
-        <DetailBookAnnotations books={authorBooks} notes={journalEntries} />
       </div>
 
       <SendAttachmentDialog

@@ -142,11 +142,11 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
               <p role="status" className="text-sm text-muted-foreground">{visibleBooks.length} of {summary.total} book{summary.total === 1 ? "" : "s"}</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <FilterSelect label="Status" value={selectedStatuses} options={statuses} emptyLabel="All statuses"
+              <FilterSelect systemMenu label="Status" value={selectedStatuses} options={statuses} emptyLabel="All statuses"
                 triggerClassName="w-[9.75rem]"
                 onChange={(value) => setSelectedStatuses((current) => !value ? [] : current.includes(value as BookStatus)
                   ? current.filter((status) => status !== value) : [...current, value as BookStatus])} />
-              <LibrarySortingControls sort={sort}
+              <LibrarySortingControls systemMenu sort={sort}
                 options={genreSortOptions.map((option) => ({ ...option, directionLabel: sortDirectionLabel(option.bookSort, option.value === "title" ? "asc" : "desc") }))}
                 directionLabel={sortDirectionLabel(genreSortOptions.find((option) => option.value === sort)!.bookSort, direction)}
                 onSortChange={(value) => { setSort(value as GenreBookSort); setDirection(value === "title" ? "asc" : "desc"); }}

@@ -62,7 +62,7 @@ function RedirectBookJournal() {
 
 function RedirectEntityDetail({ entity, section }: {
   entity: "author" | "series";
-  section: "books" | "journal" | "analytics" | "book-annotations";
+  section: "books" | "journal" | "analytics";
 }) {
   const { authorId, seriesId } = useParams();
   const { search } = useLocation();
@@ -120,14 +120,14 @@ export const router = createBrowserRouter([
           { path: "/series/:seriesId/journal", element: <RedirectEntityDetail entity="series" section="journal" /> },
           { path: "/series/:seriesId/analytics", element: <RedirectEntityDetail entity="series" section="analytics" /> },
           { path: "/series/:seriesId/books", element: <RedirectEntityDetail entity="series" section="books" /> },
-          { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="book-annotations" /> },
+          { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="journal" /> },
           { path: "/library/explore", element: <RedirectTo to="/library/books" preserveSearch /> },
           { path: "/authors", element: lazyRoute(<Authors />) },
           { path: "/authors/explore", element: <RedirectTo to="/library/authors" preserveSearch /> },
           { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
           { path: "/authors/:authorId/journal", element: <RedirectEntityDetail entity="author" section="journal" /> },
           { path: "/authors/:authorId/books", element: <RedirectEntityDetail entity="author" section="books" /> },
-          { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="book-annotations" /> },
+          { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="journal" /> },
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/genres", element: <Navigate to="/library/genres" replace /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },

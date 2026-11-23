@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Bookmark, Copy, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
-import OverflowMenu from "@/components/OverflowMenu";
+import { useEffect, useRef, useState } from "react";
+import { Bookmark, Copy, MoreHorizontal, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { DropdownMenu } from "radix-ui";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +53,8 @@ export default function DetailActionsMenu({
   deleteConfirmLabel = "Delete",
   className,
 }: DetailActionsMenuProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const openingDialog = useRef(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -62,6 +64,16 @@ export default function DetailActionsMenu({
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
   }, [shareOpen]);
+
+  function openDialog(open: () => void) {
+    openingDialog.current = true;
+    open();
+  }
+
+  function restoreTriggerFocus(event: Event) {
+    event.preventDefault();
+    triggerRef.current?.focus({ preventScroll: true });
+  }
 
   async function copyLink() {
     try {
@@ -84,92 +96,72 @@ export default function DetailActionsMenu({
 
   return (
     <div className={cn("relative", className)}>
-      <OverflowMenu
-        label="More actions"
-        className="size-11 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-background/30 aria-expanded:bg-background/30 focus-visible:border-transparent focus-visible:ring-0"
-      >{(close, trigger) => <>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-            onClick={() => {
-              close();
-              setShareOpen(true);
+      <DropdownMenu.Root modal={false}>
+        <DropdownMenu.Trigger asChild>
+          <Button ref={triggerRef} variant="ghost" size="icon-lg" className="size-11" aria-label="More actions">
+            <MoreHorizontal aria-hidden="true" />
+          </Button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            className="rj-add-menu"
+            align="end"
+            sideOffset={8}
+            collisionPadding={12}
+            onCloseAutoFocus={(event) => {
+              if (openingDialog.current) event.preventDefault();
+              openingDialog.current = false;
             }}
           >
-            <Share2 className="h-4 w-4" />
-            Share
-          </button>
-          {onPause && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => {
-                close();
-                setPauseOpen(true);
-              }}
-            >
-              <PauseCircle className="h-4 w-4" />
-              Pause
-            </button>
-          )}
-          {onResume && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => {
-                close();
-                onResume();
-              }}
-            >
-              <Play className="h-4 w-4" />
-              Resume
-            </button>
-          )}
-          {onEdit && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => {
-                close();
-                onEdit(trigger);
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-              Edit
-            </button>
-          )}
-          {onDuplicate && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
-              onClick={() => {
-                close();
-                onDuplicate(trigger);
-              }}
-            >
-              <Copy className="h-4 w-4" />
-              Duplicate
-            </button>
-          )}
-          {onWishlist && <button type="button" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { close(); onWishlist(); }}><Bookmark className="h-4 w-4" />Move to Wishlist</button>}
-          {onDelete && (
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
-              onClick={() => {
-                close();
+            <DropdownMenu.Item onSelect={() => openDialog(() => setShareOpen(true))}>
+              <Share2 aria-hidden="true" className="size-4" />
+              Share
+            </DropdownMenu.Item>
+            {onPause && (
+              <DropdownMenu.Item onSelect={() => openDialog(() => setPauseOpen(true))}>
+                <PauseCircle aria-hidden="true" className="size-4" />
+                Pause
+              </DropdownMenu.Item>
+            )}
+            {onResume && (
+              <DropdownMenu.Item onSelect={onResume}>
+                <Play aria-hidden="true" className="size-4" />
+                Resume
+              </DropdownMenu.Item>
+            )}
+            {onEdit && (
+              <DropdownMenu.Item onSelect={() => openDialog(() => onEdit(triggerRef.current ?? undefined))}>
+                <Pencil aria-hidden="true" className="size-4" />
+                Edit
+              </DropdownMenu.Item>
+            )}
+            {onDuplicate && (
+              <DropdownMenu.Item onSelect={() => openDialog(() => onDuplicate(triggerRef.current ?? undefined))}>
+                <Copy aria-hidden="true" className="size-4" />
+                Duplicate
+              </DropdownMenu.Item>
+            )}
+            {onWishlist && (
+              <DropdownMenu.Item onSelect={onWishlist}>
+                <Bookmark aria-hidden="true" className="size-4" />
+                Move to Wishlist
+              </DropdownMenu.Item>
+            )}
+            {onDelete && (
+              <DropdownMenu.Item className="text-destructive" onSelect={() => openDialog(() => {
                 setDeleteLinkedBooks(false);
                 setDeleteOpen(true);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-          )}
-        </>}</OverflowMenu>
+              })}>
+                <Trash2 aria-hidden="true" className="size-4" />
+                Delete
+              </DropdownMenu.Item>
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" onCloseAutoFocus={restoreTriggerFocus}>
           <DialogHeader>
             <DialogTitle>Share this {kind}</DialogTitle>
             <DialogDescription>{label}</DialogDescription>
@@ -193,7 +185,7 @@ export default function DetailActionsMenu({
 
       {onPause && (
         <Dialog open={pauseOpen} onOpenChange={setPauseOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md" onCloseAutoFocus={restoreTriggerFocus}>
             <DialogHeader>
               <DialogTitle>{pauseTitle}</DialogTitle>
               <DialogDescription>{pauseDescription}</DialogDescription>
@@ -212,7 +204,7 @@ export default function DetailActionsMenu({
 
       {onDelete && (
         <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md" onCloseAutoFocus={restoreTriggerFocus}>
             <DialogHeader>
               <DialogTitle>{deleteTitle}</DialogTitle>
               <DialogDescription>{deleteDescription}</DialogDescription>

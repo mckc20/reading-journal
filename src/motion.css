@@ -50,10 +50,6 @@
 }
 @keyframes rj-chart-bar-up { from { scale: 1 0; } to { scale: 1; } }
 @keyframes rj-chart-bar-across { from { scale: 0 1; } to { scale: 1; } }
-@keyframes rj-chart-podium-up {
-  from { clip-path: inset(100% -8px -8px -8px); }
-  to { clip-path: inset(-12px -8px -8px -8px); }
-}
 @keyframes rj-chart-mark-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rj-chart-distribution-in {
   from { opacity: 0; scale: .94; }
@@ -82,15 +78,14 @@
     transition: transform 320ms cubic-bezier(.2, .85, .25, 1), width 320ms cubic-bezier(.2, .85, .25, 1), height 320ms cubic-bezier(.2, .85, .25, 1);
   }
 
-  [data-chart-motion="waiting"] :is(.rj-chart-line, .rj-chart-bar, .rj-chart-point, .rj-chart-distribution, .rj-chart-podium) { opacity: 0; }
+  [data-chart-motion="waiting"] :is(.rj-chart-line, .rj-chart-bar, .rj-chart-point, .rj-chart-distribution) { opacity: 0; }
   [data-chart-motion="ready"] .rj-chart-line { animation: rj-chart-draw 660ms cubic-bezier(.35, .15, .23, 1) both; }
   [data-chart-motion="ready"] .rj-chart-bar { animation: rj-chart-bar-up 540ms cubic-bezier(.2, .75, .25, 1) var(--chart-delay, 0ms) both; }
   [data-chart-motion="ready"] .rj-chart-bar-horizontal { animation-name: rj-chart-bar-across; }
-  [data-chart-motion="ready"] .rj-chart-podium { animation: rj-chart-podium-up 540ms cubic-bezier(.2, .75, .25, 1) backwards; }
   [data-chart-motion="ready"] .rj-chart-point { animation: rj-chart-mark-in 180ms ease-out var(--chart-delay, 0ms) both; }
   [data-chart-motion="ready"] .rj-chart-distribution { animation: rj-chart-distribution-in 480ms cubic-bezier(.2, .75, .25, 1) both; transform-origin: center; }
   [data-chart-motion] .rj-chart-point:focus-visible,
-  [data-chart-motion]:focus-within :is(.rj-chart-line, .rj-chart-distribution, .rj-chart-podium),
+  [data-chart-motion]:focus-within :is(.rj-chart-line, .rj-chart-distribution),
   [data-chart-motion] :focus-visible > .rj-chart-bar {
     animation: none;
     opacity: 1;

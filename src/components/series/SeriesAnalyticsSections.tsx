@@ -2,15 +2,14 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
-import { BookOpen, CalendarDays, Clock3, PauseCircle, Timer, type LucideIcon } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { BookOpen, CalendarDays, Clock3, Timer, type LucideIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 import type { SeriesStats } from "@/lib/seriesDetails";
 
 type SpeedChartMode = "duration" | "speed";
-type RankingMode = "rating" | "length" | "annotations";
 
 function formatStatsReadingTime(minutes: number): string {
   const hours = Math.floor(minutes / 60);
@@ -81,37 +80,6 @@ function StatsOverviewCard({
   );
 }
 
-function BookThumbnail({ book }: { book: Book }) {
-  const isPaused = book.status === "Paused";
-
-  return (
-    <div
-      className={cn(
-        "relative h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm",
-        isPaused && "opacity-70",
-      )}
-    >
-      {book.cover_url ? (
-        <img
-          src={book.cover_url}
-          alt=""
-          loading="lazy"
-          className={cn("block h-full w-full object-cover object-top", isPaused && "grayscale")}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-        </div>
-      )}
-      {isPaused && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-          <PauseCircle className="h-4 w-4 text-muted-foreground" />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function StatsBarChart({
   rows,
   emptyLabel,
@@ -153,152 +121,6 @@ function StatsBarChart({
               <p className="text-sm tabular-nums text-muted-foreground sm:text-right">{row.formattedValue}</p>
             </div>
           ))}
-        </div>
-      )}
-    </SummaryCard>
-  );
-}
-
-function getRankingGroups(
-  rows: Array<{ book: Book; value: number }>,
-  getTieKey: (row: { book: Book; value: number }) => string | number,
-): Array<{ rank: number; key: string | number; value: number; rows: Array<{ book: Book; value: number }> }> {
-  return rows.reduce<
-    Array<{ key: string | number; value: number; rows: Array<{ book: Book; value: number }> }>
-  >((groups, row) => {
-    const key = getTieKey(row);
-    const lastGroup = groups[groups.length - 1];
-    if (lastGroup?.key === key) {
-      lastGroup.rows.push(row);
-    } else {
-      groups.push({ key, value: row.value, rows: [row] });
-    }
-    return groups;
-  }, []).map((group, index) => ({ ...group, rank: index + 1 }));
-}
-
-function PodiumBookLink({
-  book,
-  metadata,
-}: {
-  book: Book;
-  metadata: string;
-}) {
-  return (
-    <Link to={`/books/${book.id}`} className="block min-w-0 rounded-md p-1.5 transition-colors hover:bg-background/70">
-      <p className="text-sm font-medium leading-snug">{book.title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{metadata}</p>
-    </Link>
-  );
-}
-
-function PodiumCoverStack({ books }: { books: Book[] }) {
-  return (
-    <div className="flex min-h-20 flex-wrap items-end justify-center gap-2">
-      {books.slice(0, 4).map((book) => (
-        <BookThumbnail key={book.id} book={book} />
-      ))}
-      {books.length > 4 && (
-        <span className="mb-1 rounded-full border px-2 py-1 text-xs font-semibold text-muted-foreground">
-          +{books.length - 4}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function PodiumColumn({
-  group,
-  formatValue,
-}: {
-  group: ReturnType<typeof getRankingGroups>[number] | undefined;
-  formatValue: (value: number, book: Book) => string;
-}) {
-  const rank = group?.rank ?? null;
-  const heightClass = rank === 1 ? "min-h-72" : rank === 2 ? "min-h-60" : "min-h-52";
-
-  return (
-    <div className="relative flex min-w-0 flex-1 flex-col justify-end overflow-visible pt-20">
-      {group && (
-        <div className="absolute inset-x-0 -top-2 z-10">
-          <PodiumCoverStack books={group.rows.map((row) => row.book)} />
-        </div>
-      )}
-      <div
-        className={cn(
-          "overflow-visible rounded-t-xl border bg-muted/45 p-3 text-center",
-          heightClass,
-          rank === 1 && "border-primary/40 bg-primary/10",
-        )}
-      >
-        <div className={cn("mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold", rank === 1 && "border-primary text-primary")}>
-          {rank ? `#${rank}` : "--"}
-        </div>
-        {group ? (
-          <div className="space-y-2">
-            {group.rows.map((row) => (
-              <PodiumBookLink key={row.book.id} book={row.book} metadata={formatValue(row.value, row.book)} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No book yet</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SeriesRankingPodium({
-  rows,
-  formatValue,
-  emptyLabel,
-  getTieKey = (row) => row.value,
-}: {
-  rows: Array<{ book: Book; value: number }>;
-  formatValue: (value: number, book: Book) => string;
-  emptyLabel: string;
-  getTieKey?: (row: { book: Book; value: number }) => string | number;
-}) {
-  const motion = useChartEntrance<HTMLDivElement>();
-  const rankingGroups = getRankingGroups(rows, getTieKey);
-  const first = rankingGroups[0];
-  const second = rankingGroups[1];
-  const third = rankingGroups[2];
-  const remainingGroups = rankingGroups.slice(3);
-  const hasRemainingGroups = remainingGroups.length > 0;
-
-  return (
-    <SummaryCard compact unframed>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div {...motion} className="space-y-4 overflow-visible">
-          <div className="rj-chart-podium overflow-visible">
-            <div className="grid grid-cols-3 items-end gap-2 overflow-visible sm:gap-4">
-              <PodiumColumn group={second} formatValue={formatValue} />
-              <PodiumColumn group={first} formatValue={formatValue} />
-              <PodiumColumn group={third} formatValue={formatValue} />
-            </div>
-            {hasRemainingGroups && (
-              <ol className="mx-auto mt-5 flex max-w-4xl flex-wrap justify-center gap-2 px-3">
-                {remainingGroups.map((group) => (
-                  <li key={`${group.rank}-${group.key}`}>
-                    <div className="flex max-w-72 items-start gap-2 rounded-lg border px-3 py-2 text-left shadow-sm">
-                      <span className="shrink-0 text-sm font-semibold text-primary">#{group.rank}</span>
-                      <div className="min-w-0 space-y-1">
-                        {group.rows.map((row) => (
-                          <Link key={row.book.id} to={`/books/${row.book.id}`} className="block min-w-0 rounded-sm hover:text-primary">
-                            <p className="truncate text-xs font-medium">{row.book.title}</p>
-                            <p className="text-xs text-muted-foreground">{formatValue(row.value, row.book)}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
         </div>
       )}
     </SummaryCard>
@@ -395,57 +217,5 @@ export function SeriesAnalyticsComparison({ stats }: { stats: SeriesStats }) {
           : "Add reading time and page progress to compare reading speed."}
       />
     </section>
-  );
-}
-
-export function SeriesAnalyticsRankings({ stats }: { stats: SeriesStats }) {
-  const [rankingMode, setRankingMode] = useState<RankingMode>("rating");
-  const ranking = useMemo(() => {
-    if (rankingMode === "length") {
-      return {
-        rows: stats.rankings.length,
-        emptyLabel: "No page totals yet",
-        formatValue: (value: number) => `${value.toLocaleString()} pages`,
-        getTieKey: (row: { book: Book; value: number }) => row.value,
-      };
-    }
-
-    if (rankingMode === "annotations") {
-      return {
-        rows: stats.rankings.annotations,
-        emptyLabel: "No annotations yet",
-        formatValue: (value: number) => `${value} annotation${value === 1 ? "" : "s"}`,
-        getTieKey: (row: { book: Book; value: number }) => row.value,
-      };
-    }
-
-    return {
-      rows: stats.rankings.rating,
-      emptyLabel: "No ratings yet",
-      formatValue: (value: number, book: Book) => (book.is_favorite ? "Favorite" : `${value.toFixed(1)} / 5`),
-      getTieKey: (row: { book: Book; value: number }) => row.value,
-    };
-  }, [rankingMode, stats.rankings]);
-
-  return (
-    <div className="space-y-4">
-      <SegmentedControl<RankingMode>
-        label="Book ranking metric"
-        value={rankingMode}
-        onChange={setRankingMode}
-        options={[
-          { value: "rating", label: "Top Rated" },
-          { value: "length", label: "Longest" },
-          { value: "annotations", label: "Most Annotated" },
-        ]}
-      />
-      <SeriesRankingPodium
-        key={rankingMode}
-        rows={ranking.rows}
-        formatValue={ranking.formatValue}
-        emptyLabel={ranking.emptyLabel}
-        getTieKey={ranking.getTieKey}
-      />
-    </div>
   );
 }
