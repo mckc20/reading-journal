@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { buildBookLibraryFilterPath, buildGenreDetailPath } from "@/components/LinkedMetadata";
+import { cn } from "@/lib/utils";
 
 export function DetailHero({
   titleId,
@@ -56,14 +57,16 @@ export function DetailStat({
   label,
   value,
   detail,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
   detail?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rj-reading-stat rj-reading-stat-static">
+    <div className={cn("rj-reading-stat rj-reading-stat-static", className)}>
       <dt className="rj-reading-stat-label">
         <Icon aria-hidden="true" />
         {label}

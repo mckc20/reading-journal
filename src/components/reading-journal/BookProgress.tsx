@@ -5,6 +5,7 @@ interface BookProgressProps {
   currentPage?: number | null;
   totalPages?: number | null;
   showLabel?: boolean;
+  pill?: boolean;
   className?: string;
   barClassName?: string;
 }
@@ -16,13 +17,18 @@ export function getBookProgress(currentPage?: number | null, totalPages?: number
 }
 
 /** A safe, consistent reading-progress indicator. */
-export function BookProgress({ currentPage, totalPages, showLabel = false, className, barClassName }: BookProgressProps) {
+export function BookProgress({ currentPage, totalPages, showLabel = false, pill = false, className, barClassName }: BookProgressProps) {
   const value = getBookProgress(currentPage, totalPages);
   if (value === null) return null;
 
   return (
     <div className={cn("space-y-1", className)}>
-      <Progress aria-label="Reading progress" value={value} className={cn("h-1", barClassName)} />
+      <Progress
+        aria-label="Reading progress"
+        value={value}
+        roundedFill={pill}
+        className={cn(pill ? "h-2.5" : "h-1", barClassName)}
+      />
       {showLabel && <p className="text-xs text-muted-foreground">{value}% · {Math.max(0, currentPage ?? 0)} / {totalPages}</p>}
     </div>
   );

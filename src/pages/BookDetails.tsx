@@ -413,7 +413,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         <div className="rj-detail-summary">
           <div>
             {seriesName && (
-              <p className="mb-2 break-words font-sans text-sm text-muted-foreground sm:text-base">
+              <p className="mb-2 break-words font-sans text-lg text-muted-foreground sm:text-xl">
                 <Link
                   to={`/series/${book.series_id}`}
                   className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -534,7 +534,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             <p>{currentPage}{totalPages > 0 ? ` / ${totalPages}` : ""} pages</p>
             {progressPercent !== null && <span>{progressPercent}%</span>}
           </div>
-          <BookProgress currentPage={currentPage} totalPages={book.total_pages} />
+          <BookProgress currentPage={currentPage} totalPages={book.total_pages} pill />
 
           <div className="rj-detail-actions">
             {isPaused ? (

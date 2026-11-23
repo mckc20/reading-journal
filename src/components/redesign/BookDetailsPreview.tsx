@@ -86,7 +86,7 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
           <p className="rj-detail-author">{book.author}</p>
           <div className="rj-detail-status-row"><BookStatus status={book.status} />{book.rating != null && <div className="rj-detail-rating"><BookRating rating={book.rating} /><span aria-hidden="true">{book.rating} / 5</span></div>}</div>
           <div className="rj-detail-position"><p aria-label="Reading position">{book.currentPage}{book.totalPages && book.totalPages > 0 ? ` / ${book.totalPages}` : ''} pages</p>{progress != null && <span>{progress}%</span>}</div>
-          <BookProgress currentPage={book.currentPage} totalPages={book.totalPages} />
+          <BookProgress currentPage={book.currentPage} totalPages={book.totalPages} pill />
           <div className="rj-detail-actions"><Button onClick={onReadingAction}><BookOpen aria-hidden="true" />{action}</Button><Button variant="outline" onClick={onAddEntry}><NotebookPen aria-hidden="true" />Add entry</Button></div>
         </div>
       </section>
