@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from "react";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { ProgressBookSummary, ProgressWheels } from "@/components/redesign/ProgressFields";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ const JournalEntryForm = lazy(() => import("@/components/AddJournalEntryDialog")
 
 interface ReadingProgressPanelProps {
   book: Book;
+  titleLink?: ReactNode;
   onProgressSaved: (newCurrentPage: number) => Promise<void>;
   onJournalEntrySaved?: (entry: BookJournalEntryRecord) => void;
   onCancel: () => void;
@@ -43,7 +44,7 @@ async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: 
 }
 
 export default function ReadingProgressPanel({
-  book, onProgressSaved, onJournalEntrySaved, onCancel, onEntryComposerOpenChange, onSavingChange,
+  book, titleLink, onProgressSaved, onJournalEntrySaved, onCancel, onEntryComposerOpenChange, onSavingChange,
 }: ReadingProgressPanelProps) {
   const { user } = useAuth();
   const errorId = useId();
@@ -114,10 +115,13 @@ export default function ReadingProgressPanel({
 
   return (
     <div className="rj-progress-form">
-      <ProgressBookSummary book={{
-        id: book.id, title: book.title, author: book.authors.join(", "),
-        cover: book.cover_url, currentPage, totalPages,
-      }} />
+      <ProgressBookSummary
+        titleLink={titleLink}
+        book={{
+          id: book.id, title: book.title, author: book.authors.join(", "),
+          cover: book.cover_url, currentPage, totalPages,
+        }}
+      />
 
       {loading && <LoadingIndicator variant="inline" label="Loading reading progress…" />}
       {totalPages === 0 && <p className="rj-muted">Set the total pages to track progress.</p>}

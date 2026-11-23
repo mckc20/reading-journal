@@ -1,13 +1,13 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import type { HomeBook } from './HomeCards';
 import { ProgressWheelPicker } from './ProgressWheelPicker';
 
-export function ProgressBookSummary({ book }: { book: HomeBook }) {
+export function ProgressBookSummary({ book, titleLink }: { book: HomeBook; titleLink?: ReactNode }) {
   return (
     <div className="rj-progress-book">
       <div>
-        <span className="rj-book-title">{book.title}</span>
+        <span className="rj-book-title">{titleLink ?? book.title}</span>
         <span className="rj-muted">{book.author}</span>
         <dl className="rj-progress-page-count">
           <div><dt>Current page:</dt><dd>{book.currentPage}</dd></div>

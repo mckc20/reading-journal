@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Link, useMatch, useNavigate } from "react-router-dom";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Dialog,
@@ -33,6 +34,10 @@ export default function ReadingProgressDialog({
   onOpenChange,
   onCloseAutoFocus,
 }: ReadingProgressDialogProps) {
+  const navigate = useNavigate();
+  const bookDetail = useMatch("/books/:bookId");
+  const bookPath = `/books/${encodeURIComponent(book.id)}`;
+  const destinationAfterClose = useRef<string | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
   const [entryComposerOpen, setEntryComposerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,6 +50,22 @@ export default function ReadingProgressDialog({
     onOpenChange?.(nextOpen);
   }
 
+  function handleBookTitleClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    destinationAfterClose.current = bookDetail?.params.bookId === book.id ? null : bookPath;
+    handleOpenChange(false);
+  }
+
+  function handleCloseAutoFocus(event: Event) {
+    onCloseAutoFocus?.(event);
+    const destination = destinationAfterClose.current;
+    if (!destination) return;
+    destinationAfterClose.current = null;
+    // Let the dialog restore focus before the phone sheet remembers the page behind it.
+    queueMicrotask(() => void navigate(destination));
+  }
+
   return (
     <Dialog open={resolvedOpen} onOpenChange={next => { if (!saving) handleOpenChange(next); }}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
@@ -52,7 +73,7 @@ export default function ReadingProgressDialog({
         className={entryComposerOpen ? "rj-progress-dialog rj-progress-dialog-wide" : "rj-progress-dialog"}
         showCloseButton={!saving}
         onClick={(event) => event.stopPropagation()}
-        onCloseAutoFocus={onCloseAutoFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         <DialogTitle>Update Progress</DialogTitle>
         <DialogDescription className="sr-only">Record the page you reached in {book.title} and, optionally, your reading time.</DialogDescription>
@@ -60,6 +81,15 @@ export default function ReadingProgressDialog({
           <ReadingProgressPanel
             key={book.id}
             book={book}
+            titleLink={saving ? undefined : (
+              <Link
+                to={bookPath}
+                onClick={handleBookTitleClick}
+                className="rounded-sm underline decoration-muted-foreground/45 underline-offset-4 hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {book.title}
+              </Link>
+            )}
             onSavingChange={setSaving}
             onEntryComposerOpenChange={setEntryComposerOpen}
             onJournalEntrySaved={onJournalEntrySaved}
