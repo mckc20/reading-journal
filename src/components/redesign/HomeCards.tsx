@@ -33,17 +33,32 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
   );
 }
 
-export function BookShelf({ books, onOpen, showStatus = true }: { books: HomeBook[]; onOpen: (book: HomeBook) => void; showStatus?: boolean }) {
+type ShelfBook = Pick<HomeBook, 'id' | 'title' | 'cover' | 'status'> & {
+  author?: string;
+  favorite?: boolean;
+  paused?: boolean;
+  cornerLabel?: string;
+};
+
+export function BookShelf<T extends ShelfBook>({ books, onOpen, showStatus = true, label = 'Books' }: {
+  books: T[];
+  onOpen: (book: T) => void;
+  showStatus?: boolean;
+  label?: string;
+}) {
   const drag = useShelfDrag<HTMLDivElement>();
 
   return (
     <div className="rj-shelf-frame rj-home-shelf-frame">
-      <div {...drag} className="rj-shelf rj-shelf-scroll" tabIndex={0} role="group" aria-label="Books">
+      <div {...drag} className="rj-shelf rj-shelf-scroll" tabIndex={0} role="group" aria-label={label}>
         {books.map(book => <button key={book.id} type="button" className="rj-shelf-book" onClick={() => onOpen(book)}>
-          <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} showFallbackTitle decorative />
+          <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} favorite={book.favorite}
+            paused={book.paused} cornerLabel={book.cornerLabel} showFallbackTitle decorative />
           <span className="rj-book-title">{book.title}</span>
-          <span className="rj-muted">{book.author}</span>
+          {book.author !== undefined && <span className="rj-muted">{book.author}</span>}
           {showStatus && book.status && <span className="sr-only">{book.status}</span>}
+          {book.cornerLabel && <span className="sr-only">Volume {book.cornerLabel}</span>}
+          {book.favorite && <span className="sr-only">Favorite</span>}
         </button>)}
       </div>
     </div>

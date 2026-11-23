@@ -1,8 +1,8 @@
 import { useId, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import BookCard from "@/components/BookCard";
 import CollectionEmptyState from "@/components/CollectionEmptyState";
 import { FilterSelect, LibraryFilterChips, LibrarySortingControls } from "@/components/LibraryControls";
+import { BookShelf } from "@/components/redesign/HomeCards";
 import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
 import { defaultSortDirection, sortDirectionLabel, sortLibraryBooks, type SortDirection } from "@/lib/librarySorting";
 import type { Book, BookStatus } from "@/types";
@@ -64,7 +64,7 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
   const visibleBooks = sortBooks(filteredBooks, sort, direction);
 
   return (
-    <section id="books" ref={sectionRef} aria-labelledby={titleId} className="space-y-4 scroll-mt-4">
+    <section id="books" ref={sectionRef} aria-labelledby={titleId} className="min-w-0 space-y-4 scroll-mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 id={titleId}>Books</h2>
         {books.length > 0 && (
@@ -107,18 +107,21 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
         onClear={() => setSelectedStatuses([])}
       />
       {visibleBooks.length > 0 ? (
-        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:gap-x-5">
-          {visibleBooks.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              cornerLabel={series && book.volume_number != null ? String(book.volume_number) : undefined}
-              onBook={(item) => navigate(`/books/${encodeURIComponent(item.id)}`)}
-              textSize="compact"
-              showAuthor={series}
-            />
-          ))}
-        </div>
+        <BookShelf
+          key={JSON.stringify([sort, direction, selectedStatuses])}
+          label="Books shelf"
+          books={visibleBooks.map((book) => ({
+            id: book.id,
+            title: book.title,
+            author: series ? book.authors.join(", ") : undefined,
+            cover: book.cover_url,
+            status: book.status,
+            paused: book.status === "Paused",
+            favorite: book.is_favorite,
+            cornerLabel: series && book.volume_number != null ? String(book.volume_number) : undefined,
+          }))}
+          onOpen={(book) => navigate(`/books/${encodeURIComponent(book.id)}`)}
+        />
       ) : (
         <CollectionEmptyState
           title={books.length ? "No books match your filters" : "No books yet"}
