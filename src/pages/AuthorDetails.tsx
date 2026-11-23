@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, NotebookPen, Star } from "lucide-react";
 import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
 import BackButton from "@/components/BackButton";
@@ -14,15 +14,11 @@ import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
-import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { BookHighlights } from "@/components/redesign/BookHighlights";
+import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
-import {
-  buildBookLibraryFilterPath,
-  buildGenreDetailPath,
-  MetadataLink,
-} from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth, useUserSettings } from "@/context";
@@ -40,6 +36,7 @@ import {
 import { fetchAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
+import { getBookRankings } from "@/lib/bookRankings";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
 import { authorJournalToJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
@@ -72,12 +69,6 @@ function AuthorPhoto({ name, photoUrl }: { name: string; photoUrl?: string | nul
         <img src={photoUrl} alt="" className="size-full object-cover" onError={() => setFailedUrl(photoUrl)} />
       ) : getAuthorInitials(name)}
     </div>
-  );
-}
-
-function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
-  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
-    (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
   );
 }
 
@@ -174,10 +165,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     () => getTopValues(authorBooks.flatMap((book) => book.genres ?? []), 6),
     [authorBooks],
   );
-  const authorLanguages = useMemo(
-    () => uniqueSortedValues(authorBooks.map((book) => book.language)).slice(0, 4),
-    [authorBooks],
-  );
+  const authorRankings = useMemo(() => getBookRankings(authorBooks, journalEntries), [authorBooks, journalEntries]);
   const genreSlugByName = useMemo(() => {
     const { slugById } = buildGenreSlugLookup(genres);
     return new Map(
@@ -340,48 +328,17 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
       </DetailHero>
 
       <div className="rj-detail-body">
-        <dl className="rj-reading-stats rj-author-reading-stats">
+        <dl className="rj-reading-stats rj-detail-summary-stats">
           <DetailStat icon={BookOpen} label="Books written" value={formatNumber(author.bookCount)} />
           <DetailStat icon={Star} label="Average rating" value={formatAverageRating(averageRating)} />
         </dl>
 
-        <div>
-          <AboutSection
-            className="rj-detail-description"
-            title="About this author"
-            text={bio}
-            titleContent={
-              <div className="rj-detail-tags">
-                {authorGenres.map((genre) => {
-                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                  return (
-                    <Link key={genre} to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-                      {genre}
-                    </Link>
-                  );
-                })}
-              </div>
-            }
-          />
-          {authorLanguages.length > 0 && (
-            <details className="rj-detail-metadata">
-              <summary>More author details</summary>
-              <dl>
-                <div>
-                  <dt>{authorLanguages.length === 1 ? "Language" : "Languages"}</dt>
-                  <dd>
-                    {authorLanguages.map((language, index) => (
-                      <span key={language}>
-                        {index > 0 && ", "}
-                        <MetadataLink to={buildBookLibraryFilterPath("language", language)}>{language}</MetadataLink>
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-            </details>
-          )}
-        </div>
+        <AboutSection
+          className="rj-detail-description"
+          title="About this author"
+          text={bio}
+          titleContent={<DetailGenreTags genres={authorGenres} slugByName={genreSlugByName} />}
+        />
 
         <DetailBooks books={authorBooks} />
 
@@ -395,6 +352,11 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
             </div>
           </section>
         )}
+
+        <section aria-labelledby={`${headingId}-insights`} className="space-y-4">
+          <h2 id={`${headingId}-insights`}>Insights</h2>
+          <BookHighlights rankings={authorRankings} label="Author book highlights" />
+        </section>
 
         <DetailJournal
           sectionId="journal"

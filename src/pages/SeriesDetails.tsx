@@ -7,22 +7,19 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   BookOpen,
   CalendarDays,
-  Gauge,
   ImagePlus,
-  Languages,
   Loader2,
   NotebookPen,
   PauseCircle,
   Route,
   Star,
-  Tags,
   Trash2,
-  type LucideIcon,
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import SaveCancelBar from "@/components/SaveCancelBar";
@@ -31,27 +28,24 @@ import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
-import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import {
   buildAuthorDetailPath,
-  buildBookLibraryFilterPath,
-  buildGenreDetailPath,
   MetadataLink,
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { SeriesAnalyticsOverview, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
-import { SeriesBookHighlights } from "@/components/series/SeriesBookHighlights";
+import { SeriesReadingTotals, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
+import { BookHighlights } from "@/components/redesign/BookHighlights";
 import SeriesBooksEditor, {
   buildEditableSeriesBooks,
   parseVolumeInput,
   type EditableSeriesBook,
 } from "@/components/series/SeriesBooksEditor";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -89,10 +83,6 @@ import { seriesJournalToJournalEntries } from "@/lib/journal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
-
-function bookCountLabel(count: number): string {
-  return `${count} book${count === 1 ? "" : "s"}`;
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -133,38 +123,6 @@ function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started:
   };
 }
 
-function formatPagesRead(readPages: number | null, totalPages: number | null): string {
-  if (readPages === null || totalPages === null) return "--";
-  return `${readPages.toLocaleString()} / ~${totalPages.toLocaleString()}`;
-}
-
-function formatReadingSpeed(books: Book[], logs: ReadingLog[]): string {
-  const activeBook = getCurrentSeriesBook(books);
-  if (!activeBook) return "--";
-  const activeLogs = logs
-    .filter((log) => log.book_id === activeBook.id)
-    .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
-
-  let previousPage = 0;
-  let pagesRead = 0;
-  let readingMinutes = 0;
-
-  for (const log of activeLogs) {
-    const minutes = Math.max(0, log.reading_time_minutes ?? 0);
-    const currentPage = Math.max(0, log.current_page);
-    const pageDelta = Math.max(0, currentPage - previousPage);
-    previousPage = Math.max(previousPage, currentPage);
-
-    if (minutes > 0) {
-      pagesRead += pageDelta;
-      readingMinutes += minutes;
-    }
-  }
-
-  if (pagesRead <= 0 || readingMinutes <= 0) return "--";
-  return `~${(pagesRead / (readingMinutes / 60)).toFixed(1)} pages / hour`;
-}
-
 function BookThumbnail({ book }: { book: Book }) {
   const isPaused = book.status === "Paused";
   return (
@@ -191,27 +149,6 @@ function BookThumbnail({ book }: { book: Book }) {
         </div>
       )}
     </div>
-  );
-}
-
-function SeriesMetadataHeading({
-  icon: Icon,
-  title,
-}: {
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      {title}
-    </h3>
-  );
-}
-
-function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
-  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
-    (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
   );
 }
 
@@ -273,7 +210,6 @@ type SeriesProgressDetail =
       kind: "active";
       book: Book | null;
       estimatedCompletion: string | null;
-      readingSpeed: string;
     }
   | {
       kind: "not-started";
@@ -292,15 +228,9 @@ type SeriesProgressDetail =
       kind: "hidden";
     };
 
-function SeriesProgressCard({
-  progress,
-  totalBooks,
-  averageRating,
-  detail,
-}: {
-  progress: ReturnType<typeof getSeriesProgress>;
-  totalBooks: number;
-  averageRating: number | null;
+function SeriesProgressCard({ percentage, readingTotals, detail }: {
+  percentage: number | null;
+  readingTotals: ReactNode;
   detail: SeriesProgressDetail;
 }) {
   const headingId = useId();
@@ -309,13 +239,9 @@ function SeriesProgressCard({
       <div className="rj-detail-section-heading"><h2 id={headingId}>Reading progress</h2></div>
       <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
         <div className="flex justify-center">
-          <CircularSeriesProgress value={progress.percentage} />
+          <CircularSeriesProgress value={percentage} />
         </div>
-        <dl className="rj-reading-stats rj-series-progress-stats">
-          <DetailStat icon={BookOpen} label="Books read" value={`${progress.finishedBooks} / ${totalBooks}`} />
-          <DetailStat icon={BookOpen} label="Pages read" value={formatPagesRead(progress.readPages, progress.totalPages)} />
-          <DetailStat icon={Star} label="Average rating" value={averageRating === null ? "No rating" : averageRating.toFixed(1)} />
-        </dl>
+        {readingTotals}
       </div>
       {detail.kind === "active" && (
         <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
@@ -323,21 +249,12 @@ function SeriesProgressCard({
             <p className="mb-2 text-sm font-semibold">Current Book</p>
             <FeaturedBookProgress book={detail.book} />
           </div>
-          <div className="space-y-4 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-            <div>
-              <p className="text-sm font-semibold">Estimated Completion</p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <CalendarDays className="h-4 w-4 text-primary" />
-                {formatDate(detail.estimatedCompletion)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Reading Speed</p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <Gauge className="h-4 w-4 text-primary" />
-                {detail.readingSpeed}
-              </p>
-            </div>
+          <div className="border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+            <p className="text-sm font-semibold">Estimated Completion</p>
+            <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              {formatDate(detail.estimatedCompletion)}
+            </p>
           </div>
         </div>
       )}
@@ -716,10 +633,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesBooks), [seriesBooks]);
   const genres = useMemo(() => getSeriesGenres(seriesBooks), [seriesBooks]);
-  const languages = useMemo(
-    () => uniqueSortedValues(seriesBooks.map((book) => book.language)),
-    [seriesBooks],
-  );
   const genreSlugByName = useMemo(() => {
     const { slugById } = buildGenreSlugLookup(availableGenres);
     return new Map(
@@ -745,10 +658,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const estimatedCompletion = useMemo(
     () => estimateSeriesCompletionDate(seriesBooks, seriesLogs),
     [seriesBooks, seriesLogs],
-  );
-  const readingSpeed = useMemo(
-    () => (logsLoading || logsError ? "--" : formatReadingSpeed(seriesBooks, seriesLogs)),
-    [logsError, logsLoading, seriesBooks, seriesLogs],
   );
   const progressDetail = useMemo<SeriesProgressDetail>(() => {
     if (derivedStatus === "Not Started") {
@@ -777,7 +686,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         kind: "active",
         book: currentBook,
         estimatedCompletion,
-        readingSpeed,
       };
     }
 
@@ -790,7 +698,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     estimatedCompletion,
     firstVolume,
     journeyRecap.favoriteBook,
-    readingSpeed,
     seriesStats.overview.journeySpan,
     startingBookId,
   ]);
@@ -1011,7 +918,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           onToggleFavorite={() => void handleToggleFavorite()}
         />
         <p className="rj-detail-author flex flex-wrap gap-x-1">
-          <span>by</span>
           {authors.length > 0 ? (
             authors.map((author, index) => (
               <span key={author}>
@@ -1042,68 +948,22 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
       </DetailHero>
 
       <div className="rj-detail-body">
-        {(seriesRecord.description?.trim() || seriesBooks.length > 0) && (
-          <div className="rj-detail-about">
-            <AboutSection title="About" text={seriesRecord.description} emptyText="" />
-            {seriesBooks.length > 0 && (
-              <details className="rj-detail-metadata">
-                <summary>Series details</summary>
-                <div className="grid gap-4 pb-2 pt-1 sm:grid-cols-3">
-                  <div>
-                    <SeriesMetadataHeading icon={Tags} title="Genres" />
-                    <div className="mt-1.5">
-                      {genres.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {genres.map((genre) => {
-                            const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                            return (
-                              <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
-                                <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-                                  {genre}
-                                </Link>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Not set</p>
-                      )}
-                    </div>
-                  </div>
+        <dl className="rj-reading-stats rj-detail-summary-stats">
+          <DetailStat icon={BookOpen} label="Books read" value={seriesBooks.length > 0 ? `${progress.finishedBooks} / ${seriesBooks.length}` : "0"} />
+          <DetailStat icon={Star} label="Average rating" value={averageRating === null ? "No rating" : averageRating.toFixed(1)} />
+        </dl>
 
-                  <div>
-                    <SeriesMetadataHeading icon={Languages} title="Language" />
-                    <p className="mt-1.5 text-base">
-                      {languages.length > 0 ? (
-                        languages.map((language, index) => (
-                          <span key={language}>
-                            {index > 0 ? ", " : null}
-                            <MetadataLink to={buildBookLibraryFilterPath("language", language)}>
-                              {language}
-                            </MetadataLink>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground">Not set</span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <SeriesMetadataHeading icon={BookOpen} title="Books" />
-                    <p className="mt-1.5 text-base">{bookCountLabel(seriesBooks.length)}</p>
-                  </div>
-                </div>
-              </details>
-            )}
-          </div>
-        )}
+        <AboutSection
+          className="rj-detail-description"
+          title="About this series"
+          text={seriesRecord.description}
+          titleContent={<DetailGenreTags genres={genres} slugByName={genreSlugByName} />}
+        />
 
         {seriesBooks.length > 0 && (
           <SeriesProgressCard
-            progress={progress}
-            totalBooks={seriesBooks.length}
-            averageRating={averageRating}
+            percentage={progress.percentage}
+            readingTotals={<SeriesReadingTotals stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />}
             detail={progressDetail}
           />
         )}
@@ -1115,8 +975,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             <h2 id={`${headingId}-insights`}>Insights</h2>
             {seriesBooks.length > 0 ? (
               <>
-                <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
-                <SeriesBookHighlights stats={seriesStats} />
+                <BookHighlights rankings={seriesStats.rankings} label="Series book highlights" />
                 <SeriesAnalyticsComparison stats={seriesStats} />
               </>
             ) : <p className="rj-detail-quiet text-sm">Books added to this series will appear here.</p>}

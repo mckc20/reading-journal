@@ -88,6 +88,7 @@
   .rj-chart-bar {
     transition: height 340ms cubic-bezier(.2, .75, .25, 1), width 340ms cubic-bezier(.2, .75, .25, 1), background-color 160ms ease;
   }
+  .rj-horizontal-chart .rj-chart-bar-horizontal { transition-property: background-color; }
   .rj-chart-distribution circle {
     transition: stroke-dasharray 340ms ease-out, stroke-dashoffset 340ms ease-out, stroke-width 160ms ease;
   }

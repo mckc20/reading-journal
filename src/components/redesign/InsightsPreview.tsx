@@ -1,4 +1,5 @@
 import { useChartEntrance } from "@/hooks/useChartEntrance";
+import { useHorizontalChartTransition } from "@/hooks/useHorizontalChartTransition";
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -33,6 +34,7 @@ export function InsightsPreview({ periods, goal, milestone, wrapUp, loading, err
   const motion = useChartEntrance<HTMLElement>();
   const [periodId, setPeriodId] = useState(periods[0]?.id);
   const period = periods.find(item => item.id === periodId) ?? periods[0];
+  const transition = useHorizontalChartTransition(motion.ref, period?.id);
   const [detail, setDetail] = useState<Detail>('rhythm');
   const [open, setOpen] = useState(false);
   const title = useRef<HTMLHeadingElement>(null);
@@ -42,14 +44,14 @@ export function InsightsPreview({ periods, goal, milestone, wrapUp, loading, err
   const maxDays = Math.max(1, ...period?.buckets.map(bucket => bucket.available) ?? []);
   return <div className="rj-redesign rj-insights-preview"><HomeShell {...actions} activeDestination="Insights">
     <header className="rj-insights-heading"><div><p className="rj-insights-kicker">A little more about you</p><h1>Insights</h1><p>Find the shape of your reading life.</p></div>
-      {period && <label>Explore a period<select value={period.id} onChange={event => setPeriodId(event.target.value)}>{periods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
+      {period && <label>Explore a period<select value={period.id} onChange={event => { transition.capture(); setPeriodId(event.target.value); }}>{periods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
     </header>
     {loading ? <p className="rj-insights-state" role="status">Gathering your reading story…</p> : error ? <EmptyState title="Your insights couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
       {period && <>
         <section className="rj-insights-rhythm" aria-labelledby={`${id}-rhythm`}>
           <div className="rj-insights-section-head"><div><p className="rj-insights-kicker">01 · Your rhythm</p><h2 id={`${id}-rhythm`}>What does my reading rhythm look like?</h2><p>{period.range} · Europe/Vienna</p></div><Button variant="outline" onClick={event => explore('rhythm', event.currentTarget)}>Explore rhythm</Button></div>
           <dl className="rj-insights-summary"><div><dt>Recorded reading days</dt><dd>{period.days}</dd></div><div><dt>Average timed log</dt><dd>{period.averageMinutes === null ? 'Not available' : `${period.averageMinutes} min`}</dd></div><div><dt>Books finished</dt><dd>{period.finished}</dd></div></dl>
-          {period.logs === 0 ? <EmptyState title="Your rhythm has room to grow" message="No reading logs in this period. You may still have been reading; finished books and goals can tell another part of the story." /> : <figure {...motion} className="rj-chart-surface rj-insights-chart"><figcaption>Recorded reading days · {period.label}</figcaption><ul>{period.buckets.map(bucket => <li key={bucket.label}><span>{bucket.label}</span><div className="rj-insights-track" aria-hidden="true"><div className="rj-chart-bar rj-chart-bar-horizontal" style={{ width: `${bucket.days / maxDays * 100}%` }} /></div><strong>{bucket.days} / {bucket.available} days</strong></li>)}</ul></figure>}
+          {period.logs === 0 ? <EmptyState title="Your rhythm has room to grow" message="No reading logs in this period. You may still have been reading; finished books and goals can tell another part of the story." /> : <figure {...motion} data-chart-motion={transition.hasSwitched ? "settled" : motion["data-chart-motion"]} className="rj-chart-surface rj-horizontal-chart rj-insights-chart"><figcaption>Recorded reading days · {period.label}</figcaption><ul>{period.buckets.map(bucket => <li key={bucket.label} data-chart-row={bucket.label}><span>{bucket.label}</span><div className="rj-insights-track" aria-hidden="true"><div className="rj-chart-bar rj-chart-bar-horizontal" style={{ width: `${bucket.days / maxDays * 100}%` }} /></div><strong>{bucket.days} / {bucket.available} days</strong></li>)}</ul></figure>}
           <p className="rj-insights-note">A day counts once when a log records pages read or reading minutes. Gaps mean no recorded activity, not necessarily no reading.</p>
           <div className="rj-insights-observations">
             <button onClick={event => explore('rhythm', event.currentTarget)}><span>{period.previous ? `${period.days} recorded days, compared with ${period.previous.days} in ${period.previous.label}.` : `${period.days} recorded days in this period.`}</span><span>See the context ↗</span></button>

@@ -1,5 +1,7 @@
+import { Link } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { buildBookLibraryFilterPath, buildGenreDetailPath } from "@/components/LinkedMetadata";
 
 export function DetailHero({
   titleId,
@@ -27,6 +29,25 @@ export function DetailHero({
       </div>
       <div className="rj-detail-summary">{children}</div>
     </header>
+  );
+}
+
+export function DetailGenreTags({ genres, slugByName }: {
+  genres: string[];
+  slugByName: ReadonlyMap<string, string>;
+}) {
+  if (genres.length === 0) return null;
+  return (
+    <div className="rj-detail-tags">
+      {genres.map((genre) => {
+        const slug = slugByName.get(genre.toLocaleLowerCase());
+        return (
+          <Link key={genre} to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+            {genre}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 

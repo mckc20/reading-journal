@@ -6,6 +6,7 @@ import {
   type CalendarSpan,
 } from "@/lib/bookAnalytics";
 import type { Book, BookJournalEntryRecord, ReadingLog, Series } from "@/types";
+import { getBookRankings, type BookRankings } from "@/lib/bookRankings";
 
 export type SeriesProgress = {
   isAvailable: boolean;
@@ -71,11 +72,6 @@ export type SeriesPaceChartRow = {
   pagesPerHour: number;
 };
 
-export type SeriesRankedBook = {
-  book: Book;
-  value: number;
-};
-
 export type SeriesFavoriteQuote = {
   book: Book;
   note: BookJournalEntryRecord;
@@ -97,11 +93,7 @@ export type SeriesStats = {
   shortestBook: SeriesBookWinners | null;
   durationChart: SeriesDurationChartRow[];
   paceChart: SeriesPaceChartRow[];
-  rankings: {
-    rating: SeriesRankedBook[];
-    length: SeriesRankedBook[];
-    annotations: SeriesRankedBook[];
-  };
+  rankings: BookRankings;
   favoriteQuotes: SeriesFavoriteQuote[];
 };
 
@@ -521,36 +513,7 @@ export function getSeriesStats(
       ? [{ book, value: pagesRead / (readingMinutes / 60) }]
       : [];
   });
-  const lengths = sortedBooks.flatMap((book) =>
-    typeof book.total_pages === "number" && book.total_pages > 0
-      ? [{ book, value: book.total_pages }]
-      : [],
-  );
-  const journalEntriesByBook = new Map(
-    sortedBooks.map((book) => [
-      book.id,
-      {
-        annotated: seriesJournal.filter(
-          (note) => note.book_id === book.id && (note.label === "note" || note.label === "quote"),
-        ).length,
-      },
-    ]),
-  );
-  const annotations = sortedBooks.map((book) => ({
-    book,
-    value: journalEntriesByBook.get(book.id)?.annotated ?? 0,
-  }));
-  const ratingRanking = sortedBooks
-    .flatMap((book) =>
-      book.is_favorite || typeof book.rating === "number"
-        ? [{ book, value: book.is_favorite ? 6 : book.rating ?? 0 }]
-        : [],
-    )
-    .sort((a, b) => b.value - a.value || compareBookTitles(a.book, b.book));
-  const lengthRanking = [...lengths].sort((a, b) => b.value - a.value);
-  const annotationRanking = annotations
-    .filter((candidate) => candidate.value > 0)
-    .sort((a, b) => b.value - a.value);
+  const rankings = getBookRankings(sortedBooks, seriesJournal);
   const favoriteQuotes = seriesJournal
     .filter(
       (note) =>
@@ -584,15 +547,11 @@ export function getSeriesStats(
         : null,
     fastestRead: getWinnerBooks(completedSpeeds, (values) => Math.max(...values)),
     slowestRead: getWinnerBooks(completedSpeeds, (values) => Math.min(...values)),
-    longestBook: getWinnerBooks(lengths, (values) => Math.max(...values)),
-    shortestBook: getWinnerBooks(lengths, (values) => Math.min(...values)),
+    longestBook: getWinnerBooks(rankings.length, (values) => Math.max(...values)),
+    shortestBook: getWinnerBooks(rankings.length, (values) => Math.min(...values)),
     durationChart: chartDurations.map(({ book, value }) => ({ book, days: value })),
     paceChart: chartSpeeds.map(({ book, value }) => ({ book, pagesPerHour: value })),
-    rankings: {
-      rating: ratingRanking,
-      length: lengthRanking,
-      annotations: annotationRanking,
-    },
+    rankings,
     favoriteQuotes,
   };
 }
