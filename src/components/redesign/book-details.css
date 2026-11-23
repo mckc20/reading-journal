@@ -172,8 +172,18 @@
   box-shadow: 0 5px 15px #21150f18;
 }
 .rj-reading-stat-static {
-  grid-template-columns: 20px minmax(0, 1fr);
+  position: relative;
+  display: block;
+  padding-inline-start: 48px;
   cursor: auto;
+}
+.rj-reading-stat-static svg {
+  position: absolute;
+  inset-inline-start: 16px;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
 }
 .rj-reading-stat-static:hover { background: var(--card); }
 @media (min-width: 768px) {

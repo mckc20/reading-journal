@@ -373,8 +373,8 @@ function getSpeedChartRows(stats: SeriesStats, mode: SpeedChartMode) {
 export function SeriesAnalyticsComparison({ stats, titled = false }: { stats: SeriesStats; titled?: boolean }) {
   const [mode, setMode] = useState<SpeedChartMode>("speed");
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className={titled ? "space-y-6" : "space-y-4"}>
+      <div className={titled ? "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" : "flex flex-wrap items-center justify-between gap-3"}>
         {titled ? (
           <div>
             <div className="flex items-center gap-2">
@@ -402,7 +402,7 @@ export function SeriesAnalyticsComparison({ stats, titled = false }: { stats: Se
           ? "No books with start dates yet."
           : "Add reading time and page progress to compare reading speed."}
       />
-    </div>
+    </section>
   );
 }
 

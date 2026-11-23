@@ -43,12 +43,12 @@ export function DetailStat({
 }) {
   return (
     <div className="rj-reading-stat rj-reading-stat-static">
-      <Icon aria-hidden="true" />
-      <div>
-        <dt className="rj-reading-stat-label">{label}</dt>
-        <dd className="rj-reading-stat-value">{value}</dd>
-        {detail && <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>}
-      </div>
+      <dt className="rj-reading-stat-label">
+        <Icon aria-hidden="true" />
+        {label}
+      </dt>
+      <dd className="rj-reading-stat-value">{value}</dd>
+      {detail && <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>}
     </div>
   );
 }
