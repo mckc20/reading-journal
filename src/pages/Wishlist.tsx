@@ -6,6 +6,7 @@ import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import OverflowMenu from "@/components/OverflowMenu";
 import { selectionLabel } from "@/lib/selectionLabels";
+import { formatMediumDate } from "@/lib/dateDisplay";
 import { BookCover } from "@/components/reading-journal";
 import { PageHeader, EmptyState } from "@/components/reading-journal";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ function formatDate(value?: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return formatMediumDate(date);
 }
 
 function getWishlistErrorMessage(error: unknown, fallback: string): string {

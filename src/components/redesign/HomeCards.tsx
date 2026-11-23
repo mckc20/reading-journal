@@ -27,7 +27,7 @@ export function ReadingBookCard({ book, onOpen }: { book: HomeBook; onOpen: (boo
         <span className="rj-muted">{book.author}</span>
         <span className="rj-page-count"><span>Current page: {book.currentPage}</span><span>Total pages: {book.totalPages || 'Unknown'}</span></span>
         <span className="rj-progress-copy">{progress === null ? 'Total pages needed to track progress' : `You’re ${progress}% through the book`}</span>
-        <BookProgress currentPage={book.currentPage} totalPages={book.totalPages} />
+        <BookProgress currentPage={book.currentPage} totalPages={book.totalPages} barClassName="h-1.5" />
       </span>
     </button>
   );

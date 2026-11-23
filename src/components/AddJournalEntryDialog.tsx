@@ -61,6 +61,7 @@ interface AddJournalEntryDialogProps {
   systemTags?: string[];
   replaceSystemTagPrefixes?: string[];
   entryLinkTargets?: JournalLinkTarget[];
+  formIntro?: ReactNode;
   onSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
   onSubmitSaved?: (note: BookJournalEntryRecord | SeriesJournalEntryRecord | AuthorJournalEntryRecord) => void;
   onCloseAutoFocus?: (event: Event) => void;
@@ -81,6 +82,7 @@ interface JournalEntryFormProps {
   entryLinkTargets?: JournalLinkTarget[];
   variant?: "dialog" | "inline" | "creation-dialog";
   heading?: ReactNode;
+  formIntro?: ReactNode;
   hideEntitySelector?: boolean;
   footerStart?: ReactNode;
   autoFocus?: boolean;
@@ -286,6 +288,7 @@ export function JournalEntryForm({
   entryLinkTargets = [],
   variant = "dialog",
   heading,
+  formIntro,
   hideEntitySelector = false,
   footerStart,
   autoFocus = false,
@@ -444,7 +447,10 @@ export function JournalEntryForm({
     reset(draft ? {
       ...initialValues,
       ...draft,
-      bookId: !initialEntry && initialBookId ? initialBookId : draft.bookId,
+      bookId: initialEntry ? initialValues.bookId : initialBookId || draft.bookId,
+      entityId: initialEntry ? initialValues.entityId : draft.entityId,
+      pageStart: initialEntry && preferInitialPageAndDate ? initialValues.pageStart : draft.pageStart,
+      noteDate: initialEntry && preferInitialPageAndDate ? initialValues.noteDate : draft.noteDate,
     } : initialValues);
     const timeoutId = window.setTimeout(() => {
       draftSaveReadyRef.current = true;
@@ -819,6 +825,7 @@ export function JournalEntryForm({
               </div>
             )}
             <div className={isCreationDialog ? "rj-book-form-scroll" : isInline ? "p-3" : "p-4"}>
+              {formIntro}
               <Label htmlFor="note-content" className="sr-only">
                 Note content
               </Label>
@@ -915,6 +922,7 @@ export function JournalEntryForm({
                         rules={{ required: "Choose a book." }}
                         render={({ field }) => (
                           <Select
+                            disabled={Boolean(initialEntry)}
                             value={field.value || "__none__"}
                             onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
                           >
@@ -944,6 +952,7 @@ export function JournalEntryForm({
                         rules={{ required: "Choose a series." }}
                         render={({ field }) => (
                           <Select
+                            disabled={Boolean(initialEntry)}
                             value={field.value || "__none__"}
                             onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
                           >
@@ -973,6 +982,7 @@ export function JournalEntryForm({
                         rules={{ required: "Choose an author." }}
                         render={({ field }) => (
                           <Select
+                            disabled={Boolean(initialEntry)}
                             value={field.value || "__none__"}
                             onValueChange={(value) => field.onChange(value === "__none__" ? "" : value)}
                           >
@@ -1144,6 +1154,7 @@ export default function AddJournalEntryDialog({
   systemTags = [],
   replaceSystemTagPrefixes = [],
   entryLinkTargets = [],
+  formIntro,
   onSaved,
   onSubmitSaved,
   onCloseAutoFocus,
@@ -1156,8 +1167,8 @@ export default function AddJournalEntryDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
         className="rj-add-entry-dialog"
-        title="Add journal entry"
-        description="Write a note or save a quote in your journal."
+        title={initialEntry ? "Edit journal entry" : "Add journal entry"}
+        description={initialEntry ? "Update this note or quote in your journal." : "Write a note or save a quote in your journal."}
         icon={NotebookPen}
         onCloseAutoFocus={onCloseAutoFocus}
       >
@@ -1175,6 +1186,7 @@ export default function AddJournalEntryDialog({
           systemTags={systemTags}
           replaceSystemTagPrefixes={replaceSystemTagPrefixes}
           entryLinkTargets={entryLinkTargets}
+          formIntro={formIntro}
           onCancel={() => onOpenChange(false)}
           onSaved={(note) => {
             onSaved?.(note);

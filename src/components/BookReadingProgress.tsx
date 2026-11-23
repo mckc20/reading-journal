@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Calendar, CalendarClock, ChevronRight, Clock, Flag, Hourglass, type LucideIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Calendar, CalendarClock, Clock, Flag, Hourglass } from "lucide-react";
 import ProgressOverTimeChart, { type ProgressOverTimeChartMode } from "@/components/ProgressOverTimeChart";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
 import {
   formatCalendarSpan,
   formatTotalReadingTime,
@@ -13,6 +13,7 @@ import {
   parseLocalDateOnly,
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
+import { formatMediumDate } from "@/lib/dateDisplay";
 import type { Book, ReadingLog } from "@/types";
 
 const chartModes = [
@@ -22,61 +23,7 @@ const chartModes = [
 ] as const;
 
 function formatDate(date: Date | null, fallback = "Not available") {
-  return date?.toLocaleDateString(undefined, { dateStyle: "medium" }) ?? fallback;
-}
-
-function ReadingStat({
-  icon: Icon, label, value, secondary, children,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  secondary?: { label: string; value: string };
-  children: ReactNode;
-}) {
-  const summary = secondary ? `${label}: ${value}, ${secondary.label}: ${secondary.value}` : `${label}: ${value}`;
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button type="button" className="rj-reading-stat" aria-label={summary}>
-          <Icon aria-hidden="true" />
-          <span className="flex flex-wrap gap-x-5 gap-y-3">
-            <span>
-              <span className="rj-reading-stat-label">{label}</span>
-              <span className="rj-reading-stat-value">{value}</span>
-            </span>
-            {secondary && (
-              <span>
-                <span className="rj-reading-stat-label">{secondary.label}</span>
-                <span className="rj-reading-stat-value">{secondary.value}</span>
-              </span>
-            )}
-          </span>
-          <ChevronRight aria-hidden="true" />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto pt-11 sm:max-w-md" aria-describedby={undefined}>
-        <DialogTitle className="sr-only">{label}</DialogTitle>
-        {children}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function StatRow({ icon: Icon, label, value }: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="relative grid min-h-16 content-center gap-1 rounded-xl bg-card py-3 pr-3 pl-16">
-      <dt className="text-xs text-muted-foreground">
-        <Icon aria-hidden="true" className="absolute top-1/2 left-[1.375rem] size-5 -translate-y-1/2 text-favorite" />
-        {label}
-      </dt>
-      <dd className="text-base font-semibold leading-snug">{value}</dd>
-    </div>
-  );
+  return date ? formatMediumDate(date) : fallback;
 }
 
 function ReadingLogDetails({ logs }: { logs: ReadingLog[] }) {
@@ -102,7 +49,7 @@ function ReadingLogDetails({ logs }: { logs: ReadingLog[] }) {
           <li key={entry.id || `${entry.logged_at}-${entry.current_page}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
             <span>
               <span className="block text-xs text-muted-foreground">
-                {new Date(entry.logged_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                {formatMediumDate(new Date(entry.logged_at), "short")}
               </span>
               Page {entry.current_page} <span className="text-muted-foreground">(+{entry.pagesRead})</span>
             </span>

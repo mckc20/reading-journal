@@ -1,12 +1,13 @@
 import CollectionEmptyState from "@/components/CollectionEmptyState";
 import { FilterSelect, LibrarySortingControls, LibraryFilterChips } from "@/components/LibraryControls";
-import { sortDirectionLabel, type LibrarySort, type SortDirection } from "@/lib/librarySorting";
+import { sortDirectionLabel, type LibrarySort } from "@/lib/librarySorting";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useId, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BookCheck, BookOpen, BookOpenText, ChevronRight, Star } from "lucide-react";
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
+import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
 import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
@@ -49,14 +50,14 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
   const { books, loading: booksLoading, error: booksError } = useBooksContext();
   const [selectedStatuses, setSelectedStatuses] = useState<BookStatus[]>([]);
   const [sort, setSort] = useState<GenreBookSort>("title");
-  const [direction, setDirection] = useState<SortDirection>("asc");
   const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
   const genre = genreId ? resolveGenreSlug(genreId, genres) : null;
   const slug = genre ? slugById.get(genre.id) ?? genre.id : "";
   const path = genre ? getGenrePath(genre.id, genres) : [];
   const matchingBooks = useMemo(() => genre ? getBooksForGenreSubtree(books, genre.id, genres) : [], [books, genre, genres]);
   const summary = summarizeGenreBooks(matchingBooks);
-  const visibleBooks = filterAndSortGenreBooks(matchingBooks, selectedStatuses, sort, direction);
+  const toRead = matchingBooks.filter((book) => book.status === "To Read").length;
+  const visibleBooks = filterAndSortGenreBooks(matchingBooks, selectedStatuses, sort);
   const subgenres = genre ? genres.filter((item) => item.parent_id === genre.id)
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })) : [];
   const onBook = (book: Book) => navigate(`/books/${book.id}`);
@@ -91,24 +92,22 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
                 <Link to={`/genres/${slugById.get(item.id) ?? item.id}`} className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>}
             </span>)}
           </nav>
-          <h1 id={headingId} className="rj-detail-title">{genre.name}</h1>
-          <HeadingDescription>{metadata.description}</HeadingDescription>
+          <h1 id={headingId} className="rj-detail-title rj-detail-title-italic">{genre.name}</h1>
+          <HeadingDescription className="pt-2">{metadata.description}</HeadingDescription>
         </div>
       </DetailHero>
 
-      <div className="rj-detail-body">
-        <section aria-labelledby={`${headingId}-summary`}>
-          <div className="rj-detail-section-heading"><h2 id={`${headingId}-summary`}>Your reading summary</h2></div>
-          <dl className="rj-reading-stats rj-genre-reading-stats">
-            <DetailStat icon={BookOpen} label="Total books" value={summary.total} />
-            <DetailStat icon={BookCheck} label="Finished" value={summary.finished} />
-            <DetailStat icon={BookOpenText} label="Currently reading" value={summary.reading} />
-            <DetailStat
-              icon={Star}
-              label="Average rating"
-              value={summary.averageRating === null ? "No ratings yet" : `${summary.averageRating.toFixed(1)} / 5`}
-              detail={`${summary.ratedCount} rated, finished book${summary.ratedCount === 1 ? "" : "s"}${summary.smallSample ? " · Small sample" : ""}`}
-            />
+      <div className="rj-detail-body rj-genre-detail-body">
+        <section aria-label="Genre stats" className="rj-reading-stats rj-detail-summary-stats">
+          <ReadingStat icon={BookOpen} label="Total books" value={summary.total.toLocaleString()}>
+            <dl className="space-y-2">
+              <StatRow icon={BookOpen} label="Total books" value={summary.total.toLocaleString()} />
+              <StatRow icon={BookCheck} label="Finished" value={summary.finished.toLocaleString()} />
+              <StatRow icon={BookOpenText} label="To Read" value={toRead.toLocaleString()} />
+            </dl>
+          </ReadingStat>
+          <dl>
+            <DetailStat icon={Star} label="Average rating" value={summary.averageRating === null ? "No rating" : summary.averageRating.toFixed(2)} />
           </dl>
         </section>
 
@@ -137,10 +136,7 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
 
         <section className="space-y-5" aria-labelledby={`${headingId}-books`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-1">
-              <AppHeading level={2} id={`${headingId}-books`}>Your books</AppHeading>
-              <p role="status" className="text-sm text-muted-foreground">{visibleBooks.length} of {summary.total} book{summary.total === 1 ? "" : "s"}</p>
-            </div>
+            <AppHeading level={2} id={`${headingId}-books`}>Books</AppHeading>
             <div className="flex flex-wrap gap-3">
               <FilterSelect nativeMenu label="Status" value={selectedStatuses} options={statuses} emptyLabel="All statuses"
                 triggerClassName="w-[9.75rem]"
@@ -148,9 +144,8 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
                   ? current.filter((status) => status !== value) : [...current, value as BookStatus])} />
               <LibrarySortingControls nativeMenu sort={sort}
                 options={genreSortOptions.map((option) => ({ ...option, directionLabel: sortDirectionLabel(option.bookSort, option.value === "title" ? "asc" : "desc") }))}
-                directionLabel={sortDirectionLabel(genreSortOptions.find((option) => option.value === sort)!.bookSort, direction)}
-                onSortChange={(value) => { setSort(value as GenreBookSort); setDirection(value === "title" ? "asc" : "desc"); }}
-                onDirectionChange={() => setDirection((current) => current === "asc" ? "desc" : "asc")} />
+                directionLabel={sortDirectionLabel(genreSortOptions.find((option) => option.value === sort)!.bookSort, sort === "title" ? "asc" : "desc")}
+                onSortChange={(value) => setSort(value as GenreBookSort)} />
             </div>
           </div>
           <LibraryFilterChips chips={selectedStatuses.map((status) => ({ label: `Status: ${status}`, onRemove: () => setSelectedStatuses((current) => current.filter((value) => value !== status)) }))} onClear={() => setSelectedStatuses([])} />

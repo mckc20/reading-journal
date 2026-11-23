@@ -3,9 +3,11 @@ import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { useHorizontalChartTransition } from "@/hooks/useHorizontalChartTransition";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
-import { CalendarDays, Clock3, Timer } from "lucide-react";
+import { CalendarDays, Clock3, Route, Timer } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DetailStat } from "@/components/redesign/DetailHero";
+import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
+import { formatCalendarSpan } from "@/lib/bookAnalytics";
 import type { SeriesStats } from "@/lib/seriesDetails";
 
 type SpeedChartMode = "duration" | "speed";
@@ -27,36 +29,36 @@ export function SeriesReadingTotals({
   stats,
   logsLoading,
   logsError,
-  children,
+  leadingStat,
 }: {
   stats: SeriesStats;
   logsLoading: boolean;
   logsError: string | null;
-  children?: ReactNode;
+  leadingStat?: ReactNode;
 }) {
   const { overview, averageDaysPerBook } = stats;
+  const journeyLength = overview.journeySpan ? formatCalendarSpan(overview.journeySpan) : "Not available";
   return (
-    <dl className="rj-reading-stats rj-series-progress-stats" aria-label="Series reading totals">
-      <DetailStat
-        icon={Clock3}
-        label="Hours read"
-        value={logsLoading ? <LoadingIndicator variant="inline" label="Loading reading time…" /> : logsError ? "Not available" : formatStatsReadingTime(overview.readingMinutes)}
-        detail={logsError && "Reading logs are unavailable."}
-      />
-      <DetailStat
-        icon={CalendarDays}
-        label="Days read"
-        value={overview.journeyDays === null ? "Not available" : formatDaysSpent(overview.journeyDays)}
-        detail={overview.journeyDays === null && "Reading dates are incomplete."}
-      />
-      <DetailStat
-        icon={Timer}
-        label="Average days per book"
-        value={averageDaysPerBook === null ? "Not available" : `${averageDaysPerBook.toFixed(1)} days`}
-        detail={averageDaysPerBook === null && "No completed books with dates."}
-      />
-      {children}
-    </dl>
+    <div role="group" aria-label="Series reading totals" className="rj-reading-stats rj-series-progress-stats">
+      {leadingStat}
+      <ReadingStat icon={Route} label="Journey Length" value={journeyLength}>
+        <dl className="space-y-2">
+          <StatRow icon={Route} label="Journey Length" value={journeyLength} />
+          <StatRow icon={CalendarDays} label="Days read"
+            value={overview.journeyDays === null ? "Not available" : formatDaysSpent(overview.journeyDays)} />
+          <StatRow icon={Clock3} label="Hours read"
+            value={logsLoading ? <LoadingIndicator variant="inline" label="Loading reading time…" /> : logsError ? "Not available" : formatStatsReadingTime(overview.readingMinutes)} />
+        </dl>
+      </ReadingStat>
+      <dl>
+        <DetailStat
+          icon={Timer}
+          label="Average days per book"
+          value={averageDaysPerBook === null ? "Not available" : formatDaysSpent(Math.round(averageDaysPerBook))}
+          detail={averageDaysPerBook === null && "No completed books with dates."}
+        />
+      </dl>
+    </div>
   );
 }
 

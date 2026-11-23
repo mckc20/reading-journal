@@ -12,6 +12,7 @@ import { useAuth, useUserSettings } from "@/context";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
 import { searchBooksAcrossCatalogs, type BookTitleSearchResult } from "@/lib/bookLookup";
+import { formatMediumDate } from "@/lib/dateDisplay";
 import { fetchSeriesVolumeRejections, rejectSeriesVolumeCandidate, type SeriesVolumeRejection } from "@/lib/seriesVolumeFeedback";
 import {
   getNextSeriesVolumeTargets,
@@ -571,7 +572,7 @@ function normalizeTitle(value: string): string {
     .replace(/\b(?:illustrated|revised|updated|anniversary|deluxe|expanded|special|collector'?s) edition\b/gi, " ")
     .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
-function formatDate(value: string): string { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value)); }
+function formatDate(value: string): string { return formatMediumDate(new Date(value)); }
 
 function getContinuations(books: Book[], series: Array<{ id: string; name: string }>): Array<{ book: Book; seriesName: string }> {
   const seriesNames = new Map(series.map((item) => [item.id, item.name]));

@@ -11,11 +11,12 @@ import {
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   BookOpen,
+  Calendar,
   CalendarDays,
+  Flag,
   ImagePlus,
   Loader2,
   NotebookPen,
-  Route,
   Star,
   Trash2,
 } from "lucide-react";
@@ -25,12 +26,12 @@ import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookCover } from "@/components/reading-journal/BookCover";
-import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
+import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
 import {
   buildAuthorDetailPath,
   MetadataLink,
@@ -61,6 +62,7 @@ import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/
 import { duplicateSeriesRecord } from "@/lib/duplication";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
+import { formatMediumDate } from "@/lib/dateDisplay";
 import {
   filterSeriesLogs,
   estimateSeriesCompletionDate,
@@ -91,24 +93,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function formatDate(value: string | null): string {
   const date = parseLocalDateOnly(value ?? undefined);
-  if (!date) return "--";
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatJourneyLength(
-  value: { months: number; weeks: number; days: number } | null,
-): string {
-  if (!value) return "--";
-  const parts = [
-    value.months > 0 ? `${value.months} mo` : null,
-    value.weeks > 0 ? `${value.weeks} wk` : null,
-    value.days > 0 ? `${value.days} d` : null,
-  ].filter(Boolean);
-  return parts.join(" ") || "0 d";
+  return date ? formatMediumDate(date) : "Not available";
 }
 
 function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started: string | null; finished: string | null } {
@@ -137,37 +122,35 @@ function SeriesArtwork({ banner, volume }: { banner?: string | null; volume?: Bo
 
 function CircularSeriesProgress({ value }: { value: number | null }) {
   const percentage = value ?? 0;
-  const background = `conic-gradient(var(--ring) ${percentage * 3.6}deg, var(--muted) 0deg)`;
 
   return (
-    <div className="rj-series-progress-ring flex aspect-square shrink-0 items-center justify-center rounded-full p-2 sm:p-3" style={{ background }}>
-      <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-card text-center">
-        <span className="rj-series-progress-percentage font-heading text-xl font-semibold sm:text-3xl">{value === null ? "--" : `${value}%`}</span>
-        <span className="text-xs text-muted-foreground">Complete</span>
+    <div role="progressbar" aria-label="Series progress" aria-valuenow={value ?? undefined}
+      className="rj-series-progress-ring relative flex aspect-square shrink-0 items-center justify-center rounded-full p-2 sm:p-3">
+      <svg aria-hidden="true" className="absolute inset-0 size-full" viewBox="0 0 144 144" fill="none">
+        <circle cx="72" cy="72" r="66" stroke="var(--muted)" strokeWidth="12" />
+        {percentage > 0 && (
+          <circle cx="72" cy="72" r="66" stroke="var(--ring)" strokeWidth="12" strokeLinecap="round"
+            pathLength="100" strokeDasharray={percentage < 100 ? `${percentage} 100` : undefined} transform="rotate(-90 72 72)" />
+        )}
+      </svg>
+      <div className="flex h-full w-full items-center justify-center rounded-full bg-card text-center">
+        <span className="rj-series-progress-percentage font-heading text-lg font-semibold italic sm:text-2xl">{value === null ? "--" : `${value}%`}</span>
       </div>
     </div>
   );
 }
 
-function FeaturedBookProgress({ book, showProgress = true }: { book: Book | null; showProgress?: boolean }) {
+function FeaturedSeriesBook({ book }: { book: Book | null }) {
   if (!book) {
     return <p className="text-sm text-muted-foreground">No book available</p>;
   }
 
-  const currentPage = Math.max(0, book.current_page ?? 0);
-  const percent = getBookProgress(currentPage, book.total_pages);
   return (
     <Link to={`/books/${encodeURIComponent(book.id)}`} className="rj-reading-card rj-series-progress-book">
       <BookCover src={book.cover_url} title={book.title} paused={book.status === "Paused"} decorative />
       <span className="rj-reading-card-copy">
         <span className="rj-book-title wrap-anywhere">{book.title}</span>
         {book.volume_number != null && <span className="rj-muted">Volume {book.volume_number}</span>}
-        {showProgress && (
-          <>
-            <span className="rj-progress-copy">{percent === null ? "Page total unknown" : `${percent}% complete`}</span>
-            <BookProgress currentPage={currentPage} totalPages={book.total_pages} className="max-w-40" />
-          </>
-        )}
       </span>
     </Link>
   );
@@ -189,7 +172,6 @@ type SeriesProgressDetail =
       kind: "completed";
       started: string | null;
       finished: string | null;
-      journeyLength: string;
     }
   | {
       kind: "hidden";
@@ -203,6 +185,18 @@ function SeriesProgressCard({ percentage, stats, logsLoading, logsError, detail 
   detail: SeriesProgressDetail;
 }) {
   const headingId = useId();
+  const startedOn = detail.kind === "completed" ? formatDate(detail.started) : null;
+  const finishedOn = detail.kind === "completed" ? formatDate(detail.finished) : null;
+  const leadingStat = detail.kind === "active" ? (
+    <dl><DetailStat icon={CalendarDays} label="Estimated Finish" value={formatDate(detail.estimatedCompletion)} /></dl>
+  ) : startedOn && finishedOn ? (
+    <ReadingStat icon={Calendar} label="Started on" value={startedOn} secondary={{ label: "Finished on", value: finishedOn }}>
+      <dl className="space-y-2">
+        <StatRow icon={Calendar} label="Started on" value={startedOn} />
+        <StatRow icon={Flag} label="Finished on" value={finishedOn} />
+      </dl>
+    </ReadingStat>
+  ) : undefined;
   return (
     <section aria-labelledby={headingId}>
       <div className="rj-detail-section-heading"><h2 id={headingId}>Reading progress</h2></div>
@@ -212,21 +206,11 @@ function SeriesProgressCard({ percentage, stats, logsLoading, logsError, detail 
           {(detail.kind === "active" || detail.kind === "not-started") && (
             <div className="min-w-0 flex-1">
               <p className="mb-1 text-sm font-semibold">{detail.kind === "active" ? "Current Book" : "First volume"}</p>
-              <FeaturedBookProgress book={detail.book} showProgress={detail.kind === "active"} />
+              <FeaturedSeriesBook book={detail.book} />
             </div>
           )}
         </div>
-        <SeriesReadingTotals stats={stats} logsLoading={logsLoading} logsError={logsError}>
-          {detail.kind === "active" && (
-            <DetailStat icon={CalendarDays} label="Estimated Finish" value={formatDate(detail.estimatedCompletion)} />
-          )}
-          {detail.kind === "completed" && (
-            <>
-              <DetailStat icon={CalendarDays} label="Start and Finish Date" value={`${formatDate(detail.started)} – ${formatDate(detail.finished)}`} />
-              <DetailStat icon={Route} label="Journey Length" value={detail.journeyLength} />
-            </>
-          )}
-        </SeriesReadingTotals>
+        <SeriesReadingTotals stats={stats} logsLoading={logsLoading} logsError={logsError} leadingStat={leadingStat} />
       </div>
     </section>
   );
@@ -612,7 +596,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         kind: "completed",
         started: completionDates.started,
         finished: completionDates.finished,
-        journeyLength: formatJourneyLength(seriesStats.overview.journeySpan),
       };
     }
 
@@ -632,7 +615,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     derivedStatus,
     estimatedCompletion,
     firstVolume,
-    seriesStats.overview.journeySpan,
     startingBookId,
   ]);
 

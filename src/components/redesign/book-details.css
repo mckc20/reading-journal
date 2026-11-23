@@ -70,6 +70,7 @@
 .rj-detail-actions > :is([data-slot='button'], [data-slot='dialog-trigger']) { flex: 1 0 auto; min-height: 44px; border-radius: 999px; box-shadow: none; }
 .rj-detail-notice { padding: 12px 16px; border: 1px solid var(--input); border-radius: 14px; margin-top: 20px !important; }
 .rj-detail-body { display: grid; gap: 38px; margin: 38px auto 0; max-width: 760px; }
+.rj-detail-body.rj-genre-detail-body { margin-top: 24px; }
 .rj-detail-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
 .rj-detail-tags :is(span, a) { padding: 5px 10px; background: var(--card); border-radius: 999px; font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
 .rj-detail-tags:empty { display: none; }
@@ -192,9 +193,9 @@
 .rj-series-progress-stats { grid-template-columns: minmax(0, 1fr); margin-top: 16px; }
 .rj-series-progress-ring { width: clamp(76px, 24vw, 144px); }
 .rj-series-progress-completed { display: grid; align-items: center; gap: 20px; }
-.rj-series-progress-completed > div { justify-content: center; }
+.rj-series-progress-completed > div:first-child { justify-content: center; }
 .rj-series-progress-completed .rj-series-progress-ring { width: 144px; padding: 12px; }
-.rj-series-progress-completed .rj-series-progress-percentage { font-size: 30px; line-height: 36px; }
+.rj-series-progress-completed .rj-series-progress-percentage { font-size: 24px; line-height: 32px; }
 .rj-series-progress-completed .rj-series-progress-stats { margin-top: 0; }
 @media (min-width: 640px) {
   .rj-series-progress-completed { grid-template-columns: auto minmax(0, 1fr); }
@@ -207,15 +208,9 @@
 .rj-reading-card.rj-series-progress-book > div { width: var(--series-progress-cover-width); }
 .rj-series-progress-book:hover .rj-book-title { text-decoration: underline; text-underline-offset: 4px; }
 .rj-detail-about p { overflow-wrap: anywhere; }
-@media (min-width: 768px) {
-  .rj-genre-reading-stats, .rj-series-progress-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 .rj-detail-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-.rj-highest-rated-stat { grid-column: 1 / -1; min-width: 0; padding-inline: 16px; }
-.rj-highest-rated-stat > dt { display: flex; align-items: center; gap: 12px; }
-.rj-highest-rated-stat > dt > svg { position: static; transform: none; }
-.rj-highest-rated-stat > dd { margin-top: 10px; }
+.rj-highest-rated-stat { grid-column: 1 / -1; min-width: 0; }
 @media (min-width: 768px) {
   .rj-book-highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
