@@ -9,7 +9,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   Info,
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
-import JournalTimeline from "@/components/JournalTimeline";
+import { DetailJournal } from "@/components/redesign/DetailJournal";
 import {
   buildBookLibraryFilterPath,
   MetadataLink,
@@ -92,16 +92,12 @@ export default function BookDetails() {
 function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const headingId = useId();
   const { bookId } = useParams<{ bookId: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
   const { openAddJournalEntry, openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedEntryId = searchParams.get("entry");
   const wantsJournalEditor = searchParams.get("new") === "1";
-  const hasJournalAnchor = location.hash === BOOK_JOURNAL_HASH;
   const addEntryButtonRef = useRef<HTMLButtonElement>(null);
-  const journalSectionRef = useRef<HTMLElement>(null);
   const {
     books,
     wishlistBooks,
@@ -327,11 +323,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     setSearchParams(next, { replace: true });
   }, [journalAvailable, launchJournalEditor, searchParams, setSearchParams, user, wantsJournalEditor]);
 
-  useEffect(() => {
-    if (!journalAvailable || !hasJournalAnchor || selectedEntryId || wantsJournalEditor) return;
-    journalSectionRef.current?.scrollIntoView({ block: "start" });
-  }, [hasJournalAnchor, journalAvailable, selectedEntryId, wantsJournalEditor]);
-
   function handleJournalTimelineChange(entry: JournalTimelineEntry) {
     if (entry.source === "book_note") rememberSavedEntry(entry.bookJournalEntry);
   }
@@ -406,7 +397,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
               onSendAttachment={openAttachmentPicker}
               deleteTitle="Delete this book?"
               deleteDescription="Are you sure you want to delete this book? This cannot be undone."
-              buttonClassName="size-11 hover:bg-background/30 aria-expanded:bg-background/30"
             />
           </div>
           <BookCover
@@ -693,42 +683,18 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           )}
         </section>
 
-        <section ref={journalSectionRef} id={BOOK_JOURNAL_HASH.slice(1)} className="scroll-mt-4" aria-labelledby={`${headingId}-journal`}>
-          <div className="rj-detail-section-heading">
-            <h2 id={`${headingId}-journal`}>Journal</h2>
-          </div>
-
-          {journalEntriesLoading ? (
-            <LoadingIndicator label="Loading journal entries…" />
-          ) : journalEntriesError ? (
-            <p className="text-sm text-destructive" role="alert">{journalEntriesError}</p>
-          ) : visibleJournalEntries.length > 0 ? (
-            <JournalTimeline
-              entries={visibleJournalEntries}
-              layout="list"
-              initialEntryLimit={hasJournalAnchor ? undefined : 3}
-              selectedEntryId={selectedEntryId}
-              onEntryUpdated={handleJournalTimelineChange}
-              onEntryCreated={handleJournalTimelineChange}
-              onEntryDeleted={(entry) => {
-                setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
-              }}
-            />
-          ) : (
-            <div className="rj-detail-empty">
-              <NotebookPen aria-hidden="true" />
-              <p>A place for your thoughts</p>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!user}
-                onClick={(event) => launchJournalEditor(event.currentTarget)}
-              >
-                Write your first entry
-              </Button>
-            </div>
-          )}
-        </section>
+        <DetailJournal
+          sectionId={BOOK_JOURNAL_HASH.slice(1)}
+          entries={visibleJournalEntries}
+          loading={journalEntriesLoading}
+          error={journalEntriesError}
+          onAdd={launchJournalEditor}
+          onEntryUpdated={handleJournalTimelineChange}
+          onEntryDeleted={(entry) => {
+            setJournalEntries((current) => current.filter((note) => note.id !== entry.sourceId));
+          }}
+          addDisabled={!user}
+        />
       </div>
     </div>
   );

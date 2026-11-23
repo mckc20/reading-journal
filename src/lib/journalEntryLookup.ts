@@ -6,7 +6,7 @@ import {
   sortJournalEntries,
   type JournalTimelineEntry,
 } from "@/lib/journal";
-import { bookJournalHref, extractJournalEntryPublicIds } from "@/lib/journalLinks";
+import { bookJournalHref, entityJournalHref, extractJournalEntryPublicIds } from "@/lib/journalLinks";
 import type {
   AuthorJournalEntryRecord,
   BookJournalEntryRecord,
@@ -78,7 +78,7 @@ export async function resolveJournalEntryByPublicId(publicId: string): Promise<R
     return {
       source: "series_note",
       record,
-      href: `/series/${encodeURIComponent(record.series_id)}/journal?entry=${encodeURIComponent(record.id)}`,
+      href: entityJournalHref("series", record.series_id, new URLSearchParams({ entry: record.id })),
     };
   }
 
@@ -87,7 +87,7 @@ export async function resolveJournalEntryByPublicId(publicId: string): Promise<R
     return {
       source: "author_note",
       record,
-      href: `/authors/${encodeURIComponent(record.author_id)}/journal?entry=${encodeURIComponent(record.id)}`,
+      href: entityJournalHref("author", record.author_id, new URLSearchParams({ entry: record.id })),
     };
   }
 

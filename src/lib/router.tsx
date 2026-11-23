@@ -2,7 +2,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { bookJournalHref } from "@/lib/journalLinks";
+import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 
 // Load the signed-in app shell only after ProtectedRoute resolves the session.
 const AppLayout = lazy(() => import("@/components/AppLayout"));
@@ -14,17 +14,10 @@ const Library = lazy(() => import("@/pages/Library"));
 const Wishlist = lazy(() => import("@/pages/Wishlist"));
 const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
-const SeriesJournal = lazy(() => import("@/pages/SeriesJournal"));
-const SeriesAnalytics = lazy(() => import("@/pages/SeriesAnalytics"));
-const SeriesBooks = lazy(() => import("@/pages/SeriesBooks"));
-const SeriesQuotes = lazy(() => import("@/pages/SeriesQuotes"));
 const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
 const AuthorsExplore = lazy(() => import("@/pages/AuthorsExplore"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
-const AuthorJournal = lazy(() => import("@/pages/AuthorJournal"));
-const AuthorBooks = lazy(() => import("@/pages/AuthorBooks"));
-const AuthorQuotes = lazy(() => import("@/pages/AuthorQuotes"));
 const Search = lazy(() => import("@/pages/Search"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Discover = lazy(() => import("@/pages/Discover"));
@@ -67,6 +60,26 @@ function RedirectBookJournal() {
   return <Navigate to={bookId ? bookJournalHref(bookId, new URLSearchParams(search)) : "/library"} replace />;
 }
 
+function RedirectEntityDetail({ entity, section }: {
+  entity: "author" | "series";
+  section: "books" | "journal" | "analytics" | "book-annotations";
+}) {
+  const { authorId, seriesId } = useParams();
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const id = entity === "author" ? authorId : seriesId;
+  const collection = entity === "author" ? "/authors" : "/library/series";
+  if (!id) return <Navigate to={collection} replace />;
+  if (section === "journal") return <Navigate to={entityJournalHref(entity, id, params)} replace />;
+
+  if (section === "books") {
+    params.delete("display");
+    if (params.get("sort") === "chronological-order") params.set("sort", "volume");
+  }
+  const path = `/${entity === "author" ? "authors" : "series"}/${encodeURIComponent(id)}`;
+  return <Navigate to={`${path}${params.size ? `?${params}` : ""}#${section}`} replace />;
+}
+
 export const router = createBrowserRouter([
   // Public route — no auth required
   {
@@ -104,17 +117,17 @@ export const router = createBrowserRouter([
           { path: "/discover", element: lazyRoute(<Discover />) },
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
-          { path: "/series/:seriesId/journal", element: lazyRoute(<SeriesJournal />) },
-          { path: "/series/:seriesId/analytics", element: lazyRoute(<SeriesAnalytics />) },
-          { path: "/series/:seriesId/books", element: lazyRoute(<SeriesBooks />) },
-          { path: "/series/:seriesId/quotes", element: lazyRoute(<SeriesQuotes />) },
+          { path: "/series/:seriesId/journal", element: <RedirectEntityDetail entity="series" section="journal" /> },
+          { path: "/series/:seriesId/analytics", element: <RedirectEntityDetail entity="series" section="analytics" /> },
+          { path: "/series/:seriesId/books", element: <RedirectEntityDetail entity="series" section="books" /> },
+          { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="book-annotations" /> },
           { path: "/library/explore", element: <RedirectTo to="/library/books" preserveSearch /> },
           { path: "/authors", element: lazyRoute(<Authors />) },
           { path: "/authors/explore", element: <RedirectTo to="/library/authors" preserveSearch /> },
           { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
-          { path: "/authors/:authorId/journal", element: lazyRoute(<AuthorJournal />) },
-          { path: "/authors/:authorId/books", element: lazyRoute(<AuthorBooks />) },
-          { path: "/authors/:authorId/quotes", element: lazyRoute(<AuthorQuotes />) },
+          { path: "/authors/:authorId/journal", element: <RedirectEntityDetail entity="author" section="journal" /> },
+          { path: "/authors/:authorId/books", element: <RedirectEntityDetail entity="author" section="books" /> },
+          { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="book-annotations" /> },
           { path: "/search", element: lazyRoute(<Search />) },
           { path: "/genres", element: <Navigate to="/library/genres" replace /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },

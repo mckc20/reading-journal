@@ -7,17 +7,16 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   BookOpen,
   CalendarDays,
-  ChevronRight,
   Gauge,
   ImagePlus,
   Languages,
   Loader2,
+  NotebookPen,
   PauseCircle,
   Route,
   Star,
@@ -27,15 +26,15 @@ import {
 } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import SaveCancelBar from "@/components/SaveCancelBar";
-import BookCard from "@/components/BookCard";
-import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
-import { DetailJournal } from "@/components/redesign/DetailJournal";
+import { DetailBookAnnotations } from "@/components/redesign/DetailBookAnnotations";
+import { DetailBooks } from "@/components/redesign/DetailBooks";
+import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import {
   buildAuthorDetailPath,
@@ -45,7 +44,7 @@ import {
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { SeriesAnalyticsOverview, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
+import { SeriesAnalyticsOverview, SeriesAnalyticsComparison, SeriesAnalyticsRankings } from "@/components/series/SeriesAnalyticsSections";
 import SeriesBooksEditor, {
   buildEditableSeriesBooks,
   parseVolumeInput,
@@ -62,6 +61,7 @@ import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
+import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
@@ -84,15 +84,11 @@ import {
   getSeriesStats,
   sortSeriesBooks,
 } from "@/lib/seriesDetails";
-import {
-  fetchSeriesJournalEntryRecords,
-  sortSeriesJournalEntryRecords,
-} from "@/lib/seriesJournal";
-import { seriesJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
-import { bookHasGenreName, getMostPopularMatchingGenre } from "@/lib/recommendations";
+import { fetchSeriesJournalEntryRecords } from "@/lib/seriesJournal";
+import { seriesJournalToJournalEntries } from "@/lib/journal";
 import { cn, getTodayLocalDate } from "@/lib/utils";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
-import type { Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
+import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
 
 function bookCountLabel(count: number): string {
   return `${count} book${count === 1 ? "" : "s"}`;
@@ -198,40 +194,6 @@ function BookThumbnail({ book }: { book: Book }) {
   );
 }
 
-function SectionHeader({
-  title,
-  action,
-}: {
-  title: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rj-detail-section-heading">
-      <h2>{title}</h2>
-      {action}
-    </div>
-  );
-}
-
-function ViewMoreLink({ to, label = "View More" }: { to: string; label?: string }) {
-  return (
-    <Button asChild variant="link" className="px-0 text-primary">
-      <Link to={to}>
-        {label}
-        <ChevronRight className="h-4 w-4" />
-      </Link>
-    </Button>
-  );
-}
-
-function EmptySection({ message }: { message: string }) {
-  return (
-    <div className="rj-detail-quiet text-center text-sm">
-      {message}
-    </div>
-  );
-}
-
 function SeriesMetadataHeading({
   icon: Icon,
   title,
@@ -250,56 +212,6 @@ function SeriesMetadataHeading({
 function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
     (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
-  );
-}
-
-function SeriesJournalSection({
-  series,
-}: {
-  series: Series;
-}) {
-  const [seriesJournal, setSeriesJournalEntryRecords] = useState<SeriesJournalEntryRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const journalEntries = useMemo(
-    () => sortJournalEntries(seriesJournalToJournalEntries(seriesJournal)),
-    [seriesJournal],
-  );
-
-  const loadSeriesJournalEntryRecords = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setSeriesJournalEntryRecords(await fetchSeriesJournalEntryRecords(series.id));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError, "Failed to load series journal entries"));
-    } finally {
-      setLoading(false);
-    }
-  }, [series.id]);
-
-  useEffect(() => {
-    void loadSeriesJournalEntryRecords();
-  }, [loadSeriesJournalEntryRecords]);
-
-  function rememberEntry(note: SeriesJournalEntryRecord) {
-    if (note.series_id !== series.id) return;
-    setSeriesJournalEntryRecords((current) => sortSeriesJournalEntryRecords([note, ...current.filter((entry) => entry.id !== note.id)]));
-  }
-
-  return (
-    <DetailJournal
-      entity={{ type: "Series", id: series.id }}
-      entries={journalEntries}
-      loading={loading}
-      error={error}
-      onSaved={(note) => { if ("series_id" in note) rememberEntry(note); }}
-      onEntryUpdated={(entry) => { if (entry.source === "series_note") rememberEntry(entry.seriesJournalEntry); }}
-      onEntryDeleted={(entry) => {
-        if (entry.source === "series_note") setSeriesJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
-      }}
-    />
   );
 }
 
@@ -460,35 +372,6 @@ function SeriesProgressCard({
         </div>
       )}
     </section>
-  );
-}
-
-function ExploreBooksCard({
-  title,
-  books,
-  onBook,
-  emptyLabel = "No matches in your library yet.",
-}: {
-  title: ReactNode;
-  books: Book[];
-  onBook: (book: Book) => void;
-  emptyLabel?: string;
-}) {
-  return (
-    <article className="rounded-xl border p-4">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {books.length === 0 ? (
-        <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
-          {emptyLabel}
-        </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {books.slice(0, 3).map((book) => (
-            <CoverOnlyBookCard key={book.id} book={book} onBook={onBook} />
-          ))}
-        </div>
-      )}
-    </article>
   );
 }
 
@@ -760,6 +643,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
+  const [bookAnnotationsLoading, setBookAnnotationsLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
@@ -769,6 +653,13 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
+  const analyticsAnchored = location.hash === "#analytics";
+  const analyticsRef = useDetailSectionAnchor("analytics", !booksLoading && !seriesLoading && !isEditMode);
+  const seriesJournal = useDetailJournalEntries(seriesRecord?.id, fetchSeriesJournalEntryRecords, seriesJournalToJournalEntries);
+  const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
+    if ("series_id" in record && record.series_id === seriesRecord?.id) seriesJournal.save(record);
+  }, [seriesRecord?.id, seriesJournal.save]);
+  const journalEditor = useDetailJournalEditor("Series", !booksLoading && !seriesLoading && !isEditMode && user ? seriesRecord?.id : undefined, saveJournalEntry);
   useEffect(() => {
     if (!seriesRecord || location.state?.openEdit !== true) return;
     setIsEditMode(true);
@@ -796,9 +687,12 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
 
   const loadJournalEntries = useCallback(async () => {
     try {
+      setBookAnnotationsLoading(true);
       setJournalEntries(await fetchAllBookJournalEntryRecords());
     } catch {
       setJournalEntries([]);
+    } finally {
+      setBookAnnotationsLoading(false);
     }
   }, []);
 
@@ -857,36 +751,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     () => (logsLoading || logsError ? "--" : formatReadingSpeed(seriesBooks, seriesLogs)),
     [logsError, logsLoading, seriesBooks, seriesLogs],
   );
-  const primaryAuthor = authors[0] ?? "this author";
-  const exploreGenre = useMemo(
-    () => getMostPopularMatchingGenre(genres, books),
-    [books, genres],
-  );
-  const moreByAuthor = useMemo(() => {
-    const author = primaryAuthor.toLowerCase();
-    return books
-      .filter(
-        (book) =>
-          !seriesBookIds.has(book.id) &&
-          book.authors.some((bookAuthor) => bookAuthor.toLowerCase() === author),
-      )
-      .slice(0, 3);
-  }, [books, primaryAuthor, seriesBookIds]);
-  const moreByGenre = useMemo(
-    () =>
-      exploreGenre
-        ? books
-            .filter(
-              (book) =>
-                !seriesBookIds.has(book.id) &&
-                !moreByAuthor.some((authorBook) => authorBook.id === book.id) &&
-                bookHasGenreName(book, exploreGenre),
-            )
-            .slice(0, 3)
-        : [],
-    [books, exploreGenre, moreByAuthor, seriesBookIds],
-  );
-
   const progressDetail = useMemo<SeriesProgressDetail>(() => {
     if (derivedStatus === "Not Started") {
       return {
@@ -1138,7 +1002,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             onSendAttachment={openAttachmentPicker}
             deleteTitle="Delete this series?"
             deleteDescription="This permanently deletes the series. Choose whether its linked books should be deleted too."
-            buttonClassName="size-11"
           />
         }
       >
@@ -1163,14 +1026,18 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             <span>Unknown author</span>
           )}
         </p>
-        {progressDetail.kind === "not-started" && (
-          <div className="rj-detail-actions">
+        <div className="rj-detail-actions">
+          {progressDetail.kind === "not-started" && (
             <Button type="button" onClick={progressDetail.onStartReading} disabled={progressDetail.startDisabled}>
               {progressDetail.startDisabled && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
               {progressDetail.startDisabled ? "Starting…" : "Start Reading"}
             </Button>
-          </div>
-        )}
+          )}
+          <Button ref={journalEditor.triggerRef} type="button" variant="outline" disabled={!user} onClick={(event) => journalEditor.launch(event.currentTarget)}>
+            <NotebookPen aria-hidden="true" />
+            Add entry
+          </Button>
+        </div>
         {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
         {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
       </DetailHero>
@@ -1233,66 +1100,49 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           </div>
         )}
 
-        {seriesBooks.length === 0 ? (
-          <EmptySection message="Books added to this series will appear here." />
-        ) : (
-          <>
-            <SeriesProgressCard
-              progress={progress}
-              totalBooks={seriesBooks.length}
-              averageRating={averageRating}
-              detail={progressDetail}
-            />
-
-            <section className="space-y-4">
-              <SectionHeader title="Books" action={<ViewMoreLink to={`/series/${seriesRecord.id}/books`} label="View All" />} />
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(144px,1fr))]">
-                {seriesBooks.slice(0, 8).map((book) => (
-                  <BookCard key={book.id} book={book} onClick={(item) => navigate(`/books/${item.id}`)} textSize="compact" />
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <SectionHeader title="Analytics" action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
-              <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
-              <SeriesAnalyticsComparison stats={seriesStats} />
-            </section>
-          </>
-        )}
-        <SeriesJournalSection series={seriesRecord} />
-
         {seriesBooks.length > 0 && (
-          <section className="space-y-5">
-            <SectionHeader title="More to explore" />
-            <div className="grid gap-5 lg:grid-cols-3">
-              <ExploreBooksCard
-                title={<>More by <span className="font-serif italic">{primaryAuthor}</span></>}
-                books={moreByAuthor}
-                onBook={(book) => navigate(`/books/${book.id}`)}
-              />
-              <ExploreBooksCard
-                title={
-                  exploreGenre ? (
-                    <>More in <span className="font-serif italic">{exploreGenre}</span></>
-                  ) : (
-                    "More in this genre"
-                  )
-                }
-                books={moreByGenre}
-                onBook={(book) => navigate(`/books/${book.id}`)}
-              />
-              <article className="rounded-xl border p-4">
-                <h3 className="text-sm font-medium">
-                  You Might Also <span className="font-serif italic">Like</span>
-                </h3>
-                <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
-                  Recommendations coming later.
-                </div>
-              </article>
-            </div>
+          <SeriesProgressCard
+            progress={progress}
+            totalBooks={seriesBooks.length}
+            averageRating={averageRating}
+            detail={progressDetail}
+          />
+        )}
+
+        <DetailBooks books={seriesBooks} series />
+
+        {(seriesBooks.length > 0 || analyticsAnchored) && (
+          <section id="analytics" ref={analyticsRef} aria-labelledby={`${headingId}-analytics`} className="space-y-4 scroll-mt-4">
+            <h2 id={`${headingId}-analytics`}>Analytics</h2>
+            {seriesBooks.length > 0 ? (
+              <>
+                <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
+                <SeriesAnalyticsComparison stats={seriesStats} />
+                <details className="rj-detail-metadata" open={analyticsAnchored || undefined}>
+                  <summary>Book rankings</summary>
+                  <SeriesAnalyticsRankings stats={seriesStats} />
+                </details>
+              </>
+            ) : <p className="rj-detail-quiet text-sm">Books added to this series will appear here.</p>}
+            {logsError && <p className="text-sm text-muted-foreground">Reading activity could not be loaded.</p>}
           </section>
         )}
+
+        <DetailJournal
+          sectionId="journal"
+          entries={seriesJournal.entries}
+          loading={seriesJournal.loading}
+          error={seriesJournal.error}
+          onAdd={journalEditor.launch}
+          onEntryUpdated={(entry) => { if (entry.source === "series_note") seriesJournal.save(entry.seriesJournalEntry); }}
+          onEntryDeleted={(entry) => { if (entry.source === "series_note") seriesJournal.remove(entry.sourceId); }}
+          addDisabled={!user}
+        />
+        <DetailBookAnnotations
+          books={seriesBooks}
+          notes={journalEntries.filter((note) => note.label === "quote")}
+          loading={seriesBooks.length > 0 && bookAnnotationsLoading}
+        />
       </div>
       <SendAttachmentDialog
         open={sendAttachmentOpen}

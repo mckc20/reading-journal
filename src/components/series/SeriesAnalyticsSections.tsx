@@ -2,7 +2,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
-import { BarChart3, BookOpen, CalendarDays, Clock3, PauseCircle, Podium, Timer, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarDays, Clock3, PauseCircle, Timer, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { AppHeading } from "@/components/design";
 import { cn } from "@/lib/utils";
@@ -370,20 +370,12 @@ function getSpeedChartRows(stats: SeriesStats, mode: SpeedChartMode) {
   }));
 }
 
-export function SeriesAnalyticsComparison({ stats, titled = false }: { stats: SeriesStats; titled?: boolean }) {
+export function SeriesAnalyticsComparison({ stats }: { stats: SeriesStats }) {
   const [mode, setMode] = useState<SpeedChartMode>("speed");
   return (
-    <section className={titled ? "space-y-6" : "space-y-4"}>
-      <div className={titled ? "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" : "flex flex-wrap items-center justify-between gap-3"}>
-        {titled ? (
-          <div>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              <AppHeading level={3} as="h2">Book Comparisons</AppHeading>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">Compare how long each book took and how quickly pages moved.</p>
-          </div>
-        ) : <h3 className="font-medium">Book comparisons</h3>}
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-medium">Book comparisons</h3>
         <SegmentedControl<SpeedChartMode>
           label="Book comparison metric"
           value={mode}
@@ -406,15 +398,7 @@ export function SeriesAnalyticsComparison({ stats, titled = false }: { stats: Se
   );
 }
 
-export function SeriesAnalyticsFull({
-  stats,
-  logsLoading,
-  logsError,
-}: {
-  stats: SeriesStats;
-  logsLoading: boolean;
-  logsError: string | null;
-}) {
+export function SeriesAnalyticsRankings({ stats }: { stats: SeriesStats }) {
   const [rankingMode, setRankingMode] = useState<RankingMode>("rating");
   const ranking = useMemo(() => {
     if (rankingMode === "length") {
@@ -444,47 +428,24 @@ export function SeriesAnalyticsFull({
   }, [rankingMode, stats.rankings]);
 
   return (
-    <div className="space-y-12">
-      <SeriesAnalyticsOverview stats={stats} logsLoading={logsLoading} logsError={logsError} />
-
-      <SeriesAnalyticsComparison stats={stats} titled />
-
-      <section className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Podium className="h-4 w-4 text-primary" />
-              <AppHeading level={3} as="h2">Book Rankings</AppHeading>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Compare standout volumes by rating, length, and annotations.
-            </p>
-          </div>
-          <SegmentedControl<RankingMode>
-            label="Book ranking metric"
-            value={rankingMode}
-            onChange={setRankingMode}
-            options={[
-              { value: "rating", label: "Top Rated" },
-              { value: "length", label: "Longest" },
-              { value: "annotations", label: "Most Annotated" },
-            ]}
-          />
-        </div>
-        <SeriesRankingPodium
-          key={rankingMode}
-          rows={ranking.rows}
-          formatValue={ranking.formatValue}
-          emptyLabel={ranking.emptyLabel}
-          getTieKey={ranking.getTieKey}
-        />
-      </section>
-
-      {logsError && (
-        <p className="text-sm text-muted-foreground">
-          Reading activity could not be loaded, so logged hours and date fallbacks may be unavailable.
-        </p>
-      )}
+    <div className="space-y-4">
+      <SegmentedControl<RankingMode>
+        label="Book ranking metric"
+        value={rankingMode}
+        onChange={setRankingMode}
+        options={[
+          { value: "rating", label: "Top Rated" },
+          { value: "length", label: "Longest" },
+          { value: "annotations", label: "Most Annotated" },
+        ]}
+      />
+      <SeriesRankingPodium
+        key={rankingMode}
+        rows={ranking.rows}
+        formatValue={ranking.formatValue}
+        emptyLabel={ranking.emptyLabel}
+        getTieKey={ranking.getTieKey}
+      />
     </div>
   );
 }

@@ -83,7 +83,7 @@ import { createSeriesJournalEntryRecord, fetchAllSeriesJournalEntryRecords } fro
 import { createAuthorJournalEntryRecord, fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
-import { bookJournalHref } from "@/lib/journalLinks";
+import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 import type {
   Book,
   AuthorJournalEntryRecord,
@@ -1823,12 +1823,12 @@ export function GroupsManager() {
 
     if (attachment.note.source_type === "series") {
       const matchingSeries = librarySeries.find((series) => series.id === attachment.note.source_id);
-      return matchingSeries ? `/series/${matchingSeries.id}/journal` : "/library/series";
+      return matchingSeries ? entityJournalHref("series", matchingSeries.id) : "/library/series";
     }
 
     if (attachment.note.source_type === "author") {
       const matchingAuthor = authorRecords.find((author) => author.id === attachment.note.source_id);
-      return matchingAuthor ? `/authors/${encodeURIComponent(matchingAuthor.id)}/journal` : "/authors";
+      return matchingAuthor ? entityJournalHref("author", matchingAuthor.id) : "/authors";
     }
 
     return "/library";
@@ -1842,8 +1842,8 @@ export function GroupsManager() {
     const libraryHref = noteImportTargetKind === "book"
       ? bookJournalHref(noteImportTargetId)
       : noteImportTargetKind === "series"
-        ? `/series/${noteImportTargetId}/journal`
-        : `/authors/${encodeURIComponent(noteImportTargetId)}/journal`;
+        ? entityJournalHref("series", noteImportTargetId)
+        : entityJournalHref("author", noteImportTargetId);
     setAttachmentImporting(messageId, true);
 
     setSaving(true);

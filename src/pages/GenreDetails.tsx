@@ -8,6 +8,7 @@ import { BookCheck, BookOpen, BookOpenText, ChevronRight, Star } from "lucide-re
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import BookCard from "@/components/BookCard";
+import DetailActionsMenu from "@/components/DetailActionsMenu";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import { GenreIllustration } from "@/components/genres/GenreVisuals";
 import { useBooksContext } from "@/context/BooksContext";
@@ -78,6 +79,7 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
         titleId={headingId}
         color={genre.is_system ? getGenreArtwork(slug).heroColor : "#ead0d3"}
         navigation={back}
+        actions={<DetailActionsMenu kind="genre" label={genre.name} />}
         artwork={<div className="rj-detail-genre-art"><GenreIllustration slug={slug} /></div>}
       >
         <div className="space-y-3">

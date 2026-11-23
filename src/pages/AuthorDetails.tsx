@@ -5,27 +5,26 @@ import {
   useId,
   useMemo,
   useState,
-  type ComponentType,
-  type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ChevronRight, FileText, Languages, Star, Tags } from "lucide-react";
+import { BookOpen, NotebookPen, Star } from "lucide-react";
 import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
 import BackButton from "@/components/BackButton";
-import BookCard from "@/components/BookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
-import { DetailJournal } from "@/components/redesign/DetailJournal";
+import { DetailBookAnnotations } from "@/components/redesign/DetailBookAnnotations";
+import { DetailBooks } from "@/components/redesign/DetailBooks";
+import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import {
   buildBookLibraryFilterPath,
   buildGenreDetailPath,
+  MetadataLink,
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -38,21 +37,17 @@ import {
   findAuthorSummary,
   getAuthorAverageRating,
   getAuthorInitials,
-  getAuthorPagesWritten,
 } from "@/lib/authorShelf";
-import {
-  fetchAuthorJournalEntryRecords,
-  sortAuthorJournalEntryRecords,
-} from "@/lib/authorJournal";
+import { fetchAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
-import { authorJournalToJournalEntries, sortJournalEntries } from "@/lib/journal";
+import { authorJournalToJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
-import type { AuthorJournalEntryRecord, BookJournalEntryRecord } from "@/types";
+import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
@@ -81,44 +76,6 @@ function AuthorPhoto({ name, photoUrl }: { name: string; photoUrl?: string | nul
   );
 }
 
-function SectionTitle({
-  title,
-  action,
-}: {
-  title: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rj-detail-section-heading">
-      <h2>{title}</h2>
-      {action}
-    </div>
-  );
-}
-
-function EmptySection({ message }: { message: string }) {
-  return (
-    <div className="rj-detail-quiet text-center text-sm">
-      {message}
-    </div>
-  );
-}
-
-function AuthorMetadataHeading({
-  icon: Icon,
-  title,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-}) {
-  return (
-    <h3 className="flex items-center gap-1.5 font-sans text-xs font-normal uppercase tracking-wide text-muted-foreground/70">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      {title}
-    </h3>
-  );
-}
-
 function uniqueSortedValues(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort(
     (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }),
@@ -143,52 +100,6 @@ function getTopValues(values: Array<string | null | undefined>, limit: number): 
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value, undefined, { sensitivity: "base", numeric: true }))
     .slice(0, limit)
     .map((item) => item.value);
-}
-
-function AuthorJournalSection({ author }: { author: { id: string; name: string } }) {
-  const [authorJournal, setAuthorJournalEntryRecords] = useState<AuthorJournalEntryRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const journalEntries = useMemo(
-    () => sortJournalEntries(authorJournalToJournalEntries(authorJournal)),
-    [authorJournal],
-  );
-
-  const loadAuthorJournalEntryRecords = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setAuthorJournalEntryRecords(await fetchAuthorJournalEntryRecords(author.id));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError, "Failed to load author journal entries"));
-    } finally {
-      setLoading(false);
-    }
-  }, [author.id]);
-
-  useEffect(() => {
-    void loadAuthorJournalEntryRecords();
-  }, [loadAuthorJournalEntryRecords]);
-
-  function rememberEntry(note: AuthorJournalEntryRecord) {
-    if (note.author_id !== author.id) return;
-    setAuthorJournalEntryRecords((current) => sortAuthorJournalEntryRecords([note, ...current.filter((entry) => entry.id !== note.id)]));
-  }
-
-  return (
-    <DetailJournal
-      entity={{ type: "Author", id: author.id }}
-      entries={journalEntries}
-      loading={loading}
-      error={error}
-      onSaved={(note) => { if ("author_id" in note) rememberEntry(note); }}
-      onEntryUpdated={(entry) => { if (entry.source === "author_note") rememberEntry(entry.authorJournalEntry); }}
-      onEntryDeleted={(entry) => {
-        if (entry.source === "author_note") setAuthorJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
-      }}
-    />
-  );
 }
 
 const authorDetailLabel = "Author details";
@@ -258,10 +169,8 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   }, [author, location, navigate]);
   const heroColor = useBookHeroColor(author?.photo_url);
   const authorBooks = author?.books ?? [];
-  const previewBooks = authorBooks.slice(0, 4);
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
   const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
-  const pagesWritten = useMemo(() => (author ? getAuthorPagesWritten(author) : 0), [author]);
   const authorGenres = useMemo(
     () => getTopValues(authorBooks.flatMap((book) => book.genres ?? []), 6),
     [authorBooks],
@@ -277,6 +186,11 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     );
   }, [genres]);
   const loading = authorsLoading || booksLoading || journalEntriesLoading || seriesLoading;
+  const authorJournal = useDetailJournalEntries(author?.id, fetchAuthorJournalEntryRecords, authorJournalToJournalEntries);
+  const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
+    if ("author_id" in record && record.author_id === author?.id) authorJournal.save(record);
+  }, [author?.id, authorJournal.save]);
+  const journalEditor = useDetailJournalEditor("Author", !loading && !isEditMode && user ? author?.id : undefined, saveJournalEntry);
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
@@ -362,7 +276,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     );
   }
 
-  const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
   const bio = author.bio?.trim() || "";
   if (isEditMode) {
     return (
@@ -408,7 +321,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
             onSendAttachment={openAttachmentPicker}
             deleteTitle="Delete this author?"
             deleteDescription="Deleting this author removes the record and unlinks it from books. The books stay in your library."
-            buttonClassName="size-11"
           />
         }
       >
@@ -418,95 +330,65 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           favorite={author.isFavorite}
           onToggleFavorite={() => void handleToggleFavorite()}
         />
+        <div className="rj-detail-actions">
+          <Button ref={journalEditor.triggerRef} type="button" variant="outline" disabled={!user} onClick={(event) => journalEditor.launch(event.currentTarget)}>
+            <NotebookPen aria-hidden="true" />
+            Add entry
+          </Button>
+        </div>
         {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
         {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
       </DetailHero>
 
       <div className="rj-detail-body">
-        {(bio || authorGenres.length > 0 || authorLanguages.length > 0) && (
-          <div className="rj-detail-about">
-            <AboutSection title="About" text={bio} emptyText="" />
-            {(authorGenres.length > 0 || authorLanguages.length > 0) && (
-              <details className="rj-detail-metadata">
-                <summary>Author details</summary>
-                <div className="grid gap-3 pb-2 pt-1 sm:grid-cols-2">
-                  {authorGenres.length > 0 && (
-                    <div>
-                      <AuthorMetadataHeading icon={Tags} title="Genres" />
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {authorGenres.map((genre) => {
-                          const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                          return (
-                            <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
-                              <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-                                {genre}
-                              </Link>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+        <dl className="rj-reading-stats rj-author-reading-stats">
+          <DetailStat icon={BookOpen} label="Books written" value={formatNumber(author.bookCount)} />
+          <DetailStat icon={Star} label="Average rating" value={formatAverageRating(averageRating)} />
+        </dl>
 
-                  {authorLanguages.length > 0 && (
-                    <div>
-                      <AuthorMetadataHeading icon={Languages} title="Languages" />
-                      <p className="mt-1.5 text-base">
-                        {authorLanguages.map((language, index) => (
-                          <span key={language}>
-                            {index > 0 ? ", " : null}
-                            <Link
-                              to={buildBookLibraryFilterPath("language", language)}
-                              className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            >
-                              {language}
-                            </Link>
-                          </span>
-                        ))}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-          </div>
-        )}
-
-        <section aria-labelledby={`${headingId}-summary`}>
-          <div className="rj-detail-section-heading"><h2 id={`${headingId}-summary`}>In your library</h2></div>
-          <dl className="rj-reading-stats">
-            <DetailStat icon={BookOpen} label="Books written" value={formatNumber(author.bookCount)} />
-            <DetailStat icon={FileText} label="Pages written" value={`~${formatNumber(pagesWritten)}`} />
-            <DetailStat icon={Star} label="Average rating" value={formatAverageRating(averageRating)} />
-          </dl>
-        </section>
-
-        <section className="space-y-4">
-          <SectionTitle
-            title="Books"
-            action={
-              <Button asChild variant="link" className="px-0 text-primary">
-                <Link to={booksViewAllPath}>
-                  View all
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </Button>
+        <div>
+          <AboutSection
+            className="rj-detail-description"
+            title="About this author"
+            text={bio}
+            titleContent={
+              <div className="rj-detail-tags">
+                {authorGenres.map((genre) => {
+                  const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                  return (
+                    <Link key={genre} to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+                      {genre}
+                    </Link>
+                  );
+                })}
+              </div>
             }
           />
-          {previewBooks.length === 0 ? (
-            <EmptySection message="Books by this author will appear here." />
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4">
-              {previewBooks.map((book) => (
-                <BookCard key={book.id} book={book} onClick={() => navigate(`/books/${book.id}`)} textSize="compact" />
-              ))}
-            </div>
+          {authorLanguages.length > 0 && (
+            <details className="rj-detail-metadata">
+              <summary>More author details</summary>
+              <dl>
+                <div>
+                  <dt>{authorLanguages.length === 1 ? "Language" : "Languages"}</dt>
+                  <dd>
+                    {authorLanguages.map((language, index) => (
+                      <span key={language}>
+                        {index > 0 && ", "}
+                        <MetadataLink to={buildBookLibraryFilterPath("language", language)}>{language}</MetadataLink>
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              </dl>
+            </details>
           )}
-        </section>
+        </div>
+
+        <DetailBooks books={authorBooks} />
 
         {authorSeries.length > 0 && (
           <section className="space-y-4">
-            <SectionTitle title="Series" />
+            <h2>Series</h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
               {authorSeries.map((group) => (
                 <SeriesStackCard key={group.seriesId} variant="grid" group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
@@ -515,7 +397,17 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           </section>
         )}
 
-        <AuthorJournalSection author={author} />
+        <DetailJournal
+          sectionId="journal"
+          entries={authorJournal.entries}
+          loading={authorJournal.loading}
+          error={authorJournal.error}
+          onAdd={journalEditor.launch}
+          onEntryUpdated={(entry) => { if (entry.source === "author_note") authorJournal.save(entry.authorJournalEntry); }}
+          onEntryDeleted={(entry) => { if (entry.source === "author_note") authorJournal.remove(entry.sourceId); }}
+          addDisabled={!user}
+        />
+        <DetailBookAnnotations books={authorBooks} notes={journalEntries} />
       </div>
 
       <SendAttachmentDialog

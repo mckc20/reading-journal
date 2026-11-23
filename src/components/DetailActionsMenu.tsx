@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bookmark, Copy, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import OverflowMenu from "@/components/OverflowMenu";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
@@ -12,13 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-type DetailKind = "book" | "author" | "series";
+type DetailKind = "book" | "author" | "series" | "genre";
 
 interface DetailActionsMenuProps {
   kind: DetailKind;
   label: string;
   shareLinkLabel?: string;
-  shareAttachmentLabel: string;
+  shareAttachmentLabel?: string;
   onPause?: () => void;
   pauseTitle?: string;
   pauseDescription?: string;
@@ -26,19 +26,12 @@ interface DetailActionsMenuProps {
   onEdit?: (trigger?: HTMLElement) => void;
   onDuplicate?: (trigger?: HTMLElement) => void;
   onWishlist?: () => void;
-  onDelete: (deleteLinkedBooks?: boolean) => void | Promise<void>;
-  onSendAttachment: () => void;
-  deleteTitle: string;
-  deleteDescription: string;
+  onDelete?: (deleteLinkedBooks?: boolean) => void | Promise<void>;
+  onSendAttachment?: () => void;
+  deleteTitle?: string;
+  deleteDescription?: string;
   deleteConfirmLabel?: string;
   className?: string;
-  buttonClassName?: string;
-}
-
-function entityLabel(kind: DetailKind): string {
-  if (kind === "book") return "book";
-  if (kind === "author") return "author";
-  return "series";
 }
 
 export default function DetailActionsMenu({
@@ -59,7 +52,6 @@ export default function DetailActionsMenu({
   deleteDescription,
   deleteConfirmLabel = "Delete",
   className,
-  buttonClassName,
 }: DetailActionsMenuProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
@@ -67,14 +59,13 @@ export default function DetailActionsMenu({
   const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
-  const currentUrl = useMemo(() => window.location.href, []);
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
   }, [shareOpen]);
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(currentUrl);
+      await navigator.clipboard.writeText(window.location.href);
       setCopyStatus("Link copied.");
     } catch {
       setCopyStatus("Could not copy link.");
@@ -83,7 +74,7 @@ export default function DetailActionsMenu({
 
   async function runDelete() {
     setDeleteOpen(false);
-    await onDelete(kind === "series" && deleteLinkedBooks);
+    await onDelete?.(kind === "series" && deleteLinkedBooks);
   }
 
   async function runPause() {
@@ -93,10 +84,10 @@ export default function DetailActionsMenu({
 
   return (
     <div className={cn("relative", className)}>
-      <OverflowMenu label="More actions" className={cn(
-          "h-8 w-8 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-transparent hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
-          buttonClassName,
-        )}>{(close, trigger) => <>
+      <OverflowMenu
+        label="More actions"
+        className="size-11 rounded-full border-0 bg-transparent text-foreground/80 shadow-none hover:bg-background/30 aria-expanded:bg-background/30 focus-visible:border-transparent focus-visible:ring-0"
+      >{(close, trigger) => <>
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
@@ -161,24 +152,26 @@ export default function DetailActionsMenu({
             </button>
           )}
           {onWishlist && <button type="button" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { close(); onWishlist(); }}><Bookmark className="h-4 w-4" />Move to Wishlist</button>}
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
-            onClick={() => {
-              close();
-              setDeleteLinkedBooks(false);
-              setDeleteOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-destructive hover:bg-muted"
+              onClick={() => {
+                close();
+                setDeleteLinkedBooks(false);
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
         </>}</OverflowMenu>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Share this {entityLabel(kind)}</DialogTitle>
+            <DialogTitle>Share this {kind}</DialogTitle>
             <DialogDescription>{label}</DialogDescription>
           </DialogHeader>
 
@@ -187,10 +180,12 @@ export default function DetailActionsMenu({
               <Share2 className="mr-2 h-4 w-4" />
               {shareLinkLabel}
             </Button>
-            <Button type="button" className="w-full justify-start" onClick={onSendAttachment}>
-              <Send className="mr-2 h-4 w-4" />
-              {shareAttachmentLabel}
-            </Button>
+            {onSendAttachment && shareAttachmentLabel && (
+              <Button type="button" className="w-full justify-start" onClick={onSendAttachment}>
+                <Send className="mr-2 h-4 w-4" />
+                {shareAttachmentLabel}
+              </Button>
+            )}
             {copyStatus && <p className="text-xs text-muted-foreground">{copyStatus}</p>}
           </div>
         </DialogContent>
@@ -215,23 +210,25 @@ export default function DetailActionsMenu({
         </Dialog>
       )}
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{deleteTitle}</DialogTitle>
-            <DialogDescription>{deleteDescription}</DialogDescription>
-          </DialogHeader>
-          {kind === "series" && <DeleteSeriesBooksOption checked={deleteLinkedBooks} onChange={setDeleteLinkedBooks} />}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="destructive" onClick={() => void runDelete()}>
-              {deleteConfirmLabel}{kind === "series" && deleteLinkedBooks ? " series and books" : ""}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {onDelete && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{deleteTitle}</DialogTitle>
+              <DialogDescription>{deleteDescription}</DialogDescription>
+            </DialogHeader>
+            {kind === "series" && <DeleteSeriesBooksOption checked={deleteLinkedBooks} onChange={setDeleteLinkedBooks} />}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="destructive" onClick={() => void runDelete()}>
+                {deleteConfirmLabel}{kind === "series" && deleteLinkedBooks ? " series and books" : ""}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
