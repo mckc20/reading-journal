@@ -1,0 +1,21 @@
+.rj-library-collections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 22px;
+  font-family: var(--font-body);
+  --tab-background: var(--rj-rose-light);
+}
+
+.rj-library-collections [role="tab"] {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rj-library-collections [role="tab"]:hover { background: var(--surface-hover); }
+.rj-library-collections [aria-selected="true"] { background: transparent; font-weight: 600; }
+.rj-library-collections [role="tab"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }

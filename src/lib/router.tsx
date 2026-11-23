@@ -1,6 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet, useLocation, useOutletContext, useParams } from "react-router-dom";
+import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 
@@ -11,6 +12,8 @@ const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Library = lazy(() => import("@/pages/Library"));
+const LibraryTabs = lazy(() => import("@/components/redesign/LibraryNavigation").then(module => ({ default: module.LibraryTabs })));
+const LibraryCollections = lazy(() => import("@/pages/LibraryCollections"));
 const Wishlist = lazy(() => import("@/pages/Wishlist"));
 const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
@@ -39,6 +42,15 @@ const Settings = lazy(() => import("@/pages/Settings"));
 
 function lazyRoute(element: ReactNode) {
   return <Suspense fallback={<LoadingIndicator variant="page" />}>{element}</Suspense>;
+}
+
+function animatedRoute(path: string, element: ReactNode) {
+  return { path, element: lazyRoute(<div key={path} className="rj-route-enter">{element}</div>) };
+}
+
+function LibraryLayoutRoute() {
+  const appContext = useOutletContext<AppLayoutOutletContext>();
+  return <LibraryTabs><Outlet context={appContext} /></LibraryTabs>;
 }
 
 function NotFound() {
@@ -98,17 +110,24 @@ export const router = createBrowserRouter([
       {
         element: lazyRoute(<AppLayout />),
         children: [
-          { path: "/", element: lazyRoute(<Dashboard />) },
-          { path: "/library", element: lazyRoute(<Library />) },
+          animatedRoute("/", <Dashboard />),
+          {
+            path: "/library",
+            element: lazyRoute(<LibraryLayoutRoute />),
+            children: [
+              { index: true, element: <Library /> },
+              { path: "collections", element: <LibraryCollections /> },
+              { path: "series", element: <Series /> },
+            ],
+          },
           { path: "/library/wishlist", element: lazyRoute(<Wishlist />) },
           { path: "/library/books", element: lazyRoute(<ExploreLibrary />) },
           { path: "/library/authors", element: lazyRoute(<AuthorsExplore />) },
-          { path: "/library/series", element: lazyRoute(<Series />) },
           { path: "/library/genres", element: lazyRoute(<Genres />) },
           { path: "/library/genres/all", element: lazyRoute(<AllGenres />) },
-          { path: "/library/journal", element: lazyRoute(<LibraryJournal />) },
+          animatedRoute("/library/journal", <LibraryJournal />),
           { path: "/journal/:publicId", element: lazyRoute(<JournalEntryRedirect />) },
-          { path: "/statistics", element: lazyRoute(<Analytics />) },
+          animatedRoute("/statistics", <Analytics />),
           { path: "/reading-history", element: lazyRoute(<ReadingHistory />) },
           { path: "/wrap-ups", element: lazyRoute(<WrapUps />) },
           { path: "/wrap-ups/:monthKey", element: lazyRoute(<WrapUps />) },
@@ -144,7 +163,7 @@ export const router = createBrowserRouter([
           { path: "/chat", element: <Navigate to="/messages" replace /> },
           { path: "/group", element: <Navigate to="/messages" replace /> },
           { path: "/groups", element: <Navigate to="/messages" replace /> },
-          { path: "/profile", element: lazyRoute(<Profile />) },
+          animatedRoute("/profile", <Profile />),
           { path: "/profiles/:profileId", element: lazyRoute(<PublicProfile />) },
           { path: "/settings", element: lazyRoute(<Settings />) },
           { path: "/settings/:tab", element: lazyRoute(<Settings />) },

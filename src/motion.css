@@ -44,6 +44,16 @@
 .rj-segmented-control { --tab-background: var(--primary); }
 .rj-segmented-control > [aria-pressed="true"] { color: var(--primary-foreground); background: transparent; }
 
+@keyframes rj-content-enter {
+  from { opacity: .35; }
+  to { opacity: 1; }
+}
+
+@keyframes rj-layout-enter {
+  from { opacity: .5; translate: 0 6px; }
+  to { opacity: 1; translate: none; }
+}
+
 .rj-chart-surface {
   min-width: 0;
   padding: 16px;
@@ -66,6 +76,9 @@
 .rj-chart-bar-horizontal { transform-origin: left center; }
 
 @media (prefers-reduced-motion: no-preference) {
+  .rj-route-enter { animation: rj-content-enter 240ms ease-out; }
+  .rj-layout-enter { animation: rj-layout-enter 240ms cubic-bezier(.2, .85, .25, 1); }
+
   :is(.rj-menu-motion, .rj-add-menu:not(.rj-create-menu), [data-slot="select-content"]):not([data-state="closed"]) {
     animation: rj-menu-open 270ms cubic-bezier(.16, 1, .3, 1) both;
   }

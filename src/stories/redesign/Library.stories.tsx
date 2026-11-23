@@ -1,29 +1,43 @@
 import { useState } from 'react';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
 import { LibraryPreview, type LibraryPreviewProps } from '@/components/redesign/LibraryPreview';
+import { HomeShell } from '@/components/redesign/HomeShell';
+import { LibraryTabs } from '@/components/redesign/LibraryNavigation';
 import { libraryBooks } from './libraryFixtures';
 import { CollectionsPreview } from '@/components/redesign/CollectionsPreview';
 
 
 function LibraryReview(args: LibraryPreviewProps) {
   const [notice, setNotice] = useState('');
-  const [page, setPage] = useState<'Books' | 'Collections'>('Books');
   const [error, setError] = useState(args.error);
   const preview = (message: string) => setNotice(`${message} — preview only`);
-  return <>
-    {page === 'Collections' ? <CollectionsPreview {...args} error={error} onRetry={() => setError(undefined)} onNavigate={destination => preview(destination)} onCreate={destination => preview(`Create ${destination}`)} onNotifications={() => preview('Notifications')} onLibraryNavigate={destination => { if (destination === 'Books') setPage('Books'); else if (destination === 'Series') preview('Series'); }} onOpenBook={book => preview(`Book details: ${book.title}`)} /> : <LibraryPreview {...args} error={error} onRetry={() => { setError(undefined); preview('Library reloaded'); }}
-      onOpenBook={book => preview(`Book details: ${book.title}`)}
-      onNavigate={destination => preview(destination)} onCreate={destination => preview(`Create ${destination}`)}
-      onNotifications={() => preview('Notifications')} onCollection={collection => { if (collection === 'Collections') setPage('Collections'); else preview(collection); }} />}
+  const props = {
+    ...args,
+    error,
+    onRetry: () => setError(undefined),
+    onOpenBook: (book: LibraryPreviewProps['books'][number]) => preview(`Book details: ${book.title}`),
+    onNavigate: preview,
+    onCreate: (destination: string) => preview(`Create ${destination}`),
+    onNotifications: () => preview('Notifications'),
+  };
+  return <MemoryRouter initialEntries={['/library']}>
+    <Routes>
+      <Route path="/library" element={<HomeShell {...props} activeDestination="Library"><LibraryTabs><Outlet /></LibraryTabs></HomeShell>}>
+        <Route index element={<LibraryPreview {...props} />} />
+        <Route path="collections" element={<CollectionsPreview {...props} />} />
+        <Route path="series" element={<p role="status">Series — preview only</p>} />
+      </Route>
+    </Routes>
     {notice && <div role="status" style={{ position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 100, width: 'min(90%, 520px)', padding: 12, borderRadius: 12, background: '#21150f', color: 'white', fontSize: 13 }}>{notice}</div>}
-  </>;
+  </MemoryRouter>;
 }
 const noop = () => {};
 const meta = {
   title: 'Redesign/Library', component: LibraryPreview,
   parameters: { layout: 'fullscreen', docs: { description: { component: 'The Books and Collections views used by the signed-in Library overview. Storybook uses fictional data and reports intent for Series, creating a book and opening book details. Wishlist entries appear under Collections. Advanced filters and bulk tools are available in the app’s separate All books page.' } } },
-  args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop, onCollection: noop },
+  args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
   render: args => <LibraryReview key={JSON.stringify([args.books, args.error, args.loading, args.initialQuery])} {...args} />,
 } satisfies Meta<typeof LibraryPreview>;
 export default meta;
@@ -38,12 +52,12 @@ export const NoResults: Story = { args: { initialQuery: 'A book that is not here
 export const BrowseCollections: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const navigation = within(canvas.getByRole('navigation', { name: 'Library collections' }));
-    await expect(navigation.getAllByRole('button').map(button => button.textContent)).toEqual(['Books', 'Collections', 'Series']);
-    await userEvent.click(navigation.getByRole('button', { name: 'Collections' }));
+    const navigation = within(canvas.getByRole('tablist', { name: 'Library collections' }));
+    await expect(navigation.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Books', 'Collections', 'Series']);
+    await userEvent.click(navigation.getByRole('tab', { name: 'Collections' }));
     await userEvent.click(within(canvas.getByRole('list', { name: 'Default collections' })).getByRole('button', { name: 'Wishlist' }));
     await expect(within(canvas.getByRole('list', { name: 'Library books' })).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
-    await userEvent.click(within(canvas.getByRole('navigation', { name: 'Library collections' })).getByRole('button', { name: 'Books' }));
+    await userEvent.click(within(canvas.getByRole('tablist', { name: 'Library collections' })).getByRole('tab', { name: 'Books' }));
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
     await expect(canvas.queryByRole('button', { name: 'A Future Adventure' })).not.toBeInTheDocument();
   },
@@ -73,15 +87,15 @@ export const MobileSearch: Story = {
   play: async ({ canvasElement }) => {
     if (!window.matchMedia('(max-width: 767px)').matches) return;
     const canvas = within(canvasElement);
-    const heading = canvas.getByRole('heading', { name: 'Library' });
+    const bookList = canvas.getByRole('list', { name: 'Library books' });
     const swipe = (from: number, to: number) => {
       // Plain Events also run in browsers without a constructible Touch class.
       const start = new Event('touchstart', { bubbles: true });
       Object.defineProperty(start, 'touches', { value: [{ clientX: 100, clientY: from }] });
-      fireEvent(heading, start);
+      fireEvent(bookList, start);
       const end = new Event('touchend', { bubbles: true });
       Object.defineProperty(end, 'changedTouches', { value: [{ clientX: 100, clientY: to }] });
-      fireEvent(heading, end);
+      fireEvent(bookList, end);
     };
     await expect(canvas.queryByRole('searchbox')).not.toBeInTheDocument();
     swipe(500, 380);
@@ -112,14 +126,13 @@ export const MobileSearch: Story = {
 export const SortingAndLayout: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const list = canvas.getByRole('list', { name: 'Library books' });
-    const titles = () => within(list).getAllByRole('button').map(button => button.textContent);
+    const titles = () => within(canvas.getByRole('list', { name: 'Library books' })).getAllByRole('button').map(button => button.textContent);
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'title');
     await expect(titles()[1]).toBe('An Atlas of Quiet Places and the People Who Find Them');
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'author');
     await expect(titles()[2]).toBe('The Hobbit');
     await userEvent.click(canvas.getByRole('button', { name: 'List view' }));
-    await expect(list).toHaveAttribute('data-view', 'list');
+    await expect(canvas.getByRole('list', { name: 'Library books' })).toHaveAttribute('data-view', 'list');
     await expect(canvas.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'recent');
     await expect(titles()[0]).toBe('A Psalm for the Wild-Built');

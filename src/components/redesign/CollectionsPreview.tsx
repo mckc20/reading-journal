@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, BookOpen, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
-import { HomeShell } from './HomeShell';
-import { LibraryNavigation, type LibraryDestination } from './LibraryNavigation';
+import { LibrarySearchButton } from './LibraryNavigation';
 import { LibraryBookGrid } from './LibraryBookGrid';
 import { CollectionSearch } from './CollectionSearch';
 import type { LibraryContentProps, LibraryPreviewProps, LibraryPreviewBook } from './LibraryPreview';
@@ -28,24 +27,19 @@ export function parseCollectionId(value: string | null): CollectionId | null {
 interface LibraryCollectionsProps extends Omit<LibraryContentProps, 'initialQuery'> {
   initialCollection?: CollectionId;
   selection?: { collection: CollectionId | null; onChange: (collection: CollectionId | null) => void };
-  onLibraryNavigate: (destination: LibraryDestination) => void;
-  wrapContent?: (content: ReactNode) => ReactNode;
 }
 
-export interface CollectionsPreviewProps extends Omit<LibraryPreviewProps, 'onCollection' | 'initialQuery'> {
+export interface CollectionsPreviewProps extends Omit<LibraryPreviewProps, 'initialQuery'> {
   initialCollection?: CollectionId;
-  onLibraryNavigate: (destination: LibraryDestination) => void;
 }
 
 export function CollectionsPreview(props: CollectionsPreviewProps) {
-  return <LibraryCollections {...props} wrapContent={content => (
-    <HomeShell {...props} activeDestination="Library">{content}</HomeShell>
-  )} />;
+  return <LibraryCollections {...props} />;
 }
 
 /** Derived default collections; no separate records or persistence are needed. */
 export function LibraryCollections({
-  books, initialCollection, selection, onLibraryNavigate, loading, error, wrapContent = content => content, ...actions
+  books, initialCollection, selection, loading, error, ...actions
 }: LibraryCollectionsProps) {
   const [localSelection, setLocalSelection] = useState<CollectionId | null>(initialCollection ?? null);
   const selected = selection ? selection.collection : localSelection;
@@ -77,12 +71,8 @@ export function LibraryCollections({
 
   return <CollectionSearch key={selected ?? 'collections'} collection={current ? `${current.id === 'Favorites' ? 'Favorite' : current.id} books` : 'Collections'}
     items={searchItems} query={query} onQueryChange={setQuery} onSelect={id => { if (current) openBook(id); else openCollection(id as CollectionId); }}>
-    {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview rj-collections-preview">{wrapContent(<>
-      <header className="rj-library-heading"><div><p className="rj-library-eyebrow">Your reading collection</p><h1>Library</h1></div>{mobileSearchButton}</header>
-      <LibraryNavigation current="Collections" onNavigate={destination => {
-        if (destination === 'Collections') { setSelected(null); setQuery(''); }
-        else onLibraryNavigate(destination);
-      }} />
+    {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview rj-collections-preview">
+      <LibrarySearchButton>{mobileSearchButton}</LibrarySearchButton>
       {loading ? <p role="status">Loading your collections…</p> : error ? <EmptyState title="Your collections couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
         <div className="rj-collections-toolbar"><div>
           {current && <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}><ArrowLeft aria-hidden="true" />All collections</Button>}
@@ -93,7 +83,7 @@ export function LibraryCollections({
           : visibleCollections.length ? <ul ref={grid} className="rj-collection-grid" aria-label="Default collections">{visibleCollections.map(collection => <CollectionCard key={collection.id} collection={collection} onOpen={() => openCollection(collection.id)} />)}</ul>
           : <EmptyState title="No collections found" message="Try a collection name, such as Reading or Favorites." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />}
       </>}
-    </>)}</div>}
+    </div>}
   </CollectionSearch>;
 }
 

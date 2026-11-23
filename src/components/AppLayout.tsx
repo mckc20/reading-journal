@@ -426,7 +426,8 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
-  const menuLinks = matchPath("/library", pathname) ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
+  const hasLibraryMenu = ["/library", "/library/collections", "/library/series"].some(path => matchPath(path, pathname));
+  const menuLinks = hasLibraryMenu ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
 
   return (
     <div className="rj-app-header-wrap">

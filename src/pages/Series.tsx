@@ -9,7 +9,6 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronRight, Copy, Download, ListFilter, SquareMousePointer, Trash2, X } from "lucide-react";
-import BackButton from "@/components/BackButton";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
 import { selectionLabel } from "@/lib/selectionLabels";
@@ -230,9 +229,8 @@ export default function Series() {
       </LibraryFiltersDialog>
     <div className="space-y-4">
       <div className="relative flex flex-wrap items-start gap-2 pr-20">
-        <BackButton fallbackTo="/library" className="mt-1" />
         <div className="space-y-1">
-          <AppHeading level={1} as="h1">Series</AppHeading>
+          <AppHeading level={2} as="h2">Series</AppHeading>
           <HeadingDescription>
             {loading ? "..." : `${groups.length} series`}
           </HeadingDescription>

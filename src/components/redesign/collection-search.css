@@ -17,10 +17,10 @@
 @media (max-width: 767px) {
   .rj-desktop-search { display: none; }
   .rj-redesign .rj-mobile-search-button { display: inline-flex; }
-  .rj-collection-search[data-search-revealed] .rj-home-shell { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
+  :is(.rj-collection-search[data-search-revealed] .rj-home-shell, .rj-home-shell:has(.rj-collection-search[data-search-revealed])) { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
   .rj-mobile-search-bar { position: fixed; bottom: calc(90px + env(safe-area-inset-bottom)); left: 20px; right: 20px; z-index: 30; display: flex; align-items: center; padding: 6px; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 6px 24px #21150f18; animation: rj-search-reveal 180ms ease-out; }
   .rj-search-invitation { min-width: 0; display: flex; flex: 1; align-items: center; gap: 10px; min-height: 44px; padding: 10px; color: var(--muted-foreground); text-align: left; }
-  .rj-collection-search[data-search-revealed] .rj-floating-add { bottom: calc(170px + env(safe-area-inset-bottom)); }
+  :is(.rj-collection-search[data-search-revealed], .rj-home-shell:has(.rj-collection-search[data-search-revealed])) .rj-floating-add { bottom: calc(170px + env(safe-area-inset-bottom)); }
 }
 @keyframes rj-search-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .rj-mobile-search-bar { animation: none; } }

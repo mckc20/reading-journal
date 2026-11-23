@@ -1,25 +1,43 @@
 import { useState } from 'react';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { CollectionsPreview, type CollectionsPreviewProps } from '@/components/redesign/CollectionsPreview';
+import { LibraryPreview } from '@/components/redesign/LibraryPreview';
+import { HomeShell } from '@/components/redesign/HomeShell';
+import { LibraryTabs } from '@/components/redesign/LibraryNavigation';
 import { libraryBooks } from './libraryFixtures';
 
 function CollectionsReview(args: CollectionsPreviewProps) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState(args.error);
   const preview = (action: string) => setNotice(`${action} — preview only.`);
-  return <><CollectionsPreview {...args} error={error} onRetry={() => setError(undefined)}
-    onLibraryNavigate={preview} onNavigate={preview} onCreate={preview} onNotifications={() => preview('Notifications')}
-    onOpenBook={book => preview(`Book details: ${book.title}`)} />
+  const props = {
+    ...args,
+    error,
+    onRetry: () => setError(undefined),
+    onNavigate: preview,
+    onCreate: preview,
+    onNotifications: () => preview('Notifications'),
+    onOpenBook: (book: CollectionsPreviewProps['books'][number]) => preview(`Book details: ${book.title}`),
+  };
+  return <MemoryRouter initialEntries={['/library/collections']}>
+    <Routes>
+      <Route path="/library" element={<HomeShell {...props} activeDestination="Library"><LibraryTabs><Outlet /></LibraryTabs></HomeShell>}>
+        <Route index element={<LibraryPreview {...props} />} />
+        <Route path="collections" element={<CollectionsPreview {...props} />} />
+        <Route path="series" element={<p role="status">Series — preview only</p>} />
+      </Route>
+    </Routes>
     {notice && <p role="status" className="rj-redesign" style={{ padding: 16 }}>{notice}</p>}
-  </>;
+  </MemoryRouter>;
 }
 
 const noop = () => {};
 const meta = {
   title: 'Redesign/Collections', component: CollectionsPreview,
   parameters: { layout: 'fullscreen', docs: { description: { component: 'A separate collection index with eight default collections: the seven canonical book statuses (including Wishlist) and Favorites. Cards use covers and live sample counts; empty cards stay available. Opening a card shows only its books using the shared Library book grid. Favorites contains favorite library books; wishes have their own Wishlist collection. Search is scoped to collection names on the index and to the selected collection’s books after opening. Fictional data only; nothing is persisted.' } } },
-  args: { books: libraryBooks, onLibraryNavigate: noop, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
+  args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
   render: args => <CollectionsReview key={JSON.stringify([args.books, args.initialCollection, args.loading, args.error])} {...args} />,
 } satisfies Meta<typeof CollectionsPreview>;
 export default meta;
