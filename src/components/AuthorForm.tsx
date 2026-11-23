@@ -1,6 +1,7 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Trash2 } from "lucide-react";
 import SaveCancelBar from "@/components/SaveCancelBar";
+import { CoverUploadField } from "@/components/redesign/CoverUploadField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +27,6 @@ interface AuthorFormProps {
   onCancel: () => void;
   onSaved?: (author: Author) => void;
   submitLabel: string;
-  mode?: "page" | "dialog";
 }
 
 function toFormValues(author?: Author | null, initialName = ""): AuthorFormValues {
@@ -44,7 +44,6 @@ export default function AuthorForm({
   onCancel,
   onSaved,
   submitLabel,
-  mode = "page",
 }: AuthorFormProps) {
   const [values, setValues] = useState<AuthorFormValues>(() => toFormValues(initialAuthor, initialName));
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -73,13 +72,11 @@ export default function AuthorForm({
   }, [photoFile]);
 
   const currentPhotoUrl = removePhoto ? null : photoPreviewUrl ?? initialAuthor?.photo_url ?? null;
-  const photoAlt = initialAuthor?.name ?? initialName ?? "Author photo";
+  const photoAlt = initialAuthor?.name || initialName || "Author photo";
 
-  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
+  function handlePhotoChange(file: File) {
     setPhotoFile(file);
     setRemovePhoto(false);
-    event.target.value = "";
   }
 
   function handleRemovePhoto() {
@@ -115,57 +112,21 @@ export default function AuthorForm({
     }
   }
 
-  const photoField = (
-    <div className="space-y-2">
-      <Label>Photo</Label>
-      <div className="flex flex-col items-start gap-2">
-        <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border bg-muted">
-          {currentPhotoUrl ? (
-            <img src={currentPhotoUrl} alt={photoAlt} className="h-full w-full object-cover" />
-          ) : (
-            <ImagePlus className="h-8 w-8 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground/70" />
-          )}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            <ImagePlus className="h-5 w-5 text-white" />
-          </div>
-          <Input
-            type="file"
-            accept="image/*"
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            onChange={handlePhotoChange}
-            disabled={saving}
-          />
-        </label>
-        {(currentPhotoUrl || photoFile) && (
-          mode === "page" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              aria-label="Remove photo"
-              onClick={handleRemovePhoto}
-              disabled={saving}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button type="button" variant="ghost" onClick={handleRemovePhoto} className="gap-2 px-2" disabled={saving}>
-              <Trash2 className="h-4 w-4" />
-              Remove
-            </Button>
-          )
-        )}
-        <p className="text-xs text-muted-foreground">PNG, JPG, WEBP, or AVIF. Click the image to upload.</p>
-      </div>
-    </div>
-  );
-
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 pb-24">
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start">
-          {photoField}
+    <form onSubmit={handleSubmit} className="rj-book-form">
+      <div className="rj-book-form-scroll space-y-4">
+        <div className="grid gap-5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-start">
+          <div className="max-w-40 space-y-2">
+            <Label htmlFor="author-photo">Photo</Label>
+            <CoverUploadField id="author-photo" label="Photo" shape="portrait" preview={currentPhotoUrl}
+              previewAlt={photoAlt} fileName={photoFile?.name} disabled={saving} onFileChange={handlePhotoChange} />
+            {currentPhotoUrl && (
+              <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={handleRemovePhoto} disabled={saving}>
+                <Trash2 aria-hidden="true" /> Remove photo
+              </Button>
+            )}
+          </div>
+
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="author-name">Name *</Label>
@@ -177,25 +138,24 @@ export default function AuthorForm({
                 disabled={saving}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="author-bio">Bio</Label>
+              <Textarea
+                id="author-bio"
+                rows={5}
+                value={values.bio}
+                onChange={(event) => setValues((current) => ({ ...current, bio: event.target.value }))}
+                disabled={saving}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="author-bio">Bio</Label>
-          <Textarea
-            id="author-bio"
-            rows={5}
-            value={values.bio}
-            onChange={(event) => setValues((current) => ({ ...current, bio: event.target.value }))}
-            disabled={saving}
-          />
-        </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
 
       <SaveCancelBar
-        mode={mode === "dialog" ? "dialog" : "page"}
+        mode="creation-dialog"
         onCancel={handleCancel}
         saving={saving}
         saveDisabled={!values.name.trim()}

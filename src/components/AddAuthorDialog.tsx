@@ -1,5 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UserRound } from "lucide-react";
+import { Dialog } from "@/components/ui/dialog";
 import AuthorForm from "@/components/AuthorForm";
+import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
 import { useAuthorsContext } from "@/context";
 import type { Author } from "@/types";
 
@@ -25,16 +27,16 @@ export default function AddAuthorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit author" : "Add Author"}</DialogTitle>
-        </DialogHeader>
-
+      <CreationDialogContent
+        title={isEditing ? "Edit author" : "Add Author"}
+        description={isEditing ? "Update the author details shown in your library." : "Create an author profile in your library."}
+        icon={UserRound}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <AuthorForm
           key={`${open}-${initialAuthor?.id ?? initialName}`}
           initialAuthor={initialAuthor}
           initialName={initialName}
-          mode="dialog"
           submitLabel={isEditing ? "Save changes" : "Add author"}
           onCancel={() => onOpenChange(false)}
           onSave={(payload) =>
@@ -47,7 +49,7 @@ export default function AddAuthorDialog({
             onOpenChange(false);
           }}
         />
-      </DialogContent>
+      </CreationDialogContent>
     </Dialog>
   );
 }

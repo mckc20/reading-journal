@@ -6,19 +6,22 @@ interface CoverUploadFieldProps {
   label: string;
   preview: string | null;
   fileName?: string;
-  shape: "cover" | "banner";
+  shape: "cover" | "banner" | "portrait";
+  previewAlt?: string;
   disabled?: boolean;
   onFileChange: (file: File) => void;
 }
 
-export function CoverUploadField({ id, label, preview, fileName, shape, disabled, onFileChange }: CoverUploadFieldProps) {
+const shapeClass = { cover: "aspect-[2/3]", banner: "aspect-[16/7]", portrait: "aspect-square" };
+
+export function CoverUploadField({ id, label, preview, fileName, shape, previewAlt = "", disabled, onFileChange }: CoverUploadFieldProps) {
   const descriptionId = `${id}-description`;
 
   return (
     <div className="min-w-0 space-y-2">
       <label className={cn(
         "rj-creation-upload group relative flex cursor-pointer items-center justify-center overflow-hidden border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60",
-        shape === "cover" ? "aspect-[2/3]" : "aspect-[16/7]",
+        shapeClass[shape],
       )}>
         <input id={id} type="file" accept="image/*" className="sr-only" aria-label={label} aria-describedby={descriptionId} disabled={disabled}
           onChange={event => {
@@ -28,7 +31,7 @@ export function CoverUploadField({ id, label, preview, fileName, shape, disabled
             event.currentTarget.value = "";
           }} />
         {preview ? (
-          <img src={preview} alt="" className="h-full w-full object-cover" />
+          <img src={preview} alt={previewAlt} className="h-full w-full object-cover" />
         ) : (
           <span className="flex flex-col items-center gap-2 px-2 text-center text-muted-foreground" aria-hidden="true">
             <ImagePlus className="h-6 w-6" />
