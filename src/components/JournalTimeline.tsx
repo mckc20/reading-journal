@@ -2139,6 +2139,7 @@ export default function JournalTimeline({
   const [highlightedEntryId, setHighlightedEntryId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
   const consumedSelectedEntryIdRef = useRef<string | null>(null);
+  const visibleEntriesRef = useRef<HTMLDivElement>(null);
   const visibleEntries = useMemo(() => entries, [entries]);
   const generatedPanelReferenceEntries = useMemo(() => {
     const generatedEntries = new Map<string, GeneratedBookJournalEntry>();
@@ -2402,7 +2403,9 @@ export default function JournalTimeline({
     if (consumedSelectedEntryIdRef.current === selectedEntryId) return;
 
     const timeoutId = window.setTimeout(() => {
-      const target = document.getElementById(journalEntryElementId(selectedEntryId));
+      const timeline = visibleEntriesRef.current;
+      if (!timeline || timeline.closest("[inert]")) return;
+      const target = timeline.querySelector<HTMLElement>(`#${journalEntryElementId(selectedEntryId)}`);
       if (!target) return;
 
       consumedSelectedEntryIdRef.current = selectedEntryId;
@@ -2927,7 +2930,7 @@ export default function JournalTimeline({
   return (
     <>
       {layout === "list" && listEntries.length > 0 ? (
-        <div className={cn("mr-auto max-w-5xl space-y-3", className)}>
+        <div ref={visibleEntriesRef} className={cn("mr-auto max-w-5xl space-y-3", className)}>
           {inlineComposer && (
             <InlineJournalEntryComposer
               open={inlineComposer.open}
@@ -3037,7 +3040,7 @@ export default function JournalTimeline({
           )}
         </div>
       ) : splitEntries.visible.length > 0 ? (
-        <div className={cn(layout === "cards" ? "grid gap-3 md:grid-cols-2" : "space-y-4", className)}>
+        <div ref={visibleEntriesRef} className={cn(layout === "cards" ? "grid gap-3 md:grid-cols-2" : "space-y-4", className)}>
           {inlineComposer && layout !== "cards" && (
             <InlineJournalEntryComposer
               open={inlineComposer.open}

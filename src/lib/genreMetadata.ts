@@ -93,6 +93,18 @@ export function getGenreArtwork(slug: string) {
     compass: "from-[#92acb8]/30 via-[#92acb8]/15 to-[#b9c8af]/15",
     sparkles: "from-[#b7a0bc]/30 via-[#b7a0bc]/15 to-[#d9b5b2]/15",
   };
+  const heroColors: Record<GenreAccent, string> = {
+    book: "#dce2ce",
+    castle: "#cee3d3",
+    orbit: "#dcd1ec",
+    heart: "#ead0d3",
+    search: "#dbd6e1",
+    feather: "#efddc2",
+    landmark: "#efd5c7",
+    leaf: "#dbe5c4",
+    compass: "#d0e1eb",
+    sparkles: "#e7d1e8",
+  };
   const iconColors: Record<GenreAccent, string> = {
     book: "text-[#a6ad96] dark:text-[#c0c7af]",
     castle: "text-[#90aa96] dark:text-[#aec4b1]",
@@ -108,6 +120,7 @@ export function getGenreArtwork(slug: string) {
   return {
     illustration: genreIcons[slug] ?? BookOpen,
     accentClassName: accents[accent],
+    heroColor: heroColors[accent],
     iconClassName: iconColors[accent],
   };
 }

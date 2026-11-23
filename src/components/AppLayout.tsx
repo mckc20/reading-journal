@@ -1,6 +1,6 @@
 import LoadingDialog from "@/components/LoadingDialog";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Link, UNSAFE_LocationContext, useLocation, useMatch, useNavigate, useNavigationType, useOutlet } from "react-router-dom";
+import { Link, matchPath, UNSAFE_LocationContext, useLocation, useNavigate, useNavigationType, useOutlet } from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -73,7 +73,7 @@ export interface AddBookDialogLaunchOptions {
   onWishlistSaved?: () => void;
 }
 
-type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "initialBookId" | "initialTags" | "onSaved">;
+type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "entity" | "initialBookId" | "initialTags" | "onSaved">;
 
 const phoneLayout = "(max-width: 767px)";
 
@@ -81,8 +81,20 @@ type AppPage = {
   location: ReturnType<typeof useLocation>;
   navigationType: ReturnType<typeof useNavigationType>;
   outlet: ReturnType<typeof useOutlet>;
-  isBookDetail: boolean;
+  detailLabel?: string;
 };
+
+type DetailPage = AppPage & {
+  historyIndex: number;
+  mountIndex: number;
+};
+
+const detailRoutes = [
+  ["/books/:bookId", "Book details"],
+  ["/authors/:authorId", "Author details"],
+  ["/series/:seriesId", "Series details"],
+  ["/genres/:genreId", "Genre details"],
+] as const;
 
 type NavLink = {
   to: string;
@@ -118,9 +130,11 @@ function AppLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
-  const isBookDetail = Boolean(useMatch("/books/:bookId"));
+  const isAuthorRedirect = Boolean(matchPath("/authors/explore", location.pathname));
+  const detailLabel = isAuthorRedirect ? undefined : detailRoutes.find(([path]) => matchPath(path, location.pathname))?.[1];
   const [isPhone, setIsPhone] = useState(() => window.matchMedia(phoneLayout).matches);
-  const bookOverlayOpen = isBookDetail && isPhone;
+  const detailOverlayOpen = Boolean(detailLabel) && isPhone;
+  const detailPages = useRef<DetailPage[]>([]);
   const lastPage = useRef<AppPage | null>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef<{ key: string; y: number; focus: HTMLElement | null } | null>(null);
@@ -162,10 +176,24 @@ function AppLayoutContent() {
     openAddBook,
     openAddJournalEntry,
   } satisfies AppLayoutOutletContext);
-  const page = { location, navigationType, outlet, isBookDetail };
+  const page = { location, navigationType, outlet, detailLabel };
   // Keep the previous route's outlet and location together so its scroll and local state survive the sheet.
-  const underlay = bookOverlayOpen && lastPage.current && !lastPage.current.isBookDetail ? lastPage.current : null;
-  const mainPage = bookOverlayOpen ? underlay : page;
+  const underlay = detailOverlayOpen && lastPage.current && !lastPage.current.detailLabel ? lastPage.current : null;
+  const mainPage = detailOverlayOpen ? underlay : page;
+  const historyIndex = window.history.state?.idx ?? 0;
+  // Keep earlier detail sheets under the active one. Search and hash changes share a sheet.
+  const previousDetails = detailPages.current.filter((detail) => detail.historyIndex < historyIndex);
+  const lastDetail = detailPages.current[detailPages.current.length - 1];
+  const currentDetail = [...detailPages.current].reverse().find((detail) =>
+    detail.location.pathname === location.pathname && (
+      detail === lastDetail ||
+      (navigationType === "POP" && detail.mountIndex <= historyIndex && historyIndex <= detail.historyIndex)
+    )
+  );
+  const overlays = detailOverlayOpen ? [
+    ...previousDetails.filter((detail) => detail.mountIndex !== currentDetail?.mountIndex),
+    { ...page, historyIndex, mountIndex: currentDetail?.mountIndex ?? historyIndex },
+  ] : [];
   const mainIsMessages = mainPage?.location.pathname === "/messages";
 
   useLayoutEffect(() => {
@@ -176,7 +204,8 @@ function AppLayoutContent() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!bookOverlayOpen) lastPage.current = page;
+    detailPages.current = overlays;
+    if (!detailOverlayOpen) lastPage.current = page;
   });
 
   useEffect(() => {
@@ -192,7 +221,7 @@ function AppLayoutContent() {
 
   useLayoutEffect(() => {
     const background = underlayRef.current;
-    if (bookOverlayOpen) {
+    if (detailOverlayOpen) {
       if (underlay && !savedScroll.current) {
         const active = document.activeElement;
         savedScroll.current = {
@@ -216,7 +245,7 @@ function AppLayoutContent() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-  }, [bookOverlayOpen, location.pathname, underlay]);
+  }, [detailOverlayOpen, location.pathname, underlay]);
 
   useLayoutEffect(() => {
     // Portalled dialogs and menus inherit the same colors as the signed-in UI.
@@ -261,7 +290,7 @@ function AppLayoutContent() {
 
   return (
     <>
-      <div className={cn("rj-app min-h-svh bg-background text-foreground", bookOverlayOpen && !underlay && "rj-app--book-detail")}>
+      <div className={cn("rj-app min-h-svh bg-background text-foreground", detailOverlayOpen && !underlay && "rj-app--detail")}>
         <div ref={underlayRef}>
           {mainPage && (
             <UNSAFE_LocationContext.Provider value={{ location: mainPage.location, navigationType: mainPage.navigationType }}>
@@ -276,11 +305,13 @@ function AppLayoutContent() {
             </UNSAFE_LocationContext.Provider>
           )}
         </div>
-        {bookOverlayOpen && (
-          <main className="rj-book-detail-overlay" aria-label="Book details">
-            {outlet}
-          </main>
-        )}
+        {overlays.map((detail, index) => (
+          <DetailOverlay
+            key={`${detail.mountIndex}:${detail.location.pathname}`}
+            detail={detail}
+            active={index === overlays.length - 1}
+          />
+        ))}
       </div>
 
       <Suspense fallback={
@@ -348,6 +379,38 @@ function AppLayoutContent() {
       <ReleaseNotesDialog />
       <BookFinishedCelebration />
     </>
+  );
+}
+
+function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean }) {
+  const focusToRestore = useRef<HTMLElement | null>(null);
+
+  const setLayer = useCallback((layer: HTMLDivElement | null) => {
+    if (!layer) return;
+    if (!active && !layer.inert && document.activeElement instanceof HTMLElement && layer.contains(document.activeElement)) {
+      focusToRestore.current = document.activeElement;
+    }
+    const returning = active && layer.inert;
+    layer.inert = !active;
+    if (returning) {
+      const target = focusToRestore.current;
+      (target?.isConnected ? target : layer.querySelector<HTMLElement>(".rj-detail-sheet"))?.focus({ preventScroll: true });
+      focusToRestore.current = null;
+    }
+  }, [active]);
+
+  return (
+    <div
+      ref={setLayer}
+      className="rj-detail-overlay"
+      role={active ? "main" : undefined}
+      aria-label={active ? detail.detailLabel : undefined}
+      aria-hidden={!active || undefined}
+    >
+      <UNSAFE_LocationContext.Provider value={{ location: detail.location, navigationType: detail.navigationType }}>
+        {detail.outlet}
+      </UNSAFE_LocationContext.Provider>
+    </div>
   );
 }
 

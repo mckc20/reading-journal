@@ -77,11 +77,11 @@
 .rj-app-home-shelves { display: grid; grid-template-columns: minmax(0, 1fr); }
 
 @media (max-width: 767px) {
-  .rj-app--book-detail {
+  .rj-app--detail {
     background: var(--surface-sunken);
   }
-  .rj-app-theme:has(.rj-book-detail-overlay) { overflow: hidden; }
-  .rj-book-detail-overlay {
+  .rj-app-theme:has(.rj-detail-overlay) { overflow: hidden; }
+  .rj-detail-overlay {
     --app-header-height: 0px;
     --app-bottom-nav-space: env(safe-area-inset-bottom);
     position: fixed;

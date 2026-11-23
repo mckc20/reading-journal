@@ -370,14 +370,39 @@ function getSpeedChartRows(stats: SeriesStats, mode: SpeedChartMode) {
   }));
 }
 
-export function SeriesAnalyticsPaceChart({ stats }: { stats: SeriesStats }) {
+export function SeriesAnalyticsComparison({ stats, titled = false }: { stats: SeriesStats; titled?: boolean }) {
+  const [mode, setMode] = useState<SpeedChartMode>("speed");
   return (
-    <StatsBarChart
-      title="Speed"
-      rows={getSpeedChartRows(stats, "speed")}
-      unframed
-      emptyLabel="Add reading time and page progress to compare reading speed."
-    />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {titled ? (
+          <div>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              <AppHeading level={3} as="h2">Book Comparisons</AppHeading>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Compare how long each book took and how quickly pages moved.</p>
+          </div>
+        ) : <h3 className="font-medium">Book comparisons</h3>}
+        <SegmentedControl<SpeedChartMode>
+          label="Book comparison metric"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "speed", label: "Speed" },
+            { value: "duration", label: "Duration" },
+          ]}
+        />
+      </div>
+      <StatsBarChart
+        key={mode}
+        rows={getSpeedChartRows(stats, mode)}
+        unframed
+        emptyLabel={mode === "duration"
+          ? "No books with start dates yet."
+          : "Add reading time and page progress to compare reading speed."}
+      />
+    </div>
   );
 }
 
@@ -390,9 +415,7 @@ export function SeriesAnalyticsFull({
   logsLoading: boolean;
   logsError: string | null;
 }) {
-  const [paceMode, setPaceMode] = useState<SpeedChartMode>("speed");
   const [rankingMode, setRankingMode] = useState<RankingMode>("rating");
-  const paceRows = useMemo(() => getSpeedChartRows(stats, paceMode), [paceMode, stats]);
   const ranking = useMemo(() => {
     if (rankingMode === "length") {
       return {
@@ -424,38 +447,7 @@ export function SeriesAnalyticsFull({
     <div className="space-y-12">
       <SeriesAnalyticsOverview stats={stats} logsLoading={logsLoading} logsError={logsError} />
 
-      <section className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              <AppHeading level={3} as="h2">Book Comparisons</AppHeading>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Compare how long each book took and how quickly pages moved.
-            </p>
-          </div>
-          <SegmentedControl<SpeedChartMode>
-            label="Book comparison metric"
-            value={paceMode}
-            onChange={setPaceMode}
-            options={[
-              { value: "speed", label: "Speed" },
-              { value: "duration", label: "Duration" },
-            ]}
-          />
-        </div>
-        <StatsBarChart
-          key={paceMode}
-          rows={paceRows}
-          unframed
-          emptyLabel={
-            paceMode === "duration"
-              ? "No books with start dates yet."
-              : "Add reading time and page progress to compare reading speed."
-          }
-        />
-      </section>
+      <SeriesAnalyticsComparison stats={stats} titled />
 
       <section className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

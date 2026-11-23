@@ -3,6 +3,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -11,14 +12,12 @@ import {
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
-  ChevronDown,
   Info,
   NotebookPen,
   PauseCircle,
   RefreshCw,
   Star,
 } from "lucide-react";
-import BackButton from "@/components/BackButton";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import JournalTimeline from "@/components/JournalTimeline";
@@ -34,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
-import "@/components/redesign/book-details.css";
+import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { useAuth } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -75,8 +74,6 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
-const BOOK_DETAIL_SHEET_MEDIA = "(max-width: 767px)";
-
 function getPublicationYear(value?: string | null): string | null {
   const [year] = (value ?? "").split("-");
   return year && /^\d{4}$/.test(year) ? year : null;
@@ -85,157 +82,15 @@ function getPublicationYear(value?: string | null): string | null {
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
 
-  return <BookDetailSheet key={bookId} />;
-}
-
-function BookDetailSheet() {
-  const navigate = useNavigate();
-  const sheetRef = useRef<HTMLElement>(null);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const closingAnimation = useRef<Animation | null>(null);
-
-  const close = useCallback(() => {
-    if (closingAnimation.current) return;
-
-    function leave() {
-      if (window.history.state?.idx > 0) {
-        navigate(-1);
-      } else {
-        navigate("/library", { replace: true });
-      }
-    }
-
-    const sheet = sheetRef.current;
-    if (!sheet || !window.matchMedia(BOOK_DETAIL_SHEET_MEDIA).matches ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      leave();
-      return;
-    }
-
-    const animation = sheet.animate(
-      [{ transform: getComputedStyle(sheet).transform }, { transform: "translateY(100%)" }],
-      { duration: 165, easing: "cubic-bezier(.25, .35, .65, 1)", fill: "forwards" },
-    );
-    closingAnimation.current = animation;
-    void animation.finished.then(leave, () => {
-      // Leaving through browser history or navigation cancels this animation.
-    });
-  }, [navigate]);
-
-  useEffect(() => {
-    const sheet = sheetRef.current;
-    const scroller = scrollerRef.current;
-    if (!sheet || !scroller) return;
-    const phone = window.matchMedia(BOOK_DETAIL_SHEET_MEDIA);
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (phone.matches) sheet.focus({ preventScroll: true });
-
-    let start: { x: number; y: number; id: number; dragging: boolean } | null = null;
-    let settle: Animation | null = null;
-
-    function resetDrag() {
-      start = null;
-      settle?.cancel();
-      settle = null;
-      if (!sheet?.style.getPropertyValue("--sheet-drag-transform")) return;
-      const transform = getComputedStyle(sheet).transform;
-      sheet.style.removeProperty("--sheet-drag-transform");
-      if (!reducedMotion.matches) {
-        settle = sheet.animate([{ transform }, { transform: "none" }], {
-          duration: 220,
-          easing: "cubic-bezier(.2, .75, .25, 1)",
-        });
-      }
-    }
-
-    function onTouchStart(event: TouchEvent) {
-      if (closingAnimation.current) return;
-      if (event.touches.length !== 1) {
-        resetDrag();
-        return;
-      }
-      if (!phone.matches || settle?.playState === "running" || (scroller?.scrollTop ?? 0) !== 0 ||
-        sheet?.getAnimations().some((animation) => animation.playState === "running") ||
-        !(event.target instanceof Element) ||
-        event.target.closest("button, a, input, select, textarea, summary")) return;
-
-      const touch = event.touches[0];
-      start = { x: touch.clientX, y: touch.clientY, id: touch.identifier, dragging: false };
-    }
-
-    function onTouchMove(event: TouchEvent) {
-      if (!start || !sheet) return;
-      const touch = Array.from(event.touches).find(({ identifier }) => identifier === start?.id);
-      if (!touch) return;
-      const dx = Math.abs(touch.clientX - start.x);
-      const dy = touch.clientY - start.y;
-
-      if (!start.dragging && Math.max(dx, Math.abs(dy)) < 5) return;
-      if (!start.dragging && (dy <= dx * 1.25 || (scroller?.scrollTop ?? 0) > 0 || !event.cancelable)) {
-        start = null;
-        return;
-      }
-
-      start.dragging = true;
-      if (event.cancelable) event.preventDefault();
-      if (!reducedMotion.matches) {
-        // Snap to physical pixels so the rounded edge stays crisp while held.
-        const distance = Math.min(sheet.clientHeight, Math.max(0, dy));
-        const offset = Math.round(distance * window.devicePixelRatio) / window.devicePixelRatio;
-        sheet.style.setProperty("--sheet-drag-transform", `translateY(${offset}px)`);
-      }
-    }
-
-    function onTouchEnd(event: TouchEvent) {
-      if (!start) return;
-      const touch = Array.from(event.changedTouches).find(({ identifier }) => identifier === start?.id);
-      const shouldClose = start.dragging && touch && touch.clientY - start.y >= 80;
-      if (shouldClose) {
-        start = null;
-        close();
-      } else {
-        resetDrag();
-      }
-    }
-
-    scroller.addEventListener("touchstart", onTouchStart, { passive: true });
-    scroller.addEventListener("touchmove", onTouchMove, { passive: false });
-    scroller.addEventListener("touchend", onTouchEnd, { passive: true });
-    scroller.addEventListener("touchcancel", resetDrag, { passive: true });
-    return () => {
-      scroller.removeEventListener("touchstart", onTouchStart);
-      scroller.removeEventListener("touchmove", onTouchMove);
-      scroller.removeEventListener("touchend", onTouchEnd);
-      scroller.removeEventListener("touchcancel", resetDrag);
-      settle?.cancel();
-      if (closingAnimation.current) {
-        closingAnimation.current.cancel();
-        closingAnimation.current = null;
-      }
-    };
-  }, [close]);
-
   return (
-    <section className="rj-book-detail-sheet" ref={sheetRef} tabIndex={-1} aria-label="Book details">
-      <div className="rj-book-detail-scroll" ref={scrollerRef}>
-        <BookDetailsContent onClose={close} />
-      </div>
-    </section>
-  );
-}
-
-function CloseBookDetailButton({ onClose }: { onClose: () => void }) {
-  return (
-    <>
-      <Button type="button" variant="ghost" size="icon-lg" className="size-11 md:hidden" aria-label="Close book details" onClick={onClose}>
-        <ChevronDown className="size-6" aria-hidden="true" />
-      </Button>
-      <BackButton fallbackTo="/library" className="hidden min-h-11 min-w-11 md:inline-flex" />
-    </>
+    <DetailSheet key={bookId} label="Book details" fallbackTo="/library">
+      {(close) => <BookDetailsContent onClose={close} />}
+    </DetailSheet>
   );
 }
 
 function BookDetailsContent({ onClose }: { onClose: () => void }) {
+  const headingId = useId();
   const { bookId } = useParams<{ bookId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -484,7 +339,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   if (loading) {
     return (
       <div className="rj-detail-page">
-        <CloseBookDetailButton onClose={onClose} />
+        <DetailBack label="Book details" fallbackTo="/library" onClose={onClose} />
         <LoadingIndicator variant="page" />
       </div>
     );
@@ -498,7 +353,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           <RefreshCw className="mr-2 h-4 w-4" />
           Try again
         </Button>
-        <CloseBookDetailButton onClose={onClose} />
+        <DetailBack label="Book details" fallbackTo="/library" onClose={onClose} />
       </div>
     );
   }
@@ -511,7 +366,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         <p className="max-w-md text-sm text-muted-foreground">
           This book may not exist, may have been deleted, or you may not have access.
         </p>
-        <CloseBookDetailButton onClose={onClose} />
+        <DetailBack label="Book details" fallbackTo="/library" onClose={onClose} />
       </div>
     );
   }
@@ -525,13 +380,13 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const description = book.description?.trim() || "";
   return (
     <div className="rj-detail-page">
-      <section className="rj-detail-hero" aria-labelledby="book-detail-title">
+      <section className="rj-detail-hero" aria-labelledby={headingId}>
         <div
           className="rj-detail-cover-stage"
           style={{ "--book-detail-hero-color": coverColor } as CSSProperties}
         >
           <div className="rj-detail-topline">
-            <CloseBookDetailButton onClose={onClose} />
+            <DetailBack label="Book details" fallbackTo="/library" onClose={onClose} />
             <DetailActionsMenu
               kind="book"
               label={book.title}
@@ -578,7 +433,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
               </p>
             )}
 
-            <BookDetailTitle id="book-detail-title" title={book.title} favorite={isFavorite} onToggleFavorite={toggleFavorite} />
+            <BookDetailTitle id={headingId} title={book.title} favorite={isFavorite} onToggleFavorite={toggleFavorite} />
 
             <p className="rj-detail-author break-words">
               {book.authors.map((author, index) => (
@@ -640,7 +495,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                     type="button"
                     aria-label="Show rating guide"
                     aria-expanded={showRatingGuide}
-                    aria-describedby={showRatingGuide ? "rating-guide-tooltip" : undefined}
+                    aria-describedby={showRatingGuide ? `${headingId}-rating-guide` : undefined}
                     onClick={() => setShowRatingGuide((current) => !current)}
                     className="rounded-full p-0.5 text-muted-foreground/65 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
@@ -648,7 +503,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                   </button>
                   {showRatingGuide && (
                     <div
-                      id="rating-guide-tooltip"
+                      id={`${headingId}-rating-guide`}
                       role="tooltip"
                       className="absolute left-0 top-full z-20 mt-2 w-72 max-w-full rounded-lg border bg-popover p-3 text-xs text-muted-foreground shadow-sm"
                     >
@@ -819,9 +674,9 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <section aria-labelledby="book-detail-progress">
+        <section aria-labelledby={`${headingId}-progress`}>
           <div className="rj-detail-section-heading">
-            <h2 id="book-detail-progress">Reading Progress</h2>
+            <h2 id={`${headingId}-progress`}>Reading Progress</h2>
           </div>
 
           {logsLoading ? (
@@ -838,9 +693,9 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           )}
         </section>
 
-        <section ref={journalSectionRef} id={BOOK_JOURNAL_HASH.slice(1)} className="scroll-mt-4" aria-labelledby="book-detail-journal-title">
+        <section ref={journalSectionRef} id={BOOK_JOURNAL_HASH.slice(1)} className="scroll-mt-4" aria-labelledby={`${headingId}-journal`}>
           <div className="rj-detail-section-heading">
-            <h2 id="book-detail-journal-title">Journal</h2>
+            <h2 id={`${headingId}-journal`}>Journal</h2>
           </div>
 
           {journalEntriesLoading ? (

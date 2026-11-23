@@ -2,21 +2,24 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   type ComponentType,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ChevronRight, FileText, Heart, Languages, Star, Tags } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Languages, Star, Tags } from "lucide-react";
 import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
 import BackButton from "@/components/BackButton";
 import BookCard from "@/components/BookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
-import JournalTimeline from "@/components/JournalTimeline";
+import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
+import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { DetailJournal } from "@/components/redesign/DetailJournal";
+import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import {
   buildBookLibraryFilterPath,
   buildGenreDetailPath,
@@ -28,7 +31,7 @@ import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
-import { useDominantImageColor } from "@/hooks/useDominantImageColor";
+import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import {
   buildAuthorSummaries,
@@ -48,7 +51,6 @@ import { authorJournalToJournalEntries, sortJournalEntries } from "@/lib/journal
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
-import { cn } from "@/lib/utils";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord } from "@/types";
 
@@ -69,33 +71,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function AuthorPhoto({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   return (
-    <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-5xl font-medium text-primary-foreground shadow-sm sm:h-40 sm:w-40 sm:text-6xl">
-      {photoUrl ? (
-        <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        getAuthorInitials(name)
-      )}
-    </div>
-  );
-}
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon className="h-4 w-4 shrink-0" />
-        <span>{label}</span>
-      </div>
-      <p className="mt-1 font-heading text-2xl font-medium leading-none sm:text-3xl">{value}</p>
+    <div className="rj-detail-portrait" aria-hidden="true">
+      {photoUrl && photoUrl !== failedUrl ? (
+        <img src={photoUrl} alt="" className="size-full object-cover" onError={() => setFailedUrl(photoUrl)} />
+      ) : getAuthorInitials(name)}
     </div>
   );
 }
@@ -108,8 +89,8 @@ function SectionTitle({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <AppHeading level={2} as="h2">{title}</AppHeading>
+    <div className="rj-detail-section-heading">
+      <h2>{title}</h2>
       {action}
     </div>
   );
@@ -117,7 +98,7 @@ function SectionTitle({
 
 function EmptySection({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
+    <div className="rj-detail-quiet text-center text-sm">
       {message}
     </div>
   );
@@ -170,7 +151,7 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
   const [error, setError] = useState<string | null>(null);
 
   const journalEntries = useMemo(
-    () => sortJournalEntries(authorJournalToJournalEntries(authorJournal)).slice(0, 3),
+    () => sortJournalEntries(authorJournalToJournalEntries(authorJournal)),
     [authorJournal],
   );
 
@@ -190,54 +171,40 @@ function AuthorJournalSection({ author }: { author: { id: string; name: string }
     void loadAuthorJournalEntryRecords();
   }, [loadAuthorJournalEntryRecords]);
 
+  function rememberEntry(note: AuthorJournalEntryRecord) {
+    if (note.author_id !== author.id) return;
+    setAuthorJournalEntryRecords((current) => sortAuthorJournalEntryRecords([note, ...current.filter((entry) => entry.id !== note.id)]));
+  }
+
   return (
-    <section className="space-y-4">
-      <SectionTitle
-        title={<span className="font-serif italic">Journal</span>}
-        action={
-          <Button asChild variant="link" className="px-0 text-primary">
-            <Link to={`/authors/${author.id}/journal`}>
-              Open journal
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
-      />
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <LoadingIndicator />
-      ) : (
-        journalEntries.length === 0 ? (
-          <EmptySection message="Author journal entries will appear here." />
-        ) : (
-          <JournalTimeline
-            entries={journalEntries}
-            layout="cards"
-            previewMode
-            emptyMessage="Author journal entries will appear here."
-            onEntryUpdated={(entry) => {
-              if (entry.source === "author_note") {
-                setAuthorJournalEntryRecords((current) => sortAuthorJournalEntryRecords([entry.authorJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-              }
-            }}
-            onEntryDeleted={(entry) => {
-              if (entry.source === "author_note") setAuthorJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
-            }}
-          />
-        )
-      )}
-    </section>
+    <DetailJournal
+      entity={{ type: "Author", id: author.id }}
+      entries={journalEntries}
+      loading={loading}
+      error={error}
+      onSaved={(note) => { if ("author_id" in note) rememberEntry(note); }}
+      onEntryUpdated={(entry) => { if (entry.source === "author_note") rememberEntry(entry.authorJournalEntry); }}
+      onEntryDeleted={(entry) => {
+        if (entry.source === "author_note") setAuthorJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
+      }}
+    />
   );
 }
 
+const authorDetailLabel = "Author details";
+const authorFallback = "/authors";
+
 export default function AuthorDetails() {
   const { authorId } = useParams();
+  return (
+    <DetailSheet key={authorId} label={authorDetailLabel} fallbackTo={authorFallback}>
+      {(close) => <AuthorDetailsContent authorId={authorId} onClose={close} />}
+    </DetailSheet>
+  );
+}
+
+function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClose: () => void }) {
+  const headingId = useId();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -287,9 +254,9 @@ export default function AuthorDetails() {
   useEffect(() => {
     if (!author || location.state?.openEdit !== true) return;
     setIsEditMode(true);
-    navigate(location.pathname, { replace: true, state: null });
-  }, [author, location.pathname, location.state, navigate]);
-  const dominantPhotoColor = useDominantImageColor(author?.photo_url);
+    navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
+  }, [author, location, navigate]);
+  const heroColor = useBookHeroColor(author?.photo_url);
   const authorBooks = author?.books ?? [];
   const previewBooks = authorBooks.slice(0, 4);
   const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
@@ -371,31 +338,20 @@ export default function AuthorDetails() {
     return editAuthor(authorId, payload);
   }
 
+  const back = <DetailBack label={authorDetailLabel} fallbackTo={authorFallback} onClose={onClose} />;
   if (loading) {
-    return (
-      <LoadingIndicator variant="page" />
-    );
+    return <div className="rj-detail-page">{back}<LoadingIndicator variant="page" /></div>;
   }
 
-  if (booksError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{booksError}</div>;
-  }
-
-  if (authorsError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{authorsError}</div>;
-  }
-
-  if (seriesError) {
-    return <div className="rounded-lg border bg-card p-4 text-sm text-destructive">{seriesError}</div>;
+  const error = booksError || authorsError || seriesError;
+  if (error) {
+    return <div className="rj-detail-page">{back}<p role="alert" className="text-sm text-destructive">{error}</p></div>;
   }
 
   if (!author) {
     return (
-      <div className="space-y-4">
-        <BackButton
-          fallbackTo="/authors"
-          className="hover:bg-transparent hover:text-foreground/80"
-        />
+      <div className="rj-detail-page space-y-4">
+        {back}
         <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="font-heading text-lg font-medium">Author not found</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -408,16 +364,11 @@ export default function AuthorDetails() {
 
   const booksViewAllPath = `/authors/${encodeURIComponent(author.id)}/books`;
   const bio = author.bio?.trim() || "";
-  const detailBackgroundStyle = {
-    "--detail-image-color": dominantPhotoColor,
-  } as CSSProperties;
-
   if (isEditMode) {
     return (
-      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
-        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(11.5rem,26vh,14rem)] w-screen md:h-[clamp(17.5rem,31vh,19.5rem)]" />
+      <div className="rj-detail-page space-y-6">
         <BackButton
-          fallbackTo="/authors"
+          fallbackTo={authorFallback}
           className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
           onClick={() => setIsEditMode(false)}
         />
@@ -440,165 +391,132 @@ export default function AuthorDetails() {
   }
 
   return (
-    <div className="relative isolate -mt-5 space-y-10 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
-      <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(11.5rem,26vh,14rem)] w-screen md:h-[clamp(17.5rem,31vh,19.5rem)]" />
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <BackButton
-          fallbackTo="/authors"
-          className="hover:bg-background/20 hover:text-foreground"
-        />
-
-        <DetailActionsMenu
-          kind="author"
-          label={author.name}
-          shareAttachmentLabel="Send the author as attachment in a chat"
-          onEdit={() => setIsEditMode(true)}
-          onDuplicate={openDuplicateDialog}
-          onDelete={() => void handleDeleteAuthor()}
-          onSendAttachment={openAttachmentPicker}
-          deleteTitle="Delete this author?"
-          deleteDescription="Deleting this author removes the record and unlinks it from books. The books stay in your library."
-          buttonClassName="hover:bg-background/20 hover:text-foreground aria-expanded:bg-background/25 aria-expanded:text-foreground"
-        />
-      </div>
-
-      {actionError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {actionError}
-        </div>
-      )}
-
-      {shareStatus && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
-          {shareStatus}
-        </div>
-      )}
-
-      <section className="relative z-10 flex items-start gap-4 sm:gap-6">
-        <AuthorPhoto name={author.name} photoUrl={author.photo_url} />
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <AppHeading level={1}>{author.name}</AppHeading>
-            <button
-              type="button"
-              onClick={handleToggleFavorite}
-              aria-label={author.isFavorite ? "Remove from favorites" : "Add to favorites"}
-              className="shrink-0 rounded p-1 transition-colors hover:bg-background/20"
-            >
-              <Heart
-                className={cn(
-                  "h-5 w-5",
-                  author.isFavorite ? "fill-favorite text-favorite" : "text-muted-foreground",
-                )}
-              />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 sm:gap-5">
-            <StatTile icon={BookOpen} label="Books Written" value={formatNumber(author.bookCount)} />
-            <StatTile icon={FileText} label="Pages Written" value={`~${formatNumber(pagesWritten)}`} />
-            <StatTile icon={Star} label="Avg. Rating" value={formatAverageRating(averageRating)} />
-          </div>
-        </div>
-      </section>
-
-      <AboutSection
-        title={
-          <>
-            <span className="font-serif italic">About</span> this author
-          </>
+    <div className="rj-detail-page">
+      <DetailHero
+        titleId={headingId}
+        color={heroColor}
+        navigation={back}
+        artwork={<AuthorPhoto name={author.name} photoUrl={author.photo_url} />}
+        actions={
+          <DetailActionsMenu
+            kind="author"
+            label={author.name}
+            shareAttachmentLabel="Send the author as attachment in a chat"
+            onEdit={() => setIsEditMode(true)}
+            onDuplicate={openDuplicateDialog}
+            onDelete={() => void handleDeleteAuthor()}
+            onSendAttachment={openAttachmentPicker}
+            deleteTitle="Delete this author?"
+            deleteDescription="Deleting this author removes the record and unlinks it from books. The books stay in your library."
+            buttonClassName="size-11"
+          />
         }
-        titleContent={
-          (authorGenres.length > 0 || authorLanguages.length > 0) ? (
-            <div className="grid gap-3 pb-2 pt-1 sm:grid-cols-2">
-              {authorGenres.length > 0 && (
-                <div>
-                  <AuthorMetadataHeading icon={Tags} title="Genres" />
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {authorGenres.map((genre) => {
-                      const slug = genreSlugByName.get(genre.toLocaleLowerCase());
-                      return (
-                        <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
-                          <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-                            {genre}
-                          </Link>
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {authorLanguages.length > 0 && (
-                <div>
-                  <AuthorMetadataHeading icon={Languages} title="Languages" />
-                  <p className="mt-1.5 text-base">
-                    {authorLanguages.map((language, index) => (
-                      <span key={language}>
-                        {index > 0 ? ", " : null}
-                        <Link
-                          to={buildBookLibraryFilterPath("language", language)}
-                          className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                          {language}
-                        </Link>
-                      </span>
-                    ))}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : undefined
-        }
-        text={bio}
-        emptyText=""
-      />
-
-      <section className="space-y-4">
-        <SectionTitle
-          title={
-            <>
-              <span className="font-serif italic">Books</span>
-            </>
-          }
-          action={
-            <Button asChild variant="link" className="px-0 text-primary">
-              <Link to={booksViewAllPath}>
-                View all
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          }
+      >
+        <BookDetailTitle
+          id={headingId}
+          title={author.name}
+          favorite={author.isFavorite}
+          onToggleFavorite={() => void handleToggleFavorite()}
         />
-        {previewBooks.length === 0 ? (
-          <EmptySection message="Books by this author will appear here." />
-        ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4">
-            {previewBooks.map((book) => (
-              <BookCard key={book.id} book={book} onClick={() => navigate(`/books/${book.id}`)} textSize="compact" />
-            ))}
+        {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
+        {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
+      </DetailHero>
+
+      <div className="rj-detail-body">
+        {(bio || authorGenres.length > 0 || authorLanguages.length > 0) && (
+          <div className="rj-detail-about">
+            <AboutSection title="About" text={bio} emptyText="" />
+            {(authorGenres.length > 0 || authorLanguages.length > 0) && (
+              <details className="rj-detail-metadata">
+                <summary>Author details</summary>
+                <div className="grid gap-3 pb-2 pt-1 sm:grid-cols-2">
+                  {authorGenres.length > 0 && (
+                    <div>
+                      <AuthorMetadataHeading icon={Tags} title="Genres" />
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {authorGenres.map((genre) => {
+                          const slug = genreSlugByName.get(genre.toLocaleLowerCase());
+                          return (
+                            <Badge key={genre} variant="outline" className="max-w-full font-normal" asChild>
+                              <Link to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
+                                {genre}
+                              </Link>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {authorLanguages.length > 0 && (
+                    <div>
+                      <AuthorMetadataHeading icon={Languages} title="Languages" />
+                      <p className="mt-1.5 text-base">
+                        {authorLanguages.map((language, index) => (
+                          <span key={language}>
+                            {index > 0 ? ", " : null}
+                            <Link
+                              to={buildBookLibraryFilterPath("language", language)}
+                              className="rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                              {language}
+                            </Link>
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         )}
-      </section>
 
-      {authorSeries.length > 0 && (
+        <section aria-labelledby={`${headingId}-summary`}>
+          <div className="rj-detail-section-heading"><h2 id={`${headingId}-summary`}>In your library</h2></div>
+          <dl className="rj-reading-stats">
+            <DetailStat icon={BookOpen} label="Books written" value={formatNumber(author.bookCount)} />
+            <DetailStat icon={FileText} label="Pages written" value={`~${formatNumber(pagesWritten)}`} />
+            <DetailStat icon={Star} label="Average rating" value={formatAverageRating(averageRating)} />
+          </dl>
+        </section>
+
         <section className="space-y-4">
           <SectionTitle
-            title={
-              <>
-                <span className="font-serif italic">Series</span>
-              </>
+            title="Books"
+            action={
+              <Button asChild variant="link" className="px-0 text-primary">
+                <Link to={booksViewAllPath}>
+                  View all
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
             }
           />
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-            {authorSeries.map((group) => (
-              <SeriesStackCard key={group.seriesId} variant="grid" group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
-            ))}
-          </div>
+          {previewBooks.length === 0 ? (
+            <EmptySection message="Books by this author will appear here." />
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4">
+              {previewBooks.map((book) => (
+                <BookCard key={book.id} book={book} onClick={() => navigate(`/books/${book.id}`)} textSize="compact" />
+              ))}
+            </div>
+          )}
         </section>
-      )}
 
-      <AuthorJournalSection author={author} />
+        {authorSeries.length > 0 && (
+          <section className="space-y-4">
+            <SectionTitle title="Series" />
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
+              {authorSeries.map((group) => (
+                <SeriesStackCard key={group.seriesId} variant="grid" group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <AuthorJournalSection author={author} />
+      </div>
 
       <SendAttachmentDialog
         open={sendAttachmentOpen}

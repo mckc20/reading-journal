@@ -2,11 +2,10 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
-  useRef,
   useState,
   type ChangeEvent,
-  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -16,7 +15,6 @@ import {
   CalendarDays,
   ChevronRight,
   Gauge,
-  Heart,
   ImagePlus,
   Languages,
   Loader2,
@@ -34,7 +32,11 @@ import CoverOnlyBookCard from "@/components/CoverOnlyBookCard";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
-import JournalTimeline from "@/components/JournalTimeline";
+import { BookCover } from "@/components/reading-journal/BookCover";
+import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
+import { DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { DetailJournal } from "@/components/redesign/DetailJournal";
+import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import {
   buildAuthorDetailPath,
   buildBookLibraryFilterPath,
@@ -43,7 +45,7 @@ import {
 } from "@/components/LinkedMetadata";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
-import { SeriesAnalyticsOverview, SeriesAnalyticsPaceChart } from "@/components/series/SeriesAnalyticsSections";
+import { SeriesAnalyticsOverview, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
 import SeriesBooksEditor, {
   buildEditableSeriesBooks,
   parseVolumeInput,
@@ -60,7 +62,7 @@ import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
-import { useDominantImageColor } from "@/hooks/useDominantImageColor";
+import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
@@ -204,8 +206,8 @@ function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <AppHeading level={2} as="h2">{title}</AppHeading>
+    <div className="rj-detail-section-heading">
+      <h2>{title}</h2>
       {action}
     </div>
   );
@@ -224,7 +226,7 @@ function ViewMoreLink({ to, label = "View More" }: { to: string; label?: string 
 
 function EmptySection({ message }: { message: string }) {
   return (
-    <div className="rounded-lg border border-dashed bg-background/55 py-8 text-center text-sm text-muted-foreground">
+    <div className="rj-detail-quiet text-center text-sm">
       {message}
     </div>
   );
@@ -261,7 +263,7 @@ function SeriesJournalSection({
   const [error, setError] = useState<string | null>(null);
 
   const journalEntries = useMemo(
-    () => sortJournalEntries(seriesJournalToJournalEntries(seriesJournal)).slice(0, 3),
+    () => sortJournalEntries(seriesJournalToJournalEntries(seriesJournal)),
     [seriesJournal],
   );
 
@@ -281,55 +283,44 @@ function SeriesJournalSection({
     void loadSeriesJournalEntryRecords();
   }, [loadSeriesJournalEntryRecords]);
 
+  function rememberEntry(note: SeriesJournalEntryRecord) {
+    if (note.series_id !== series.id) return;
+    setSeriesJournalEntryRecords((current) => sortSeriesJournalEntryRecords([note, ...current.filter((entry) => entry.id !== note.id)]));
+  }
+
   return (
-    <section className="space-y-4">
-      <SectionHeader
-        title={<span className="font-serif italic">Journal</span>}
-        action={
-          <Button asChild variant="link" className="px-0 text-primary">
-            <Link to={`/series/${series.id}/journal`}>
-              Open journal
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
-      />
-
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <LoadingIndicator />
-      ) : (
-        journalEntries.length === 0 ? (
-          <EmptySection message="Series journal entries will appear here." />
-        ) : (
-          <JournalTimeline
-            entries={journalEntries}
-            layout="cards"
-            previewMode
-            emptyMessage="Series journal entries will appear here."
-            onEntryUpdated={(entry) => {
-              if (entry.source === "series_note") {
-                setSeriesJournalEntryRecords((current) => sortSeriesJournalEntryRecords([entry.seriesJournalEntry, ...current.filter((note) => note.id !== entry.sourceId)]));
-              }
-            }}
-            onEntryDeleted={(entry) => {
-              if (entry.source === "series_note") setSeriesJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
-            }}
-          />
-        )
-      )}
-    </section>
+    <DetailJournal
+      entity={{ type: "Series", id: series.id }}
+      entries={journalEntries}
+      loading={loading}
+      error={error}
+      onSaved={(note) => { if ("series_id" in note) rememberEntry(note); }}
+      onEntryUpdated={(entry) => { if (entry.source === "series_note") rememberEntry(entry.seriesJournalEntry); }}
+      onEntryDeleted={(entry) => {
+        if (entry.source === "series_note") setSeriesJournalEntryRecords((current) => current.filter((note) => note.id !== entry.sourceId));
+      }}
+    />
   );
+}
+
+function SeriesArtwork({ banner, volume }: { banner?: string | null; volume?: Book }) {
+  const [failedBanner, setFailedBanner] = useState<string | null>(null);
+  if (banner && banner !== failedBanner) {
+    return (
+      <div className="rj-detail-banner">
+        <img src={banner} alt="" className="size-full object-cover" onError={() => setFailedBanner(banner)} />
+      </div>
+    );
+  }
+  if (volume?.cover_url) {
+    return <BookCover className="rj-detail-cover" src={volume.cover_url} title={volume.title} />;
+  }
+  return <div className="rj-detail-banner"><BookOpen aria-hidden="true" className="size-12" strokeWidth={1} /></div>;
 }
 
 function CircularSeriesProgress({ value }: { value: number | null }) {
   const percentage = value ?? 0;
-  const background = `conic-gradient(var(--primary) ${percentage * 3.6}deg, var(--muted) 0deg)`;
+  const background = `conic-gradient(var(--ring) ${percentage * 3.6}deg, var(--muted) 0deg)`;
 
   return (
     <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full p-3" style={{ background }}>
@@ -337,24 +328,6 @@ function CircularSeriesProgress({ value }: { value: number | null }) {
         <span className="font-heading text-3xl font-semibold">{value === null ? "--" : `${value}%`}</span>
         <span className="text-xs text-muted-foreground">Complete</span>
       </div>
-    </div>
-  );
-}
-
-function ProgressStatRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b py-3 last:border-0">
-      <div className="text-primary">{icon}</div>
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      <div className="text-sm font-semibold tabular-nums text-foreground">{value}</div>
     </div>
   );
 }
@@ -418,37 +391,19 @@ function SeriesProgressCard({
   averageRating: number | null;
   detail: SeriesProgressDetail;
 }) {
+  const headingId = useId();
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-[var(--shadow-card)]">
-      <AppHeading level={4} as="h2">
-        Reading <span className="font-serif italic">Progress</span>
-      </AppHeading>
-      <div className="mt-4 grid gap-5 lg:grid-cols-[11rem_minmax(0,1fr)]">
-        <div className="flex justify-center lg:justify-start">
+    <section aria-labelledby={headingId}>
+      <div className="rj-detail-section-heading"><h2 id={headingId}>Reading progress</h2></div>
+      <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="flex justify-center">
           <CircularSeriesProgress value={progress.percentage} />
         </div>
-        <div className="min-w-0">
-          <ProgressStatRow
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Books Read"
-            value={`${progress.finishedBooks} / ${totalBooks}`}
-          />
-          <ProgressStatRow
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Pages Read"
-            value={formatPagesRead(progress.readPages, progress.totalPages)}
-          />
-          <ProgressStatRow
-            icon={<Star className="h-4 w-4" />}
-            label="Average Rating"
-            value={
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-4 w-4 fill-rating text-rating" />
-                {averageRating === null ? "--" : averageRating.toFixed(1)}
-              </span>
-            }
-          />
-        </div>
+        <dl className="rj-reading-stats rj-series-progress-stats">
+          <DetailStat icon={BookOpen} label="Books read" value={`${progress.finishedBooks} / ${totalBooks}`} />
+          <DetailStat icon={BookOpen} label="Pages read" value={formatPagesRead(progress.readPages, progress.totalPages)} />
+          <DetailStat icon={Star} label="Average rating" value={averageRating === null ? "No rating" : averageRating.toFixed(1)} />
+        </dl>
       </div>
       {detail.kind === "active" && (
         <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
@@ -475,21 +430,9 @@ function SeriesProgressCard({
         </div>
       )}
       {detail.kind === "not-started" && (
-        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-          <div>
-            <p className="mb-2 text-sm font-semibold">First Volume</p>
-            <FeaturedBookProgress book={detail.book} showProgress={false} />
-          </div>
-          <Button type="button" onClick={detail.onStartReading} disabled={detail.startDisabled}>
-            {detail.startDisabled ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Starting...
-              </>
-            ) : (
-              "Start Reading"
-            )}
-          </Button>
+        <div className="mt-4 border-t pt-4">
+          <p className="mb-2 text-sm font-semibold">First volume</p>
+          <FeaturedBookProgress book={detail.book} showProgress={false} />
         </div>
       )}
       {detail.kind === "completed" && (
@@ -782,8 +725,20 @@ function SeriesEditPage({
   );
 }
 
+const seriesDetailLabel = "Series details";
+const seriesFallback = "/library/series";
+
 export default function SeriesDetails() {
   const { seriesId } = useParams<{ seriesId: string }>();
+  return (
+    <DetailSheet key={seriesId} label={seriesDetailLabel} fallbackTo={seriesFallback}>
+      {(close) => <SeriesDetailsContent seriesId={seriesId} onClose={close} />}
+    </DetailSheet>
+  );
+}
+
+function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClose: () => void }) {
+  const headingId = useId();
   const location = useLocation();
   const navigate = useNavigate();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
@@ -812,22 +767,20 @@ export default function SeriesDetails() {
   const [savingSeries, setSavingSeries] = useState(false);
   const [startingBookId, setStartingBookId] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const progressCardRef = useRef<HTMLDivElement>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
   useEffect(() => {
     if (!seriesRecord || location.state?.openEdit !== true) return;
     setIsEditMode(true);
-    navigate(location.pathname, { replace: true, state: null });
-  }, [location.pathname, location.state, navigate, seriesRecord]);
-  const dominantCoverColor = useDominantImageColor(seriesRecord?.cover_url);
-  const detailBackgroundStyle = {
-    "--detail-image-color": dominantCoverColor,
-  } as CSSProperties;
+    navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
+  }, [location, navigate, seriesRecord]);
   const seriesBooks = useMemo(
     () => sortSeriesBooks(books.filter((book) => book.series_id === seriesId)),
     [books, seriesId],
   );
+
+  const featuredVolume = seriesBooks.find((book) => book.cover_url);
+  const heroColor = useBookHeroColor(seriesRecord?.cover_url || featuredVolume?.cover_url);
 
   const loadLogs = useCallback(async () => {
     try {
@@ -1103,10 +1056,11 @@ export default function SeriesDetails() {
     }
   }
 
-  if (booksLoading || seriesLoading) return <PageLoading />;
+  const back = <DetailBack label={seriesDetailLabel} fallbackTo={seriesFallback} onClose={onClose} />;
+  if (booksLoading || seriesLoading) return <div className="rj-detail-page">{back}<PageLoading /></div>;
 
   if (booksError || seriesError) {
-    return <p className="text-sm text-destructive">{booksError || seriesError}</p>;
+    return <div className="rj-detail-page">{back}<p role="alert" className="text-sm text-destructive">{booksError || seriesError}</p></div>;
   }
 
   if (!seriesRecord) {
@@ -1117,17 +1071,16 @@ export default function SeriesDetails() {
         <p className="text-sm text-muted-foreground">
           This series may have been deleted or you may not have access.
         </p>
-        <BackButton fallbackTo="/library/series" />
+        {back}
       </div>
     );
   }
 
   if (isEditMode) {
     return (
-      <div className="relative isolate -mt-5 space-y-6 pt-5 md:-mt-24 md:pt-24" style={detailBackgroundStyle}>
-        <div className="detail-image-color-band pointer-events-none absolute left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] top-[-1.25rem] -z-10 h-[clamp(25rem,54vh,27rem)] w-screen md:h-[clamp(30rem,42vh,32rem)]" />
+      <div className="rj-detail-page space-y-6">
         <BackButton
-          fallbackTo="/library/series"
+          fallbackTo={seriesFallback}
           className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
           onClick={() => {
             setActionError(null);
@@ -1168,35 +1121,13 @@ export default function SeriesDetails() {
   }
 
   return (
-    <div className="space-y-6">
-      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
-      {shareStatus && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
-          {shareStatus}
-        </div>
-      )}
-      <header className="relative -mt-5 flex min-h-[clamp(15rem,24vh,25rem)] flex-col justify-between pb-5 pt-5 sm:pb-6 sm:pt-6 md:-mt-24 md:pt-24">
-        <div className="absolute inset-y-0 left-[calc(50%_-_50vw_-_var(--detail-bg-left-offset,0px))] z-0 w-screen overflow-hidden border-y bg-muted">
-          {seriesRecord.cover_url ? (
-            <img
-              src={seriesRecord.cover_url}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          ) : (
-            <div
-              className="absolute inset-0 bg-primary"
-              aria-label="Series banner placeholder"
-            />
-          )}
-          <div className="absolute inset-0 bg-foreground/45" />
-        </div>
-
-        <div className="relative z-10 flex items-start justify-between gap-3">
-          <BackButton
-            fallbackTo="/library/series"
-            className="text-white hover:bg-white/10 hover:text-white"
-          />
+    <div className="rj-detail-page">
+      <DetailHero
+        titleId={headingId}
+        color={heroColor}
+        navigation={back}
+        artwork={<SeriesArtwork banner={seriesRecord.cover_url} volume={featuredVolume} />}
+        actions={
           <DetailActionsMenu
             kind="series"
             label={seriesRecord.name}
@@ -1207,62 +1138,50 @@ export default function SeriesDetails() {
             onSendAttachment={openAttachmentPicker}
             deleteTitle="Delete this series?"
             deleteDescription="This permanently deletes the series. Choose whether its linked books should be deleted too."
-            buttonClassName="text-white hover:bg-white/10 hover:text-white aria-expanded:bg-white/15 aria-expanded:text-white"
+            buttonClassName="size-11"
           />
-        </div>
-
-        <div className="relative z-10 space-y-3 pb-2 pt-16 text-white sm:pb-4">
-          <div className="flex items-start gap-3">
-            <AppHeading level={1} className="text-white">
-              {seriesRecord.name}
-            </AppHeading>
-            <button
-              type="button"
-              onClick={() => void handleToggleFavorite()}
-              aria-label={seriesRecord.is_favorite ? "Remove series from favorites" : "Add series to favorites"}
-              className="mt-2 shrink-0 rounded p-1 text-white transition-colors hover:bg-white/10"
-            >
-              <Heart
-                className={cn(
-                  "h-5 w-5",
-                  seriesRecord.is_favorite ? "fill-favorite text-favorite" : "text-white",
-                )}
-              />
-            </button>
+        }
+      >
+        <BookDetailTitle
+          id={headingId}
+          title={seriesRecord.name}
+          favorite={Boolean(seriesRecord.is_favorite)}
+          onToggleFavorite={() => void handleToggleFavorite()}
+        />
+        <p className="rj-detail-author flex flex-wrap gap-x-1">
+          <span>by</span>
+          {authors.length > 0 ? (
+            authors.map((author, index) => (
+              <span key={author}>
+                <MetadataLink to={buildAuthorDetailPath(author)}>
+                  {author}
+                </MetadataLink>
+                {index < authors.length - 1 ? "," : ""}
+              </span>
+            ))
+          ) : (
+            <span>Unknown author</span>
+          )}
+        </p>
+        {progressDetail.kind === "not-started" && (
+          <div className="rj-detail-actions">
+            <Button type="button" onClick={progressDetail.onStartReading} disabled={progressDetail.startDisabled}>
+              {progressDetail.startDisabled && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+              {progressDetail.startDisabled ? "Starting…" : "Start Reading"}
+            </Button>
           </div>
-          <p className="flex flex-wrap gap-x-1 text-base text-white/85">
-            <span>by</span>
-            {authors.length > 0 ? (
-              authors.map((author, index) => (
-                <span key={author}>
-                  <MetadataLink
-                    to={buildAuthorDetailPath(author)}
-                    className="text-white/85 hover:text-white focus-visible:ring-white/80 focus-visible:ring-offset-foreground"
-                  >
-                    {author}
-                  </MetadataLink>
-                  {index < authors.length - 1 ? "," : ""}
-                </span>
-              ))
-            ) : (
-              <span>Unknown author</span>
-            )}
-          </p>
-        </div>
-      </header>
+        )}
+        {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
+        {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
+      </DetailHero>
 
-      {seriesBooks.length === 0 ? (
-        <EmptySection message="Books added to this series will appear here." />
-      ) : (
-        <div className="space-y-10">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(24rem,1.1fr)] lg:items-start">
-            <AboutSection
-              title={
-                <>
-                  <span className="font-serif italic">About</span> this series
-                </>
-              }
-              titleContent={
+      <div className="rj-detail-body">
+        {(seriesRecord.description?.trim() || seriesBooks.length > 0) && (
+          <div className="rj-detail-about">
+            <AboutSection title="About" text={seriesRecord.description} emptyText="" />
+            {seriesBooks.length > 0 && (
+              <details className="rj-detail-metadata">
+                <summary>Series details</summary>
                 <div className="grid gap-4 pb-2 pt-1 sm:grid-cols-3">
                   <div>
                     <SeriesMetadataHeading icon={Tags} title="Genres" />
@@ -1309,42 +1228,43 @@ export default function SeriesDetails() {
                     <p className="mt-1.5 text-base">{bookCountLabel(seriesBooks.length)}</p>
                   </div>
                 </div>
-              }
-              text={seriesRecord.description}
-              emptyText=""
-              clampClassName="line-clamp-4 lg:line-clamp-[11]"
-              collapsedBottomRef={progressCardRef}
-              collapsedBottomMinWidth={1024}
-            />
-            <div ref={progressCardRef}>
-              <SeriesProgressCard
-                progress={progress}
-                totalBooks={seriesBooks.length}
-                averageRating={averageRating}
-                detail={progressDetail}
-              />
-            </div>
+              </details>
+            )}
           </div>
+        )}
 
-          <section className="space-y-4">
-            <SectionHeader title={<span className="font-serif italic">Books</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/books`} label="View All" />} />
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(144px,1fr))]">
-              {seriesBooks.slice(0, 8).map((book) => (
-                <BookCard key={book.id} book={book} onClick={(item) => navigate(`/books/${item.id}`)} textSize="compact" />
-              ))}
-            </div>
-          </section>
+        {seriesBooks.length === 0 ? (
+          <EmptySection message="Books added to this series will appear here." />
+        ) : (
+          <>
+            <SeriesProgressCard
+              progress={progress}
+              totalBooks={seriesBooks.length}
+              averageRating={averageRating}
+              detail={progressDetail}
+            />
 
-          <section className="space-y-4">
-            <SectionHeader title={<span className="font-serif italic">Analytics</span>} action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
-            <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
-            <SeriesAnalyticsPaceChart stats={seriesStats} />
-          </section>
+            <section className="space-y-4">
+              <SectionHeader title="Books" action={<ViewMoreLink to={`/series/${seriesRecord.id}/books`} label="View All" />} />
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(144px,1fr))]">
+                {seriesBooks.slice(0, 8).map((book) => (
+                  <BookCard key={book.id} book={book} onClick={(item) => navigate(`/books/${item.id}`)} textSize="compact" />
+                ))}
+              </div>
+            </section>
 
-          <SeriesJournalSection series={seriesRecord} />
+            <section className="space-y-4">
+              <SectionHeader title="Analytics" action={<ViewMoreLink to={`/series/${seriesRecord.id}/analytics`} />} />
+              <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />
+              <SeriesAnalyticsComparison stats={seriesStats} />
+            </section>
+          </>
+        )}
+        <SeriesJournalSection series={seriesRecord} />
 
+        {seriesBooks.length > 0 && (
           <section className="space-y-5">
-            <SectionHeader title={<>More to <span className="font-serif italic">Explore</span></>} />
+            <SectionHeader title="More to explore" />
             <div className="grid gap-5 lg:grid-cols-3">
               <ExploreBooksCard
                 title={<>More by <span className="font-serif italic">{primaryAuthor}</span></>}
@@ -1372,8 +1292,8 @@ export default function SeriesDetails() {
               </article>
             </div>
           </section>
-        </div>
-      )}
+        )}
+      </div>
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}
