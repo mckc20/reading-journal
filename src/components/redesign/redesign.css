@@ -2,7 +2,7 @@
 @import '@fontsource-variable/dm-sans/wght-italic.css';
 
 /* Use the workshop's original light palette in the signed-in app, too. */
-:is(.rj-redesign, .rj-app-theme:not(.dark)) {
+:is(:where(:root:not(.rj-app-theme)) .rj-redesign, .rj-app-theme:not(.dark)) {
   --font-body: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --background: #fff;
   --foreground: #21150f;

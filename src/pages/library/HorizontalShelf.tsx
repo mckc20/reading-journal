@@ -8,11 +8,10 @@ interface HorizontalShelfProps {
   title: string;
   children: ReactNode;
   className?: string;
-  bookRail?: boolean;
 }
 
 /** Shared scrolling and arrow controls for every library shelf. */
-export default function HorizontalShelf({ title, children, className, bookRail = false }: HorizontalShelfProps) {
+export default function HorizontalShelf({ title, children, className }: HorizontalShelfProps) {
   const itemCount = Children.count(children);
   const { ref: rowRef, ...drag } = useShelfDrag<HTMLDivElement>();
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -90,18 +89,12 @@ export default function HorizontalShelf({ title, children, className, bookRail =
         </Button>
       )}
 
-      <div className={cn("rj-shelf-frame", bookRail ? "rj-home-shelf-frame" : "-mx-1")}>
+      <div className="rj-shelf-frame -mx-1">
         <div
           {...drag}
           ref={rowRef}
-          role={bookRail ? "group" : undefined}
-          tabIndex={bookRail ? 0 : undefined}
           aria-label={`${title} shelf`}
-          className={cn(
-            "rj-shelf-scroll overscroll-x-contain",
-            bookRail ? "rj-shelf" : "isolate flex items-start gap-3 overflow-x-auto overflow-y-hidden px-1 py-3 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            className,
-          )}
+          className={cn("rj-shelf-scroll isolate flex items-start gap-3 overflow-x-auto overflow-y-hidden px-1 py-3 overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
           onScroll={updateScrollButtons}
           onWheel={handleRowWheel}
         >

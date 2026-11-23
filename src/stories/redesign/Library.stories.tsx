@@ -22,7 +22,7 @@ function LibraryReview(args: LibraryPreviewProps) {
 const noop = () => {};
 const meta = {
   title: 'Redesign/Library', component: LibraryPreview,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Proposed book exploration layout using the Home workshop’s visual language. Search, sorting and grid/list views work on fictional data only. Wishlist entries are excluded from counts and results. Collections opens a separate page with status, Wishlist and Favorites collections. Series, creation and book opening report intent. This is not a complete replacement for the current Library overview or advanced filtering/bulk tools.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Books and Collections views used by the signed-in Library overview. Storybook uses fictional data and reports intent for Series, creating a book and opening book details. Wishlist entries appear under Collections. Advanced filters and bulk tools are available in the app’s separate All books page.' } } },
   args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop, onCollection: noop },
   render: args => <LibraryReview key={JSON.stringify([args.books, args.error, args.loading, args.initialQuery])} {...args} />,
 } satisfies Meta<typeof LibraryPreview>;

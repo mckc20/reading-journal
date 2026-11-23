@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { Grid2X2, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
@@ -18,21 +18,37 @@ export interface LibraryPreviewBook extends HomeBook {
   addedAt: string;
 }
 
-export interface LibraryPreviewProps {
+export interface LibraryContentProps {
   books: LibraryPreviewBook[];
   loading?: boolean;
   error?: string;
   initialQuery?: string;
   onRetry: () => void;
   onOpenBook: (book: LibraryPreviewBook) => void;
+}
+
+type LibraryShellProps = {
   onNavigate: (destination: HomeDestination) => void;
   onCreate: (destination: CreateDestination) => void;
   onNotifications: () => void;
+};
+
+type LibraryBooksProps = LibraryContentProps & {
   onCollection: (collection: 'Collections' | 'Series') => void;
+};
+
+export type LibraryPreviewProps = LibraryBooksProps & LibraryShellProps;
+
+export function LibraryPreview(props: LibraryPreviewProps) {
+  return <LibraryBooks {...props} wrapContent={content => (
+    <HomeShell {...props} activeDestination="Library">{content}</HomeShell>
+  )} onAddBook={() => props.onCreate('book')} />;
 }
 
-/** A controlled-data book workshop. Search and presentation are local. */
-export function LibraryPreview({ books, loading, error, initialQuery = '', ...actions }: LibraryPreviewProps) {
+/** The Books view shared by the signed-in Library and Storybook. */
+export function LibraryBooks({
+  books, loading, error, initialQuery = '', wrapContent = content => content, onAddBook, ...actions
+}: LibraryBooksProps & { wrapContent?: (content: ReactNode) => ReactNode; onAddBook: (trigger: HTMLButtonElement) => void }) {
   const fieldId = useId();
   const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState('recent');
@@ -46,13 +62,13 @@ export function LibraryPreview({ books, loading, error, initialQuery = '', ...ac
       .sort((a, b) => {
         if (sort === 'title') return a.title.localeCompare(b.title) || a.id.localeCompare(b.id);
         if (sort === 'author') return a.author.localeCompare(b.author) || a.title.localeCompare(b.title);
-        return b.addedAt.localeCompare(a.addedAt) || a.title.localeCompare(b.title);
+        return Date.parse(b.addedAt) - Date.parse(a.addedAt) || a.title.localeCompare(b.title);
       });
   }, [books, query, sort]);
 
   return <CollectionSearch collection="Books" items={library.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` }))}
     query={query} onQueryChange={setQuery} onSelect={id => { const book = library.find(item => item.id === id); if (book) actions.onOpenBook(book); }}>
-    {({ desktopSearch, mobileSearchButton }) => <div className="rj-redesign rj-library-preview"><HomeShell {...actions} activeDestination="Library">
+    {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview">{wrapContent(<>
     <header className="rj-library-heading">
       <div><p className="rj-library-eyebrow">Your reading collection</p><h1>Library</h1></div>
       {mobileSearchButton}
@@ -60,7 +76,7 @@ export function LibraryPreview({ books, loading, error, initialQuery = '', ...ac
     <LibraryNavigation current="Books" onNavigate={destination => { if (destination !== 'Books') actions.onCollection(destination); }} />
     {loading ? <div className="rj-library-loading" role="status">Loading your library…<div aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div></div>
       : error ? <EmptyState title="Your library couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} />
-      : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={() => actions.onCreate('book')}>Add your first book</Button>} /> : <>
+      : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>
         <div className="rj-library-search-toolbar">{desktopSearch}</div>
         <div className="rj-library-results-bar">
           <p role="status" aria-live="polite">{visible.length} {visible.length === 1 ? 'book' : 'books'}{query ? ` of ${library.length}` : ''}</p>
@@ -71,6 +87,6 @@ export function LibraryPreview({ books, loading, error, initialQuery = '', ...ac
         {visible.length === 0 ? <EmptyState title="No books found" message="Try another title or author." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />
           : <LibraryBookGrid books={visible} view={view} onOpenBook={actions.onOpenBook} />}
       </>}
-  </HomeShell></div>}
+  </>)}</div>}
   </CollectionSearch>;
 }

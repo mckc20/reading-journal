@@ -4,6 +4,8 @@ import { Link, matchPath, UNSAFE_LocationContext, useLocation, useNavigate, useN
 import {
   BarChart3,
   Bell,
+  Bookmark,
+  BookOpen,
   BookPlus,
   Clock3,
   Compass,
@@ -16,6 +18,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Tags,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -117,6 +120,13 @@ const moreNavLinks: NavLink[] = [
   { to: "/wrap-ups", label: "Wrap-Ups", icon: Sparkles },
   { to: "/messages", label: "Messages", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
+];
+
+const libraryNavLinks: NavLink[] = [
+  { to: "/library/books", label: "All books", icon: BookOpen },
+  { to: "/library/authors", label: "Authors", icon: UserRound },
+  { to: "/library/genres", label: "Genres", icon: Tags },
+  { to: "/library/wishlist", label: "Wishlist", icon: Bookmark },
 ];
 
 function getPrimaryRoute(pathname: string) {
@@ -416,6 +426,7 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
+  const menuLinks = matchPath("/library", pathname) ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
 
   return (
     <div className="rj-app-header-wrap">
@@ -444,7 +455,7 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content className="rj-add-menu" align="end" sideOffset={8} collisionPadding={12}>
-                {moreNavLinks.map(({ to, label, icon: Icon }) => (
+                {menuLinks.map(({ to, label, icon: Icon }) => (
                   <DropdownMenu.Item key={to} asChild>
                     <Link to={to} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
                       <Icon size={18} aria-hidden="true" />

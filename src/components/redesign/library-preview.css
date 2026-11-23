@@ -51,3 +51,13 @@
 
 .rj-library-collections > span:not(.rj-tab-indicator) { background: var(--rj-rose-light); font-weight: 600; }
 .rj-library-collections button[aria-current='page']:hover { background: transparent; }
+
+@media (min-width: 768px) {
+  .rj-app-content:has(.rj-library-preview) { max-width: calc(1200px + 56px); }
+}
+
+@media (max-width: 767px) {
+  .rj-app-content:has(.rj-collection-search[data-search-revealed]) { padding-bottom: 134px; }
+  .rj-app:has(.rj-collection-search[data-search-revealed]) .rj-floating-add { bottom: calc(170px + env(safe-area-inset-bottom)); }
+  .rj-app .rj-mobile-search-bar { z-index: 34; }
+}

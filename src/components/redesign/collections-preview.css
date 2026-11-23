@@ -12,6 +12,11 @@
 .rj-collection-card[data-tone='blue'] .rj-collection-art { background: #e1eaed; }
 .rj-collection-card[data-tone='rose'] .rj-collection-art { background: var(--rj-rose-light); }
 .rj-collection-symbol { position: absolute; right: 10px; top: 10px; display: grid; place-items: center; border-radius: 50%; width: 30px; height: 30px; background: #ffffffb3; }
+.rj-app-theme.dark .rj-collection-art { background: var(--surface-raised); }
+.rj-app-theme.dark .rj-collection-card[data-tone='gold'] .rj-collection-art { background: var(--rj-gold); }
+.rj-app-theme.dark .rj-collection-card[data-tone='blue'] .rj-collection-art { background: #303f47; }
+.rj-app-theme.dark .rj-collection-symbol { background: var(--surface-sunken); }
+.rj-app-theme.dark .rj-collection-card[data-tone='rose'] .rj-collection-art { background: var(--rj-rose-light); }
 .rj-collection-covers { display: flex; align-items: center; justify-content: center; padding-top: 24px; }
 .rj-collection-covers > div { width: 64px; flex: 0 0 64px; border-radius: 5px; box-shadow: 0 8px 18px #21150f1c; transform: rotate(-8deg); }
 .rj-collection-covers > div + div { margin-left: -34px; transform: rotate(5deg) translateY(-5px); }
