@@ -307,11 +307,10 @@ export default function GenreDistributionChart({ books, genres = [], loading = f
         Include subgenres
       </button>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+      <div className="rj-chart-surface grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
         <div className="mx-auto w-full max-w-[26rem]">
           <div {...motion} className="relative">
             <svg
-              key={String(includeSubgenres)}
               viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
               role="img"
               aria-label="Donut chart showing book counts by genre"
@@ -322,7 +321,7 @@ export default function GenreDistributionChart({ books, genres = [], loading = f
                 cy={CHART_SIZE / 2}
                 r={RADIUS}
                 fill="none"
-                stroke="hsl(var(--muted))"
+                stroke="var(--background)"
                 strokeWidth={STROKE_WIDTH}
               />
               {data.flatMap((parent) =>
@@ -345,7 +344,7 @@ export default function GenreDistributionChart({ books, genres = [], loading = f
                       strokeDashoffset={dashOffset}
                       strokeLinecap="butt"
                       transform={`rotate(-90 ${CHART_SIZE / 2} ${CHART_SIZE / 2})`}
-                      className="cursor-pointer transition-all"
+                      className="cursor-pointer"
                       onMouseEnter={() => setActiveKey(segment.key)}
                       onMouseLeave={() => setActiveKey(null)}
                       onFocus={() => setActiveKey(segment.key)}

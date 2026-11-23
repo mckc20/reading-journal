@@ -107,7 +107,7 @@ function HistoryChart({ books, genres, genre }: { books: Book[]; genres: Genre[]
       : history.ratedCount === 0 && enjoyment ? <p className="text-sm text-muted-foreground">Finished books have no ratings yet.</p>
         : null}
     {history.finishedCount > 0 && history.excludedDateCount === history.finishedCount && <p className="text-sm text-muted-foreground">No finished books have usable finish dates yet.</p>}
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2" onKeyDown={(event) => {
+    <div className="rj-chart-surface grid grid-cols-[2rem_minmax(0,1fr)] gap-2" onKeyDown={(event) => {
       if (event.key === "Escape" && selected) { event.preventDefault(); closeYear(); }
     }}>
       <div aria-hidden="true" className="relative h-[200px] text-right text-xs text-muted-foreground">{ticks.map((tick, index) => <span key={tick} className="absolute right-0 -translate-y-1/2" style={{ top: 10 + index / (ticks.length - 1) * 180 }}>{tick}</span>)}</div>

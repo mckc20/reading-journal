@@ -198,7 +198,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
 
       {hasAnyReading ? (
         <div className="space-y-3">
-          <div {...motion} className="overflow-x-auto pb-2">
+          <div {...motion} className="rj-chart-surface overflow-x-auto">
             <div className="min-w-[860px]">
               <div className="grid grid-cols-[auto_1fr] gap-2 text-xs text-muted-foreground">
                 <div />
@@ -226,7 +226,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
 
                 <div className="grid auto-cols-max grid-flow-col gap-1">
                   {weeks.map((week, weekIndex) => (
-                    <div key={`${activeWindowStart.getTime()}-${weekIndex}`} className="rj-chart-point grid grid-rows-7 gap-1" style={{ animationDelay: `${weekIndex / weeks.length * 225}ms` }}>
+                    <div key={week[0].dayKey} className="rj-chart-point grid grid-rows-7 gap-1" style={{ animationDelay: `${weekIndex / weeks.length * 225}ms` }}>
                       {week.map((cell) => {
                         const title =
                           cell.trackedMinutes > 0

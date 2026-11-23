@@ -62,7 +62,7 @@ function RedirectBookJournal() {
 
 function RedirectEntityDetail({ entity, section }: {
   entity: "author" | "series";
-  section: "books" | "journal" | "analytics";
+  section: "books" | "journal" | "insights";
 }) {
   const { authorId, seriesId } = useParams();
   const { search } = useLocation();
@@ -118,7 +118,7 @@ export const router = createBrowserRouter([
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
           { path: "/series/:seriesId/journal", element: <RedirectEntityDetail entity="series" section="journal" /> },
-          { path: "/series/:seriesId/analytics", element: <RedirectEntityDetail entity="series" section="analytics" /> },
+          { path: "/series/:seriesId/analytics", element: <RedirectEntityDetail entity="series" section="insights" /> },
           { path: "/series/:seriesId/books", element: <RedirectEntityDetail entity="series" section="books" /> },
           { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="journal" /> },
           { path: "/library/explore", element: <RedirectTo to="/library/books" preserveSearch /> },

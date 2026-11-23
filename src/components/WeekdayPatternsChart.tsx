@@ -99,7 +99,7 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
         </button>
       </div>
 
-      <div className="rounded-md border px-3 py-3">
+      <div className="rj-chart-surface">
         <div {...motion} className="grid h-56 grid-cols-7 items-end gap-2" aria-label="Median reading minutes by weekday">
           {weekdays.all.map((day, dayIndex) => {
             const activityLabel = getActivityLabel(day, highest, lowest);

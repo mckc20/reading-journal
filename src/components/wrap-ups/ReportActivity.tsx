@@ -48,7 +48,6 @@ export default function ReportActivity({ activity, monthKey }: {
       ) : (
         <VerticalBarChart
           data={chartData}
-          animationKey={metric}
           showEmptySeries
           formatValue={value => `${Math.round(value)} ${metric === 'pagesLogged' ? 'pages' : 'min'}`}
         />

@@ -44,6 +44,13 @@
 .rj-segmented-control { --tab-background: var(--primary); }
 .rj-segmented-control > [aria-pressed="true"] { color: var(--primary-foreground); background: transparent; }
 
+.rj-chart-surface {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--card);
+}
+
 @keyframes rj-chart-draw {
   from { clip-path: inset(-6px calc(100% + 1px) -6px -6px); }
   to { clip-path: inset(-6px -6px -6px -6px); }
@@ -76,6 +83,13 @@
 
   .rj-tab-indicator {
     transition: transform 320ms cubic-bezier(.2, .85, .25, 1), width 320ms cubic-bezier(.2, .85, .25, 1), height 320ms cubic-bezier(.2, .85, .25, 1);
+  }
+
+  .rj-chart-bar {
+    transition: height 340ms cubic-bezier(.2, .75, .25, 1), width 340ms cubic-bezier(.2, .75, .25, 1), background-color 160ms ease;
+  }
+  .rj-chart-distribution circle {
+    transition: stroke-dasharray 340ms ease-out, stroke-dashoffset 340ms ease-out, stroke-width 160ms ease;
   }
 
   [data-chart-motion="waiting"] :is(.rj-chart-line, .rj-chart-bar, .rj-chart-point, .rj-chart-distribution) { opacity: 0; }

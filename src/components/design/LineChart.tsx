@@ -3,6 +3,7 @@ import { AppHeading } from "@/components/design/Typography";
 import ChartTooltip from "@/components/design/ChartTooltip";
 import type { ChartDatum } from "@/components/design/VerticalBarChart";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
+import { useChartPointTransition } from "@/hooks/useChartPointTransition";
 import { cn } from "@/lib/utils";
 
 interface LineChartProps {
@@ -70,14 +71,14 @@ export default function LineChart({
     () => ({ gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(0, 1fr))` }),
     [data.length],
   );
-  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPoints =
-    points.length > 0
-      ? `0,${chartHeight} ${points.map((point) => `${point.x},${point.y}`).join(" ")} 100,${chartHeight}`
-      : "";
+  const positions = useChartPointTransition(points, maxValue > 0);
+  const positionsByKey = new Map(positions.map((point) => [point.key, point]));
+  const activePosition = activePoint && (positionsByKey.get(activePoint.key) ?? activePoint);
+  const linePoints = positions.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPoints = positions.length > 0 ? `0,${chartHeight} ${linePoints} 100,${chartHeight}` : "";
 
   return (
-    <div {...motion} className={timeline ? "space-y-3" : "rounded-lg bg-muted/20 p-4"}>
+    <div {...motion} className={cn("rj-chart-surface", timeline && "space-y-3")}>
       {title ? timeline ? <h4 className="text-sm font-medium">{title}</h4> : <AppHeading level={4}>{title}</AppHeading> : null}
       {data.length === 0 || maxValue <= 0 ? (
         <div className={timeline ? "rounded-md border bg-background/80 p-3 text-sm text-muted-foreground" : "mt-4 flex min-h-36 items-center justify-center rounded-lg bg-muted/20 px-4 text-center text-sm text-muted-foreground"}>
@@ -100,8 +101,8 @@ export default function LineChart({
                     <div className="border-t border-border/70" />
                   </div>
 
-                  {activePoint && (
-                    <ChartTooltip xPercent={activePoint.x} y={activePoint.y}>
+                  {activePoint && activePosition && (
+                    <ChartTooltip xPercent={activePosition.x} y={activePosition.y}>
                       {activePoint.label}: {formatValue(activePoint.value)}
                     </ChartTooltip>
                   )}
@@ -134,29 +135,32 @@ export default function LineChart({
                     />
                   </svg>
 
-                  {points.map((point) => (
-                    <button
-                      key={point.key}
-                      type="button"
-                      className="rj-chart-point absolute z-[3] flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                      style={{ left: `${point.x}%`, top: `${point.y}px`, animationDelay: `${point.x * 4}ms` }}
-                      onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveKey(point.key); }}
-                      onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveKey(null); }}
-                      onPointerDown={(event) => {
-                        if (event.pointerType === "touch") setActiveKey((key) => key === point.key ? null : point.key);
-                      }}
-                      onFocus={(event) => {
-                        if (event.currentTarget.matches(":focus-visible")) setActiveKey(point.key);
-                      }}
-                      onBlur={() => setActiveKey((key) => key === point.key ? null : key)}
-                      aria-label={`${point.label}: ${formatValue(point.value)}`}
-                    >
-                      <span className={timeline
-                        ? "mx-auto block h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] rounded-full border bg-primary"
-                        : "block h-2.5 w-2.5 rounded-full border-2 border-background bg-primary shadow-sm"}
-                        style={timeline ? { borderColor: "color-mix(in oklch, var(--muted) 20%, var(--background))" } : undefined} />
-                    </button>
-                  ))}
+                  {points.map((point) => {
+                    const position = positionsByKey.get(point.key) ?? point;
+                    return (
+                      <button
+                        key={point.key}
+                        type="button"
+                        className="rj-chart-point absolute z-[3] flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                        style={{ left: `${position.x}%`, top: `${position.y}px`, animationDelay: `${point.x * 4}ms` }}
+                        onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveKey(point.key); }}
+                        onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveKey(null); }}
+                        onPointerDown={(event) => {
+                          if (event.pointerType === "touch") setActiveKey((key) => key === point.key ? null : point.key);
+                        }}
+                        onFocus={(event) => {
+                          if (event.currentTarget.matches(":focus-visible")) setActiveKey(point.key);
+                        }}
+                        onBlur={() => setActiveKey((key) => key === point.key ? null : key)}
+                        aria-label={`${point.label}: ${formatValue(point.value)}`}
+                      >
+                        <span className={timeline
+                          ? "mx-auto block h-[clamp(0.4rem,0.65vw,0.55rem)] w-[clamp(0.4rem,0.65vw,0.55rem)] rounded-full border bg-primary"
+                          : "block h-2.5 w-2.5 rounded-full border-2 border-background bg-primary shadow-sm"}
+                          style={timeline ? { borderColor: "color-mix(in oklch, var(--muted) 20%, var(--background))" } : undefined} />
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className={timeline ? "relative h-4 w-full" : "grid w-full gap-1"} style={timeline ? undefined : gridStyle}>

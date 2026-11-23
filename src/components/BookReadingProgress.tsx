@@ -208,7 +208,6 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
             <SegmentedControl label="Chart metric" value={chartMode} options={chartModes} onChange={setChartMode} />
           </div>
           <ProgressOverTimeChart
-            key={chartMode}
             logs={logs}
             totalPages={book.total_pages}
             pausePeriods={book.pause_periods}

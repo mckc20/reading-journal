@@ -652,8 +652,11 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const seriesRecord = series.find((item) => item.id === seriesId) ?? null;
-  const analyticsAnchored = location.hash === "#analytics";
-  const analyticsRef = useDetailSectionAnchor("analytics", !booksLoading && !seriesLoading && !isEditMode);
+  const insightsAnchored = location.hash === "#insights" || location.hash === "#analytics";
+  const insightsRef = useDetailSectionAnchor(
+    location.hash === "#analytics" ? "analytics" : "insights",
+    !booksLoading && !seriesLoading && !isEditMode,
+  );
   const seriesJournal = useDetailJournalEntries(seriesRecord?.id, fetchSeriesJournalEntryRecords, seriesJournalToJournalEntries);
   const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
     if ("series_id" in record && record.series_id === seriesRecord?.id) seriesJournal.save(record);
@@ -1107,9 +1110,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
 
         <DetailBooks books={seriesBooks} series />
 
-        {(seriesBooks.length > 0 || analyticsAnchored) && (
-          <section id="analytics" ref={analyticsRef} aria-labelledby={`${headingId}-analytics`} className="space-y-4 scroll-mt-4">
-            <h2 id={`${headingId}-analytics`}>Analytics</h2>
+        {(seriesBooks.length > 0 || insightsAnchored) && (
+          <section id="insights" ref={insightsRef} aria-labelledby={`${headingId}-insights`} className="space-y-4 scroll-mt-4">
+            <h2 id={`${headingId}-insights`}>Insights</h2>
             {seriesBooks.length > 0 ? (
               <>
                 <SeriesAnalyticsOverview stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />

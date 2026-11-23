@@ -193,7 +193,6 @@ function SimpleBarChart({
       highlightKey={highlightKey}
       showAllXLabels={showAllXLabels}
       showEmptySeries={unit === "books"}
-      animationKey={unit}
     />
   );
 }

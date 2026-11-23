@@ -24,7 +24,6 @@ interface VerticalBarChartProps {
   showAllXLabels?: boolean;
   yAxisClassName?: string;
   showEmptySeries?: boolean;
-  animationKey?: string;
   referenceLine?: { value: number; label: string };
 }
 
@@ -38,7 +37,6 @@ export default function VerticalBarChart({
   showAllXLabels = false,
   yAxisClassName = "grid-cols-[3rem_1fr]",
   showEmptySeries = false,
-  animationKey,
   referenceLine,
 }: VerticalBarChartProps) {
   const motion = useChartEntrance<HTMLDivElement>();
@@ -69,7 +67,7 @@ export default function VerticalBarChart({
   );
 
   return (
-    <div {...motion} className="rounded-lg bg-muted/20 p-4">
+    <div {...motion} className="rj-chart-surface">
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           {title ? <AppHeading level={4}>{title}</AppHeading> : <span />}
@@ -125,7 +123,6 @@ export default function VerticalBarChart({
                           aria-label={`${point.label}: ${point.displayValue ?? formatValue(point.value)}`}
                         >
                           <div
-                            key={animationKey}
                             className={cn(
                               "rj-chart-bar w-[70%] max-w-8 rounded-t-sm transition-colors group-hover:bg-primary",
                               highlighted ? "bg-rating" : "bg-primary/85",

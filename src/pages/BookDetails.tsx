@@ -30,6 +30,7 @@ import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
@@ -447,16 +448,15 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                     Paused
                   </Badge>
                 ) : (
-                  <select
+                  <NativeSelect
                     aria-label="Reading status"
-                    className="min-h-11 rounded-xl border border-input bg-surface px-3 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     value={book.status}
                     onChange={(event) => void handleStatusChange(event.currentTarget.value as BookStatus)}
                   >
                     {STATUS_OPTIONS.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 )}
               </div>
               <div className="rj-detail-rating">

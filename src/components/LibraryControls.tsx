@@ -2,15 +2,15 @@ import { useId } from "react";
 import { ArrowDownUp, Check, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NativeSelect } from "@/components/ui/native-select";
 import { collectionSelectClassName, collectionSelectFieldClassName } from "@/components/ui/collection-select";
 import { DropdownMenu } from "radix-ui";
 import { cn } from "@/lib/utils";
 
 const collectionMenuClassName = "rj-menu-motion z-50 max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-lg border border-input bg-background p-1 text-sm text-foreground shadow-sm";
-const systemMenuClassName = "rj-add-menu max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] max-w-[calc(100vw-24px)] overflow-y-auto";
 const collectionMenuItemClassName = "relative flex min-h-8 w-full cursor-default items-center gap-2 rounded px-2 py-1.5 text-left text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground";
 
-export function FilterSelect({ label, value, options, onChange, emptyLabel = "All", triggerClassName, disabled = false, systemMenu = false }: {
+export function FilterSelect({ label, value, options, onChange, emptyLabel = "All", triggerClassName, disabled = false, nativeMenu = false }: {
   label: string;
   value: string[];
   options: string[];
@@ -18,10 +18,30 @@ export function FilterSelect({ label, value, options, onChange, emptyLabel = "Al
   emptyLabel?: string;
   triggerClassName?: string;
   disabled?: boolean;
-  systemMenu?: boolean;
+  nativeMenu?: boolean;
 }) {
   const id = useId();
   const selectedLabel = value.length === 0 ? emptyLabel : value.length === 1 ? value[0] : `${value.length} selected`;
+  if (nativeMenu) {
+    return (
+      <div className={collectionSelectFieldClassName}>
+        <label htmlFor={id}>{label}</label>
+        <NativeSelect
+          id={id}
+          disabled={disabled}
+          value=""
+          className={triggerClassName}
+          onChange={(event) => onChange(event.currentTarget.value === "clear" ? "" : event.currentTarget.value)}
+        >
+          <option value="" hidden>{selectedLabel}</option>
+          <option value="clear">{emptyLabel}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>{value.includes(option) ? `✓ ${option}` : option}</option>
+          ))}
+        </NativeSelect>
+      </div>
+    );
+  }
   return (
     <div className={collectionSelectFieldClassName}>
       <label htmlFor={id}>{label}</label>
@@ -34,15 +54,15 @@ export function FilterSelect({ label, value, options, onChange, emptyLabel = "Al
           </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content align="start" sideOffset={4} collisionPadding={systemMenu ? 12 : undefined} className={systemMenu ? systemMenuClassName : collectionMenuClassName}>
-            <DropdownMenu.Item onSelect={() => onChange("")} className={systemMenu ? undefined : collectionMenuItemClassName}>
+          <DropdownMenu.Content align="start" sideOffset={4} className={collectionMenuClassName}>
+            <DropdownMenu.Item onSelect={() => onChange("")} className={collectionMenuItemClassName}>
               <span className="flex-1">{emptyLabel}</span>
               {value.length === 0 && <Check aria-hidden="true" className="h-3.5 w-3.5" />}
             </DropdownMenu.Item>
             {options.map((option) => (
               <DropdownMenu.CheckboxItem key={option} checked={value.includes(option)}
                 onCheckedChange={() => onChange(option)} onSelect={(event) => event.preventDefault()}
-                className={systemMenu ? undefined : collectionMenuItemClassName}>
+                className={collectionMenuItemClassName}>
                 <span className="flex-1">{option}</span>
                 <DropdownMenu.ItemIndicator><Check aria-hidden="true" className="h-3.5 w-3.5" /></DropdownMenu.ItemIndicator>
               </DropdownMenu.CheckboxItem>
@@ -70,14 +90,14 @@ function SortOptionContent({ label, directionLabel, active }: {
   );
 }
 
-export function LibrarySortingControls({ sort, options, directionLabel, onSortChange, onDirectionChange, compact = false, systemMenu = false }: {
+export function LibrarySortingControls({ sort, options, directionLabel, onSortChange, onDirectionChange, compact = false, nativeMenu = false }: {
   sort: string;
   options: ReadonlyArray<{ value: string; label: string; directionLabel: string }>;
   directionLabel: string;
   onSortChange: (value: string) => void;
   onDirectionChange: () => void;
   compact?: boolean;
-  systemMenu?: boolean;
+  nativeMenu?: boolean;
 }) {
   const chooseSort = (value: string) => {
     if (value === sort) onDirectionChange();
@@ -86,6 +106,27 @@ export function LibrarySortingControls({ sort, options, directionLabel, onSortCh
   const optionLabel = (option: typeof options[number]) => option.value === sort ? directionLabel : option.directionLabel;
   const id = useId();
   const selected = options.find((option) => option.value === sort);
+
+  if (nativeMenu) {
+    return (
+      <div className={cn(collectionSelectFieldClassName, compact && "hidden lg:flex")}>
+        <label htmlFor={id}>Sort by</label>
+        <NativeSelect
+          id={id}
+          value={sort}
+          aria-label={`Sort by: ${selected?.label}, ${directionLabel}`}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            if (value === "reverse") onDirectionChange();
+            else onSortChange(value);
+          }}
+        >
+          {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <option value="reverse">Reverse order</option>
+        </NativeSelect>
+      </div>
+    );
+  }
 
   // A menu fires on every selection, including the current sort, so it can reverse.
   return (
@@ -101,14 +142,13 @@ export function LibrarySortingControls({ sort, options, directionLabel, onSortCh
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            align={systemMenu || compact ? "end" : "start"}
+            align={compact ? "end" : "start"}
             sideOffset={4}
-            collisionPadding={systemMenu ? 12 : undefined}
-            className={systemMenu ? cn(systemMenuClassName, "w-72") : cn(collectionMenuClassName, "min-w-72")}
+            className={cn(collectionMenuClassName, "min-w-72")}
           >
             {options.map((option) => (
               <DropdownMenu.Item key={option.value} onSelect={() => chooseSort(option.value)} aria-current={option.value === sort ? "true" : undefined}
-                className={systemMenu ? undefined : collectionMenuItemClassName}>
+                className={collectionMenuItemClassName}>
                 <SortOptionContent label={option.label} directionLabel={optionLabel(option)} active={option.value === sort} />
               </DropdownMenu.Item>
             ))}
