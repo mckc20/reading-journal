@@ -5,8 +5,7 @@ import {
   useId,
   useMemo,
   useState,
-  type ChangeEvent,
-  type FormEvent,
+  useRef,
 } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
@@ -14,14 +13,11 @@ import {
   Calendar,
   CalendarDays,
   Flag,
-  ImagePlus,
   Loader2,
   NotebookPen,
   Star,
-  Trash2,
 } from "lucide-react";
-import BackButton from "@/components/BackButton";
-import SaveCancelBar from "@/components/SaveCancelBar";
+import AddSeriesDialog from "@/components/AddSeriesDialog";
 import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
@@ -40,15 +36,7 @@ import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { SeriesReadingTotals, SeriesAnalyticsComparison } from "@/components/series/SeriesAnalyticsSections";
 import { BookHighlights } from "@/components/redesign/BookHighlights";
-import SeriesBooksEditor, {
-  buildEditableSeriesBooks,
-  parseVolumeInput,
-  type EditableSeriesBook,
-} from "@/components/series/SeriesBooksEditor";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
@@ -58,7 +46,7 @@ import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
-import { deleteSeriesBanner, fetchReadingLogs, uploadSeriesBanner } from "@/lib/books";
+import { fetchReadingLogs } from "@/lib/books";
 import { duplicateSeriesRecord } from "@/lib/duplication";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
 import { buildGenreSlugLookup } from "@/lib/genreTree";
@@ -81,7 +69,7 @@ import { fetchSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import { seriesJournalToJournalEntries } from "@/lib/journal";
 import { getTodayLocalDate } from "@/lib/utils";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
-import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
+import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, SeriesJournalEntryRecord } from "@/types";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -222,233 +210,6 @@ function PageLoading() {
   );
 }
 
-function getNextEditableVolume(rows: EditableSeriesBook[]): number {
-  const visibleRows = rows.filter((row) => !row.removed);
-  const largestVolume = visibleRows.reduce((largest, row) => {
-    const volume = parseVolumeInput(row.volumeInput);
-    return volume === null ? largest : Math.max(largest, volume);
-  }, 0);
-  return largestVolume + 1 || visibleRows.length + 1;
-}
-
-function SeriesEditPage({
-  series,
-  seriesBooks,
-  allBooks,
-  userId,
-  saving,
-  onCancel,
-  onSave,
-  onCreateBook,
-}: {
-  series: Series;
-  seriesBooks: Book[];
-  allBooks: Book[];
-  userId: string | undefined;
-  saving: boolean;
-  onCancel: () => void;
-  onSave: (input: {
-    name: string;
-    description: string | null;
-    cover_url?: string | null;
-    rows: EditableSeriesBook[];
-  }) => Promise<void>;
-  onCreateBook: (rows: EditableSeriesBook[], onSaved: (book: Book, volumeNumber: number) => void) => void;
-}) {
-  const [name, setName] = useState(series.name);
-  const [description, setDescription] = useState(series.description ?? "");
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [removeBanner, setRemoveBanner] = useState(false);
-  const [rows, setRows] = useState<EditableSeriesBook[]>(() => buildEditableSeriesBooks(seriesBooks));
-  const [error, setError] = useState<string | null>(null);
-  const shownBannerUrl = bannerPreview ?? (!removeBanner ? series.cover_url : null);
-
-  useEffect(() => {
-    return () => {
-      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-    };
-  }, [bannerPreview]);
-
-  function handleBannerChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-    setBannerFile(file);
-    setBannerPreview(URL.createObjectURL(file));
-    setRemoveBanner(false);
-  }
-
-  function handleRemoveBanner() {
-    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-    setBannerFile(null);
-    setBannerPreview(null);
-    setRemoveBanner(true);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName || saving) return;
-
-    const invalidRow = rows.find((row) => !row.removed && parseVolumeInput(row.volumeInput) === null);
-    if (invalidRow) {
-      setError(`Add a positive volume number with at most two decimal places for "${invalidRow.book.title}" before saving.`);
-      return;
-    }
-
-    setError(null);
-    let coverUrl: string | null | undefined;
-    let keepExtension: string | null | undefined;
-
-    try {
-      if (bannerFile) {
-        if (!userId) throw new Error("You must be signed in to upload a banner.");
-        const upload = await uploadSeriesBanner(userId, series.id, bannerFile);
-        coverUrl = upload.publicUrl;
-        keepExtension = upload.extension;
-      } else if (removeBanner) {
-        coverUrl = null;
-      }
-
-      await onSave({
-        name: trimmedName,
-        description: description.trim() || null,
-        ...(coverUrl !== undefined ? { cover_url: coverUrl } : {}),
-        rows,
-      });
-
-      if (userId && (bannerFile || removeBanner)) {
-        await deleteSeriesBanner(userId, series.id, keepExtension).catch(() => {});
-      }
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to save series.");
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-5 pb-24">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="series-banner">Banner image</Label>
-              <label
-                htmlFor="series-banner"
-                className="group relative flex aspect-[16/7] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60"
-              >
-                {shownBannerUrl ? (
-                  <img src={shownBannerUrl} alt="Series banner preview" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <ImagePlus className="h-6 w-6" />
-                    <span className="text-xs">Click to upload</span>
-                  </div>
-                )}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                  <ImagePlus className="h-5 w-5 text-white" />
-                </div>
-              </label>
-              <input
-                id="series-banner"
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={saving}
-                onChange={handleBannerChange}
-              />
-              <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-xs text-muted-foreground">
-                  {bannerFile ? bannerFile.name : "PNG, JPG, WEBP, or AVIF."}
-                </p>
-                {shownBannerUrl && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                    aria-label="Remove banner"
-                    disabled={saving}
-                    onClick={handleRemoveBanner}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-series-name">Series name *</Label>
-              <Input
-                id="edit-series-name"
-                value={name}
-                disabled={saving}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-series-description">Description</Label>
-              <Textarea
-                id="edit-series-description"
-                rows={6}
-                value={description}
-                disabled={saving}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <section className="space-y-3">
-            <div>
-              <AppHeading level={4} as="h2">Books in this series</AppHeading>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Search for books, drag by the handle, edit volume numbers, or remove books from this series.
-              </p>
-            </div>
-            <SeriesBooksEditor
-              rows={rows}
-              allBooks={allBooks}
-              saving={saving}
-              enableSearch
-              emptyLabel="No books will remain in this series."
-              removedLabel={(count) =>
-                `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
-              }
-              onRowsChange={setRows}
-              onCreateBook={() =>
-                onCreateBook(rows, (book, volumeNumber) => {
-                  setRows((currentRows) => {
-                    if (currentRows.some((row) => row.book.id === book.id)) return currentRows;
-                    return [
-                      ...currentRows,
-                      {
-                        book,
-                        volumeInput: book.volume_number ? String(book.volume_number) : String(volumeNumber),
-                        removed: false,
-                      },
-                    ];
-                  });
-                })
-              }
-            />
-          </section>
-        </div>
-
-        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-
-        <SaveCancelBar
-          onCancel={onCancel}
-          saving={saving}
-          saveDisabled={!name.trim()}
-          saveLabel="Save Series"
-          savingLabel="Saving..."
-        />
-      </form>
-    </div>
-  );
-}
-
 const seriesDetailLabel = "Series details";
 const seriesFallback = "/library/series";
 
@@ -473,8 +234,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     loading: booksLoading,
     error: booksError,
     updateBook,
-    updateBookSeriesPlacement,
-    updateBookVolumeNumber,
     reload: reloadBooks,
   } = useBooksContext();
   const { genres: availableGenres } = useGenresContext();
@@ -487,8 +246,8 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const [actionError, setActionError] = useState<string | null>(null);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [savingSeries, setSavingSeries] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const editTriggerRef = useRef<HTMLElement | null>(null);
   const [startingBookId, setStartingBookId] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
@@ -496,16 +255,16 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const insightsAnchored = location.hash === "#insights" || location.hash === "#analytics";
   const insightsRef = useDetailSectionAnchor(
     location.hash === "#analytics" ? "analytics" : "insights",
-    !booksLoading && !seriesLoading && !isEditMode,
+    !booksLoading && !seriesLoading && !editOpen,
   );
   const seriesJournal = useDetailJournalEntries(seriesRecord?.id, fetchSeriesJournalEntryRecords, seriesJournalToJournalEntries);
   const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
     if ("series_id" in record && record.series_id === seriesRecord?.id) seriesJournal.save(record);
   }, [seriesRecord?.id, seriesJournal.save]);
-  const journalEditor = useDetailJournalEditor("Series", !booksLoading && !seriesLoading && !isEditMode && user ? seriesRecord?.id : undefined, saveJournalEntry);
+  const journalEditor = useDetailJournalEditor("Series", !booksLoading && !seriesLoading && !editOpen && user ? seriesRecord?.id : undefined, saveJournalEntry);
   useEffect(() => {
     if (!seriesRecord || location.state?.openEdit !== true) return;
-    setIsEditMode(true);
+    setEditOpen(true);
     navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
   }, [location, navigate, seriesRecord]);
   const seriesBooks = useMemo(
@@ -683,65 +442,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     }
   }
 
-  async function handleSaveSeriesEdit(input: {
-    name: string;
-    description: string | null;
-    cover_url?: string | null;
-    rows: EditableSeriesBook[];
-  }) {
-    if (!seriesRecord) return;
-
-    try {
-      setSavingSeries(true);
-      setActionError(null);
-
-      const seriesPayload: Parameters<typeof editSeries>[1] = {};
-      if (input.name !== seriesRecord.name) seriesPayload.name = input.name;
-      if ((input.description ?? null) !== (seriesRecord.description ?? null)) {
-        seriesPayload.description = input.description;
-      }
-      if (input.cover_url !== undefined && input.cover_url !== (seriesRecord.cover_url ?? null)) {
-        seriesPayload.cover_url = input.cover_url;
-      }
-
-      if (Object.keys(seriesPayload).length > 0) {
-        await editSeries(seriesRecord.id, seriesPayload);
-      }
-
-      for (const row of input.rows) {
-        const nextVolume = parseVolumeInput(row.volumeInput);
-        if (row.removed) {
-          if (row.book.series_id === seriesRecord.id) {
-            await updateBookSeriesPlacement(row.book.id, {
-              series_id: null,
-              volume_number: null,
-            });
-          }
-          continue;
-        }
-
-        if (row.book.series_id !== seriesRecord.id) {
-          await updateBookSeriesPlacement(row.book.id, {
-            series_id: seriesRecord.id,
-            volume_number: nextVolume,
-          });
-          continue;
-        }
-
-        if (nextVolume !== null && nextVolume !== row.book.volume_number) {
-          await updateBookVolumeNumber(row.book.id, nextVolume);
-        }
-      }
-
-      setIsEditMode(false);
-    } catch (error) {
-      setActionError(getErrorMessage(error, "Failed to save series"));
-      throw error;
-    } finally {
-      setSavingSeries(false);
-    }
-  }
-
   const back = <DetailBack label={seriesDetailLabel} fallbackTo={seriesFallback} onClose={onClose} />;
   if (booksLoading || seriesLoading) return <div className="rj-detail-page">{back}<PageLoading /></div>;
 
@@ -762,50 +462,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     );
   }
 
-  if (isEditMode) {
-    return (
-      <div className="rj-detail-page space-y-6">
-        <BackButton
-          fallbackTo={seriesFallback}
-          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
-          onClick={() => {
-            setActionError(null);
-            setIsEditMode(false);
-          }}
-        />
-
-        <div className="relative z-10 space-y-2">
-          <AppHeading level={1} as="h1">Edit series</AppHeading>
-          <p className="text-sm text-muted-foreground">Update the series details shown in your library.</p>
-        </div>
-
-        {actionError && <p className="relative z-10 text-sm text-destructive">{actionError}</p>}
-        <div className="relative z-10">
-          <SeriesEditPage
-            series={seriesRecord}
-            seriesBooks={seriesBooks}
-            allBooks={books}
-            userId={user?.id}
-            saving={savingSeries}
-            onCancel={() => {
-              setActionError(null);
-              setIsEditMode(false);
-            }}
-            onSave={handleSaveSeriesEdit}
-            onCreateBook={(rows, onSaved) => {
-              const nextVolume = getNextEditableVolume(rows);
-              openAddBook({
-                initialSeriesId: seriesRecord.id,
-                initialVolumeNumber: nextVolume,
-                onSaved: (book) => onSaved(book, nextVolume),
-              });
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rj-detail-page">
       <DetailHero
@@ -818,7 +474,10 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             kind="series"
             label={seriesRecord.name}
             shareAttachmentLabel="Send the series as attachment in a chat"
-            onEdit={() => setIsEditMode(true)}
+            onEdit={(trigger) => {
+              editTriggerRef.current = trigger ?? null;
+              setEditOpen(true);
+            }}
             onDuplicate={openDuplicateDialog}
             onDelete={handleDeleteSeries}
             onSendAttachment={openAttachmentPicker}
@@ -912,6 +571,19 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           addDisabled={!user}
         />
       </div>
+      {editOpen && (
+        <AddSeriesDialog
+          open
+          initialSeries={seriesRecord}
+          openAddBook={openAddBook}
+          onUpdateSeries={editSeries}
+          onOpenChange={setEditOpen}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editTriggerRef.current?.focus({ preventScroll: true });
+          }}
+        />
+      )}
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}

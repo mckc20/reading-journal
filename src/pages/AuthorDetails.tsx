@@ -4,13 +4,13 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { BookOpen, NotebookPen, Star } from "lucide-react";
-import AuthorForm, { type AuthorFormPayload } from "@/components/AuthorForm";
-import BackButton from "@/components/BackButton";
-import { AboutSection, AppHeading } from "@/components/design";
+import AddAuthorDialog from "@/components/AddAuthorDialog";
+import { AboutSection } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
@@ -126,7 +126,8 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
   const [sendAttachmentOpen, setSendAttachmentOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const editTriggerRef = useRef<HTMLElement | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -155,7 +156,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   useEffect(() => {
     if (!author || location.state?.openEdit !== true) return;
-    setIsEditMode(true);
+    setEditOpen(true);
     navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
   }, [author, location, navigate]);
   const heroColor = useBookHeroColor(author?.photo_url);
@@ -178,7 +179,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
     if ("author_id" in record && record.author_id === author?.id) authorJournal.save(record);
   }, [author?.id, authorJournal.save]);
-  const journalEditor = useDetailJournalEditor("Author", !loading && !isEditMode && user ? author?.id : undefined, saveJournalEntry);
+  const journalEditor = useDetailJournalEditor("Author", !loading && !editOpen && user ? author?.id : undefined, saveJournalEntry);
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
@@ -236,10 +237,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     }
   }
 
-  async function handleSaveAuthor(authorId: string, payload: AuthorFormPayload) {
-    return editAuthor(authorId, payload);
-  }
-
   const back = <DetailBack label={authorDetailLabel} fallbackTo={authorFallback} onClose={onClose} />;
   if (loading) {
     return <div className="rj-detail-page">{back}<LoadingIndicator variant="page" /></div>;
@@ -265,32 +262,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   }
 
   const bio = author.bio?.trim() || "";
-  if (isEditMode) {
-    return (
-      <div className="rj-detail-page space-y-6">
-        <BackButton
-          fallbackTo={authorFallback}
-          className="relative z-10 rounded-full bg-transparent hover:bg-background/20 hover:text-foreground"
-          onClick={() => setIsEditMode(false)}
-        />
-        <div className="relative z-10 space-y-2">
-          <AppHeading level={1} as="h1">Edit author</AppHeading>
-          <p className="text-sm text-muted-foreground">Update the author details shown in your library.</p>
-        </div>
-        <div className="relative z-10">
-          <AuthorForm
-            initialAuthor={author}
-            mode="page"
-            submitLabel="Save author"
-            onCancel={() => setIsEditMode(false)}
-            onSave={(payload) => handleSaveAuthor(author.id, payload)}
-            onSaved={() => setIsEditMode(false)}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rj-detail-page">
       <DetailHero
@@ -303,7 +274,10 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
             kind="author"
             label={author.name}
             shareAttachmentLabel="Send the author as attachment in a chat"
-            onEdit={() => setIsEditMode(true)}
+            onEdit={(trigger) => {
+              editTriggerRef.current = trigger ?? null;
+              setEditOpen(true);
+            }}
             onDuplicate={openDuplicateDialog}
             onDelete={() => void handleDeleteAuthor()}
             onSendAttachment={openAttachmentPicker}
@@ -373,6 +347,17 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
         />
       </div>
 
+      {editOpen && (
+        <AddAuthorDialog
+          open
+          initialAuthor={authorRecords.find((record) => record.id === author.id) ?? author}
+          onOpenChange={setEditOpen}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editTriggerRef.current?.focus({ preventScroll: true });
+          }}
+        />
+      )}
       <SendAttachmentDialog
         open={sendAttachmentOpen}
         onOpenChange={setSendAttachmentOpen}

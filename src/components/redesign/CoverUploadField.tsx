@@ -7,10 +7,11 @@ interface CoverUploadFieldProps {
   preview: string | null;
   fileName?: string;
   shape: "cover" | "banner";
+  disabled?: boolean;
   onFileChange: (file: File) => void;
 }
 
-export function CoverUploadField({ id, label, preview, fileName, shape, onFileChange }: CoverUploadFieldProps) {
+export function CoverUploadField({ id, label, preview, fileName, shape, disabled, onFileChange }: CoverUploadFieldProps) {
   const descriptionId = `${id}-description`;
 
   return (
@@ -19,7 +20,7 @@ export function CoverUploadField({ id, label, preview, fileName, shape, onFileCh
         "rj-creation-upload group relative flex cursor-pointer items-center justify-center overflow-hidden border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-primary/60",
         shape === "cover" ? "aspect-[2/3]" : "aspect-[16/7]",
       )}>
-        <input id={id} type="file" accept="image/*" className="sr-only" aria-label={label} aria-describedby={descriptionId}
+        <input id={id} type="file" accept="image/*" className="sr-only" aria-label={label} aria-describedby={descriptionId} disabled={disabled}
           onChange={event => {
             const file = event.currentTarget.files?.[0];
             if (!file) return;

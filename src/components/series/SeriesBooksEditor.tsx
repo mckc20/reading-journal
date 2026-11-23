@@ -221,7 +221,7 @@ export default function SeriesBooksEditor({
   enableSearch?: boolean;
   createBookLabel?: string;
   onRowsChange: (rows: EditableSeriesBook[]) => void;
-  onCreateBook?: () => void;
+  onCreateBook?: (trigger: HTMLButtonElement) => void;
 }) {
   const [search, setSearch] = useState("");
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
@@ -341,7 +341,7 @@ export default function SeriesBooksEditor({
             </div>
           )}
           {onCreateBook && (
-            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={onCreateBook}>
+            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={(event) => onCreateBook(event.currentTarget)}>
               <Plus className="h-4 w-4" />
               {createBookLabel}
             </Button>

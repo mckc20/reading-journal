@@ -66,12 +66,12 @@ export function useDetailJournalEditor(
   }, [entityId, onSaved, openAddJournalEntry, type]);
 
   useEffect(() => {
-    if (searchParams.get("new") !== "1" || !triggerRef.current || triggerRef.current.closest("[inert]")) return;
+    if (!entityId || searchParams.get("new") !== "1" || !triggerRef.current || triggerRef.current.closest("[inert]")) return;
     launch(triggerRef.current);
     const next = new URLSearchParams(searchParams);
     next.delete("new");
     setSearchParams(next, { replace: true });
-  }, [launch, searchParams, setSearchParams]);
+  }, [entityId, launch, searchParams, setSearchParams]);
 
   return { launch, triggerRef };
 }

@@ -25,9 +25,9 @@ export default function AddAuthorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} onCloseAutoFocus={onCloseAutoFocus} className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Author" : "Add Author"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit author" : "Add Author"}</DialogTitle>
         </DialogHeader>
 
         <AuthorForm

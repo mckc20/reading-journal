@@ -1,28 +1,32 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Layers } from "lucide-react";
+import { Layers, Trash2 } from "lucide-react";
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
 import { CoverUploadField } from "@/components/redesign/CoverUploadField";
 import { Dialog } from "@/components/ui/dialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import type { AddBookDialogLaunchOptions } from "@/components/AppLayout";
 import SeriesBooksEditor, {
+  buildEditableSeriesBooks,
   parseVolumeInput,
   type EditableSeriesBook,
 } from "@/components/series/SeriesBooksEditor";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useBooksContext } from "@/context/BooksContext";
 import { useSeries } from "@/hooks/useSeries";
-import { deleteSeriesBanner, uploadSeriesBanner } from "@/lib/books";
+import { deleteSeriesBanner, uploadSeriesBanner, type SeriesInput } from "@/lib/books";
 import type { Series } from "@/types";
 
 interface AddSeriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
-  openAddBook: (options?: AddBookDialogLaunchOptions) => void;
+  openAddBook: (options?: AddBookDialogLaunchOptions, trigger?: HTMLElement) => void;
+  initialSeries?: Series;
+  onUpdateSeries?: (id: string, payload: Partial<SeriesInput>) => Promise<Series>;
   onSaved?: (series: Series) => void;
 }
 
@@ -35,18 +39,23 @@ function getNextVolume(rows: EditableSeriesBook[]): number {
   return largestVolume + 1 || visibleRows.length + 1;
 }
 
-export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, openAddBook, onSaved }: AddSeriesDialogProps) {
+export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, openAddBook, initialSeries, onUpdateSeries, onSaved }: AddSeriesDialogProps) {
   const { user } = useAuth();
   const { addSeries, editSeries } = useSeries();
-  const { books, updateBookSeriesPlacement } = useBooksContext();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const { books, updateBookSeriesPlacement, updateBookVolumeNumber } = useBooksContext();
+  const updateSeries = onUpdateSeries ?? editSeries;
+  const [name, setName] = useState(initialSeries?.name ?? "");
+  const [description, setDescription] = useState(initialSeries?.description ?? "");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [rows, setRows] = useState<EditableSeriesBook[]>([]);
-  const [draftSeries, setDraftSeries] = useState<Series | null>(null);
+  const [removeCover, setRemoveCover] = useState(false);
+  const [rows, setRows] = useState<EditableSeriesBook[]>(() => initialSeries
+    ? buildEditableSeriesBooks(books.filter((book) => book.series_id === initialSeries.id))
+    : []);
+  const [draftSeries, setDraftSeries] = useState<Series | null>(initialSeries ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shownCover = coverPreview ?? (removeCover ? null : draftSeries?.cover_url ?? null);
 
   useEffect(() => {
     return () => {
@@ -54,22 +63,29 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
     };
   }, [coverPreview]);
 
-  function reset() {
-    setName("");
-    setDescription("");
-    setCoverFile(null);
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
-    setCoverPreview(null);
-    setRows([]);
-    setDraftSeries(null);
-    setError(null);
-    setSaving(false);
-  }
-
   function handleFileChange(file: File) {
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+    setRemoveCover(false);
+  }
+
+  function handleRemoveBanner() {
+    setCoverFile(null);
+    setCoverPreview(null);
+    setRemoveCover(true);
+  }
+
+  async function saveSeriesFields(series: Series, coverUrl?: string | null) {
+    const payload: Partial<SeriesInput> = {};
+    if (name.trim() !== series.name) payload.name = name.trim();
+    const bio = description.trim() || null;
+    if (bio !== (series.description ?? null)) payload.description = bio;
+    if (coverUrl !== undefined && coverUrl !== (series.cover_url ?? null)) payload.cover_url = coverUrl;
+    if (!Object.keys(payload).length) return series;
+
+    const saved = await updateSeries(series.id, payload);
+    setDraftSeries(saved);
+    return saved;
   }
 
   async function ensureDraftSeries(): Promise<Series> {
@@ -77,10 +93,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
     if (!trimmedName) throw new Error("Add a series name before creating a book.");
 
     if (draftSeries) {
-      return editSeries(draftSeries.id, {
-        name: trimmedName,
-        description: description.trim() || null,
-      });
+      return saveSeriesFields(draftSeries);
     }
 
     const created = await addSeries({
@@ -91,14 +104,14 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
     return created;
   }
 
-  async function handleCreateBook() {
+  async function handleCreateBook(trigger: HTMLButtonElement) {
     if (saving) return;
 
     setSaving(true);
     setError(null);
 
     try {
-      const seriesRecord = await ensureDraftSeries();
+      const seriesRecord = initialSeries ?? await ensureDraftSeries();
       const nextVolume = getNextVolume(rows);
       openAddBook({
         initialSeriesId: seriesRecord.id,
@@ -116,7 +129,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
             ];
           });
         },
-      });
+      }, initialSeries ? trigger : undefined);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to prepare series.");
     } finally {
@@ -139,31 +152,34 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
     setError(null);
 
     try {
-      const created = draftSeries
-        ? await editSeries(draftSeries.id, {
-            name: trimmedName,
-            description: description.trim() || null,
-          })
-        : await addSeries({
-            name: trimmedName,
-            description: description.trim() || null,
-          });
+      let saved = initialSeries ? (draftSeries ?? initialSeries) : await ensureDraftSeries();
+      let coverUrl: string | null | undefined = removeCover ? null : undefined;
+      let keepExtension: string | undefined;
 
-      if (coverFile && user) {
+      if (coverFile) {
         try {
-          const { publicUrl, extension } = await uploadSeriesBanner(user.id, created.id, coverFile);
-          const cover_url = publicUrl;
-          await editSeries(created.id, { cover_url });
-          await deleteSeriesBanner(user.id, created.id, extension).catch(() => {});
-        } catch {
-          // Banner upload is optional, so a failure should not block saving the series.
+          if (!user) throw new Error("You must be signed in to upload a banner.");
+          const upload = await uploadSeriesBanner(user.id, saved.id, coverFile);
+          coverUrl = upload.publicUrl;
+          keepExtension = upload.extension;
+        } catch (uploadError) {
+          if (initialSeries) throw uploadError;
         }
       }
 
+      try {
+        saved = await saveSeriesFields(saved, coverUrl);
+      } catch (updateError) {
+        if (initialSeries || !coverUrl) throw updateError;
+        // Saving an optional banner should not prevent a new series from being added.
+      }
+
+      const booksById = new Map(books.map((book) => [book.id, book]));
       for (const row of rows) {
+        const book = booksById.get(row.book.id) ?? row.book;
         if (row.removed) {
-          if (row.book.series_id === created.id) {
-            await updateBookSeriesPlacement(row.book.id, {
+          if (book.series_id === saved.id) {
+            await updateBookSeriesPlacement(book.id, {
               series_id: null,
               volume_number: null,
             });
@@ -172,34 +188,38 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
         }
 
         const nextVolume = parseVolumeInput(row.volumeInput);
-        if (nextVolume !== null) {
-          await updateBookSeriesPlacement(row.book.id, {
-            series_id: created.id,
+        if (book.series_id !== saved.id) {
+          await updateBookSeriesPlacement(book.id, {
+            series_id: saved.id,
             volume_number: nextVolume,
           });
+        } else if (nextVolume !== null && nextVolume !== book.volume_number) {
+          await updateBookVolumeNumber(book.id, nextVolume);
         }
       }
 
-      reset();
+      if (user && (removeCover || (coverUrl && saved.cover_url === coverUrl))) {
+        await deleteSeriesBanner(user.id, saved.id, keepExtension).catch(() => {});
+      }
       onOpenChange(false);
-      onSaved?.(created);
+      onSaved?.(saved);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to add series.");
+      setError(submitError instanceof Error ? submitError.message : "Failed to save series.");
     } finally {
       setSaving(false);
     }
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) reset();
+    if (!nextOpen && saving) return;
     onOpenChange(nextOpen);
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
-        title="Add Series"
-        description="Create a series entry with a description and optional banner image."
+        title={initialSeries ? "Edit series" : "Add Series"}
+        description={initialSeries ? "Update the series details shown in your library." : "Create a series entry with a description and optional banner image."}
         icon={Layers}
         onCloseAutoFocus={onCloseAutoFocus}
       >
@@ -209,8 +229,13 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="series-cover">Banner image</Label>
-                  <CoverUploadField id="series-cover" label="Banner image" shape="banner" preview={coverPreview}
-                    fileName={coverFile?.name} onFileChange={handleFileChange} />
+                  <CoverUploadField id="series-cover" label="Banner image" shape="banner" preview={shownCover}
+                    fileName={coverFile?.name} disabled={saving} onFileChange={handleFileChange} />
+                  {shownCover && (
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={handleRemoveBanner} disabled={saving}>
+                      <Trash2 aria-hidden="true" /> Remove banner
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -218,6 +243,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
                   <Input
                     id="series-name"
                     value={name}
+                    disabled={saving}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Series name"
                     aria-invalid={!name.trim() && saving ? true : undefined}
@@ -230,6 +256,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
                     id="series-description"
                     rows={6}
                     value={description}
+                    disabled={saving}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="What is this series about?"
                   />
@@ -248,7 +275,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
                   allBooks={books}
                   saving={saving}
                   enableSearch
-                  emptyLabel="No books are added to this series yet."
+                  emptyLabel={initialSeries ? "No books will remain in this series." : "No books are added to this series yet."}
                   removedLabel={(count) =>
                     `${count} book${count === 1 ? "" : "s"} will be removed from this series when you save.`
                   }
@@ -265,7 +292,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
             onCancel={() => handleOpenChange(false)}
             saving={saving}
             saveDisabled={!name.trim()}
-            saveLabel="Add Series"
+            saveLabel={initialSeries ? "Save changes" : "Add Series"}
           />
         </form>
       </CreationDialogContent>
