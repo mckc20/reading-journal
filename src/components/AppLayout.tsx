@@ -35,6 +35,7 @@ import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
+import { getLibraryTab } from "@/lib/libraryTabs";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -148,6 +149,7 @@ function AppLayoutContent() {
   const lastPage = useRef<AppPage | null>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef<{ key: string; y: number; focus: HTMLElement | null } | null>(null);
+  const previousScrollPath = useRef(location.pathname);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
@@ -230,6 +232,8 @@ function AppLayoutContent() {
   }, []);
 
   useLayoutEffect(() => {
+    const previousPath = previousScrollPath.current;
+    previousScrollPath.current = location.pathname;
     const background = underlayRef.current;
     if (detailOverlayOpen) {
       if (underlay && !savedScroll.current) {
@@ -252,6 +256,9 @@ function AppLayoutContent() {
       previous.focus?.focus({ preventScroll: true });
       return;
     }
+    const previousTab = getLibraryTab(previousPath);
+    const currentTab = getLibraryTab(location.pathname);
+    if (previousTab && currentTab && previousTab !== currentTab) return;
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
@@ -426,8 +433,7 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
-  const hasLibraryMenu = ["/library", "/library/collections", "/library/series"].some(path => matchPath(path, pathname));
-  const menuLinks = hasLibraryMenu ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
+  const menuLinks = getLibraryTab(pathname) ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
 
   return (
     <div className="rj-app-header-wrap">

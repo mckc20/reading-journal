@@ -71,7 +71,7 @@ export function LibraryBooks({
       : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>
         <div className="rj-library-search-toolbar">{desktopSearch}</div>
         <div className="rj-library-results-bar">
-          <p role="status" aria-live="polite">{visible.length} {visible.length === 1 ? 'book' : 'books'}{query ? ` of ${library.length}` : ''}</p>
+          <p className="sr-only" role="status">{query.trim() && `${visible.length} ${visible.length === 1 ? 'result' : 'results'}`}</p>
           <div className="rj-library-results-controls"><label htmlFor={`${fieldId}-sort`}>Sort by<select id={`${fieldId}-sort`} value={sort} onChange={event => setSort(event.target.value)}><option value="recent">Recently added</option><option value="title">Title A–Z</option><option value="author">Author A–Z</option></select></label>
             <div className="rj-library-view rj-tab-track" role="group" aria-label="Book layout">
               <SlidingIndicator />

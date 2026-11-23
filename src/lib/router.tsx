@@ -11,11 +11,8 @@ const AppLayout = lazy(() => import("@/components/AppLayout"));
 const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Library = lazy(() => import("@/pages/Library"));
 const LibraryTabs = lazy(() => import("@/components/redesign/LibraryNavigation").then(module => ({ default: module.LibraryTabs })));
-const LibraryCollections = lazy(() => import("@/pages/LibraryCollections"));
 const Wishlist = lazy(() => import("@/pages/Wishlist"));
-const Series = lazy(() => import("@/pages/Series"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
 const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
@@ -114,10 +111,12 @@ export const router = createBrowserRouter([
           {
             path: "/library",
             element: lazyRoute(<LibraryLayoutRoute />),
+            hydrateFallbackElement: <LoadingIndicator variant="page" />,
+            // Resolve the next tab before swapping out the current panel.
             children: [
-              { index: true, element: <Library /> },
-              { path: "collections", element: <LibraryCollections /> },
-              { path: "series", element: <Series /> },
+              { index: true, lazy: async () => ({ Component: (await import("@/pages/Library")).default }) },
+              { path: "collections", lazy: async () => ({ Component: (await import("@/pages/LibraryCollections")).default }) },
+              { path: "series", lazy: async () => ({ Component: (await import("@/pages/Series")).default }) },
             ],
           },
           { path: "/library/wishlist", element: lazyRoute(<Wishlist />) },

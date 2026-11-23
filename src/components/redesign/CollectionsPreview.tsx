@@ -74,11 +74,18 @@ export function LibraryCollections({
     {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview rj-collections-preview">
       <LibrarySearchButton>{mobileSearchButton}</LibrarySearchButton>
       {loading ? <p role="status">Loading your collections…</p> : error ? <EmptyState title="Your collections couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
-        <div className="rj-collections-toolbar"><div>
-          {current && <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}><ArrowLeft aria-hidden="true" />All collections</Button>}
-          <h2 ref={heading} tabIndex={-1}>{current?.id ?? 'Collections'}</h2>
-          <p role="status">{current ? `${visibleBooks.length} ${visibleBooks.length === 1 ? 'book' : 'books'}` : `${visibleCollections.length} collections`}</p>
-        </div>{desktopSearch}</div>
+        {current ? (
+          <div className="rj-collections-toolbar">
+            <div>
+              <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}><ArrowLeft aria-hidden="true" />All collections</Button>
+              <h2 ref={heading} tabIndex={-1}>{current.id}</h2>
+              <p role="status">{visibleBooks.length} {visibleBooks.length === 1 ? 'book' : 'books'}</p>
+            </div>
+            {desktopSearch}
+          </div>
+        ) : (
+          <div className="rj-library-search-toolbar mb-6">{desktopSearch}</div>
+        )}
         {current ? (visibleBooks.length ? <LibraryBookGrid books={visibleBooks} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
           : visibleCollections.length ? <ul ref={grid} className="rj-collection-grid" aria-label="Default collections">{visibleCollections.map(collection => <CollectionCard key={collection.id} collection={collection} onOpen={() => openCollection(collection.id)} />)}</ul>
           : <EmptyState title="No collections found" message="Try a collection name, such as Reading or Favorites." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />}

@@ -53,7 +53,8 @@ export const BrowseCollections: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const navigation = within(canvas.getByRole('tablist', { name: 'Library collections' }));
-    await expect(navigation.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Books', 'Collections', 'Series']);
+    await expect(navigation.getAllByRole('tab')).toHaveLength(3);
+    await expect(navigation.getByRole('tab', { name: 'Series' })).toBeVisible();
     await userEvent.click(navigation.getByRole('tab', { name: 'Collections' }));
     await userEvent.click(within(canvas.getByRole('list', { name: 'Default collections' })).getByRole('button', { name: 'Wishlist' }));
     await expect(within(canvas.getByRole('list', { name: 'Library books' })).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();

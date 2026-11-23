@@ -1,17 +1,11 @@
-import { createContext, Suspense, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Tabs } from "radix-ui";
 import { useLocation, useNavigate } from "react-router-dom";
-import LoadingIndicator from "@/components/LoadingIndicator";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
+import { getLibraryTab, libraryTabs } from "@/lib/libraryTabs";
 import "./library-navigation.css";
 import "./library-preview.css";
-
-const tabs = [
-  { label: "Books", to: "/library" },
-  { label: "Collections", to: "/library/collections" },
-  { label: "Series", to: "/library/series" },
-] as const;
 
 const SearchButtonSlot = createContext<HTMLElement | null>(null);
 
@@ -20,7 +14,7 @@ export function LibraryTabs({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [searchSlot, setSearchSlot] = useState<HTMLDivElement | null>(null);
-  const tab = tabs.find(item => item.to === pathname.replace(/\/$/, "")) ?? tabs[0];
+  const tab = getLibraryTab(pathname) ?? libraryTabs[0];
 
   return (
     <Tabs.Root className="rj-library-tab-layout" value={tab.to} activationMode="manual" onValueChange={to => navigate(to)}>
@@ -31,17 +25,18 @@ export function LibraryTabs({ children }: { children: ReactNode }) {
         </header>
         <Tabs.List className="rj-library-collections rj-tab-track" aria-label="Library collections">
           <SlidingIndicator />
-          {tabs.map(({ label, to }) => (
-            <Tabs.Trigger key={to} value={to} data-slot="tabs-trigger">{label}</Tabs.Trigger>
+          {libraryTabs.map(({ label, to }) => (
+            <Tabs.Trigger key={to} value={to} data-slot="tabs-trigger">
+              <span>{label}</span>
+              <span className="rj-library-tab-label-width" aria-hidden="true">{label}</span>
+            </Tabs.Trigger>
           ))}
         </Tabs.List>
       </div>
       <Tabs.Content value={tab.to}>
-        <Suspense fallback={<LoadingIndicator variant="page" />}>
-          <div key={tab.to} className="rj-route-enter">
-            <SearchButtonSlot.Provider value={searchSlot}>{children}</SearchButtonSlot.Provider>
-          </div>
-        </Suspense>
+        <div key={tab.to} className="rj-library-panel">
+          <SearchButtonSlot.Provider value={searchSlot}>{children}</SearchButtonSlot.Provider>
+        </div>
       </Tabs.Content>
     </Tabs.Root>
   );
