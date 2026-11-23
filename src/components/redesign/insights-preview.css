@@ -36,7 +36,6 @@
 .rj-insights-achievements { margin-top: 36px; }
 .rj-insights-goal, .rj-insights-milestone { min-width: 0; border-radius: 22px; padding: 24px; background: #e7eef0; }
 .rj-insights-goal h3 { font-size: 30px; margin-top: 12px; }
-.rj-insights-goal progress { display: block; width: 100%; height: 12px; appearance: none; -webkit-appearance: none; border: 0; border-radius: 8px; overflow: hidden; background: #cdd9de; accent-color: #526c76; margin: 16px 0; }
 .rj-insights-goal [data-slot='button'] { margin-top: 18px; }
 .rj-insights-milestone { background: #f9efdb; }
 .rj-insights-wrapup { margin-top: 28px; padding: 24px 0; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
@@ -56,7 +55,3 @@
 @media (max-width: 599px) { .rj-insights-rhythm, .rj-insights-panel, .rj-insights-goal, .rj-insights-milestone { padding: 20px; } .rj-insights-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } .rj-insights-summary > div:last-child { grid-column: 1/-1; } .rj-insights-summary dd { font-size: 27px; } .rj-insights-chart li { grid-template-columns: minmax(0,1fr) auto; gap: 6px; } .rj-insights-track { grid-row: 2; grid-column: 1/-1; } }
 @media (min-width: 768px) { .rj-insights-exploration, .rj-insights-observations { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (prefers-reduced-motion: reduce) { .rj-insights-dialog[data-state] { animation: none; } }
-
-.rj-insights-goal progress::-webkit-progress-bar { background: #cdd9de; border-radius: 8px; }
-.rj-insights-goal progress::-webkit-progress-value { background: #526c76; border-radius: 8px; }
-.rj-insights-goal progress::-moz-progress-bar { background: #526c76; border-radius: 8px; }

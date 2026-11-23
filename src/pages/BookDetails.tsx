@@ -534,7 +534,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             <p>{currentPage}{totalPages > 0 ? ` / ${totalPages}` : ""} pages</p>
             {progressPercent !== null && <span>{progressPercent}%</span>}
           </div>
-          <BookProgress currentPage={currentPage} totalPages={book.total_pages} pill />
+          <BookProgress currentPage={currentPage} totalPages={book.total_pages} />
 
           <div className="rj-detail-actions">
             {isPaused ? (

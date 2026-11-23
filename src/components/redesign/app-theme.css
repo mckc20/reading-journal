@@ -71,7 +71,6 @@
 .rj-app-messages { width: 100%; }
 .rj-app .rj-quick-progress { color: var(--rj-gold-foreground); }
 .rj-app :is(.rj-quick-books, .rj-shelf) { overflow-y: hidden; }
-.rj-app .rj-reading-card [data-slot='progress-indicator'] { background: var(--accent); }
 .rj-app .rj-shelf-book .rj-book-title { overflow-wrap: anywhere; }
 .rj-app-home-title { font-size: 1.75rem; }
 .rj-app-home-shelves { display: grid; grid-template-columns: minmax(0, 1fr); }

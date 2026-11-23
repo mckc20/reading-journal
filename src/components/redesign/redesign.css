@@ -90,8 +90,6 @@
 .rj-page-count { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px 16px; font-size: 10px; margin-top: 16px; }
 .rj-page-count > span { white-space: nowrap; }
 .rj-progress-copy { display: block; font-size: 10px; margin-block: 16px 8px; }
-.rj-reading-card [data-slot='progress'] { background: var(--surface); }
-.rj-reading-card [data-slot='progress-indicator'] { background: var(--input); }
 .rj-shelf { display: flex; position: relative; isolation: isolate; gap: 12px; overflow-x: auto; padding: 4px 10px 12px; scrollbar-width: none; }
 .rj-shelf::-webkit-scrollbar { display: none; }
 .rj-home-shelf-frame { position: relative; isolation: isolate; }
