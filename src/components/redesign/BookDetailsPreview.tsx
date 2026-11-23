@@ -64,7 +64,7 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
   ] as const;
 
   return <div className="rj-redesign"><HomeShell {...shell} activeDestination="Library">
-    <div className="rj-detail-page rj-book-detail-page">
+    <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby={`${id}-title`}>
         <div
           className="rj-detail-cover-stage"

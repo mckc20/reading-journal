@@ -142,7 +142,7 @@ function CircularSeriesProgress({ value }: { value: number | null }) {
   return (
     <div className="rj-series-progress-ring flex aspect-square shrink-0 items-center justify-center rounded-full p-2 sm:p-3" style={{ background }}>
       <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-card text-center">
-        <span className="font-heading text-xl font-semibold sm:text-3xl">{value === null ? "--" : `${value}%`}</span>
+        <span className="rj-series-progress-percentage font-heading text-xl font-semibold sm:text-3xl">{value === null ? "--" : `${value}%`}</span>
         <span className="text-xs text-muted-foreground">Complete</span>
       </div>
     </div>
@@ -206,26 +206,28 @@ function SeriesProgressCard({ percentage, stats, logsLoading, logsError, detail 
   return (
     <section aria-labelledby={headingId}>
       <div className="rj-detail-section-heading"><h2 id={headingId}>Reading progress</h2></div>
-      <div className="flex items-center gap-3 sm:gap-5">
-        <CircularSeriesProgress value={percentage} />
-        {(detail.kind === "active" || detail.kind === "not-started") && (
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-sm font-semibold">{detail.kind === "active" ? "Current Book" : "First volume"}</p>
-            <FeaturedBookProgress book={detail.book} showProgress={detail.kind === "active"} />
-          </div>
-        )}
+      <div className={detail.kind === "completed" ? "rj-series-progress-completed" : undefined}>
+        <div className="flex items-center gap-3 sm:gap-5">
+          <CircularSeriesProgress value={percentage} />
+          {(detail.kind === "active" || detail.kind === "not-started") && (
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-sm font-semibold">{detail.kind === "active" ? "Current Book" : "First volume"}</p>
+              <FeaturedBookProgress book={detail.book} showProgress={detail.kind === "active"} />
+            </div>
+          )}
+        </div>
+        <SeriesReadingTotals stats={stats} logsLoading={logsLoading} logsError={logsError}>
+          {detail.kind === "active" && (
+            <DetailStat icon={CalendarDays} label="Estimated Finish" value={formatDate(detail.estimatedCompletion)} />
+          )}
+          {detail.kind === "completed" && (
+            <>
+              <DetailStat icon={CalendarDays} label="Start and Finish Date" value={`${formatDate(detail.started)} – ${formatDate(detail.finished)}`} />
+              <DetailStat icon={Route} label="Journey Length" value={detail.journeyLength} />
+            </>
+          )}
+        </SeriesReadingTotals>
       </div>
-      <SeriesReadingTotals stats={stats} logsLoading={logsLoading} logsError={logsError}>
-        {detail.kind === "active" && (
-          <DetailStat icon={CalendarDays} label="Estimated Finish" value={formatDate(detail.estimatedCompletion)} />
-        )}
-        {detail.kind === "completed" && (
-          <>
-            <DetailStat icon={CalendarDays} label="Start and Finish Date" value={`${formatDate(detail.started)} – ${formatDate(detail.finished)}`} />
-            <DetailStat icon={Route} label="Journey Length" value={detail.journeyLength} />
-          </>
-        )}
-      </SeriesReadingTotals>
     </section>
   );
 }

@@ -371,7 +371,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const hasSecondaryMetadata = Boolean(book.format || book.language || publicationYear || book.source || book.isbn);
   const description = book.description?.trim() || "";
   return (
-    <div className="rj-detail-page rj-book-detail-page">
+    <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby={headingId}>
         <div
           className="rj-detail-cover-stage"
@@ -413,7 +413,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         <div className="rj-detail-summary">
           <div>
             {seriesName && (
-              <p className="mb-2 break-words font-sans text-lg text-muted-foreground sm:text-xl">
+              <p className="mb-2 break-words font-sans text-lg text-muted-foreground italic sm:text-xl">
                 <Link
                   to={`/series/${book.series_id}`}
                   className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

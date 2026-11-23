@@ -1,12 +1,8 @@
-import { BookOpen, Heart, NotebookPen, Star, type LucideIcon } from "lucide-react";
+import { BookOpen, NotebookPen, Star, type LucideIcon } from "lucide-react";
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { DetailStat } from "@/components/redesign/DetailHero";
-import { BookCover } from "@/components/reading-journal/BookCover";
-import BookRating from "@/components/reading-journal/BookRating";
 import type { BookRankings, RankedBook } from "@/lib/bookRankings";
-import type { Book } from "@/types";
-import "./redesign.css";
 
 function BookHighlightStat({ icon, label, rows, emptyLabel, formatValue }: {
   icon: LucideIcon;
@@ -39,53 +35,31 @@ function BookHighlightStat({ icon, label, rows, emptyLabel, formatValue }: {
   );
 }
 
-function RatedBookCard({ book }: { book: Book }) {
-  const rating = book.rating ?? null;
-  return (
-    <Link to={`/books/${encodeURIComponent(book.id)}`} className="rj-reading-card rj-highest-rated-card">
-      <BookCover src={book.cover_url} title={book.title} decorative />
-      <span className="rj-reading-card-copy">
-        <span className="rj-book-title">{book.title}</span>
-        {rating !== null ? (
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <BookRating rating={rating} />
-            <span aria-hidden="true">{rating.toLocaleString()} / 5</span>
-          </span>
-        ) : <span className="mt-1 block text-xs text-muted-foreground">No rating</span>}
-        {book.is_favorite && (
-          <span className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <Heart aria-hidden="true" className="size-3 fill-favorite text-favorite" />
-            Favorite
-          </span>
-        )}
-      </span>
-    </Link>
-  );
-}
-
 function HighestRatedStat({ rows }: { rows: RankedBook[] }) {
-  const winners = rows.filter((row) => row.value === rows[0]?.value);
-  const [first] = winners;
+  const highest = rows[0]?.value;
+  const winners = rows.filter((row) => row.value === highest);
+  const rating = highest !== undefined && winners.length === 1
+    ? highest > 5 ? "Favorite" : `${highest.toLocaleString()} / 5`
+    : undefined;
 
   return (
     <DetailStat
       icon={Star}
       label="Highest rated"
       className="rj-highest-rated-stat"
-      value={first ? (
-        winners.length === 1 ? <RatedBookCard book={first.book} /> : (
-          <span className="wrap-anywhere">
-            {winners.map(({ book }, index) => (
-              <Fragment key={book.id}>
-                {index > 0 && ", "}
-                <Link to={`/books/${encodeURIComponent(book.id)}`} className="underline-offset-4 hover:underline focus-visible:underline">
-                  {book.title}
-                </Link>
-              </Fragment>
-            ))}
-          </span>
-        )
+      value={winners.length > 0 ? (
+        <span className="wrap-anywhere">
+          {winners.map(({ book }, index) => (
+            <Fragment key={book.id}>
+              {index > 0 && ", "}
+              <Link to={`/books/${encodeURIComponent(book.id)}`} className="underline-offset-4 hover:underline focus-visible:underline">
+                {book.title}
+              </Link>
+            </Fragment>
+          ))}
+        </span>
       ) : "No ratings yet"}
+      detail={rating}
     />
   );
 }

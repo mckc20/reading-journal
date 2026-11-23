@@ -27,7 +27,7 @@ export function BookProgress({ currentPage, totalPages, showLabel = false, pill 
         aria-label="Reading progress"
         value={value}
         roundedFill={pill}
-        className={cn(pill ? "h-2.5" : "h-1", barClassName)}
+        className={cn(pill ? "h-2" : "h-1", barClassName)}
       />
       {showLabel && <p className="text-xs text-muted-foreground">{value}% · {Math.max(0, currentPage ?? 0)} / {totalPages}</p>}
     </div>

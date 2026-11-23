@@ -14,7 +14,7 @@ export function BookDetailTitle({ id, title, favorite, onToggleFavorite }: BookD
   const lastWordStart = Math.max(0, text.search(/\S+$/));
 
   return (
-    <h1 id={id} aria-label={title} className="rj-detail-title">
+    <h1 id={id} aria-label={title} className="rj-detail-title rj-detail-title-italic">
       {text.slice(0, lastWordStart)}
       <span className="rj-detail-title-ending">
         <span>{text.slice(lastWordStart)}</span>
