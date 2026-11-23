@@ -4,7 +4,7 @@ import { useHorizontalChartTransition } from "@/hooks/useHorizontalChartTransiti
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Link } from "react-router-dom";
 import { CalendarDays, Clock3, Timer } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { DetailStat } from "@/components/redesign/DetailHero";
 import type { SeriesStats } from "@/lib/seriesDetails";
 
@@ -27,10 +27,12 @@ export function SeriesReadingTotals({
   stats,
   logsLoading,
   logsError,
+  children,
 }: {
   stats: SeriesStats;
   logsLoading: boolean;
   logsError: string | null;
+  children?: ReactNode;
 }) {
   const { overview, averageDaysPerBook } = stats;
   return (
@@ -53,6 +55,7 @@ export function SeriesReadingTotals({
         value={averageDaysPerBook === null ? "Not available" : `${averageDaysPerBook.toFixed(1)} days`}
         detail={averageDaysPerBook === null && "No completed books with dates."}
       />
+      {children}
     </dl>
   );
 }
@@ -82,7 +85,7 @@ export function SeriesAnalyticsComparison({ stats }: { stats: SeriesStats }) {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-medium">Book comparisons</h3>
+        <h3 className="rj-detail-chart-heading font-medium">Book comparisons</h3>
         <SegmentedControl<SpeedChartMode>
           label="Book comparison metric"
           value={mode}
@@ -92,8 +95,8 @@ export function SeriesAnalyticsComparison({ stats }: { stats: SeriesStats }) {
             setMode(next);
           }}
           options={[
-            { value: "speed", label: "Speed" },
             { value: "duration", label: "Duration" },
+            { value: "speed", label: "Speed" },
           ]}
         />
       </div>

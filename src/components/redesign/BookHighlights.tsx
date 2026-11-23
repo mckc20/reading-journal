@@ -1,9 +1,9 @@
 import { BookOpen, Heart, NotebookPen, Star, type LucideIcon } from "lucide-react";
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { DetailStat } from "@/components/redesign/DetailHero";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import BookRating from "@/components/reading-journal/BookRating";
-import HorizontalShelf from "@/pages/library/HorizontalShelf";
 import type { BookRankings, RankedBook } from "@/lib/bookRankings";
 import type { Book } from "@/types";
 import "./redesign.css";
@@ -74,19 +74,16 @@ function HighestRatedStat({ rows }: { rows: RankedBook[] }) {
       className="rj-highest-rated-stat"
       value={first ? (
         winners.length === 1 ? <RatedBookCard book={first.book} /> : (
-          <HorizontalShelf title="Highest rated">
-            {winners.map(({ book }) => (
-              <Link
-                key={book.id}
-                data-shelf-item
-                to={`/books/${encodeURIComponent(book.id)}`}
-                aria-label={book.title}
-                className="w-24 shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                <BookCover src={book.cover_url} title={book.title} decorative />
-              </Link>
+          <span className="wrap-anywhere">
+            {winners.map(({ book }, index) => (
+              <Fragment key={book.id}>
+                {index > 0 && ", "}
+                <Link to={`/books/${encodeURIComponent(book.id)}`} className="underline-offset-4 hover:underline focus-visible:underline">
+                  {book.title}
+                </Link>
+              </Fragment>
             ))}
-          </HorizontalShelf>
+          </span>
         )
       ) : "No ratings yet"}
     />

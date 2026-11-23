@@ -7,7 +7,6 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
@@ -16,7 +15,6 @@ import {
   ImagePlus,
   Loader2,
   NotebookPen,
-  PauseCircle,
   Route,
   Star,
   Trash2,
@@ -27,6 +25,7 @@ import { AboutSection, AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookCover } from "@/components/reading-journal/BookCover";
+import { BookProgress, getBookProgress } from "@/components/reading-journal/BookProgress";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
@@ -48,7 +47,6 @@ import SeriesBooksEditor, {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
@@ -67,20 +65,19 @@ import {
   filterSeriesLogs,
   estimateSeriesCompletionDate,
   getAverageSeriesRating,
-  getBookProgressPercent,
   getCurrentSeriesBook,
   getDerivedSeriesStatus,
   getJourneyBookDates,
   getSeriesAuthors,
   getSeriesGenres,
-  getSeriesJourneyRecap,
   getSeriesProgress,
   getSeriesStats,
   sortSeriesBooks,
+  type SeriesStats,
 } from "@/lib/seriesDetails";
 import { fetchSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import { seriesJournalToJournalEntries } from "@/lib/journal";
-import { cn, getTodayLocalDate } from "@/lib/utils";
+import { getTodayLocalDate } from "@/lib/utils";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, Series, SeriesJournalEntryRecord } from "@/types";
 
@@ -123,35 +120,6 @@ function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started:
   };
 }
 
-function BookThumbnail({ book }: { book: Book }) {
-  const isPaused = book.status === "Paused";
-  return (
-    <div
-      className={cn(
-        "relative h-16 w-11 shrink-0 overflow-hidden rounded-md bg-muted shadow-sm",
-        isPaused && "opacity-70",
-      )}
-    >
-      {book.cover_url ? (
-        <img
-          src={book.cover_url}
-          alt=""
-          className={cn("block h-full w-full object-cover object-top", isPaused && "grayscale")}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-        </div>
-      )}
-      {isPaused && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/45 backdrop-blur-[1px]">
-          <PauseCircle className="h-4 w-4 text-muted-foreground" />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function SeriesArtwork({ banner, volume }: { banner?: string | null; volume?: Book }) {
   const [failedBanner, setFailedBanner] = useState<string | null>(null);
   if (banner && banner !== failedBanner) {
@@ -172,9 +140,9 @@ function CircularSeriesProgress({ value }: { value: number | null }) {
   const background = `conic-gradient(var(--ring) ${percentage * 3.6}deg, var(--muted) 0deg)`;
 
   return (
-    <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded-full p-3" style={{ background }}>
+    <div className="rj-series-progress-ring flex aspect-square shrink-0 items-center justify-center rounded-full p-2 sm:p-3" style={{ background }}>
       <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-card text-center">
-        <span className="font-heading text-3xl font-semibold">{value === null ? "--" : `${value}%`}</span>
+        <span className="font-heading text-xl font-semibold sm:text-3xl">{value === null ? "--" : `${value}%`}</span>
         <span className="text-xs text-muted-foreground">Complete</span>
       </div>
     </div>
@@ -182,25 +150,25 @@ function CircularSeriesProgress({ value }: { value: number | null }) {
 }
 
 function FeaturedBookProgress({ book, showProgress = true }: { book: Book | null; showProgress?: boolean }) {
-  const percent = book ? getBookProgressPercent(book) : null;
-
   if (!book) {
     return <p className="text-sm text-muted-foreground">No book available</p>;
   }
 
+  const currentPage = Math.max(0, book.current_page ?? 0);
+  const percent = getBookProgress(currentPage, book.total_pages);
   return (
-    <Link to={`/books/${book.id}`} className="flex min-w-0 gap-3 rounded-lg transition-colors hover:text-muted-foreground">
-      <BookThumbnail book={book} />
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-1 text-sm font-semibold">{book.title}</p>
-        {book.volume_number != null && <p className="text-xs text-muted-foreground">Volume {book.volume_number}</p>}
+    <Link to={`/books/${encodeURIComponent(book.id)}`} className="rj-reading-card rj-series-progress-book">
+      <BookCover src={book.cover_url} title={book.title} paused={book.status === "Paused"} decorative />
+      <span className="rj-reading-card-copy">
+        <span className="rj-book-title wrap-anywhere">{book.title}</span>
+        {book.volume_number != null && <span className="rj-muted">Volume {book.volume_number}</span>}
         {showProgress && (
           <>
-            <p className="mt-1 text-xs text-muted-foreground">{percent === null ? "--" : `${percent}% complete`}</p>
-            {percent !== null && <Progress value={percent} className="mt-2 h-1.5 max-w-40" />}
+            <span className="rj-progress-copy">{percent === null ? "Page total unknown" : `${percent}% complete`}</span>
+            <BookProgress currentPage={currentPage} totalPages={book.total_pages} className="max-w-40" />
           </>
         )}
-      </div>
+      </span>
     </Link>
   );
 }
@@ -219,7 +187,6 @@ type SeriesProgressDetail =
     }
   | {
       kind: "completed";
-      book: Book | null;
       started: string | null;
       finished: string | null;
       journeyLength: string;
@@ -228,66 +195,37 @@ type SeriesProgressDetail =
       kind: "hidden";
     };
 
-function SeriesProgressCard({ percentage, readingTotals, detail }: {
+function SeriesProgressCard({ percentage, stats, logsLoading, logsError, detail }: {
   percentage: number | null;
-  readingTotals: ReactNode;
+  stats: SeriesStats;
+  logsLoading: boolean;
+  logsError: string | null;
   detail: SeriesProgressDetail;
 }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId}>
       <div className="rj-detail-section-heading"><h2 id={headingId}>Reading progress</h2></div>
-      <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
-        <div className="flex justify-center">
-          <CircularSeriesProgress value={percentage} />
-        </div>
-        {readingTotals}
+      <div className="flex items-center gap-3 sm:gap-5">
+        <CircularSeriesProgress value={percentage} />
+        {(detail.kind === "active" || detail.kind === "not-started") && (
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-sm font-semibold">{detail.kind === "active" ? "Current Book" : "First volume"}</p>
+            <FeaturedBookProgress book={detail.book} showProgress={detail.kind === "active"} />
+          </div>
+        )}
       </div>
-      {detail.kind === "active" && (
-        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
-          <div>
-            <p className="mb-2 text-sm font-semibold">Current Book</p>
-            <FeaturedBookProgress book={detail.book} />
-          </div>
-          <div className="border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-            <p className="text-sm font-semibold">Estimated Completion</p>
-            <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              {formatDate(detail.estimatedCompletion)}
-            </p>
-          </div>
-        </div>
-      )}
-      {detail.kind === "not-started" && (
-        <div className="mt-4 border-t pt-4">
-          <p className="mb-2 text-sm font-semibold">First volume</p>
-          <FeaturedBookProgress book={detail.book} showProgress={false} />
-        </div>
-      )}
-      {detail.kind === "completed" && (
-        <div className="mt-4 grid gap-5 border-t pt-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.9fr)]">
-          <div>
-            <p className="mb-2 text-sm font-semibold">Favorite Book</p>
-            <FeaturedBookProgress book={detail.book} showProgress={false} />
-          </div>
-          <div className="space-y-4 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-            <div>
-              <p className="text-sm font-semibold">Start and Finish Date</p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <CalendarDays className="h-4 w-4 text-primary" />
-                {formatDate(detail.started)} - {formatDate(detail.finished)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Journey Length</p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <Route className="h-4 w-4 text-primary" />
-                {detail.journeyLength}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <SeriesReadingTotals stats={stats} logsLoading={logsLoading} logsError={logsError}>
+        {detail.kind === "active" && (
+          <DetailStat icon={CalendarDays} label="Estimated Finish" value={formatDate(detail.estimatedCompletion)} />
+        )}
+        {detail.kind === "completed" && (
+          <>
+            <DetailStat icon={CalendarDays} label="Start and Finish Date" value={`${formatDate(detail.started)} – ${formatDate(detail.finished)}`} />
+            <DetailStat icon={Route} label="Journey Length" value={detail.journeyLength} />
+          </>
+        )}
+      </SeriesReadingTotals>
     </section>
   );
 }
@@ -643,10 +581,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const currentBook = useMemo(() => getCurrentSeriesBook(seriesBooks), [seriesBooks]);
   const derivedStatus = useMemo(() => getDerivedSeriesStatus(seriesBooks), [seriesBooks]);
   const firstVolume = useMemo(() => sortSeriesBooks(seriesBooks)[0] ?? null, [seriesBooks]);
-  const journeyRecap = useMemo(
-    () => getSeriesJourneyRecap(seriesBooks, seriesLogs),
-    [seriesBooks, seriesLogs],
-  );
   const seriesStats = useMemo(
     () => getSeriesStats(seriesBooks, seriesLogs, journalEntries),
     [journalEntries, seriesBooks, seriesLogs],
@@ -674,7 +608,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     if (derivedStatus === "Completed") {
       return {
         kind: "completed",
-        book: journeyRecap.favoriteBook,
         started: completionDates.started,
         finished: completionDates.finished,
         journeyLength: formatJourneyLength(seriesStats.overview.journeySpan),
@@ -697,7 +630,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     derivedStatus,
     estimatedCompletion,
     firstVolume,
-    journeyRecap.favoriteBook,
     seriesStats.overview.journeySpan,
     startingBookId,
   ]);
@@ -963,7 +895,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         {seriesBooks.length > 0 && (
           <SeriesProgressCard
             percentage={progress.percentage}
-            readingTotals={<SeriesReadingTotals stats={seriesStats} logsLoading={logsLoading} logsError={logsError} />}
+            stats={seriesStats}
+            logsLoading={logsLoading}
+            logsError={logsError}
             detail={progressDetail}
           />
         )}

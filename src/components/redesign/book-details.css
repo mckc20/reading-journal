@@ -87,6 +87,7 @@
 .rj-detail-metadata dd { margin: 5px 0 0; overflow-wrap: anywhere; }
 .rj-detail-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
 .rj-detail-section-heading [data-slot='button'] { padding-inline: 0; font-size: 12px; color: var(--ring); }
+.rj-detail-chart-heading { font-family: var(--font-body); font-style: italic; }
 .rj-detail-stats { margin: 0; border-radius: 20px; background: var(--card); display: grid; }
 .rj-detail-stats > div { padding: 20px; }
 .rj-detail-stats > div + div { border-top: 1px solid var(--border); }
@@ -190,10 +191,18 @@
   .rj-detail-portrait { width: 180px; font-size: 44px; }
   .rj-detail-genre-art { width: 160px; }
 }
-.rj-series-progress-stats { grid-template-columns: minmax(0, 1fr); }
+.rj-series-progress-stats { grid-template-columns: minmax(0, 1fr); margin-top: 16px; }
+.rj-series-progress-ring { width: clamp(76px, 24vw, 144px); }
+.rj-reading-card.rj-series-progress-book {
+  --series-progress-cover-width: clamp(52px, 14vw, 88px);
+  grid-template-columns: calc(var(--series-progress-cover-width) + 20px) minmax(0, 1fr);
+}
+.rj-reading-card.rj-series-progress-book::before { inset-block: 8px; }
+.rj-reading-card.rj-series-progress-book > div { width: var(--series-progress-cover-width); }
+.rj-series-progress-book:hover .rj-book-title { text-decoration: underline; text-underline-offset: 4px; }
 .rj-detail-about p { overflow-wrap: anywhere; }
 @media (min-width: 768px) {
-  .rj-genre-reading-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rj-genre-reading-stats, .rj-series-progress-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .rj-detail-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 

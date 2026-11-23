@@ -54,12 +54,14 @@ export default function DetailActionsMenu({
   className,
 }: DetailActionsMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const openingDialog = useRef(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const hasMoreActions = Boolean(onPause || onResume || onDuplicate || onWishlist || onDelete);
 
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
@@ -95,73 +97,76 @@ export default function DetailActionsMenu({
   }
 
   return (
-    <div className={cn("relative", className)}>
-      <DropdownMenu.Root modal={false}>
-        <DropdownMenu.Trigger asChild>
-          <Button ref={triggerRef} variant="ghost" size="icon-lg" className="size-11" aria-label="More actions">
-            <MoreHorizontal aria-hidden="true" />
-          </Button>
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            className="rj-add-menu"
-            align="end"
-            sideOffset={8}
-            collisionPadding={12}
-            onCloseAutoFocus={(event) => {
-              if (openingDialog.current) event.preventDefault();
-              openingDialog.current = false;
-            }}
-          >
-            <DropdownMenu.Item onSelect={() => openDialog(() => setShareOpen(true))}>
-              <Share2 aria-hidden="true" className="size-4" />
-              Share
-            </DropdownMenu.Item>
-            {onPause && (
-              <DropdownMenu.Item onSelect={() => openDialog(() => setPauseOpen(true))}>
-                <PauseCircle aria-hidden="true" className="size-4" />
-                Pause
-              </DropdownMenu.Item>
-            )}
-            {onResume && (
-              <DropdownMenu.Item onSelect={onResume}>
-                <Play aria-hidden="true" className="size-4" />
-                Resume
-              </DropdownMenu.Item>
-            )}
-            {onEdit && (
-              <DropdownMenu.Item onSelect={() => openDialog(() => onEdit(triggerRef.current ?? undefined))}>
-                <Pencil aria-hidden="true" className="size-4" />
-                Edit
-              </DropdownMenu.Item>
-            )}
-            {onDuplicate && (
-              <DropdownMenu.Item onSelect={() => openDialog(() => onDuplicate(triggerRef.current ?? undefined))}>
-                <Copy aria-hidden="true" className="size-4" />
-                Duplicate
-              </DropdownMenu.Item>
-            )}
-            {onWishlist && (
-              <DropdownMenu.Item onSelect={onWishlist}>
-                <Bookmark aria-hidden="true" className="size-4" />
-                Move to Wishlist
-              </DropdownMenu.Item>
-            )}
-            {onDelete && (
-              <DropdownMenu.Item className="text-destructive" onSelect={() => openDialog(() => {
-                setDeleteLinkedBooks(false);
-                setDeleteOpen(true);
-              })}>
-                <Trash2 aria-hidden="true" className="size-4" />
-                Delete
-              </DropdownMenu.Item>
-            )}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+    <div className={cn("relative flex items-center gap-1", className)}>
+      {onEdit && (
+        <Button type="button" variant="ghost" size="icon-lg" className="size-11" aria-label={`Edit ${kind}`} onClick={(event) => onEdit(event.currentTarget)}>
+          <Pencil aria-hidden="true" />
+        </Button>
+      )}
+      <Button ref={shareTriggerRef} type="button" variant="ghost" size="icon-lg" className="size-11" aria-label={`Share ${kind}`} aria-haspopup="dialog" onClick={() => setShareOpen(true)}>
+        <Share2 aria-hidden="true" />
+      </Button>
+      {hasMoreActions && (
+        <DropdownMenu.Root modal={false}>
+          <DropdownMenu.Trigger asChild>
+            <Button ref={triggerRef} variant="ghost" size="icon-lg" className="size-11" aria-label="More actions">
+              <MoreHorizontal aria-hidden="true" />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              className="rj-add-menu"
+              align="end"
+              sideOffset={8}
+              collisionPadding={12}
+              onCloseAutoFocus={(event) => {
+                if (openingDialog.current) event.preventDefault();
+                openingDialog.current = false;
+              }}
+            >
+              {onPause && (
+                <DropdownMenu.Item onSelect={() => openDialog(() => setPauseOpen(true))}>
+                  <PauseCircle aria-hidden="true" className="size-4" />
+                  Pause
+                </DropdownMenu.Item>
+              )}
+              {onResume && (
+                <DropdownMenu.Item onSelect={onResume}>
+                  <Play aria-hidden="true" className="size-4" />
+                  Resume
+                </DropdownMenu.Item>
+              )}
+              {onDuplicate && (
+                <DropdownMenu.Item onSelect={() => openDialog(() => onDuplicate(triggerRef.current ?? undefined))}>
+                  <Copy aria-hidden="true" className="size-4" />
+                  Duplicate
+                </DropdownMenu.Item>
+              )}
+              {onWishlist && (
+                <DropdownMenu.Item onSelect={onWishlist}>
+                  <Bookmark aria-hidden="true" className="size-4" />
+                  Move to Wishlist
+                </DropdownMenu.Item>
+              )}
+              {onDelete && (
+                <DropdownMenu.Item className="text-destructive" onSelect={() => openDialog(() => {
+                  setDeleteLinkedBooks(false);
+                  setDeleteOpen(true);
+                })}>
+                  <Trash2 aria-hidden="true" className="size-4" />
+                  Delete
+                </DropdownMenu.Item>
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      )}
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className="sm:max-w-md" onCloseAutoFocus={restoreTriggerFocus}>
+        <DialogContent className="sm:max-w-md" onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          shareTriggerRef.current?.focus({ preventScroll: true });
+        }}>
           <DialogHeader>
             <DialogTitle>Share this {kind}</DialogTitle>
             <DialogDescription>{label}</DialogDescription>

@@ -74,9 +74,7 @@ export const ExploreDetails: Story = {
     await expect(canvas.queryByText(/A gentle fictional synopsis/)).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole('button', { name: 'Add to Favorites' }));
     await expect(canvas.getByRole('button', { name: 'Remove from Favorites' })).toHaveAttribute('aria-pressed', 'true');
-    await userEvent.click(canvas.getByRole('button', { name: 'More book actions' }));
-    const menu = await within(canvasElement.ownerDocument.body).findByRole('menu');
-    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Edit book' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit book' }));
     await expect(canvas.getByRole('status')).toHaveTextContent('Edit book');
   },
 };

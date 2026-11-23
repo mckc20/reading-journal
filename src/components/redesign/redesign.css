@@ -1,4 +1,5 @@
 @import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/dm-sans/wght-italic.css';
 
 /* Use the workshop's original light palette in the signed-in app, too. */
 :is(.rj-redesign, .rj-app-theme:not(.dark)) {

@@ -72,12 +72,14 @@ export function BookDetailsPreview({ book, entries, notice, onReadingAction, onC
         >
           <div className="rj-detail-topline">
             <Button variant="ghost" size="icon-lg" onClick={onClose} aria-label="Close book details"><ChevronDown aria-hidden="true" /></Button>
-            <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon-lg" aria-label="More book actions"><MoreHorizontal aria-hidden="true" /></Button></DropdownMenu.Trigger>
-              <DropdownMenu.Content className="rj-redesign rj-add-menu" align="end" sideOffset={6}>
-                <DropdownMenu.Item onSelect={onEdit}><Pencil size={16} aria-hidden="true" />Edit book</DropdownMenu.Item>
-                <DropdownMenu.Item onSelect={onViewAnalytics}><ArrowUpRight size={16} aria-hidden="true" />View reading analytics</DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="icon-lg" className="size-11" onClick={onEdit} aria-label="Edit book"><Pencil aria-hidden="true" /></Button>
+              <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button variant="ghost" size="icon-lg" className="size-11" aria-label="More book actions"><MoreHorizontal aria-hidden="true" /></Button></DropdownMenu.Trigger>
+                <DropdownMenu.Content className="rj-redesign rj-add-menu" align="end" sideOffset={6}>
+                  <DropdownMenu.Item onSelect={onViewAnalytics}><ArrowUpRight size={16} aria-hidden="true" />View reading analytics</DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Root>
+            </div>
           </div>
           <BookCover className="rj-detail-cover" src={book.cover} title={book.title} paused={book.status === 'Paused'} showFallbackTitle />
         </div>

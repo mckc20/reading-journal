@@ -202,7 +202,7 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
       {logs.length > 0 && (
         <section className="min-w-0 space-y-3" aria-labelledby="book-timeline-heading">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 id="book-timeline-heading" className="text-sm font-medium">
+            <h3 id="book-timeline-heading" className="rj-detail-chart-heading text-sm font-medium">
               {chartModes.find(({ value }) => value === chartMode)?.label} over time
             </h3>
             <SegmentedControl label="Chart metric" value={chartMode} options={chartModes} onChange={setChartMode} />
