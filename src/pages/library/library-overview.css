@@ -1,0 +1,107 @@
+.rj-library-directory {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  padding-inline: 12px;
+}
+
+.rj-library-category {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding-inline: 2px;
+}
+
+.rj-library-category + .rj-library-category {
+  border-top: 1px solid var(--border);
+}
+
+.rj-library-category-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.rj-library-category-label {
+  font-weight: 550;
+}
+
+.rj-library-category:hover .rj-library-category-label,
+.rj-library-overview-section-heading h2 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rj-library-overview :is(.rj-library-category, h2 a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.rj-library-count {
+  color: var(--muted-foreground);
+  font-size: .8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rj-library-overview-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rj-library-overview-section-heading h2 {
+  margin: 0;
+}
+
+.rj-library-overview-section-heading .rj-library-view-all {
+  margin-inline-start: auto;
+  min-height: 44px;
+  color: var(--muted-foreground);
+  font-size: .8125rem;
+}
+
+.rj-library-recent-grid {
+  display: grid;
+}
+
+.rj-library-recent-grid .rj-shelf-book {
+  min-width: 0;
+}
+
+.rj-library-overview .rj-shelf-book :is(.rj-book-title, .rj-muted) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.rj-library-overview-shelves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .rj-library-overview-shelves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 32px;
+  }
+
+  .rj-library-overview-shelves > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Keep the right-hand section links clear of the fixed Add launcher. */
+  .rj-library-overview-shelves > :nth-child(odd) .rj-library-view-all {
+    margin-inline-end: 36px;
+  }
+}
