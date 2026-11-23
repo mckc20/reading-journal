@@ -95,12 +95,12 @@ export function LibrarySortingControls({ sort, options, directionLabel, onSortCh
   options: ReadonlyArray<{ value: string; label: string; directionLabel: string }>;
   directionLabel: string;
   onSortChange: (value: string) => void;
-  onDirectionChange: () => void;
+  onDirectionChange?: () => void;
   compact?: boolean;
   nativeMenu?: boolean;
 }) {
   const chooseSort = (value: string) => {
-    if (value === sort) onDirectionChange();
+    if (value === sort) onDirectionChange?.();
     else onSortChange(value);
   };
   const optionLabel = (option: typeof options[number]) => option.value === sort ? directionLabel : option.directionLabel;
@@ -117,12 +117,12 @@ export function LibrarySortingControls({ sort, options, directionLabel, onSortCh
           aria-label={`Sort by: ${selected?.label}, ${directionLabel}`}
           onChange={(event) => {
             const value = event.currentTarget.value;
-            if (value === "reverse") onDirectionChange();
+            if (value === "reverse") onDirectionChange?.();
             else onSortChange(value);
           }}
         >
           {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          <option value="reverse">Reverse order</option>
+          {onDirectionChange && <option value="reverse">Reverse order</option>}
         </NativeSelect>
       </div>
     );
