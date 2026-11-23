@@ -61,7 +61,7 @@
 .rj-detail-title-ending { display: inline-flex; align-items: flex-end; gap: 6px; max-width: 100%; }
 .rj-detail-title-ending > span { min-width: 0; }
 .rj-detail-title-ending [data-slot='button'] { width: 44px; height: 44px; margin-block: -5px; color: var(--ring); }
-.rj-detail-author { color: var(--muted-foreground); font-size: 16px; font-style: italic; margin-top: 10px !important; }
+.rj-detail-author { color: var(--muted-foreground); font-size: 16px; margin-top: 10px !important; }
 .rj-detail-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0 20px; }
 .rj-detail-rating { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
 .rj-detail-rating [role='img'] { margin: 0; }
