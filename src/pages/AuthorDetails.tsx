@@ -42,6 +42,7 @@ import { authorJournalToJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
+import HorizontalShelf from "@/pages/library/HorizontalShelf";
 import SeriesStackCard from "@/pages/library/SeriesStackCard";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 
@@ -343,12 +344,14 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
         <DetailBooks books={authorBooks} />
 
         {authorSeries.length > 0 && (
-          <section className="space-y-4">
-            <h2>Series</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-x-6 gap-y-6 sm:gap-x-8 sm:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-              {authorSeries.map((group) => (
-                <SeriesStackCard key={group.seriesId} variant="grid" group={group} onSeries={(seriesId) => navigate(`/series/${seriesId}`)} />
-              ))}
+          <section aria-labelledby={`${headingId}-series`} className="min-w-0 space-y-4">
+            <h2 id={`${headingId}-series`}>Series</h2>
+            <div className="rj-home-shelf-frame">
+              <HorizontalShelf title="Series">
+                {authorSeries.map((group) => (
+                  <SeriesStackCard key={group.seriesId} group={group} onSeries={(seriesId) => navigate(`/series/${encodeURIComponent(seriesId)}`)} />
+                ))}
+              </HorizontalShelf>
             </div>
           </section>
         )}
