@@ -43,17 +43,6 @@
   align-items: center;
 }
 
-.rj-library-view {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--card);
-  --tab-background: var(--rj-rose-light);
-}
-.rj-library-view [data-slot="button"] { width: 44px; height: 44px; border-radius: 50%; }
-.rj-library-view button[aria-pressed="true"] { background: transparent; }
-
 .rj-home-shell:has(main .rj-library-tab-layout) > .rj-app-header {
   position: static;
   display: block;

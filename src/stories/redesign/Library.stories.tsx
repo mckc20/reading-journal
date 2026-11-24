@@ -70,7 +70,6 @@ export const BrowseCollections: Story = {
     const canvas = within(canvasElement);
     const navigation = within(canvas.getByRole('tablist', { name: 'Library collections' }));
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'title');
-    await userEvent.click(canvas.getByRole('button', { name: 'List view' }));
     await expect(navigation.getAllByRole('tab')).toHaveLength(3);
     await expect(navigation.getByRole('tab', { name: 'Series' })).toBeVisible();
     await userEvent.click(navigation.getByRole('tab', { name: 'Collections' }));
@@ -78,7 +77,9 @@ export const BrowseCollections: Story = {
     await expect(canvas.queryByRole('button', { name: 'List view' })).not.toBeInTheDocument();
     await expect(canvas.getByRole('list', { name: 'Default collections' })).toHaveAttribute('data-view', 'grid');
     await userEvent.click(within(canvas.getByRole('list', { name: 'Default collections' })).getByRole('button', { name: 'Wishlist' }));
-    await expect(within(canvas.getByRole('list', { name: 'Library books' })).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
+    const wishlist = canvas.getByRole('list', { name: 'Library books' });
+    await expect(wishlist).toHaveAttribute('data-view', 'list');
+    await expect(within(wishlist).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
     await userEvent.click(within(canvas.getByRole('tablist', { name: 'Library collections' })).getByRole('tab', { name: 'Books' }));
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
     await expect(canvas.getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
@@ -132,7 +133,7 @@ export const MobileSearch: Story = {
     touch('touchmove', 88);
     await waitFor(() => expect(searchBar).toHaveAttribute('data-pulling'));
     await expect(searchBar).toHaveAttribute('data-revealed');
-    await expect(searchBar!.getBoundingClientRect().height).toBeCloseTo(32);
+    await waitFor(() => expect(searchBar!.getBoundingClientRect().height).toBeCloseTo(32));
     touch('touchmove', 130);
     touch('touchend', 130);
     await waitFor(() => expect(searchBar).not.toHaveAttribute('data-pulling'));
@@ -169,14 +170,13 @@ export const MobileSearch: Story = {
 export const SortingAndLayout: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const titles = () => within(canvas.getByRole('list', { name: 'Library books' })).getAllByRole('button').map(button => (button.querySelector('.rj-library-list-title') ?? button).textContent);
+    const titles = () => within(canvas.getByRole('list', { name: 'Library books' })).getAllByRole('button').map(button => button.textContent);
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'title');
     await expect(titles()[1]).toBe('An Atlas of Quiet Places and the People Who Find Them');
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'author');
     await expect(titles()[2]).toBe('The Hobbit');
-    await userEvent.click(canvas.getByRole('button', { name: 'List view' }));
     await expect(canvas.getByRole('list', { name: 'Library books' })).toHaveAttribute('data-view', 'list');
-    await expect(canvas.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(canvas.queryByRole('group', { name: 'Library view' })).not.toBeInTheDocument();
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'recent');
     await expect(titles()[0]).toBe('A Psalm for the Wild-Built');
   },

@@ -16,7 +16,6 @@ export const librarySorts = [
 ] as const;
 
 export type LibrarySort = (typeof librarySorts)[number]["value"];
-export type LibraryLayout = "grid" | "list";
 
 export function compareLibraryItems(
   a: { title: string; author?: string; addedAt?: string },

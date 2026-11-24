@@ -5,8 +5,8 @@ import type { CreateDestination, HomeDestination } from './HomeShell';
 import type { HomeBook } from './HomeCards';
 import type { BookSource, BookStatus } from '@/types';
 import { CollectionSearch } from './CollectionSearch';
-import { LibraryBookGrid } from './LibraryBookGrid';
-import { LibraryViewSwitch, useLibraryPresentation } from './LibraryNavigation';
+import { LibraryBookList } from './LibraryBookList';
+import { useLibraryPresentation } from './LibraryNavigation';
 import { compareLibraryItems, librarySorts } from '@/lib/libraryTabs';
 import './redesign.css';
 import './library-preview.css';
@@ -44,7 +44,7 @@ export function LibraryBooks({
   books, loading, error, initialQuery = '', onAddBook, ...actions
 }: LibraryContentProps & { onAddBook: (trigger: HTMLButtonElement) => void }) {
   const [query, setQuery] = useState(initialQuery);
-  const { sort, setSort, view, animateLayout } = useLibraryPresentation();
+  const { sort, setSort } = useLibraryPresentation();
   // Wishes belong to their own destination, even if a caller supplies a mixed list.
   const library = books.filter(book => book.status !== 'Wishlist');
   const visible = useMemo(() => {
@@ -70,11 +70,10 @@ export function LibraryBooks({
               {librarySorts.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
-          <LibraryViewSwitch />
         </div>
         <p className="sr-only" role="status">{query.trim() && `${visible.length} ${visible.length === 1 ? 'result' : 'results'}`}</p>
         {visible.length === 0 ? <EmptyState title="No books found" message="Try another title or author." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />
-          : <LibraryBookGrid key={view} books={visible} view={view} animateLayout={animateLayout} onOpenBook={actions.onOpenBook} />}
+          : <LibraryBookList books={visible} onOpenBook={actions.onOpenBook} />}
       </>}
   </div>}
   </CollectionSearch>;

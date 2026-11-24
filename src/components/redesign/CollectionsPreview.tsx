@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
-import { LibraryBookGrid } from './LibraryBookGrid';
+import { LibraryBookList } from './LibraryBookList';
 import { LibraryMosaic } from './LibraryMosaic';
 import { CollectionSearch } from './CollectionSearch';
 import { useLibraryPresentation } from './LibraryNavigation';
@@ -82,7 +82,7 @@ export function LibraryCollections({
         ) : (
           <div className="rj-library-search-toolbar mb-6">{desktopSearch}</div>
         )}
-        {current ? (visibleBooks.length ? <LibraryBookGrid books={visibleBooks} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
+        {current ? (visibleBooks.length ? <LibraryBookList books={visibleBooks} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
           : visibleCollections.length ? <ul ref={grid} data-view="grid" className="rj-collection-grid" aria-label="Default collections">
             {visibleCollections.map(collection => <li key={collection.id} data-collection={collection.id}>
               <CollectionCard collection={collection} onOpen={() => openCollection(collection.id)} />
