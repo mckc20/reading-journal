@@ -75,6 +75,8 @@ interface AddBookDialogProps {
   initialRecommendation?: RecommendationItem;
   initialCatalogBook?: BookTitleSearchResult;
   initiallyAddToWishlist?: boolean;
+  collectionStatus?: BookStatus;
+  initiallyFavorite?: boolean;
   editBook?: Book;
   duplicateBooks?: Book[];
   onCopiesSaved?: (books: Book[]) => void;
@@ -159,6 +161,8 @@ export default function AddBookDialog({
   initialRecommendation,
   initialCatalogBook,
   initiallyAddToWishlist = false,
+  collectionStatus,
+  initiallyFavorite = false,
   editBook,
   duplicateBooks,
   onCopiesSaved,
@@ -183,7 +187,7 @@ export default function AddBookDialog({
   const [copyCleanupFailed, setCopyCleanupFailed] = useState(false);
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [addToWishlist, setAddToWishlist] = useState(initialBook ? initialBook.status === "Wishlist" : initiallyAddToWishlist);
+  const [addToWishlist, setAddToWishlist] = useState(initialBook ? initialBook.status === "Wishlist" : collectionStatus === "Wishlist" || initiallyAddToWishlist);
   const [secondaryInformationOpen, setSecondaryInformationOpen] = useState(false);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [newSeriesName, setNewSeriesName] = useState("");
@@ -222,7 +226,10 @@ export default function AddBookDialog({
     clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: initialBook ? getBookFormValues(initialBook, Boolean(copySource)) : getInitialFormValues(initialSeriesId, initialVolumeNumber),
+    defaultValues: initialBook ? getBookFormValues(initialBook, Boolean(copySource)) : {
+      ...getInitialFormValues(initialSeriesId, initialVolumeNumber),
+      ...(collectionStatus ? { status: collectionStatus } : {}),
+    },
   });
 
   const genreOptions = useMemo(() => {
@@ -704,7 +711,7 @@ export default function AddBookDialog({
         {
           title: values.title,
           authors,
-          status: values.status,
+          status: collectionStatus ?? values.status,
           genre_ids: values.genres,
           language: (values.language as BookLanguage) || undefined,
           format: (values.format as BookFormat) || undefined,
@@ -720,7 +727,7 @@ export default function AddBookDialog({
           isbn: isbn ?? undefined,
           metadata_source: metadataSource || undefined,
           metadata_source_url: metadataSourceUrl || undefined,
-          is_favorite: false,
+          is_favorite: initiallyFavorite,
         },
         coverFile ?? undefined
       );
@@ -1012,13 +1019,13 @@ export default function AddBookDialog({
               <div className="rj-book-form-grid">
                 <div className="rj-book-form-field">
                   <Label htmlFor="add-book-status">Reading status</Label>
-                  <select id="add-book-status" value={addToWishlist ? WISHLIST_STATUS_VALUE : status}
+                  <select id="add-book-status" disabled={Boolean(collectionStatus)} value={addToWishlist ? WISHLIST_STATUS_VALUE : status}
                     onChange={event => {
                       const nextStatus = event.currentTarget.value as BookStatus;
                       setAddToWishlist(nextStatus === WISHLIST_STATUS_VALUE);
                       if (nextStatus !== WISHLIST_STATUS_VALUE) setValue("status", nextStatus, { shouldDirty: true });
                     }}>
-                    <option value={WISHLIST_STATUS_VALUE}>Wishlist</option>
+                    {!initiallyFavorite && <option value={WISHLIST_STATUS_VALUE}>Wishlist</option>}
                     {STATUS_OPTIONS.map(option => <option key={option}>{option}</option>)}
                     {initialBook?.status === "Paused" && <option>Paused</option>}
                   </select>

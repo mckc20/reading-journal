@@ -42,7 +42,7 @@ function LibraryReview(args: LibraryPreviewProps) {
     <Routes>
       <Route path="/library" element={<HomeShell {...props} activeDestination="Library"><LibraryTabs><Outlet /></LibraryTabs></HomeShell>}>
         <Route index element={<LibraryPreview {...props} />} />
-        <Route path="collections" element={<CollectionsPreview {...props} />} />
+        <Route path="collections" element={<CollectionsPreview {...props} actions={{ onCreateBook: () => preview('Create book'), onAddBook: async () => {} }} />} />
         <Route path="series" element={<SeriesReview onOpen={id => preview(`Series details: ${id}`)} />} />
       </Route>
     </Routes>
@@ -80,12 +80,15 @@ export const BrowseCollections: Story = {
     const wishlist = canvas.getByRole('list', { name: 'Library books' });
     await expect(wishlist).toHaveAttribute('data-view', 'list');
     await expect(within(wishlist).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
-    await userEvent.click(within(canvas.getByRole('tablist', { name: 'Library collections' })).getByRole('tab', { name: 'Books' }));
+    await expect(canvas.queryByRole('heading', { name: /^Library$/ })).not.toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Wishlist', level: 1 })).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'All collections' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Books' }));
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
     await expect(canvas.getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
     await expect(canvas.getByRole('list', { name: 'Library books' })).toHaveAttribute('data-view', 'list');
     await expect(canvas.queryByRole('button', { name: 'A Future Adventure' })).not.toBeInTheDocument();
-    await userEvent.click(navigation.getByRole('tab', { name: 'Series' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Series' }));
     await expect(canvas.queryByRole('button', { name: 'Grid view' })).not.toBeInTheDocument();
     await expect(canvas.getByRole('list', { name: 'Series collection' }).querySelectorAll('.rj-collection-art')).toHaveLength(2);
   },

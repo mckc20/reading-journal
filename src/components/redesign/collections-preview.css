@@ -1,8 +1,3 @@
-.rj-collections-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 26px 0; }
-.rj-collections-toolbar h2 { font: 500 28px/1.3 var(--font-display); margin: 0 0 6px; }
-.rj-collections-toolbar h2:focus { outline: none; }
-.rj-collections-toolbar .rj-desktop-search { width: min(100%, 320px); }
-.rj-collections-toolbar [data-slot='button'] { margin: 0 0 14px -12px; }
 .rj-collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; list-style: none; padding: 0; margin: 0; }
 .rj-collection-grid > li { min-width: 0; }
 .rj-collection-card { position: relative; border-radius: 20px; }
@@ -42,3 +37,40 @@
 }
 @media (min-width: 768px) { .rj-collection-grid { gap: 30px 24px; } }
 @media (min-width: 1100px) { .rj-collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.rj-collection-detail-header {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding-block: calc(16px + env(safe-area-inset-top)) 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.rj-collection-detail-header .rj-collection-back { margin-inline-start: -12px; }
+.rj-collection-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.rj-collection-title-row h1 { font: italic 34px/1.15 var(--font-display); overflow-wrap: anywhere; }
+.rj-collection-title-row h1:focus { outline: none; }
+.rj-collection-title-row > button { flex-shrink: 0; min-height: 44px; }
+.rj-collection-book-tools > button { min-height: 44px; }
+.rj-collection-filter-dialog select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--input);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.rj-collection-picker { grid-template-rows: auto auto minmax(0, 1fr); }
+.rj-collection-picker-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.rj-collection-picker-list li + li { border-top: 1px solid var(--border); }
+.rj-collection-picker-list label { display: flex; align-items: center; gap: 12px; padding: 8px; cursor: pointer; }
+.rj-collection-picker-list label:hover { background: var(--surface-hover); }
+.rj-collection-picker-list label > input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--primary); }
+.rj-collection-picker-list .rj-collection-picker-cover { width: 32px; flex-shrink: 0; }
+.rj-collection-picker-list .rj-book-title { overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+  .rj-collection-filter-dialog label { display: grid; }
+}

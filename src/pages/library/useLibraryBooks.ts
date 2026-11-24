@@ -14,6 +14,8 @@ function toLibraryBook(book: Book): LibraryPreviewBook {
     totalPages: book.total_pages,
     status: book.status,
     favorite: book.is_favorite,
+    format: book.format,
+    language: book.language,
     addedAt: book.created_at,
   };
 }

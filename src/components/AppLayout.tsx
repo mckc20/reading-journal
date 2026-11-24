@@ -69,6 +69,8 @@ export interface AddBookDialogLaunchOptions {
   initialRecommendation?: RecommendationItem;
   initialCatalogBook?: BookTitleSearchResult;
   initiallyAddToWishlist?: boolean;
+  collectionStatus?: Book["status"];
+  initiallyFavorite?: boolean;
   editBook?: Book;
   duplicateBooks?: Book[];
   onCopiesSaved?: (books: Book[]) => void;
@@ -355,6 +357,8 @@ function AppLayoutContent() {
             initialRecommendation={addBookOptions?.initialRecommendation}
             initialCatalogBook={addBookOptions?.initialCatalogBook}
             initiallyAddToWishlist={addBookOptions?.initiallyAddToWishlist}
+            collectionStatus={addBookOptions?.collectionStatus}
+            initiallyFavorite={addBookOptions?.initiallyFavorite}
             editBook={addBookOptions?.editBook}
             duplicateBooks={addBookOptions?.duplicateBooks}
             onCopiesSaved={addBookOptions?.onCopiesSaved}

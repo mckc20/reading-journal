@@ -3,17 +3,20 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
 import type { CreateDestination, HomeDestination } from './HomeShell';
 import type { HomeBook } from './HomeCards';
-import type { BookSource, BookStatus } from '@/types';
+import type { BookFormat, BookLanguage, BookSource, BookStatus } from '@/types';
 import { CollectionSearch } from './CollectionSearch';
 import { LibraryBookList } from './LibraryBookList';
 import { useLibraryPresentation } from './LibraryNavigation';
-import { compareLibraryItems, librarySorts } from '@/lib/libraryTabs';
+import { compareLibraryItems } from '@/lib/libraryTabs';
+import { LibrarySortControl } from './LibrarySortControl';
 import './redesign.css';
 import './library-preview.css';
 
 export interface LibraryPreviewBook extends HomeBook {
   status: BookStatus;
   source?: BookSource;
+  format?: BookFormat;
+  language?: BookLanguage;
   favorite?: boolean;
   addedAt: string;
 }
@@ -61,15 +64,7 @@ export function LibraryBooks({
       : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>
         <div className="rj-library-books-toolbar">
           <div className="rj-library-search-toolbar">{desktopSearch}</div>
-          <label className="rj-library-sort">
-            <span>Sort by</span>
-            <select value={sort} onChange={event => {
-              const option = librarySorts.find(item => item.value === event.target.value);
-              if (option) setSort(option.value);
-            }}>
-              {librarySorts.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
+          <LibrarySortControl value={sort} onChange={setSort} />
         </div>
         <p className="sr-only" role="status">{query.trim() && `${visible.length} ${visible.length === 1 ? 'result' : 'results'}`}</p>
         {visible.length === 0 ? <EmptyState title="No books found" message="Try another title or author." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />
