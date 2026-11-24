@@ -10,31 +10,23 @@
   --collection-frame-width: 8px;
   --collection-inner-radius: 12px;
   position: relative;
-  display: grid;
-  place-items: center;
   aspect-ratio: 1;
   border-radius: 20px;
   overflow: hidden;
   background: var(--rj-cover-surface);
-  color: var(--foreground);
-}
-.rj-collection-art::after {
-  content: '';
-  position: absolute;
-  inset: var(--collection-frame-width);
-  border: 2px solid white;
-  border-radius: var(--collection-inner-radius);
-  pointer-events: none;
 }
 .rj-collection-covers {
   position: absolute;
   inset: var(--collection-frame-width);
   overflow: hidden;
   border-radius: var(--collection-inner-radius);
+  background: white;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   gap: 3px;
+  padding: 3px;
 }
+.rj-collection-covers > svg { place-self: center; color: #3c3336; }
 .rj-collection-covers:is([data-count="2"], [data-count="3"]) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

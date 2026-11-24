@@ -11,11 +11,11 @@ export function LibraryMosaic({ books }: { books: { id: string; title: string; c
   return (
     <div className="rj-collection-art" aria-hidden="true"
       style={covers.length ? { "--book-detail-hero-color": color } as CSSProperties : undefined}>
-      {covers.length ? (
-        <div className="rj-collection-covers" data-count={covers.length}>
-          {covers.map(book => <BookCover key={book.id} src={book.cover} title={book.title} decorative />)}
-        </div>
-      ) : <BookOpen size={38} strokeWidth={1.2} />}
+      <div className="rj-collection-covers" data-count={covers.length}>
+        {covers.length
+          ? covers.map(book => <BookCover key={book.id} src={book.cover} title={book.title} decorative />)
+          : <BookOpen size={38} strokeWidth={1.2} />}
+      </div>
     </div>
   );
 }
