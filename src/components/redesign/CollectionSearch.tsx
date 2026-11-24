@@ -1,146 +1,101 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import './collection-search.css';
 
-export interface CollectionSearchItem {
-  id: string;
-  name: string;
-  detail?: string;
-  searchText?: string;
-}
-
 const mobileBreakpoint = '(max-width: 767px)';
-const revealZoneHeight = 92;
-type SwipePoint = Pick<Touch, 'clientX' | 'clientY'>;
 
-function verticalSwipe(start: SwipePoint | null, end: SwipePoint | undefined) {
-  if (!start || !end) return null;
-  const dy = end.clientY - start.clientY;
-  const dx = end.clientX - start.clientX;
-  if (Math.abs(dy) < 48 || Math.abs(dy) < Math.abs(dx) * 1.5) return null;
-  return dy < 0 ? 'up' : 'down';
-}
-
-/** The caller supplies only the active collection, never a global search index. */
-export function CollectionSearch({ collection, items, onSelect, query, onQueryChange, children }: {
+/** Each panel owns its query and filters its existing results as the reader types. */
+export function CollectionSearch({ collection, query, onQueryChange, children }: {
   collection: string;
-  items: CollectionSearchItem[];
-  onSelect: (id: string) => void;
   query: string;
   onQueryChange: (query: string) => void;
   children: (controls: { desktopSearch: ReactNode }) => ReactNode;
 }) {
   const id = useId();
-  const [mobile, setMobile] = useState(() => window.matchMedia(mobileBreakpoint).matches);
   const [revealed, setRevealed] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [mobileQuery, setMobileQuery] = useState('');
-  const browse = useRef<HTMLDivElement>(null);
-  const bar = useRef<HTMLDivElement>(null);
-  const desktopInput = useRef<HTMLInputElement>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const dialogStart = useRef<SwipePoint | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const label = `Search your ${collection.toLowerCase()}`;
-  const needle = mobileQuery.trim().toLocaleLowerCase();
-  const results = needle.length >= 2 ? items.filter(item => (item.searchText ?? item.name).toLocaleLowerCase().includes(needle)) : [];
+  const placeholder = `Search ${collection.toLowerCase()}`;
 
   useEffect(() => {
-    const media = window.matchMedia(mobileBreakpoint);
-    const update = () => { setMobile(media.matches); setOpen(false); setRevealed(false); setMobileQuery(''); };
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+    const main = panel.current?.closest('main');
+    if (!main) return;
+    const mobile = window.matchMedia(mobileBreakpoint);
+    let start: { x: number; y: number; atTop: boolean } | null = null;
 
-  useEffect(() => {
-    if (!mobile || open) return;
-    const main = browse.current?.closest('main');
-    const header = main?.querySelector('[data-library-header]')
-      ?? main?.closest('.rj-app, .rj-home-shell')?.querySelector('.rj-app-header');
-    if (!main || !header) return;
-    let start: Touch | null = null;
-
-    const begin = (event: TouchEvent) => {
+    function begin(event: TouchEvent) {
       start = null;
       const target = event.target;
-      if (!(target instanceof Element) || event.touches.length !== 1 ||
+      if (!mobile.matches || event.touches.length !== 1 || !(target instanceof Element) ||
           target.closest('[inert], input, textarea, select, [role="slider"], [role="spinbutton"]')) return;
-      const touch = event.touches[0];
-      const rect = header.getBoundingClientRect();
-      const zoneStart = Math.max(0, header.hasAttribute('data-library-header') ? rect.top : rect.bottom);
-      const zoneEnd = Math.max(0, rect.bottom) + revealZoneHeight;
-      if (touch.clientY >= zoneStart && touch.clientY <= zoneEnd) start = touch;
-    };
+      const { clientX, clientY } = event.touches[0];
+      start = { x: clientX, y: clientY, atTop: window.scrollY <= 2 };
+    }
 
     function end(event: TouchEvent) {
-      const direction = verticalSwipe(start, event.changedTouches.length === 1 ? event.changedTouches[0] : undefined);
+      const origin = start;
       start = null;
-      if (direction === 'up') setRevealed(true);
-      if (direction === 'down') {
-        setRevealed(false);
-        if (bar.current?.contains(document.activeElement)) browse.current?.focus({ preventScroll: true });
+      if (!origin || event.changedTouches.length !== 1) return;
+      const { clientX, clientY } = event.changedTouches[0];
+      const dy = clientY - origin.y;
+      if (dy >= 40 && dy >= Math.abs(clientX - origin.x) * 1.5 && (origin.atTop || window.scrollY <= 2)) {
+        setRevealed(true);
+      }
+    }
+
+    function wheel(event: WheelEvent) {
+      if (mobile.matches && window.scrollY <= 2 && event.deltaY < -Math.abs(event.deltaX) && !event.ctrlKey) {
+        setRevealed(true);
       }
     }
 
     function cancel() { start = null; }
+
     main.addEventListener('touchstart', begin, { passive: true });
     main.addEventListener('touchend', end, { passive: true });
     main.addEventListener('touchcancel', cancel, { passive: true });
+    main.addEventListener('wheel', wheel, { passive: true });
     return () => {
       main.removeEventListener('touchstart', begin);
       main.removeEventListener('touchend', end);
       main.removeEventListener('touchcancel', cancel);
+      main.removeEventListener('wheel', wheel);
     };
-  }, [mobile, open]);
+  }, []);
 
-  function close() {
-    setOpen(false);
+  function hideSearch() {
+    onQueryChange('');
     setRevealed(false);
-    setMobileQuery('');
+    panel.current?.focus({ preventScroll: true });
   }
 
-  return <div ref={browse} tabIndex={-1} className="rj-redesign rj-collection-search">
-    {mobile && <div ref={bar} className={revealed ? 'rj-mobile-search-bar' : 'sr-only'} role="search" aria-label={label}>
-      <button type="button" className="rj-search-invitation" aria-haspopup="dialog" aria-label={label}
-        onFocus={() => setRevealed(true)} onClick={() => setOpen(true)}>
-        <Search size={18} aria-hidden="true" /><span>Search {collection.toLowerCase()}</span>
-      </button>
-      {revealed && <Button variant="ghost" size="icon" aria-label="Hide search" onClick={() => {
-        setRevealed(false);
-        browse.current?.focus({ preventScroll: true });
-      }}><X aria-hidden="true" /></Button>}
-    </div>}
-    {children({
-      desktopSearch: <div className="rj-library-search rj-desktop-search"><label htmlFor={`${id}-desktop`}>{label}</label><div><Search size={18} aria-hidden="true" /><input ref={desktopInput} id={`${id}-desktop`} type="search" placeholder={`Search ${collection.toLowerCase()}`} value={query} onChange={event => onQueryChange(event.target.value)} /></div></div>,
-    })}
-    <Dialog open={mobile && open} onOpenChange={value => { if (!value) close(); }}>
-      <DialogContent className="rj-redesign rj-collection-search-dialog" showCloseButton={false}
-        onOpenAutoFocus={event => { event.preventDefault(); input.current?.focus(); }}
-        onCloseAutoFocus={event => {
-          event.preventDefault();
-          (window.matchMedia(mobileBreakpoint).matches ? browse.current : desktopInput.current)?.focus({ preventScroll: true });
-        }}>
-        <header onTouchStart={event => {
-          dialogStart.current = event.touches.length === 1 && event.target instanceof Element && !event.target.closest('input')
-            ? event.touches[0]
-            : null;
-        }}
-          onTouchCancel={() => { dialogStart.current = null; }}
-          onTouchEnd={event => {
-            const direction = verticalSwipe(dialogStart.current, event.changedTouches.length === 1 ? event.changedTouches[0] : undefined);
-            dialogStart.current = null;
-            if (direction === 'down') close();
-          }}>
-          <DialogTitle>{label}</DialogTitle>
-          <div className="rj-search-input-row"><div><Search size={20} aria-hidden="true" /><input ref={input} type="search" aria-label={label} placeholder={`Search ${collection.toLowerCase()}`} value={mobileQuery} onChange={event => setMobileQuery(event.target.value)} autoComplete="off" enterKeyHint="search" /></div><Button variant="ghost" onClick={close}>Cancel</Button></div>
-          <DialogDescription>Search only in your {collection.toLowerCase()}. Enter at least two characters.</DialogDescription>
-        </header>
-        <section className="rj-search-results" aria-label={`${collection} search results`}>
-          <p role="status">{needle.length < 2 ? 'Type at least two characters to start searching.' : `${results.length} ${results.length === 1 ? 'result' : 'results'}`}</p>
-          {needle.length >= 2 && (results.length ? <ul>{results.map(item => <li key={item.id}><button onClick={() => { close(); onSelect(item.id); }}><span>{item.name}</span>{item.detail && <small>{item.detail}</small>}</button></li>)}</ul> : <p>No {collection.toLowerCase()} found. Try another search.</p>)}
-        </section>
-      </DialogContent>
-    </Dialog>
-  </div>;
+  return (
+    <div ref={panel} tabIndex={-1} className="rj-redesign rj-collection-search">
+      <div className="rj-library-mobile-search" data-revealed={revealed || query.length > 0 || undefined} role="search" aria-label={label}>
+        <div className="rj-library-search-field">
+          <Search size={18} aria-hidden="true" />
+          <input type="search" value={query} aria-label={label} placeholder={placeholder} autoComplete="off"
+            enterKeyHint="search" onFocus={() => setRevealed(true)} onChange={event => onQueryChange(event.target.value)}
+            onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); hideSearch(); } }} />
+        </div>
+        {(revealed || query.length > 0) && (
+          <Button type="button" variant="ghost" size="icon" aria-label="Hide search" onClick={hideSearch}>
+            <X aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+      {children({
+        desktopSearch: (
+          <div className="rj-library-search rj-desktop-search">
+            <label htmlFor={id}>{label}</label>
+            <div>
+              <Search size={18} aria-hidden="true" />
+              <input id={id} type="search" placeholder={placeholder} value={query} onChange={event => onQueryChange(event.target.value)} />
+            </div>
+          </div>
+        ),
+      })}
+    </div>
+  );
 }

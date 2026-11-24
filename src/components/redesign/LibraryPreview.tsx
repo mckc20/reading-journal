@@ -6,7 +6,7 @@ import type { HomeBook } from './HomeCards';
 import type { BookSource, BookStatus } from '@/types';
 import { CollectionSearch } from './CollectionSearch';
 import { LibraryBookGrid } from './LibraryBookGrid';
-import { useLibraryPresentation } from './LibraryNavigation';
+import { LibraryViewSwitch, useLibraryPresentation } from './LibraryNavigation';
 import { compareLibraryItems, librarySorts } from '@/lib/libraryTabs';
 import './redesign.css';
 import './library-preview.css';
@@ -54,8 +54,7 @@ export function LibraryBooks({
       .sort((a, b) => compareLibraryItems(a, b, sort));
   }, [books, query, sort]);
 
-  return <CollectionSearch collection="Books" items={library.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` }))}
-    query={query} onQueryChange={setQuery} onSelect={id => { const book = library.find(item => item.id === id); if (book) actions.onOpenBook(book); }}>
+  return <CollectionSearch collection="Books" query={query} onQueryChange={setQuery}>
     {({ desktopSearch }) => <div className="rj-library-preview">
     {loading ? <div className="rj-library-loading" role="status">Loading your library…<div aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div></div>
       : error ? <EmptyState title="Your library couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} />
@@ -71,6 +70,7 @@ export function LibraryBooks({
               {librarySorts.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
+          <LibraryViewSwitch />
         </div>
         <p className="sr-only" role="status">{query.trim() && `${visible.length} ${visible.length === 1 ? 'result' : 'results'}`}</p>
         {visible.length === 0 ? <EmptyState title="No books found" message="Try another title or author." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />

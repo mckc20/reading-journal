@@ -10,6 +10,7 @@
 .rj-library-search-toolbar .rj-desktop-search { width: min(100%, 320px); }
 .rj-library-books-toolbar { display: flex; justify-content: flex-end; gap: 16px; align-items: end; margin-bottom: 24px; }
 .rj-library-books-toolbar .rj-library-search-toolbar { flex: 1; }
+.rj-library-books-toolbar .rj-library-view { flex-shrink: 0; align-self: flex-end; }
 .rj-library-sort { display: grid; gap: 6px; font-size: 12px; font-weight: 500; }
 .rj-library-preview .rj-library-sort select { width: 144px; font-weight: 400; }
 .rj-library-search svg { position: absolute; left: 12px; top: 13px; color: var(--muted-foreground); }
@@ -22,30 +23,33 @@
 .rj-library-cover [data-slot="badge"] { background: var(--background); color: var(--foreground); text-transform: none; }
 .rj-library-book-copy { display: flex; flex-direction: column; align-items: start; gap: 5px; width: 100%; overflow-wrap: anywhere; }
 .rj-library-progress { width: 100%; max-width: 180px; display: grid; gap: 6px; font-size: 10px; color: var(--muted-foreground); margin-top: 3px; }
-.rj-library-books[data-view='list'] { grid-template-columns: 1fr; gap: 12px; }
-.rj-library-books[data-view='list'] .rj-library-book { flex-direction: row; align-items: center; padding: 12px; background: var(--card); gap: 18px; }
-.rj-library-books[data-view='list'] .rj-library-cover { flex: 0 0 80px; }
 .rj-library-loading { padding: 18px 0; color: var(--muted-foreground); }
 .rj-library-loading > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 20px; }
 .rj-library-loading span { height: 240px; border-radius: 16px; background: var(--card); }
 @media (max-width: 767px) {
   .rj-library-search-toolbar { display: none; }
+  .rj-library-books-toolbar { align-items: center; gap: 12px; }
   .rj-library-sort { display: flex; align-items: center; gap: 8px; }
   .rj-library-books[data-view='grid'] { gap: 20px 10px; }
   .rj-library-books[data-view='grid'] .rj-library-book { gap: 8px; padding: 7px; border-radius: 12px; }
   .rj-library-loading > div { gap: 10px; }
   .rj-library-loading span { height: auto; aspect-ratio: 2 / 3; }
 }
-@media (min-width: 1024px) { .rj-library-books, .rj-library-loading > div { grid-template-columns: repeat(5, minmax(0, 1fr)); } .rj-library-books[data-view='list'] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .rj-library-books, .rj-library-loading > div { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
 /* One title button names the action; its overlay keeps the full card clickable.
    Author, status and progress remain ordinary readable card content. */
-.rj-library-title { text-align: left; font-size: 14px; overflow-wrap: anywhere; }
+.rj-library-title {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
 .rj-library-title::after { content: ''; position: absolute; inset: 0; border-radius: 14px; }
 .rj-library-preview .rj-library-title:focus-visible { outline: none; }
 .rj-library-title:focus-visible::after { outline: 2px solid var(--ring); outline-offset: 4px; }
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .rj-library-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .rj-library-title:is(:hover, :focus-visible) { text-decoration: underline; text-underline-offset: 3px; }
 }
 
 @media (max-width: 767px) {
@@ -55,3 +59,39 @@
 @media (min-width: 768px) {
   .rj-app-content:has(.rj-library-tab-layout) { max-width: calc(1200px + 56px); }
 }
+
+.rj-library-list { list-style: none; padding: 0; margin: 0; }
+.rj-library-list > li + li { border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent); }
+.rj-library-list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px 8px;
+  text-align: left;
+}
+.rj-library-list-title::after { border-radius: 2px; }
+.rj-library-list-title:focus-visible::after { outline-offset: -2px; }
+.rj-library-list-media { flex: 0 0 48px; width: 48px; }
+.rj-library-list-media [data-slot="badge"] {
+  padding-inline: 2px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 8px;
+  text-transform: none;
+}
+.rj-library-list-media > .rj-library-book-thumbnail { box-shadow: none; }
+.rj-library-list-media .rj-library-book-thumbnail:has([data-slot="badge"]) > div:has(> .lucide-heart) { top: auto; bottom: 5px; }
+.rj-library-list-copy { flex: 1; min-width: 0; }
+.rj-library-list-copy > :is(.rj-library-list-title, .rj-library-list-description) {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rj-library-list-description { margin-top: 2px; font-size: 12px; }
+.rj-library-list-arrow { flex: 0 0 14px; width: 14px; height: 14px; margin-right: 12px; color: var(--muted-foreground); }
+@media (min-width: 640px) { .rj-library-list-row { padding-inline: 12px; } }
+@media (hover: hover) and (pointer: fine) { .rj-library-list-row:hover { background: color-mix(in oklab, var(--muted) 50%, transparent); } }

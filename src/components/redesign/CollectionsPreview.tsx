@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { BookCover } from '@/components/reading-journal/BookCover';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
 import { LibraryBookGrid } from './LibraryBookGrid';
+import { LibraryMosaic } from './LibraryMosaic';
 import { CollectionSearch } from './CollectionSearch';
 import { useLibraryPresentation } from './LibraryNavigation';
 import { compareLibraryItems } from '@/lib/libraryTabs';
-import { cn } from '@/lib/utils';
-import { useBookHeroColor } from '@/hooks/useDominantImageColor';
 import type { LibraryContentProps, LibraryPreviewProps, LibraryPreviewBook } from './LibraryPreview';
 import type { BookStatus } from '@/types';
 import './redesign.css';
@@ -43,7 +41,7 @@ export function LibraryCollections({
   const selected = selection ? selection.collection : localSelection;
   const setSelected = selection?.onChange ?? setLocalSelection;
   const [query, setQuery] = useState('');
-  const { sort, view, animateLayout } = useLibraryPresentation();
+  const { sort } = useLibraryPresentation();
   const heading = useRef<HTMLHeadingElement>(null);
   const grid = useRef<HTMLUListElement>(null);
   const returnFocusId = useRef<CollectionId | null>(null);
@@ -59,24 +57,18 @@ export function LibraryCollections({
   const needle = query.trim().toLocaleLowerCase();
   const visibleCollections = indexedCollections.filter(collection => collection.id.toLocaleLowerCase().includes(needle));
   const visibleBooks = (current?.books ?? []).filter(book => `${book.title} ${book.author}`.toLocaleLowerCase().includes(needle));
-  const searchItems = current ? current.books.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` })) : indexedCollections.map(collection => ({ id: collection.id, name: collection.id }));
 
   useEffect(() => {
     if (selected) heading.current?.focus();
-    else if (returnFocusId.current) grid.current?.querySelector<HTMLButtonElement>(`[data-collection="${returnFocusId.current}"]`)?.focus();
+    else if (returnFocusId.current) grid.current?.querySelector<HTMLButtonElement>(`[data-collection="${returnFocusId.current}"] button`)?.focus();
   }, [selected]);
 
   function openCollection(id: CollectionId) {
     returnFocusId.current = id;
     setQuery(''); setSelected(id);
   }
-  function openBook(id: string) {
-    const book = current?.books.find(item => item.id === id);
-    if (book) actions.onOpenBook(book);
-  }
-
   return <CollectionSearch key={selected ?? 'collections'} collection={current ? `${current.id === 'Favorites' ? 'Favorite' : current.id} books` : 'Collections'}
-    items={searchItems} query={query} onQueryChange={setQuery} onSelect={id => { if (current) openBook(id); else openCollection(id as CollectionId); }}>
+    query={query} onQueryChange={setQuery}>
     {({ desktopSearch }) => <div className="rj-library-preview rj-collections-preview">
       {loading ? <p role="status">Loading your collections…</p> : error ? <EmptyState title="Your collections couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
         {current ? (
@@ -90,8 +82,12 @@ export function LibraryCollections({
         ) : (
           <div className="rj-library-search-toolbar mb-6">{desktopSearch}</div>
         )}
-        {current ? (visibleBooks.length ? <LibraryBookGrid key={view} books={visibleBooks} view={view} animateLayout={animateLayout} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
-          : visibleCollections.length ? <ul key={view} ref={grid} data-view={view} className={cn("rj-collection-grid", animateLayout && "rj-layout-enter")} aria-label="Default collections">{visibleCollections.map(collection => <CollectionCard key={collection.id} collection={collection} onOpen={() => openCollection(collection.id)} />)}</ul>
+        {current ? (visibleBooks.length ? <LibraryBookGrid books={visibleBooks} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
+          : visibleCollections.length ? <ul ref={grid} data-view="grid" className="rj-collection-grid" aria-label="Default collections">
+            {visibleCollections.map(collection => <li key={collection.id} data-collection={collection.id}>
+              <CollectionCard collection={collection} onOpen={() => openCollection(collection.id)} />
+            </li>)}
+          </ul>
           : <EmptyState title="No collections found" message="Try a collection name, such as Finished or Favorites." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />}
       </>}
     </div>}
@@ -105,18 +101,8 @@ function emptyMessage(id: CollectionId) {
 }
 
 function CollectionCard({ collection, onOpen }: { collection: { id: CollectionId; books: LibraryPreviewBook[] }; onOpen: () => void }) {
-  const covers = collection.books.filter(book => book.cover).slice(0, 3);
-  const color = useBookHeroColor(covers[0]?.cover);
-
-  return <li><article className="rj-collection-card">
-    <div className="rj-collection-art" aria-hidden="true"
-      style={covers.length ? { '--book-detail-hero-color': color } as CSSProperties : undefined}>
-      {covers.length ? (
-        <div className="rj-collection-covers" data-count={covers.length}>
-          {covers.map(book => <BookCover key={book.id} src={book.cover} title={book.title} decorative />)}
-        </div>
-      ) : <BookOpen size={38} strokeWidth={1.2} />}
-    </div>
-    <button type="button" className="rj-book-title rj-library-title rj-collection-title" data-collection={collection.id} onClick={onOpen}>{collection.id}</button>
-  </article></li>;
+  return <article className="rj-collection-card">
+    <LibraryMosaic books={collection.books} />
+    <button type="button" className="rj-book-title rj-library-title rj-collection-title" onClick={onOpen}>{collection.id}</button>
+  </article>;
 }

@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
 
+const defaultActiveSelector = '[aria-current="page"], [aria-pressed="true"], [data-slot="tabs-trigger"][data-state="active"]';
+
 /** Tracks the active control without changing its keyboard or routing behavior. */
-export function SlidingIndicator() {
+export function SlidingIndicator({ activeSelector = defaultActiveSelector }: { activeSelector?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
@@ -11,9 +13,7 @@ export function SlidingIndicator() {
 
     const update = () => {
       const tab = Array.from(track.children).find((child): child is HTMLElement =>
-        child instanceof HTMLElement && child.matches(
-          '[aria-current="page"], [aria-pressed="true"], [data-slot="tabs-trigger"][data-state="active"]',
-        ),
+        child instanceof HTMLElement && child.matches(activeSelector),
       );
       indicator.hidden = !tab || !tab.offsetWidth;
       if (!tab || indicator.hidden) return;
@@ -42,7 +42,7 @@ export function SlidingIndicator() {
     });
     changes.observe(track, {
       attributes: true,
-      attributeFilter: ["aria-current", "aria-pressed", "data-state"],
+      attributeFilter: ["aria-current", "aria-pressed", "data-state", "data-highlighted"],
       childList: true,
       subtree: true,
     });
@@ -53,7 +53,7 @@ export function SlidingIndicator() {
       resize.disconnect();
       changes.disconnect();
     };
-  }, []);
+  }, [activeSelector]);
 
   return <span ref={ref} className="rj-tab-indicator" aria-hidden="true" hidden />;
 }

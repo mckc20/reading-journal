@@ -7,6 +7,8 @@
 .rj-collection-grid > li { min-width: 0; }
 .rj-collection-card { position: relative; border-radius: 20px; }
 .rj-collection-art {
+  --collection-frame-width: 8px;
+  --collection-inner-radius: 12px;
   position: relative;
   display: grid;
   place-items: center;
@@ -16,9 +18,19 @@
   background: var(--rj-cover-surface);
   color: var(--foreground);
 }
+.rj-collection-art::after {
+  content: '';
+  position: absolute;
+  inset: var(--collection-frame-width);
+  border: 2px solid white;
+  border-radius: var(--collection-inner-radius);
+  pointer-events: none;
+}
 .rj-collection-covers {
   position: absolute;
-  inset: 8px;
+  inset: var(--collection-frame-width);
+  overflow: hidden;
+  border-radius: var(--collection-inner-radius);
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   gap: 3px;
@@ -28,24 +40,13 @@
 }
 .rj-collection-covers[data-count="3"] { grid-template-rows: repeat(2, minmax(0, 1fr)); }
 .rj-collection-covers[data-count="3"] > :first-child { grid-row: 1 / -1; }
-.rj-collection-covers > div { height: 100%; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+.rj-collection-covers > div { height: 100%; aspect-ratio: auto; border-radius: 7px; box-shadow: none; }
 .rj-collection-title { padding: 8px 2px 2px; }
 
 @media (max-width: 767px) {
   .rj-collection-grid { gap: 20px 10px; }
-  .rj-collection-art { border-radius: 14px; }
+  .rj-collection-art { --collection-inner-radius: 6px; border-radius: 14px; }
+  .rj-collection-covers > div { border-radius: 5px; }
 }
 @media (min-width: 768px) { .rj-collection-grid { gap: 30px 24px; } }
 @media (min-width: 1100px) { .rj-collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-
-.rj-collection-grid[data-view="list"] { grid-template-columns: 1fr; gap: 12px; }
-.rj-collection-grid[data-view="list"] .rj-collection-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px;
-  border-radius: 14px;
-  background: var(--card);
-}
-.rj-collection-grid[data-view="list"] .rj-collection-art { flex: 0 0 78px; border-radius: 9px; }
-.rj-collection-grid[data-view="list"] .rj-collection-title { padding: 0; }

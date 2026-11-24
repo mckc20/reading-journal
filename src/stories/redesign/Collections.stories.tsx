@@ -86,19 +86,12 @@ export const SearchInsideWishlist: Story = {
   args: Wishlist.args,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const mobile = window.matchMedia('(max-width: 767px)').matches;
-    if (mobile) {
-      const searchButton = canvas.getByRole('button', { name: 'Search your wishlist books' });
-      searchButton.focus();
-      await userEvent.keyboard('{Enter}');
-    }
-    const body = within(canvasElement.ownerDocument.body);
-    const scope = mobile ? within(await body.findByRole('dialog')) : canvas;
-    const input = scope.getByRole('searchbox', { name: 'Search your wishlist books' });
+    const input = canvas.getByRole('searchbox', { name: 'Search your wishlist books' });
+    input.focus();
     await userEvent.type(input, 'Chambers');
-    await expect(scope.getByText(mobile ? 'No wishlist books found. Try another search.' : 'No books found')).toBeVisible();
+    await expect(canvas.getByText('No books found')).toBeVisible();
     await userEvent.clear(input);
     await userEvent.type(input, 'Future');
-    await expect(scope.getByRole('button', { name: mobile ? 'A Future Adventure Alex Rowan' : 'A Future Adventure' })).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
   },
 };

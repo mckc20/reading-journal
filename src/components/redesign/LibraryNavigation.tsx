@@ -12,39 +12,53 @@ const LibraryPresentation = createContext<{
   sort: LibrarySort;
   setSort: (sort: LibrarySort) => void;
   view: LibraryLayout;
+  setView: (view: LibraryLayout) => void;
   sortChanged: boolean;
   animateLayout: boolean;
-}>({ sort: "recent", setSort: () => {}, view: "grid", sortChanged: false, animateLayout: false });
+}>({ sort: "recent", setSort: () => {}, view: "grid", setView: () => {}, sortChanged: false, animateLayout: false });
 
 export function useLibraryPresentation() {
   return useContext(LibraryPresentation);
 }
 
+export function LibraryViewSwitch() {
+  const { view, setView } = useLibraryPresentation();
+  return (
+    <div className="rj-library-view rj-tab-track" role="group" aria-label="Library view">
+      <SlidingIndicator />
+      <Button type="button" variant="ghost" size="icon" aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={18} /></Button>
+      <Button type="button" variant="ghost" size="icon" aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")}><List size={18} /></Button>
+    </div>
+  );
+}
+
 /** Keeps the shared controls mounted while the router swaps panels. */
 export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pendingPath?: string }) {
-  const { pathname, search } = useLocation();
+  const { key, pathname, search } = useLocation();
   const navigate = useNavigate();
   const tab = getLibraryTab(pathname) ?? libraryTabs[0];
   const highlighted = (pendingPath && getLibraryTab(pendingPath)) || tab;
   const [selectedSort, setSort] = useState<LibrarySort>();
-  const [selectedView, setView] = useState<LibraryLayout>();
+  const [view, setView] = useState<LibraryLayout>("grid");
+  const [layoutAnimationKey, setLayoutAnimationKey] = useState<string>();
   const legacySeries = tab.label === "Series" ? new URLSearchParams(search) : null;
   const sort = selectedSort ?? (legacySeries?.get("sort") === "name" ? "title" : "recent");
-  const view = selectedView ?? (legacySeries?.get("display") === "table" ? "list" : "grid");
+
+  function changeView(next: LibraryLayout) {
+    if (next === view) return;
+    setView(next);
+    setLayoutAnimationKey(key);
+  }
 
   return (
-    <LibraryPresentation.Provider value={{ sort, setSort, view, sortChanged: selectedSort !== undefined, animateLayout: selectedView !== undefined }}>
-      <Tabs.Root className="rj-library-tab-layout" value={tab.to} activationMode="manual" onValueChange={to => navigate(to)}>
+    <LibraryPresentation.Provider value={{ sort, setSort, view, setView: changeView, sortChanged: selectedSort !== undefined, animateLayout: layoutAnimationKey === key && !pendingPath }}>
+      <Tabs.Root className="rj-library-tab-layout" value={tab.to} activationMode="manual" onValueChange={to => { setLayoutAnimationKey(undefined); navigate(to); }}>
         <header className="rj-redesign rj-library-heading" data-library-header>
           <h1>Library</h1>
-          <div className="rj-library-view rj-tab-track" role="group" aria-label="Library view">
-            <SlidingIndicator />
-            <Button variant="ghost" size="icon" aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={18} /></Button>
-            <Button variant="ghost" size="icon" aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")}><List size={18} /></Button>
-          </div>
         </header>
         <div className="rj-redesign">
-          <Tabs.List className="rj-library-collections" aria-label="Library collections">
+          <Tabs.List className="rj-library-collections rj-tab-track" aria-label="Library collections">
+            <SlidingIndicator activeSelector="[data-highlighted]" />
             {libraryTabs.map(({ label, to }) => (
               <Tabs.Trigger key={to} value={to} data-highlighted={highlighted.to === to || undefined}>
                 <span>{label}</span>
