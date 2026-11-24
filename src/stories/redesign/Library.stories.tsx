@@ -152,11 +152,12 @@ export const MobileSearch: Story = {
     touch('touchstart', 168);
     touch('touchmove', 143);
     touch('touchend', 120);
-    await expect(searchBar).not.toHaveAttribute('data-revealed');
+    await waitFor(() => expect(searchBar).not.toHaveAttribute('data-revealed'));
     await expect(canvas.getByText('No books found')).toBeVisible();
     await expect(canvas.queryByRole('button', { name: 'Hide search' })).not.toBeInTheDocument();
     touch('touchstart', 60);
     touch('touchend', 130);
+    await waitFor(() => expect(searchBar).toHaveAttribute('data-revealed'));
     await expect(search).toHaveValue('no matching book');
     search.focus();
     await userEvent.keyboard('{Escape}');
