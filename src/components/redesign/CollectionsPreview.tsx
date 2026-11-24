@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpen, Heart } from 'lucide-react';
+import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
 import { LibraryBookGrid } from './LibraryBookGrid';
 import { CollectionSearch } from './CollectionSearch';
+import { useLibraryPresentation } from './LibraryNavigation';
+import { compareLibraryItems } from '@/lib/libraryTabs';
+import { cn } from '@/lib/utils';
 import type { LibraryContentProps, LibraryPreviewProps, LibraryPreviewBook } from './LibraryPreview';
 import type { BookStatus } from '@/types';
 import './redesign.css';
 import './library-preview.css';
 import './collections-preview.css';
 
-type CollectionId = BookStatus | 'Favorites';
+type CollectionId = Exclude<BookStatus, 'Up Next' | 'Reading' | 'Paused'> | 'Favorites';
 const definitions: { id: CollectionId; tone: string }[] = [
-  { id: 'Reading', tone: 'gold' }, { id: 'Up Next', tone: 'blue' },
-  { id: 'To Read', tone: 'warm' }, { id: 'Paused', tone: 'blue' },
+  { id: 'To Read', tone: 'warm' },
   { id: 'Finished', tone: 'gold' }, { id: 'DNF', tone: 'warm' },
   { id: 'Wishlist', tone: 'rose' }, { id: 'Favorites', tone: 'rose' },
 ];
@@ -44,15 +46,22 @@ export function LibraryCollections({
   const selected = selection ? selection.collection : localSelection;
   const setSelected = selection?.onChange ?? setLocalSelection;
   const [query, setQuery] = useState('');
+  const { sort, view, animateLayout } = useLibraryPresentation();
   const heading = useRef<HTMLHeadingElement>(null);
   const grid = useRef<HTMLUListElement>(null);
   const returnFocusId = useRef<CollectionId | null>(null);
-  const collections = definitions.map(definition => ({ ...definition, books: books.filter(book => definition.id === 'Favorites' ? book.favorite && book.status !== 'Wishlist' : book.status === definition.id) }));
+  const collections = definitions.map(definition => {
+    const matchingBooks = books.filter(book => definition.id === 'Favorites'
+      ? book.favorite && book.status !== 'Wishlist'
+      : book.status === definition.id);
+    matchingBooks.sort((a, b) => compareLibraryItems(a, b, sort));
+    return { ...definition, books: matchingBooks, title: definition.id, author: matchingBooks[0]?.author, addedAt: matchingBooks[0]?.addedAt };
+  }).sort((a, b) => compareLibraryItems(a, b, sort));
   const current = collections.find(collection => collection.id === selected);
   const needle = query.trim().toLocaleLowerCase();
   const visibleCollections = collections.filter(collection => collection.id.toLocaleLowerCase().includes(needle));
   const visibleBooks = (current?.books ?? []).filter(book => `${book.title} ${book.author}`.toLocaleLowerCase().includes(needle));
-  const searchItems = current ? current.books.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` })) : collections.map(collection => ({ id: collection.id, name: collection.id, detail: `${collection.books.length} ${collection.books.length === 1 ? 'book' : 'books'}` }));
+  const searchItems = current ? current.books.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` })) : collections.map(collection => ({ id: collection.id, name: collection.id }));
 
   useEffect(() => {
     if (selected) heading.current?.focus();
@@ -77,16 +86,15 @@ export function LibraryCollections({
             <div>
               <Button variant="ghost" onClick={() => { setSelected(null); setQuery(''); }}><ArrowLeft aria-hidden="true" />All collections</Button>
               <h2 ref={heading} tabIndex={-1}>{current.id}</h2>
-              <p role="status">{visibleBooks.length} {visibleBooks.length === 1 ? 'book' : 'books'}</p>
             </div>
             {desktopSearch}
           </div>
         ) : (
           <div className="rj-library-search-toolbar mb-6">{desktopSearch}</div>
         )}
-        {current ? (visibleBooks.length ? <LibraryBookGrid books={visibleBooks} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
-          : visibleCollections.length ? <ul ref={grid} className="rj-collection-grid" aria-label="Default collections">{visibleCollections.map(collection => <CollectionCard key={collection.id} collection={collection} onOpen={() => openCollection(collection.id)} />)}</ul>
-          : <EmptyState title="No collections found" message="Try a collection name, such as Reading or Favorites." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />}
+        {current ? (visibleBooks.length ? <LibraryBookGrid key={view} books={visibleBooks} view={view} animateLayout={animateLayout} onOpenBook={actions.onOpenBook} /> : <EmptyState title={query ? 'No books found' : 'No books here yet'} message={query ? 'Try another title or author.' : emptyMessage(current.id)} action={query ? <Button variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined} />)
+          : visibleCollections.length ? <ul key={view} ref={grid} data-view={view} className={cn("rj-collection-grid", animateLayout && "rj-layout-enter")} aria-label="Default collections">{visibleCollections.map(collection => <CollectionCard key={collection.id} collection={collection} onOpen={() => openCollection(collection.id)} />)}</ul>
+          : <EmptyState title="No collections found" message="Try a collection name, such as Finished or Favorites." action={<Button variant="outline" onClick={() => setQuery('')}>Clear search</Button>} />}
       </>}
     </div>}
   </CollectionSearch>;
@@ -99,12 +107,10 @@ function emptyMessage(id: CollectionId) {
 }
 
 function CollectionCard({ collection, onOpen }: { collection: { id: CollectionId; tone: string; books: LibraryPreviewBook[] }; onOpen: () => void }) {
-  const Icon = collection.id === 'Favorites' ? Heart : BookOpen;
   return <li><article className="rj-collection-card" data-tone={collection.tone}>
     <div className="rj-collection-art" aria-hidden="true">
-      {collection.books.length ? <div className="rj-collection-covers">{collection.books.slice(0, 3).map(book => <BookCover key={book.id} src={book.cover} title={book.title} />)}</div> : <Icon size={38} strokeWidth={1.2} />}
-      <span className="rj-collection-symbol"><Icon size={18} /></span>
+      {collection.books.length ? <div className="rj-collection-covers">{collection.books.slice(0, 3).map(book => <BookCover key={book.id} src={book.cover} title={book.title} />)}</div> : <BookOpen size={38} strokeWidth={1.2} />}
     </div>
-    <div className="rj-collection-caption"><div><button data-collection={collection.id} onClick={onOpen}>{collection.id}</button><p>{collection.books.length} {collection.books.length === 1 ? 'book' : 'books'}</p></div><ArrowUpRight size={20} aria-hidden="true" /></div>
+    <button type="button" className="rj-book-title rj-library-title rj-collection-title" data-collection={collection.id} onClick={onOpen}>{collection.id}</button>
   </article></li>;
 }

@@ -1,8 +1,10 @@
 import CollectionEmptyState from "@/components/CollectionEmptyState";
 import { fetchReadingLogs } from "@/lib/books";
 import type { SortDirection } from "@/lib/librarySorting";
-import { sortLibrarySeries, seriesSortOptions, defaultSeriesSortDirection, seriesSortDirectionLabel } from "@/lib/libraryEntitySorting";
-import { LibrarySortingControls } from "@/components/LibraryControls";
+import { sortLibrarySeries, seriesSortOptions, defaultSeriesSortDirection } from "@/lib/libraryEntitySorting";
+import { useLibraryPresentation } from "@/components/redesign/LibraryNavigation";
+import { compareLibraryItems } from "@/lib/libraryTabs";
+import { cn } from "@/lib/utils";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -25,15 +27,16 @@ export default function Series() {
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const display = searchParams.get("display") === "table" ? "table" : "grid";
+  const { sort: librarySort, view, sortChanged, animateLayout } = useLibraryPresentation();
   const librarySeries = useMemo(() => series.filter((item) => !item.is_wishlist_only), [series]);
   const allGroups = useMemo(() => buildSeriesGroups(books, librarySeries, { includeEmpty: true }), [books, librarySeries]);
   const loading = booksLoading || seriesLoading;
   const error = booksError || seriesError;
   const genreFilters = useMemo(() => searchParams.getAll("genre").filter(Boolean), [searchParams]);
   const statusFilters = useMemo(() => searchParams.getAll("status").filter((value) => seriesStatuses.includes(value as typeof seriesStatuses[number])), [searchParams]);
-  const sort = seriesSortOptions.find((option) => option.value === searchParams.get("sort"))?.value ?? "name";
-  const directionParam = searchParams.get("direction");
+  const legacySort = sortChanged ? undefined : seriesSortOptions.find(option => option.value === searchParams.get("sort"))?.value;
+  const sort = legacySort ?? (librarySort === "recent" ? "date-added" : "name");
+  const directionParam = sortChanged ? null : searchParams.get("direction");
   const direction: SortDirection = directionParam === "asc" || directionParam === "desc" ? directionParam : defaultSeriesSortDirection(sort);
   const [latestReadTimesByBook, setLatestReadTimesByBook] = useState<Map<string, number>>(new Map());
   const [readingLogsLoaded, setReadingLogsLoaded] = useState(false);
@@ -60,14 +63,19 @@ export default function Series() {
     return () => { cancelled = true; };
   }, [sort, readingLogsLoaded]);
   const activeFilterCount = genreFilters.length + statusFilters.length;
-  const groups = useMemo(
-    () => sortLibrarySeries(allGroups.filter((group) => {
+  const groups = useMemo(() => {
+    const visible = allGroups.filter((group) => {
       if (statusFilters.length && !statusFilters.includes(getDerivedSeriesStatus(group.books))) return false;
       // Match whole series when any linked book has one of the selected genres.
       return !genreFilters.length || group.books.some((book) => (book.genres ?? []).some((genre) => genreFilters.includes(genre)));
-    }), sort, direction, { seriesCreatedAtById, latestReadTimesByBook }),
-    [allGroups, statusFilters, genreFilters, sort, direction, seriesCreatedAtById, latestReadTimesByBook],
-  );
+    });
+    if (!legacySort && librarySort === "author") {
+      return visible.map(group => ({ group, title: group.name, author: getSeriesAuthors(group).sort().join(", ") }))
+        .sort((a, b) => compareLibraryItems(a, b, "author"))
+        .map(entry => entry.group);
+    }
+    return sortLibrarySeries(visible, sort, direction, { seriesCreatedAtById, latestReadTimesByBook });
+  }, [allGroups, statusFilters, genreFilters, legacySort, librarySort, sort, direction, seriesCreatedAtById, latestReadTimesByBook]);
 
   function clearFilters() {
     setSearchParams((current) => {
@@ -78,30 +86,12 @@ export default function Series() {
     }, { replace: true });
   }
 
-  const sortingControls = () => (
-    <LibrarySortingControls sort={sort} options={seriesSortOptions.map((option) => ({ ...option, directionLabel: seriesSortDirectionLabel(option.value, defaultSeriesSortDirection(option.value)) }))}
-      directionLabel={seriesSortDirectionLabel(sort, direction)}
-      onSortChange={(value) => setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        if (value === "name") next.delete("sort");
-        else next.set("sort", value);
-        next.delete("direction");
-        return next;
-      }, { replace: true })}
-      onDirectionChange={() => setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.set("direction", direction === "asc" ? "desc" : "asc");
-        return next;
-      }, { replace: true })} nativeMenu />
-  );
   function openSeries(seriesId: string) {
     navigate(`/series/${seriesId}`);
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">{sortingControls()}</div>
-
+    <div key={view} className={cn("space-y-4", animateLayout && "rj-layout-enter")}>
       {sort === "last-read" && !readingLogsLoaded && <LoadingIndicator variant="inline" label="Loading reading order…" />}
       {sort === "last-read" && readingLogsError && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -124,7 +114,7 @@ export default function Series() {
             Series you add will appear here.
           </p>
         </div>
-      ) : display === "table" ? (
+      ) : view === "list" ? (
         <div aria-label="Series collection" className="bg-background">
           <table className="w-full table-fixed text-left text-sm">
             <tbody className="divide-y divide-border/70">

@@ -56,7 +56,8 @@ export function CollectionSearch({ collection, items, onSelect, query, onQueryCh
   useEffect(() => {
     if (!mobile || open) return;
     const main = browse.current?.closest('main');
-    const header = main?.closest('.rj-app, .rj-home-shell')?.querySelector('.rj-app-header');
+    const header = main?.querySelector('[data-library-header]')
+      ?? main?.closest('.rj-app, .rj-home-shell')?.querySelector('.rj-app-header');
     if (!main || !header) return;
     let start: Touch | null = null;
 

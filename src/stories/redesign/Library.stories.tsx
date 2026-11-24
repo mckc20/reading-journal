@@ -53,9 +53,13 @@ export const BrowseCollections: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const navigation = within(canvas.getByRole('tablist', { name: 'Library collections' }));
+    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'title');
+    await userEvent.click(canvas.getByRole('button', { name: 'List view' }));
     await expect(navigation.getAllByRole('tab')).toHaveLength(3);
     await expect(navigation.getByRole('tab', { name: 'Series' })).toBeVisible();
     await userEvent.click(navigation.getByRole('tab', { name: 'Collections' }));
+    await expect(canvas.getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
+    await expect(canvas.getByRole('list', { name: 'Default collections' })).toHaveAttribute('data-view', 'list');
     await userEvent.click(within(canvas.getByRole('list', { name: 'Default collections' })).getByRole('button', { name: 'Wishlist' }));
     await expect(within(canvas.getByRole('list', { name: 'Library books' })).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
     await userEvent.click(within(canvas.getByRole('tablist', { name: 'Library collections' })).getByRole('tab', { name: 'Books' }));
@@ -89,7 +93,7 @@ export const MobileSearch: Story = {
     if (!window.matchMedia('(max-width: 767px)').matches) return;
     const canvas = within(canvasElement);
     const heading = canvas.getByRole('heading', { name: 'Library' });
-    const headerBottom = canvasElement.querySelector('.rj-app-header')!.getBoundingClientRect().bottom;
+    const headerBottom = canvasElement.querySelector('[data-library-header]')!.getBoundingClientRect().bottom;
     const searchBar = () => canvasElement.querySelector('.rj-mobile-search-bar');
     const swipe = (target: Element, from: number, to: number) => {
       // Plain Events also run in browsers without a constructible Touch class.

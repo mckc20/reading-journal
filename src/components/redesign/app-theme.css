@@ -75,6 +75,17 @@
 .rj-app-home-title { font-size: 1.75rem; }
 .rj-app-home-shelves { display: grid; grid-template-columns: minmax(0, 1fr); }
 
+.rj-app--library {
+  --app-header-height: 0px;
+  --app-bottom-nav-space: calc(80px + env(safe-area-inset-bottom));
+}
+.rj-app--library .rj-app-header { display: block; min-height: 0; margin: 0; border: 0; }
+.rj-app--library .rj-app-content { padding-top: 0; }
+.rj-app--library .rj-navigation button:hover { background: var(--surface-hover); }
+.rj-app--library .rj-navigation button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.rj-app--library .rj-navigation button svg { color: currentColor; }
+.rj-app--library .rj-navigation :is(button, a) { min-width: 42px; }
+
 @media (max-width: 767px) {
   .rj-app--detail {
     background: var(--surface-sunken);
@@ -107,4 +118,12 @@
 @media (min-width: 1024px) {
   .rj-app-theme { --app-header-height: 82px; }
   .rj-app .rj-app-header { grid-template-rows: auto; }
+}
+
+@media (min-width: 768px) {
+  .rj-app--library .rj-navigation.rj-tab-track {
+    position: fixed;
+    inset: auto 0 calc(12px + env(safe-area-inset-bottom));
+    margin: auto;
+  }
 }

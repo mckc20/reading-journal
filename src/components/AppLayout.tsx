@@ -207,6 +207,7 @@ function AppLayoutContent() {
     { ...page, historyIndex, mountIndex: currentDetail?.mountIndex ?? historyIndex },
   ] : [];
   const mainIsMessages = mainPage?.location.pathname === "/messages";
+  const mainIsLibrary = Boolean(mainPage && getLibraryTab(mainPage.location.pathname));
 
   useLayoutEffect(() => {
     const media = window.matchMedia(phoneLayout);
@@ -307,7 +308,7 @@ function AppLayoutContent() {
 
   return (
     <>
-      <div className={cn("rj-app min-h-svh bg-background text-foreground", detailOverlayOpen && !underlay && "rj-app--detail")}>
+      <div className={cn("rj-app min-h-svh bg-background text-foreground", mainIsLibrary && "rj-app--library", detailOverlayOpen && !underlay && "rj-app--detail")}>
         <div ref={underlayRef}>
           {mainPage && (
             <UNSAFE_LocationContext.Provider value={{ location: mainPage.location, navigationType: mainPage.navigationType }}>
@@ -433,15 +434,39 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
-  const menuLinks = getLibraryTab(pathname) ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
+  const isLibrary = Boolean(getLibraryTab(pathname));
+  const menuLinks = isLibrary ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
+  const more = (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        {isLibrary ? (
+          <button type="button" aria-label="More navigation"><Menu size={22} aria-hidden="true" /><span>More</span></button>
+        ) : (
+          <Button size="icon-lg" variant="ghost" aria-label="More navigation"><Menu aria-hidden="true" /></Button>
+        )}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content className="rj-add-menu" align="end" side={isLibrary ? "top" : "bottom"} sideOffset={8} collisionPadding={12}>
+          {menuLinks.map(({ to, label, icon: Icon }) => (
+            <DropdownMenu.Item key={to} asChild>
+              <Link to={to} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
+                <Icon size={18} aria-hidden="true" />
+                {label}
+              </Link>
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 
   return (
     <div className="rj-app-header-wrap">
       <header className="rj-app-header">
-        <Link to="/" className="rj-brand" aria-label="Reading Journal home">
+        {!isLibrary && <Link to="/" className="rj-brand" aria-label="Reading Journal home">
           <img src={readingJournalLogo} alt="" />
           <span>Reading Journal</span>
-        </Link>
+        </Link>}
         <nav className="rj-navigation rj-tab-track" aria-label="Primary navigation">
           <SlidingIndicator />
           {primaryNavLinks.map(({ to, label, icon: Icon }) => (
@@ -450,30 +475,13 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
               <span>{label}</span>
             </Link>
           ))}
+          {isLibrary && more}
         </nav>
-        <div className="rj-header-actions">
+        {!isLibrary && <div className="rj-header-actions">
           {addLauncher}
           <NotificationsMenu />
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <Button size="icon-lg" variant="ghost" aria-label="More navigation">
-                <Menu aria-hidden="true" />
-              </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content className="rj-add-menu" align="end" sideOffset={8} collisionPadding={12}>
-                {menuLinks.map(({ to, label, icon: Icon }) => (
-                  <DropdownMenu.Item key={to} asChild>
-                    <Link to={to} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
-                      <Icon size={18} aria-hidden="true" />
-                      {label}
-                    </Link>
-                  </DropdownMenu.Item>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-        </div>
+          {more}
+        </div>}
       </header>
     </div>
   );

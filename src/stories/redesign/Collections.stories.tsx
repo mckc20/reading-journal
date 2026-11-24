@@ -36,7 +36,7 @@ function CollectionsReview(args: CollectionsPreviewProps) {
 const noop = () => {};
 const meta = {
   title: 'Redesign/Collections', component: CollectionsPreview,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'A separate collection index with eight default collections: the seven canonical book statuses (including Wishlist) and Favorites. Cards use covers and live sample counts; empty cards stay available. Opening a card shows only its books using the shared Library book grid. Favorites contains favorite library books; wishes have their own Wishlist collection. Search is scoped to collection names on the index and to the selected collection’s books after opening. Fictional data only; nothing is persisted.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Collections tab contains To Read, Finished, DNF, Wishlist and Favorites. Cards use covers and titles, and empty cards stay available. Opening a card shows only its books using the shared Library book grid. Favorites contains favorite library books; wishes have their own Wishlist collection. Search is scoped to collection names on the index and to the selected collection’s books after opening. Fictional data only; nothing is persisted.' } } },
   args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
   render: args => <CollectionsReview key={JSON.stringify([args.books, args.initialCollection, args.loading, args.error])} {...args} />,
 } satisfies Meta<typeof CollectionsPreview>;
@@ -47,7 +47,7 @@ export const DefaultCollections: Story = {};
 export const Empty: Story = { args: { books: [] } };
 export const Wishlist: Story = { args: { initialCollection: 'Wishlist' } };
 export const Favorites: Story = { args: { initialCollection: 'Favorites' } };
-export const EmptyCollection: Story = { args: { books: [], initialCollection: 'Reading' } };
+export const EmptyCollection: Story = { args: { books: [], initialCollection: 'Finished' } };
 export const Loading: Story = { args: { loading: true } };
 export const LoadError: Story = { args: { error: 'Please check your connection and try again.' } };
 
@@ -55,7 +55,7 @@ export const OpenCollections: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const index = () => within(canvas.getByRole('list', { name: 'Default collections' }));
-    await expect(index().getAllByRole('listitem')).toHaveLength(8);
+    await expect(index().getAllByRole('listitem')).toHaveLength(5);
     await userEvent.click(index().getByRole('button', { name: 'Wishlist' }));
     let list = within(canvas.getByRole('list', { name: 'Library books' }));
     await expect(list.getAllByRole('listitem')).toHaveLength(1);
@@ -69,10 +69,10 @@ export const OpenCollections: Story = {
     await expect(list.getByRole('button', { name: 'A Psalm for the Wild-Built' })).toBeVisible();
     await expect(list.getByRole('button', { name: 'The Night Circus' })).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'All collections' }));
-    await userEvent.click(index().getByRole('button', { name: 'Paused' }));
+    await userEvent.click(index().getByRole('button', { name: 'Finished' }));
     list = within(canvas.getByRole('list', { name: 'Library books' }));
     await expect(list.getAllByRole('listitem')).toHaveLength(1);
-    await expect(list.getByRole('button', { name: 'The Midnight Library' })).toBeVisible();
+    await expect(list.getByRole('button', { name: 'The Night Circus' })).toBeVisible();
   },
 };
 
