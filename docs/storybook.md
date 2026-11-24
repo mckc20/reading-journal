@@ -119,7 +119,7 @@ Follow-up verification: all 13 new interaction stories ran without browser error
 
 Library navigation now contains Books, Collections and Series. Authors, Genres and the standalone Wishlist tab were removed from this row at the user's request. Isolated author/genre search-scoping examples remain available for component review.
 
-Below 768px, swipe up just beneath the Library heading to reveal search at the top. Keyboard focus also reveals it. A downward swipe in the same area hides the bar. Activating the field opens a full-screen view with a focused input and live results after two trimmed characters. Cancel, Escape, or a downward swipe on the search header hides search and returns to browsing. Results scroll independently. Search works in empty libraries. Closing mobile search clears its temporary query. Resizing to desktop closes mobile search and focuses the inline search.
+Below 768px, swipe up from the Library heading or just below it to reveal search at the top. Keyboard focus also reveals it. A downward swipe in the same area hides the bar. Activating the field opens a full-screen view with a focused input and live results after two trimmed characters. Cancel, Escape, or a downward swipe on the search header hides search and returns to browsing. Results scroll independently. Search works in empty libraries. Closing mobile search clears its temporary query. Resizing to desktop closes mobile search and focuses the inline search.
 
 At 768px and wider, search stays inline, aligned to the right above the books. It continues searching the regular collection view without a separate screen. The former status/source/favorite filter panel is removed; sort and grid/list presentation controls remain.
 
@@ -127,7 +127,7 @@ At 768px and wider, search stays inline, aligned to the right above the books. I
 
 ### Collections page — 17 November
 
-The Collections tab contains To Read, Finished, DNF, Wishlist and Favorites. The Grid/List switch sits beside the Library heading. Sorting lives in Books and applies across the three tabs. Collection squares use a mosaic of up to three covers and take their tint from the first cover, using the same palette as the Book Detail hero. Empty collections stay visible. Clicking a card opens its books; All collections returns focus to the originating card. `LibraryBookGrid.tsx` shares book presentation with Books. The Books header has no subtitle or Add a book button.
+The Collections tab contains To Read, Finished, DNF, Wishlist and Favorites. The Grid/List switch sits beside the Library heading. Sorting lives in Books and applies across the three tabs. Collection squares use a mosaic of up to three covers and take their tint from the first cover, using the same palette as the Book Detail hero. Status collections appear when they contain books. Favorites is always available. Clicking a card opens its books; All collections returns focus to the originating card. `LibraryBookGrid.tsx` shares book presentation with Books. The Books header has no subtitle or Add a book button.
 
 Status collections use the matching book status. Favorites includes favorite library books; Wishlist books remain excluded from ordinary library/Favorites counts. The index searches collection names; an opened collection searches only its own books. Wishes can be found in Wishlist without leaking into Books results. The signed-in Library uses these same Books and Collections components.
 

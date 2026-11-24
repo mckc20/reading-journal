@@ -89,7 +89,7 @@ export const SearchAndReset: Story = {
 };
 
 export const MobileSearch: Story = {
-  parameters: { docs: { description: { story: 'Review below 768px. Swipe up just below the top bar to reveal search there, or tab to the search field. Swipe down to hide. Activating the field opens book-only search. Cancel or Escape hides search and returns to the browse view.' } } },
+  parameters: { docs: { description: { story: 'Review below 768px. Swipe up around the Library heading to reveal search at the top, or tab to the search field. Swipe down to hide. Activating the field opens book-only search. Cancel or Escape hides search and returns to the browse view.' } } },
   play: async ({ canvasElement }) => {
     if (!window.matchMedia('(max-width: 767px)').matches) return;
     const canvas = within(canvasElement);
@@ -107,9 +107,11 @@ export const MobileSearch: Story = {
     };
     await expect(canvas.queryByRole('searchbox')).not.toBeInTheDocument();
     await expect(searchBar()).not.toBeInTheDocument();
-    swipe(heading, headerBottom + 65, headerBottom + 5);
+    swipe(heading, headerBottom - 12, headerBottom - 72);
     await waitFor(() => expect(searchBar()).toBeVisible());
-    swipe(searchBar()!, headerBottom + 10, headerBottom + 65);
+    const bar = searchBar()!;
+    const barTop = bar.getBoundingClientRect().top;
+    swipe(bar, barTop + 12, barTop + 67);
     await waitFor(() => expect(searchBar()).not.toBeInTheDocument());
     swipe(heading, headerBottom + 65, headerBottom + 5);
     await waitFor(() => expect(searchBar()).toBeVisible());
@@ -132,6 +134,8 @@ export const MobileSearch: Story = {
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
     await expect(searchBar()).not.toBeInTheDocument();
     await expect(canvasElement.querySelector('.rj-collection-search')).toHaveFocus();
+    swipe(canvas.getByRole('list', { name: 'Library books' }), headerBottom + 190, headerBottom + 110);
+    await expect(searchBar()).not.toBeInTheDocument();
   },
 };
 export const SortingAndLayout: Story = {

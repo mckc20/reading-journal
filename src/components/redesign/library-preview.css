@@ -44,7 +44,9 @@
 .rj-library-title::after { content: ''; position: absolute; inset: 0; border-radius: 14px; }
 .rj-library-preview .rj-library-title:focus-visible { outline: none; }
 .rj-library-title:focus-visible::after { outline: 2px solid var(--ring); outline-offset: 4px; }
-.rj-library-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .rj-library-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
 
 @media (max-width: 767px) {
   .rj-library-title { font-size: 13px; }

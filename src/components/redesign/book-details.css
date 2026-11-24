@@ -72,7 +72,6 @@
 .rj-detail-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
 .rj-detail-tags :is(span, a) { padding: 5px 10px; background: var(--card); border-radius: 999px; font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
 .rj-detail-tags:empty { display: none; }
-.rj-detail-tags a:hover { text-decoration: underline; }
 .rj-detail-description p { overflow-wrap: anywhere; }
 .rj-detail-about > p { margin-top: 16px; line-height: 1.85; color: var(--muted-foreground); overflow-wrap: anywhere; white-space: pre-line; }
 .rj-detail-text-action { margin: 8px 0 0 -12px; }
@@ -204,7 +203,10 @@
 }
 .rj-reading-card.rj-series-progress-book::before { inset-block: 8px; }
 .rj-reading-card.rj-series-progress-book > div { width: var(--series-progress-cover-width); }
-.rj-series-progress-book:hover .rj-book-title { text-decoration: underline; text-underline-offset: 4px; }
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .rj-detail-tags a:hover { text-decoration: underline; }
+  .rj-series-progress-book:hover .rj-book-title { text-decoration: underline; text-underline-offset: 4px; }
+}
 .rj-detail-about p { overflow-wrap: anywhere; }
 .rj-detail-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 

@@ -36,7 +36,7 @@ function CollectionsReview(args: CollectionsPreviewProps) {
 const noop = () => {};
 const meta = {
   title: 'Redesign/Collections', component: CollectionsPreview,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Collections tab contains To Read, Finished, DNF, Wishlist and Favorites. Cards use covers and titles, and empty cards stay available. Opening a card shows only its books using the shared Library book grid. Favorites contains favorite library books; wishes have their own Wishlist collection. Search is scoped to collection names on the index and to the selected collection’s books after opening. Fictional data only; nothing is persisted.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Collections tab contains To Read, Finished, DNF, Wishlist and Favorites. Cards use covers and titles. Status collections appear when they contain books. Opening a card shows only its books using the shared Library book grid. Favorites contains favorite library books; wishes have their own Wishlist collection. Search is scoped to collection names on the index and to the selected collection’s books after opening. Fictional data only; nothing is persisted.' } } },
   args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
   render: args => <CollectionsReview key={JSON.stringify([args.books, args.initialCollection, args.loading, args.error])} {...args} />,
 } satisfies Meta<typeof CollectionsPreview>;
@@ -44,7 +44,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const DefaultCollections: Story = {};
-export const Empty: Story = { args: { books: [] } };
+export const Empty: Story = {
+  args: { books: [] },
+  play: async ({ canvasElement }) => {
+    const index = within(within(canvasElement).getByRole('list', { name: 'Default collections' }));
+    await expect(index.getAllByRole('button').map(button => button.textContent)).toEqual(['Favorites']);
+  },
+};
 export const Wishlist: Story = { args: { initialCollection: 'Wishlist' } };
 export const Favorites: Story = { args: { initialCollection: 'Favorites' } };
 export const EmptyCollection: Story = { args: { books: [], initialCollection: 'Finished' } };

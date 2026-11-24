@@ -55,10 +55,11 @@ export function LibraryCollections({
     return { id, books: matchingBooks, title: id, author: matchingBooks[0]?.author, addedAt: matchingBooks[0]?.addedAt };
   }).sort((a, b) => compareLibraryItems(a, b, sort));
   const current = collections.find(collection => collection.id === selected);
+  const indexedCollections = collections.filter(collection => collection.id === 'Favorites' || collection.books.length > 0);
   const needle = query.trim().toLocaleLowerCase();
-  const visibleCollections = collections.filter(collection => collection.id.toLocaleLowerCase().includes(needle));
+  const visibleCollections = indexedCollections.filter(collection => collection.id.toLocaleLowerCase().includes(needle));
   const visibleBooks = (current?.books ?? []).filter(book => `${book.title} ${book.author}`.toLocaleLowerCase().includes(needle));
-  const searchItems = current ? current.books.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` })) : collections.map(collection => ({ id: collection.id, name: collection.id }));
+  const searchItems = current ? current.books.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` })) : indexedCollections.map(collection => ({ id: collection.id, name: collection.id }));
 
   useEffect(() => {
     if (selected) heading.current?.focus();

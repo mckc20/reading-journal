@@ -67,8 +67,10 @@ export function CollectionSearch({ collection, items, onSelect, query, onQueryCh
       if (!(target instanceof Element) || event.touches.length !== 1 ||
           target.closest('[inert], input, textarea, select, [role="slider"], [role="spinbutton"]')) return;
       const touch = event.touches[0];
-      const headerBottom = Math.max(0, header.getBoundingClientRect().bottom);
-      if (touch.clientY >= headerBottom && touch.clientY <= headerBottom + revealZoneHeight) start = touch;
+      const rect = header.getBoundingClientRect();
+      const zoneStart = Math.max(0, header.hasAttribute('data-library-header') ? rect.top : rect.bottom);
+      const zoneEnd = Math.max(0, rect.bottom) + revealZoneHeight;
+      if (touch.clientY >= zoneStart && touch.clientY <= zoneEnd) start = touch;
     };
 
     function end(event: TouchEvent) {

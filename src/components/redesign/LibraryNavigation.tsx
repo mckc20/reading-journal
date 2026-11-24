@@ -20,11 +20,12 @@ export function useLibraryPresentation() {
   return useContext(LibraryPresentation);
 }
 
-/** Keeps the shared controls and tab indicator mounted while the router swaps panels. */
-export function LibraryTabs({ children }: { children: ReactNode }) {
+/** Keeps the shared controls mounted while the router swaps panels. */
+export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pendingPath?: string }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const tab = getLibraryTab(pathname) ?? libraryTabs[0];
+  const highlighted = (pendingPath && getLibraryTab(pendingPath)) || tab;
   const [selectedSort, setSort] = useState<LibrarySort>();
   const [selectedView, setView] = useState<LibraryLayout>();
   const legacySeries = tab.label === "Series" ? new URLSearchParams(search) : null;
@@ -43,21 +44,16 @@ export function LibraryTabs({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className="rj-redesign">
-          <Tabs.List className="rj-library-collections rj-tab-track" aria-label="Library collections">
-            <SlidingIndicator />
+          <Tabs.List className="rj-library-collections" aria-label="Library collections">
             {libraryTabs.map(({ label, to }) => (
-              <Tabs.Trigger key={to} value={to} data-slot="tabs-trigger">
+              <Tabs.Trigger key={to} value={to} data-highlighted={highlighted.to === to || undefined}>
                 <span>{label}</span>
                 <span className="rj-library-tab-label-width" aria-hidden="true">{label}</span>
               </Tabs.Trigger>
             ))}
           </Tabs.List>
         </div>
-        <Tabs.Content value={tab.to}>
-          <div key={tab.to} className="rj-library-panel">
-            {children}
-          </div>
-        </Tabs.Content>
+        <Tabs.Content value={tab.to}>{children}</Tabs.Content>
       </Tabs.Root>
     </LibraryPresentation.Provider>
   );

@@ -1,6 +1,6 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, Outlet, useLocation, useOutletContext, useParams } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet, useLocation, useNavigation, useOutletContext, useParams } from "react-router-dom";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
@@ -47,7 +47,8 @@ function animatedRoute(path: string, element: ReactNode) {
 
 function LibraryLayoutRoute() {
   const appContext = useOutletContext<AppLayoutOutletContext>();
-  return <LibraryTabs><Outlet context={appContext} /></LibraryTabs>;
+  const navigation = useNavigation();
+  return <LibraryTabs pendingPath={navigation.location?.pathname}><Outlet context={appContext} /></LibraryTabs>;
 }
 
 function NotFound() {
