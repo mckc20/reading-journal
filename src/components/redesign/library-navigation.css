@@ -35,40 +35,27 @@
     transition: transform 220ms ease-out, width 220ms ease-out;
   }
 }
-.rj-library-tab-layout {
-  --rj-library-header-height: calc(68px + env(safe-area-inset-top));
-}
-
 .rj-library-tab-layout > .rj-library-heading {
-  position: sticky;
-  top: 0;
-  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: var(--rj-library-header-height);
-  padding-block: calc(12px + env(safe-area-inset-top)) 12px;
+  padding-block: calc(26px + env(safe-area-inset-top)) 22px;
 }
 
 .rj-library-tab-layout > .rj-library-heading h1 {
   font: italic 34px/1.15 var(--font-display);
 }
 
-.rj-library-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-inline-start: auto; }
-.rj-library-controls select {
-  width: clamp(112px, 34vw, 144px);
-  height: 44px;
-  padding-inline: 8px;
-  border: 1px solid var(--input);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--foreground);
-  font-size: 12px;
+.rj-library-view {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--card);
+  --tab-background: var(--rj-rose-light);
 }
-.rj-library-controls select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.rj-library-view { display: flex; gap: 2px; --tab-background: var(--rj-rose-light); }
-.rj-library-view [data-slot="button"] { min-height: 44px; }
+.rj-library-view [data-slot="button"] { width: 44px; height: 44px; border-radius: 50%; }
 .rj-library-view button[aria-pressed="true"] { background: transparent; }
 
 .rj-home-shell:has(main .rj-library-tab-layout) > .rj-app-header {
@@ -86,15 +73,4 @@
     inset: auto 0 calc(12px + env(safe-area-inset-bottom));
     margin: auto;
   }
-}
-
-@media (max-width: 399px) {
-  .rj-library-tab-layout > .rj-library-heading h1 { font-size: 30px; }
-  .rj-library-controls { gap: 4px; }
-  .rj-library-view [data-slot="button"] { width: 32px; }
-}
-
-@media (max-width: 360px) {
-  .rj-library-tab-layout > .rj-library-heading h1 { font-size: 26px; }
-  .rj-library-controls select { width: 104px; padding-inline: 6px; font-size: 11px; }
 }

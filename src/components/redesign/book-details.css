@@ -38,17 +38,15 @@
 .rj-detail-page { max-width: 1000px; margin-inline: auto; }
 .rj-detail-hero { display: grid; gap: 26px; }
 .rj-detail-cover-stage {
-  --book-detail-stage-color: var(--book-detail-hero-color);
   --book-detail-control-color: #26212a;
   position: relative;
   display: flex;
   justify-content: center;
   padding: 54px 24px 0;
   border-radius: 24px;
-  background: linear-gradient(var(--book-detail-stage-color) 0 88%, transparent 88%);
+  background: linear-gradient(var(--rj-cover-surface) 0 88%, transparent 88%);
 }
 .dark .rj-detail-cover-stage {
-  --book-detail-stage-color: color-mix(in srgb, var(--book-detail-hero-color) 38%, #1e1720);
   --book-detail-control-color: #f8eef2;
 }
 .rj-detail-topline { position: absolute; inset: 8px 10px auto; display: flex; justify-content: space-between; gap: 12px; z-index: 1; }

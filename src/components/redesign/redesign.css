@@ -36,6 +36,13 @@
   font-size: 14px;
   line-height: 1.5;
 }
+
+:is(.rj-detail-cover-stage, .rj-collection-art) {
+  --rj-cover-surface: var(--book-detail-hero-color, var(--card));
+}
+.dark :is(.rj-detail-cover-stage, .rj-collection-art) {
+  --rj-cover-surface: color-mix(in srgb, var(--book-detail-hero-color, var(--card)) 38%, #1e1720);
+}
 .rj-redesign *, .rj-redesign *::before, .rj-redesign *::after { box-sizing: border-box; }
 .rj-redesign button { cursor: pointer; }
 .rj-redesign button:disabled { cursor: default; }

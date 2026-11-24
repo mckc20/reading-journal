@@ -76,7 +76,6 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
           books={visibleBooks.map((book) => ({
             id: book.id,
             title: book.title,
-            author: series ? book.authors.join(", ") : undefined,
             cover: book.cover_url,
             status: book.status,
             paused: book.status === "Paused",

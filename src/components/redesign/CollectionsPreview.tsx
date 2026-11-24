@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
@@ -8,6 +8,7 @@ import { CollectionSearch } from './CollectionSearch';
 import { useLibraryPresentation } from './LibraryNavigation';
 import { compareLibraryItems } from '@/lib/libraryTabs';
 import { cn } from '@/lib/utils';
+import { useBookHeroColor } from '@/hooks/useDominantImageColor';
 import type { LibraryContentProps, LibraryPreviewProps, LibraryPreviewBook } from './LibraryPreview';
 import type { BookStatus } from '@/types';
 import './redesign.css';
@@ -15,14 +16,10 @@ import './library-preview.css';
 import './collections-preview.css';
 
 type CollectionId = Exclude<BookStatus, 'Up Next' | 'Reading' | 'Paused'> | 'Favorites';
-const definitions: { id: CollectionId; tone: string }[] = [
-  { id: 'To Read', tone: 'warm' },
-  { id: 'Finished', tone: 'gold' }, { id: 'DNF', tone: 'warm' },
-  { id: 'Wishlist', tone: 'rose' }, { id: 'Favorites', tone: 'rose' },
-];
+const definitions = ['To Read', 'Finished', 'DNF', 'Wishlist', 'Favorites'] as const satisfies readonly CollectionId[];
 
 export function parseCollectionId(value: string | null): CollectionId | null {
-  return definitions.find(definition => definition.id === value)?.id ?? null;
+  return definitions.find(id => id === value) ?? null;
 }
 
 interface LibraryCollectionsProps extends Omit<LibraryContentProps, 'initialQuery'> {
@@ -50,12 +47,12 @@ export function LibraryCollections({
   const heading = useRef<HTMLHeadingElement>(null);
   const grid = useRef<HTMLUListElement>(null);
   const returnFocusId = useRef<CollectionId | null>(null);
-  const collections = definitions.map(definition => {
-    const matchingBooks = books.filter(book => definition.id === 'Favorites'
+  const collections = definitions.map(id => {
+    const matchingBooks = books.filter(book => id === 'Favorites'
       ? book.favorite && book.status !== 'Wishlist'
-      : book.status === definition.id);
+      : book.status === id);
     matchingBooks.sort((a, b) => compareLibraryItems(a, b, sort));
-    return { ...definition, books: matchingBooks, title: definition.id, author: matchingBooks[0]?.author, addedAt: matchingBooks[0]?.addedAt };
+    return { id, books: matchingBooks, title: id, author: matchingBooks[0]?.author, addedAt: matchingBooks[0]?.addedAt };
   }).sort((a, b) => compareLibraryItems(a, b, sort));
   const current = collections.find(collection => collection.id === selected);
   const needle = query.trim().toLocaleLowerCase();
@@ -106,10 +103,18 @@ function emptyMessage(id: CollectionId) {
   return `Books with the ${id} status will appear here.`;
 }
 
-function CollectionCard({ collection, onOpen }: { collection: { id: CollectionId; tone: string; books: LibraryPreviewBook[] }; onOpen: () => void }) {
-  return <li><article className="rj-collection-card" data-tone={collection.tone}>
-    <div className="rj-collection-art" aria-hidden="true">
-      {collection.books.length ? <div className="rj-collection-covers">{collection.books.slice(0, 3).map(book => <BookCover key={book.id} src={book.cover} title={book.title} />)}</div> : <BookOpen size={38} strokeWidth={1.2} />}
+function CollectionCard({ collection, onOpen }: { collection: { id: CollectionId; books: LibraryPreviewBook[] }; onOpen: () => void }) {
+  const covers = collection.books.filter(book => book.cover).slice(0, 3);
+  const color = useBookHeroColor(covers[0]?.cover);
+
+  return <li><article className="rj-collection-card">
+    <div className="rj-collection-art" aria-hidden="true"
+      style={covers.length ? { '--book-detail-hero-color': color } as CSSProperties : undefined}>
+      {covers.length ? (
+        <div className="rj-collection-covers" data-count={covers.length}>
+          {covers.map(book => <BookCover key={book.id} src={book.cover} title={book.title} decorative />)}
+        </div>
+      ) : <BookOpen size={38} strokeWidth={1.2} />}
     </div>
     <button type="button" className="rj-book-title rj-library-title rj-collection-title" data-collection={collection.id} onClick={onOpen}>{collection.id}</button>
   </article></li>;

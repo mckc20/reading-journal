@@ -28,7 +28,7 @@ const statuses: BookStatus[] = ["To Read", "Up Next", "Reading", "Paused", "Fini
 
 function BooksGrid({ books, onBook }: { books: Book[]; onBook: (book: Book) => void }) {
   return <div className="grid grid-cols-[repeat(auto-fill,minmax(108px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(132px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
-    {books.map((book) => <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" />)}
+    {books.map((book) => <BookCard key={book.id} book={book} onClick={onBook} textSize="compact" showAuthor={false} />)}
   </div>;
 }
 

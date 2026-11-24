@@ -20,6 +20,7 @@ interface BookCoverProps {
   paused?: boolean;
   favorite?: boolean;
   cornerLabel?: string;
+  cornerLabelPosition?: "left" | "right";
   status?: BookStatusType;
   className?: string;
   imageClassName?: string;
@@ -35,6 +36,7 @@ export function BookCover({
   paused = false,
   favorite = false,
   cornerLabel,
+  cornerLabelPosition = "left",
   status,
   className,
   imageClassName,
@@ -42,6 +44,12 @@ export function BookCover({
   decorative = false,
 }: BookCoverProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const labelOnRight = Boolean(cornerLabel && cornerLabelPosition === "right");
+  const label = cornerLabel && (
+    <span className="rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
+      {cornerLabel}
+    </span>
+  );
   return (
     <div
       aria-hidden={decorative || undefined}
@@ -76,20 +84,16 @@ export function BookCover({
           <PauseCircle className="h-1/3 w-1/3 min-h-5 min-w-5 text-muted-foreground" aria-label="Paused" />
         </div>
       )}
-      {favorite && (
-        <Heart
-          className="absolute right-1.5 top-1.5 h-4 w-4 fill-favorite text-favorite drop-shadow"
-          aria-label="Favorite"
-        />
+      {(favorite || labelOnRight) && (
+        <div className={cn("absolute right-1.5 top-1.5 flex flex-col items-end gap-1", labelOnRight && "z-10")}>
+          {labelOnRight && label}
+          {favorite && <Heart className="h-4 w-4 fill-favorite text-favorite drop-shadow" aria-label="Favorite" />}
+        </div>
       )}
-      {(status || cornerLabel) && (
+      {(status || (cornerLabel && !labelOnRight)) && (
         <div className="absolute left-1.5 top-1.5 z-10 flex flex-col items-start gap-1">
           {status && <BookStatus status={status} className="bg-background/95 px-1.5 text-[10px] tracking-normal shadow-sm" />}
-          {cornerLabel && (
-            <span className="rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-semibold text-foreground shadow-sm">
-              {cornerLabel}
-            </span>
-          )}
+          {!labelOnRight && label}
         </div>
       )}
     </div>

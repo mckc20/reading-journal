@@ -58,12 +58,13 @@ export const BrowseCollections: Story = {
     await expect(navigation.getAllByRole('tab')).toHaveLength(3);
     await expect(navigation.getByRole('tab', { name: 'Series' })).toBeVisible();
     await userEvent.click(navigation.getByRole('tab', { name: 'Collections' }));
-    await expect(canvas.getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
+    await expect(canvas.queryByRole('combobox', { name: 'Sort by' })).not.toBeInTheDocument();
     await expect(canvas.getByRole('list', { name: 'Default collections' })).toHaveAttribute('data-view', 'list');
     await userEvent.click(within(canvas.getByRole('list', { name: 'Default collections' })).getByRole('button', { name: 'Wishlist' }));
     await expect(within(canvas.getByRole('list', { name: 'Library books' })).getByRole('button', { name: 'A Future Adventure' })).toBeVisible();
     await userEvent.click(within(canvas.getByRole('tablist', { name: 'Library collections' })).getByRole('tab', { name: 'Books' }));
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
+    await expect(canvas.getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
     await expect(canvas.queryByRole('button', { name: 'A Future Adventure' })).not.toBeInTheDocument();
   },
 };

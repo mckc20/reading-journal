@@ -67,7 +67,7 @@ export function CollectionSearch({ collection, items, onSelect, query, onQueryCh
       if (!(target instanceof Element) || event.touches.length !== 1 ||
           target.closest('[inert], input, textarea, select, [role="slider"], [role="spinbutton"]')) return;
       const touch = event.touches[0];
-      const headerBottom = header.getBoundingClientRect().bottom;
+      const headerBottom = Math.max(0, header.getBoundingClientRect().bottom);
       if (touch.clientY >= headerBottom && touch.clientY <= headerBottom + revealZoneHeight) start = touch;
     };
 

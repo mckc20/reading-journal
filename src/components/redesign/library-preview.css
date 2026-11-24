@@ -8,6 +8,10 @@
 .rj-library-search label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
 .rj-library-search-toolbar { display: flex; justify-content: flex-end; }
 .rj-library-search-toolbar .rj-desktop-search { width: min(100%, 320px); }
+.rj-library-books-toolbar { display: flex; justify-content: flex-end; gap: 16px; align-items: end; margin-bottom: 24px; }
+.rj-library-books-toolbar .rj-library-search-toolbar { flex: 1; }
+.rj-library-sort { display: grid; gap: 6px; font-size: 12px; font-weight: 500; }
+.rj-library-preview .rj-library-sort select { width: 144px; font-weight: 400; }
 .rj-library-search svg { position: absolute; left: 12px; top: 13px; color: var(--muted-foreground); }
 .rj-library-preview input[type='search'] { padding-left: 38px; }
 .rj-library-books { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px 18px; padding: 0; margin: 0; list-style: none; }
@@ -26,6 +30,7 @@
 .rj-library-loading span { height: 240px; border-radius: 16px; background: var(--card); }
 @media (max-width: 767px) {
   .rj-library-search-toolbar { display: none; }
+  .rj-library-sort { display: flex; align-items: center; gap: 8px; }
   .rj-library-books[data-view='grid'] { gap: 20px 10px; }
   .rj-library-books[data-view='grid'] .rj-library-book { gap: 8px; padding: 7px; border-radius: 12px; }
   .rj-library-loading > div { gap: 10px; }

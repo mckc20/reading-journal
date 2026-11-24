@@ -24,7 +24,7 @@
   }
   .rj-mobile-search-bar {
     position: fixed;
-    inset: var(--rj-library-header-height, var(--app-header-height, 82px)) 0 auto;
+    inset: var(--app-header-height, 82px) 0 auto;
     z-index: 29;
     display: flex;
     align-items: center;
@@ -34,6 +34,7 @@
     box-shadow: 0 6px 18px #21150f15;
     animation: rj-search-reveal 180ms ease-out;
   }
+  .rj-library-tab-layout .rj-mobile-search-bar { top: env(safe-area-inset-top); }
   .rj-search-invitation {
     display: flex;
     flex: 1;
