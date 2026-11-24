@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowUpRight, BookOpen, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
-import { LibrarySearchButton } from './LibraryNavigation';
 import { LibraryBookGrid } from './LibraryBookGrid';
 import { CollectionSearch } from './CollectionSearch';
 import type { LibraryContentProps, LibraryPreviewProps, LibraryPreviewBook } from './LibraryPreview';
@@ -71,8 +70,7 @@ export function LibraryCollections({
 
   return <CollectionSearch key={selected ?? 'collections'} collection={current ? `${current.id === 'Favorites' ? 'Favorite' : current.id} books` : 'Collections'}
     items={searchItems} query={query} onQueryChange={setQuery} onSelect={id => { if (current) openBook(id); else openCollection(id as CollectionId); }}>
-    {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview rj-collections-preview">
-      <LibrarySearchButton>{mobileSearchButton}</LibrarySearchButton>
+    {({ desktopSearch }) => <div className="rj-library-preview rj-collections-preview">
       {loading ? <p role="status">Loading your collections…</p> : error ? <EmptyState title="Your collections couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
         {current ? (
           <div className="rj-collections-toolbar">

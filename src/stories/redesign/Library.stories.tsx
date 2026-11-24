@@ -84,26 +84,30 @@ export const SearchAndReset: Story = {
 };
 
 export const MobileSearch: Story = {
-  parameters: { docs: { description: { story: 'Review below 768px. Swipe up on page content to reveal search; swipe down to hide. Focusing search replaces the page with book-only results after two characters. Search button provides a keyboard/tap alternative. Cancel/Escape returns to the same browse view and scroll position.' } } },
+  parameters: { docs: { description: { story: 'Review below 768px. Swipe up just below the top bar to reveal search there, or tab to the search field. Swipe down to hide. Activating the field opens book-only search. Cancel or Escape hides search and returns to the browse view.' } } },
   play: async ({ canvasElement }) => {
     if (!window.matchMedia('(max-width: 767px)').matches) return;
     const canvas = within(canvasElement);
-    const bookList = canvas.getByRole('list', { name: 'Library books' });
-    const swipe = (from: number, to: number) => {
+    const heading = canvas.getByRole('heading', { name: 'Library' });
+    const headerBottom = canvasElement.querySelector('.rj-app-header')!.getBoundingClientRect().bottom;
+    const searchBar = () => canvasElement.querySelector('.rj-mobile-search-bar');
+    const swipe = (target: Element, from: number, to: number) => {
       // Plain Events also run in browsers without a constructible Touch class.
       const start = new Event('touchstart', { bubbles: true });
       Object.defineProperty(start, 'touches', { value: [{ clientX: 100, clientY: from }] });
-      fireEvent(bookList, start);
+      fireEvent(target, start);
       const end = new Event('touchend', { bubbles: true });
       Object.defineProperty(end, 'changedTouches', { value: [{ clientX: 100, clientY: to }] });
-      fireEvent(bookList, end);
+      fireEvent(target, end);
     };
     await expect(canvas.queryByRole('searchbox')).not.toBeInTheDocument();
-    swipe(500, 380);
-    await waitFor(() => expect(canvas.getByRole('search')).toBeVisible());
-    swipe(380, 500);
-    await waitFor(() => expect(canvas.queryByRole('search')).not.toBeInTheDocument());
-    swipe(500, 380);
+    await expect(searchBar()).not.toBeInTheDocument();
+    swipe(heading, headerBottom + 65, headerBottom + 5);
+    await waitFor(() => expect(searchBar()).toBeVisible());
+    swipe(searchBar()!, headerBottom + 10, headerBottom + 65);
+    await waitFor(() => expect(searchBar()).not.toBeInTheDocument());
+    swipe(heading, headerBottom + 65, headerBottom + 5);
+    await waitFor(() => expect(searchBar()).toBeVisible());
     await userEvent.click(within(await canvas.findByRole('search')).getByRole('button', { name: 'Search your books' }));
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
@@ -121,7 +125,8 @@ export const MobileSearch: Story = {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(7);
-    await expect(canvas.getAllByRole('button', { name: 'Search your books' })[0]).toHaveFocus();
+    await expect(searchBar()).not.toBeInTheDocument();
+    await expect(canvasElement.querySelector('.rj-collection-search')).toHaveFocus();
   },
 };
 export const SortingAndLayout: Story = {

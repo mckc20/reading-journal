@@ -7,7 +7,6 @@ import type { CreateDestination, HomeDestination } from './HomeShell';
 import type { HomeBook } from './HomeCards';
 import type { BookSource, BookStatus } from '@/types';
 import { CollectionSearch } from './CollectionSearch';
-import { LibrarySearchButton } from './LibraryNavigation';
 import { LibraryBookGrid } from './LibraryBookGrid';
 import './redesign.css';
 import './library-preview.css';
@@ -64,8 +63,7 @@ export function LibraryBooks({
 
   return <CollectionSearch collection="Books" items={library.map(book => ({ id: book.id, name: book.title, detail: book.author, searchText: `${book.title} ${book.author}` }))}
     query={query} onQueryChange={setQuery} onSelect={id => { const book = library.find(item => item.id === id); if (book) actions.onOpenBook(book); }}>
-    {({ desktopSearch, mobileSearchButton }) => <div className="rj-library-preview">
-    <LibrarySearchButton>{mobileSearchButton}</LibrarySearchButton>
+    {({ desktopSearch }) => <div className="rj-library-preview">
     {loading ? <div className="rj-library-loading" role="status">Loading your library…<div aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div></div>
       : error ? <EmptyState title="Your library couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} />
       : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>

@@ -81,7 +81,11 @@ export const SearchInsideWishlist: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const mobile = window.matchMedia('(max-width: 767px)').matches;
-    if (mobile) await userEvent.click(canvas.getByRole('button', { name: 'Search your wishlist books' }));
+    if (mobile) {
+      const searchButton = canvas.getByRole('button', { name: 'Search your wishlist books' });
+      searchButton.focus();
+      await userEvent.keyboard('{Enter}');
+    }
     const body = within(canvasElement.ownerDocument.body);
     const scope = mobile ? within(await body.findByRole('dialog')) : canvas;
     const input = scope.getByRole('searchbox', { name: 'Search your wishlist books' });

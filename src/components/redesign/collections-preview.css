@@ -4,7 +4,7 @@
 .rj-collections-toolbar p { color: var(--muted-foreground); font-size: 13px; }
 .rj-collections-toolbar .rj-desktop-search { width: min(100%, 320px); }
 .rj-collections-toolbar [data-slot='button'] { margin: 0 0 14px -12px; }
-.rj-collection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; list-style: none; padding: 0; margin: 0; }
+.rj-collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; list-style: none; padding: 0; margin: 0; }
 .rj-collection-grid > li { min-width: 0; }
 .rj-collection-card { position: relative; border-radius: 20px; }
 .rj-collection-art { position: relative; display: flex; align-items: center; justify-content: center; height: 154px; border-radius: 20px; background: var(--rj-warm); overflow: hidden; color: var(--foreground); }
@@ -29,5 +29,18 @@
 .rj-redesign .rj-collection-caption button:focus-visible { outline: none; }
 .rj-collection-caption button:focus-visible::after { outline: 2px solid var(--ring); outline-offset: 4px; }
 .rj-collection-caption button:hover { text-decoration: underline; text-underline-offset: 4px; }
-@media (min-width: 768px) { .rj-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 24px; } .rj-collection-art { height: 190px; } .rj-collection-covers > div { width: 85px; flex-basis: 85px; } }
+@media (max-width: 767px) {
+  .rj-collection-grid { gap: 20px 10px; }
+  .rj-collection-art { height: auto; aspect-ratio: 1 / 1.12; border-radius: 14px; }
+  .rj-collection-covers { --cover-width: clamp(37px, 12vw, 64px); padding-top: 10px; }
+  .rj-collection-covers > div { width: var(--cover-width); flex-basis: var(--cover-width); }
+  .rj-collection-covers > div + div { margin-left: calc(var(--cover-width) * -.55); }
+  .rj-collection-symbol { top: 6px; right: 6px; width: 24px; height: 24px; }
+  .rj-collection-symbol svg { width: 14px; height: 14px; }
+  .rj-collection-caption { gap: 3px; padding-top: 8px; }
+  .rj-collection-caption > div { min-width: 0; }
+  .rj-collection-caption button { font-size: 15px; overflow-wrap: anywhere; }
+  .rj-collection-caption > svg { width: 13px; height: 13px; flex-shrink: 0; }
+}
+@media (min-width: 768px) { .rj-collection-grid { gap: 30px 24px; } .rj-collection-art { height: 190px; } .rj-collection-covers > div { width: 85px; flex-basis: 85px; } }
 @media (min-width: 1100px) { .rj-collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
