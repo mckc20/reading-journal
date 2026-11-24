@@ -28,7 +28,7 @@
 }
 .rj-collection-covers > svg { place-self: center; color: #3c3336; }
 .rj-collection-covers:is([data-count="2"], [data-count="3"]) {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 56fr) minmax(0, 44fr);
 }
 .rj-collection-covers[data-count="3"] { grid-template-rows: repeat(2, minmax(0, 1fr)); }
 .rj-collection-covers[data-count="3"] > :first-child { grid-row: 1 / -1; }
