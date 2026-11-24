@@ -117,20 +117,25 @@ export const MobileSearch: Story = {
     const heading = canvas.getByRole('heading', { name: 'Library' });
     const list = () => within(canvas.getByRole('list', { name: 'Library books' }));
     const searchBar = canvasElement.querySelector('.rj-library-mobile-search');
-    const swipe = (from: number, to: number) => {
+    const touch = (type: string, clientY: number) => {
       // Plain Events also run in browsers without a constructible Touch class.
-      const start = new Event('touchstart', { bubbles: true });
-      Object.defineProperty(start, 'touches', { value: [{ clientX: 100, clientY: from }] });
-      fireEvent(heading, start);
-      const end = new Event('touchend', { bubbles: true });
-      Object.defineProperty(end, 'changedTouches', { value: [{ clientX: 100, clientY: to }] });
-      fireEvent(heading, end);
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, type === 'touchend' ? 'changedTouches' : 'touches', { value: [{ clientX: 100, clientY }] });
+      fireEvent(heading, event);
     };
     await expect(searchBar).not.toHaveAttribute('data-revealed');
-    swipe(130, 60);
+    touch('touchstart', 130);
+    touch('touchmove', 90);
+    touch('touchend', 60);
     await expect(searchBar).not.toHaveAttribute('data-revealed');
-    swipe(60, 130);
-    await waitFor(() => expect(searchBar).toHaveAttribute('data-revealed'));
+    touch('touchstart', 60);
+    touch('touchmove', 88);
+    await waitFor(() => expect(searchBar).toHaveAttribute('data-pulling'));
+    await expect(searchBar).toHaveAttribute('data-revealed');
+    await expect(searchBar!.getBoundingClientRect().height).toBeCloseTo(32);
+    touch('touchmove', 130);
+    touch('touchend', 130);
+    await waitFor(() => expect(searchBar).not.toHaveAttribute('data-pulling'));
     const search = canvas.getByRole('searchbox', { name: 'Search your books' });
     await userEvent.click(search);
     await expect(search).toHaveFocus();
@@ -144,7 +149,17 @@ export const MobileSearch: Story = {
     await userEvent.clear(search);
     await userEvent.type(search, 'no matching book');
     await expect(canvas.getByText('No books found')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Hide search' }));
+    touch('touchstart', 168);
+    touch('touchmove', 143);
+    touch('touchend', 120);
+    await expect(searchBar).not.toHaveAttribute('data-revealed');
+    await expect(canvas.getByText('No books found')).toBeVisible();
+    await expect(canvas.queryByRole('button', { name: 'Hide search' })).not.toBeInTheDocument();
+    touch('touchstart', 60);
+    touch('touchend', 130);
+    await expect(search).toHaveValue('no matching book');
+    search.focus();
+    await userEvent.keyboard('{Escape}');
     await expect(list().getAllByRole('listitem')).toHaveLength(7);
     await expect(searchBar).not.toHaveAttribute('data-revealed');
     await expect(canvasElement.querySelector('.rj-collection-search')).toHaveFocus();

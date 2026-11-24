@@ -119,7 +119,7 @@ Follow-up verification: all 13 new interaction stories ran without browser error
 
 Library navigation now contains Books, Collections and Series. Authors, Genres and the standalone Wishlist tab were removed from this row at the user's request. Isolated author/genre search-scoping examples remain available for component review.
 
-Below 768px, pull down at the top of the Library to reveal a search field just below the tab divider. Keyboard focus also reveals it. The cards stay visible when the field receives focus. Typing filters the current view in place from the first character. Hide Search or Escape clears and hides the field.
+Below 768px, pull down at the top of the Library to reveal a search field just below the tab divider. Keyboard focus also reveals it. The cards stay visible when the field receives focus. Typing filters the current view in place from the first character. The field follows the pull gesture and tucks away when scrolling down. Hiding it keeps the current query. Escape clears and hides the field.
 
 At 768px and wider, search stays inline. Books matches titles and authors, Collections matches collection names or the books in an opened collection, and Series matches titles and authors. Each tab owns its own query.
 
