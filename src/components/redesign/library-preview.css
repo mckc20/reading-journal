@@ -18,7 +18,7 @@
 .rj-library-loading span {
   min-height: 104px;
   border-radius: 12px;
-  background: linear-gradient(var(--muted), var(--muted)) 8px center / 48px 72px no-repeat var(--card);
+  background: linear-gradient(var(--muted), var(--muted)) 8px center / 56px 84px no-repeat var(--card);
 }
 @media (max-width: 767px) {
   .rj-library-search-toolbar { display: none; }
@@ -66,11 +66,14 @@
 .rj-library-books-panel .rj-library-list-row {
   border-radius: 12px;
   background: var(--card);
+  padding-block: 10px;
 }
 .rj-library-books-panel .rj-library-list-title::after { border-radius: 12px; }
 .rj-library-list-title:focus-visible::after { outline-offset: -2px; }
 .rj-library-list-media { flex: 0 0 48px; width: 48px; }
+.rj-library-books-panel .rj-library-list-media { flex-basis: 56px; width: 56px; }
 .rj-library-list-media > .rj-library-book-thumbnail { box-shadow: none; }
+.rj-library-books-panel .rj-library-book-thumbnail { border-radius: 6px; }
 .rj-library-book-thumbnail > div:has(> .lucide-heart) { top: auto; bottom: 5px; }
 .rj-library-list-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rj-library-list-status { flex: 1; display: flex; align-items: center; gap: 10px; }
