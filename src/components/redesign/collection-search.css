@@ -1,4 +1,6 @@
 .rj-library-mobile-search { display: none; }
+:is(.rj-library-search, .rj-library-search-field) input:focus { outline: none; }
+:is(.rj-library-search, .rj-library-search-field) input:focus-visible { background: var(--surface-hover); }
 
 @media (max-width: 767px) {
   .rj-desktop-search { display: none; }
@@ -27,7 +29,6 @@
     color: var(--foreground);
     font-size: 16px;
   }
-  .rj-library-search-field input:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: no-preference) {

@@ -1,7 +1,7 @@
 .rj-library-preview .rj-library-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0 24px; }
 .rj-library-preview .rj-library-heading h1 { font: italic 34px/1.3 var(--font-display); margin: 3px 0 5px; }
 .rj-library-preview input[type='search'], .rj-library-preview select { width: 100%; min-width: 0; min-height: 44px; background: var(--surface); border: 1px solid var(--input); border-radius: 10px; color: var(--foreground); font: inherit; padding: 9px 12px; }
-.rj-library-preview input:focus-visible, .rj-library-preview select:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.rj-library-preview select:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .rj-library-search > div { position: relative; }
 .rj-library-search label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
 .rj-library-search-toolbar { display: flex; justify-content: flex-end; }

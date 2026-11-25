@@ -49,8 +49,8 @@
 }
 
 @keyframes rj-page-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes rj-layout-enter {
@@ -80,10 +80,11 @@
 .rj-chart-bar-horizontal { transform-origin: left center; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .rj-transition-page { view-transition-name: rj-page; }
+  :root:active-view-transition .rj-transition-page { view-transition-name: rj-page; }
   ::view-transition-group(root), ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
   ::view-transition-old(root) { display: none; }
-  ::view-transition-group(rj-page) { animation-duration: 280ms; }
+  ::view-transition-group(rj-page) { animation: none; }
+  ::view-transition-old(rj-page), ::view-transition-new(rj-page) { width: auto; height: auto; }
   ::view-transition-old(rj-page) { animation: rj-page-out 190ms ease-out both; }
   ::view-transition-new(rj-page) { animation: rj-page-in 280ms cubic-bezier(.22, .61, .36, 1) both; }
 

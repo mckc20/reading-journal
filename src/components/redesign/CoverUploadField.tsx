@@ -31,7 +31,8 @@ export function CoverUploadField({ id, label, preview, fileName, shape, previewA
             event.currentTarget.value = "";
           }} />
         {preview ? (
-          <img src={preview} alt={previewAlt} className="h-full w-full object-cover" />
+          <img src={preview} alt={previewAlt}
+            className={shape === "cover" ? "absolute inset-0 block size-full object-contain" : "h-full w-full object-cover"} />
         ) : (
           <span className="flex flex-col items-center gap-2 px-2 text-center text-muted-foreground" aria-hidden="true">
             <ImagePlus className="h-6 w-6" />

@@ -81,10 +81,8 @@
 }
 .rj-app--library .rj-app-header { display: block; min-height: 0; margin: 0; border: 0; }
 .rj-app--library .rj-app-content { padding-top: 0; }
-.rj-app--library .rj-navigation button:hover { background: var(--surface-hover); }
-.rj-app--library .rj-navigation button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.rj-app--library .rj-navigation button svg { color: currentColor; }
-.rj-app--library .rj-navigation :is(button, a) { min-width: 42px; }
+.rj-app--library .rj-navigation a { min-width: 42px; }
+.rj-app-navigation-menu { max-height: var(--radix-dropdown-menu-content-available-height); overflow-y: auto; }
 
 @media (max-width: 767px) {
   .rj-app--detail {

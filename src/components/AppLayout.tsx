@@ -113,7 +113,7 @@ function transitionsBetweenPages(from: string, to: string) {
 }
 
 function supportsPageTransition() {
-  return typeof document.startViewTransition === "function" && !window.matchMedia(reducedMotion).matches;
+  return typeof document.startViewTransition === "function" && CSS.supports("selector(:active-view-transition)");
 }
 
 type NavLink = {
@@ -286,7 +286,7 @@ function AppLayoutContent() {
   useLayoutEffect(() => {
     const previousPath = previousTransitionPath.current;
     previousTransitionPath.current = location.pathname;
-    if (typeof document.startViewTransition === "function" || window.matchMedia(reducedMotion).matches ||
+    if (supportsPageTransition() || window.matchMedia(reducedMotion).matches ||
         !transitionsBetweenPages(previousPath, location.pathname)) return;
     const motion = mainRef.current?.animate([{ opacity: .55 }, { opacity: 1 }], {
       duration: 250,
@@ -467,20 +467,15 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
   const isLibrary = Boolean(getLibraryTab(pathname));
-  const menuLinks = isLibrary ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
-  const transitionTo = (to: string) => supportsPageTransition() && transitionsBetweenPages(pathname, to);
+  const transitionTo = (to: string) => supportsPageTransition() && !window.matchMedia(reducedMotion).matches && transitionsBetweenPages(pathname, to);
   const more = (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        {isLibrary ? (
-          <button type="button" aria-label="More navigation"><Menu size={22} aria-hidden="true" /><span>More</span></button>
-        ) : (
-          <Button size="icon-lg" variant="ghost" aria-label="More navigation"><Menu aria-hidden="true" /></Button>
-        )}
+        <Button size="icon-lg" variant="ghost" aria-label="More navigation"><Menu aria-hidden="true" /></Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="rj-add-menu" align="end" side={isLibrary ? "top" : "bottom"} sideOffset={8} collisionPadding={12}>
-          {menuLinks.map(({ to, label, icon: Icon }) => (
+        <DropdownMenu.Content className="rj-add-menu rj-app-navigation-menu" align="end" sideOffset={8} collisionPadding={12}>
+          {[...moreNavLinks, ...libraryNavLinks].map(({ to, label, icon: Icon }) => (
             <DropdownMenu.Item key={to} asChild>
               <Link to={to} viewTransition={transitionTo(to)} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
                 <Icon size={18} aria-hidden="true" />
@@ -508,7 +503,6 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
               <span>{label}</span>
             </Link>
           ))}
-          {isLibrary && more}
         </nav>
         {!isLibrary && <div className="rj-header-actions">
           {addLauncher}
