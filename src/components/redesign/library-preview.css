@@ -51,7 +51,7 @@
 
 .rj-library-list { list-style: none; padding: 0; margin: 0; }
 .rj-library-list > li + li { border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent); }
-.rj-library-books-panel .rj-library-list { display: grid; gap: 10px; }
+.rj-library-books-panel .rj-library-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .rj-library-books-panel .rj-library-list > li + li { border-top: 0; }
 .rj-library-list-row {
   position: relative;
