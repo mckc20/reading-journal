@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { buildBookLibraryFilterPath, buildGenreDetailPath } from "@/components/LinkedMetadata";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 export function DetailHero({
   titleId,
   color,
+  banner,
   navigation,
   actions,
   artwork,
@@ -14,14 +15,19 @@ export function DetailHero({
 }: {
   titleId: string;
   color: string;
+  banner?: string | null;
   navigation: ReactNode;
   actions?: ReactNode;
   artwork: ReactNode;
   children: ReactNode;
 }) {
+  const [failedBanner, setFailedBanner] = useState<string | null>(null);
   return (
     <header className="rj-detail-hero" aria-labelledby={titleId}>
       <div className="rj-detail-cover-stage" style={{ "--book-detail-hero-color": color } as CSSProperties}>
+        {banner && banner !== failedBanner && (
+          <img className="rj-detail-hero-banner" src={banner} alt="" onError={() => setFailedBanner(banner)} />
+        )}
         <div className="rj-detail-topline">
           {navigation}
           {actions}

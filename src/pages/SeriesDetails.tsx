@@ -94,19 +94,6 @@ function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started:
   };
 }
 
-function SeriesArtwork({ banner, books }: { banner?: string | null; books: Book[] }) {
-  const [failedBanner, setFailedBanner] = useState<string | null>(null);
-  const showBanner = banner && banner !== failedBanner;
-  return (
-    <div className="rj-series-detail-artwork">
-      {showBanner && <div className="rj-detail-banner">
-        <img src={banner} alt="" className="size-full object-cover" onError={() => setFailedBanner(banner)} />
-      </div>}
-      {(!showBanner || books.some(book => book.cover_url)) && <SeriesCoverStack books={books} />}
-    </div>
-  );
-}
-
 function CircularSeriesProgress({ value }: { value: number | null }) {
   const percentage = value ?? 0;
 
@@ -272,7 +259,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   );
 
   const featuredVolume = seriesBooks.find((book) => book.cover_url);
-  const heroColor = useBookHeroColor(seriesRecord?.cover_url || featuredVolume?.cover_url);
+  const heroColor = useBookHeroColor(featuredVolume?.cover_url);
 
   const loadLogs = useCallback(async () => {
     try {
@@ -466,8 +453,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
       <DetailHero
         titleId={headingId}
         color={heroColor}
+        banner={seriesRecord.cover_url}
         navigation={back}
-        artwork={<SeriesArtwork banner={seriesRecord.cover_url} books={seriesBooks} />}
+        artwork={<SeriesCoverStack books={seriesBooks} frameless />}
         actions={
           <DetailActionsMenu
             kind="series"

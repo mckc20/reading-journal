@@ -46,6 +46,22 @@
   border-radius: 24px;
   background: linear-gradient(var(--rj-cover-surface) 0 88%, transparent 88%);
 }
+.rj-detail-hero-banner {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 88%;
+  border-radius: 24px 24px 0 0;
+  object-fit: cover;
+}
+.rj-detail-cover-stage:has(> .rj-detail-hero-banner) { background: none; }
+.rj-detail-cover-stage:has(> .rj-detail-hero-banner) .rj-detail-topline [data-slot='button'] {
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+  color: var(--foreground);
+}
+.rj-detail-cover-stage:has(> .rj-detail-hero-banner) .rj-detail-topline [data-slot='button']:is(:hover, [aria-expanded='true']) {
+  background: var(--surface-hover);
+}
 .dark .rj-detail-cover-stage {
   --book-detail-control-color: #f8eef2;
 }

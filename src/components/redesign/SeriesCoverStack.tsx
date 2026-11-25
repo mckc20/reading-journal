@@ -13,19 +13,21 @@ export interface SeriesCoverBook {
   status?: BookStatus;
 }
 
-export function SeriesCoverStack({ books, className, fallback, showPaused }: {
+export function SeriesCoverStack({ books, className, fallback, showPaused, frameless }: {
   books: readonly SeriesCoverBook[];
   className?: string;
   fallback?: SeriesCoverBook;
   showPaused?: boolean;
+  frameless?: boolean;
 }) {
   const covers = books.filter(book => book.cover_url).slice(0, 3);
   if (covers.length === 0 && fallback?.cover_url) covers.push(fallback);
-  const color = useBookHeroColor(covers[0]?.cover_url);
+  const color = useBookHeroColor(frameless ? undefined : covers[0]?.cover_url);
 
   return (
-    <div className={cn("rj-series-cover-stack", className)} aria-hidden="true"
-      style={covers.length ? { "--book-detail-hero-color": color } as CSSProperties : undefined}>
+    <div className={cn("rj-series-cover-stack", frameless && "rj-series-cover-stack--frameless", className)}
+      data-cover-count={covers.length} aria-hidden="true"
+      style={!frameless && covers.length ? { "--book-detail-hero-color": color } as CSSProperties : undefined}>
       <div className="rj-series-cover-mat">
         {covers.length ? (
           <div className="rj-series-cover-layers" data-count={covers.length}>
