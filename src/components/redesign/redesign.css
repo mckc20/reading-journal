@@ -37,10 +37,10 @@
   line-height: 1.5;
 }
 
-:is(.rj-detail-cover-stage, .rj-collection-art) {
+:is(.rj-detail-cover-stage, .rj-collection-art, .rj-series-cover-stack) {
   --rj-cover-surface: var(--book-detail-hero-color, var(--card));
 }
-.dark :is(.rj-detail-cover-stage, .rj-collection-art) {
+.dark :is(.rj-detail-cover-stage, .rj-collection-art, .rj-series-cover-stack) {
   --rj-cover-surface: color-mix(in srgb, var(--book-detail-hero-color, var(--card)) 38%, #1e1720);
 }
 .rj-redesign *, .rj-redesign *::before, .rj-redesign *::after { box-sizing: border-box; }

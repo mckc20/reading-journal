@@ -84,7 +84,7 @@ export default function Series() {
     id: group.seriesId,
     title: group.name,
     author: getSeriesAuthors(group).join(", "),
-    books: group.books.map(book => ({ id: book.id, title: book.title, cover: book.cover_url })),
+    books: group.books,
   })).filter(entry => `${entry.title} ${entry.author}`.toLocaleLowerCase().includes(needle));
 
   function clearFilters() {

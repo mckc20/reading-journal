@@ -1,3 +1,4 @@
+import { SeriesCoverStack } from "@/components/redesign/SeriesCoverStack";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -383,7 +384,6 @@ async function importAuthorPhotosForBookSnapshot({
 function attachmentImage(attachment: ChatAttachmentPayload): string | null {
   if (attachment.type === "book") return attachment.book.cover_url ?? null;
   if (attachment.type === "author") return attachment.author.photo_url ?? null;
-  if (attachment.type === "series") return attachment.series.cover_url ?? attachment.series.books[0]?.cover_url ?? null;
   return null;
 }
 
@@ -395,6 +395,11 @@ function attachmentSecondaryInfo(attachment: ChatAttachmentPayload): string | nu
 }
 
 function AttachmentThumbnail({ attachment }: { attachment: ChatAttachmentPayload }) {
+  if (attachment.type === "series") {
+    return <SeriesCoverStack books={attachment.series.books} fallback={{
+      title: attachment.series.name, cover_url: attachment.series.cover_url,
+    }} className="max-w-16 shrink-0" />;
+  }
   const image = attachmentImage(attachment);
   const Icon = attachment.type === "author" ? UserRound : attachment.type === "note" ? StickyNote : BookOpen;
   const isAuthor = attachment.type === "author";
@@ -409,6 +414,11 @@ function AttachmentThumbnail({ attachment }: { attachment: ChatAttachmentPayload
 }
 
 function AttachmentCardImage({ attachment }: { attachment: ChatAttachmentPayload }) {
+  if (attachment.type === "series") {
+    return <SeriesCoverStack books={attachment.series.books} fallback={{
+      title: attachment.series.name, cover_url: attachment.series.cover_url,
+    }} className="mx-auto max-w-36" />;
+  }
   const image = attachmentImage(attachment);
   const Icon = attachment.type === "author" ? UserRound : BookOpen;
   const isAuthor = attachment.type === "author";

@@ -24,6 +24,7 @@ import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions 
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { SeriesCoverStack } from "@/components/redesign/SeriesCoverStack";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
 import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
@@ -93,19 +94,17 @@ function getSeriesCompletionDates(books: Book[], logs: ReadingLog[]): { started:
   };
 }
 
-function SeriesArtwork({ banner, volume }: { banner?: string | null; volume?: Book }) {
+function SeriesArtwork({ banner, books }: { banner?: string | null; books: Book[] }) {
   const [failedBanner, setFailedBanner] = useState<string | null>(null);
-  if (banner && banner !== failedBanner) {
-    return (
-      <div className="rj-detail-banner">
+  const showBanner = banner && banner !== failedBanner;
+  return (
+    <div className="rj-series-detail-artwork">
+      {showBanner && <div className="rj-detail-banner">
         <img src={banner} alt="" className="size-full object-cover" onError={() => setFailedBanner(banner)} />
-      </div>
-    );
-  }
-  if (volume?.cover_url) {
-    return <BookCover className="rj-detail-cover" src={volume.cover_url} title={volume.title} />;
-  }
-  return <div className="rj-detail-banner"><BookOpen aria-hidden="true" className="size-12" strokeWidth={1} /></div>;
+      </div>}
+      {(!showBanner || books.some(book => book.cover_url)) && <SeriesCoverStack books={books} />}
+    </div>
+  );
 }
 
 function CircularSeriesProgress({ value }: { value: number | null }) {
@@ -468,7 +467,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         titleId={headingId}
         color={heroColor}
         navigation={back}
-        artwork={<SeriesArtwork banner={seriesRecord.cover_url} volume={featuredVolume} />}
+        artwork={<SeriesArtwork banner={seriesRecord.cover_url} books={seriesBooks} />}
         actions={
           <DetailActionsMenu
             kind="series"

@@ -1,9 +1,11 @@
-import { LibraryMosaic } from "./LibraryMosaic";
+import { SeriesCard } from "./SeriesCard";
+import type { SeriesCoverBook } from "./SeriesCoverStack";
+import "./collections-preview.css";
 
 interface LibrarySeriesEntry {
   id: string;
   title: string;
-  books: { id: string; title: string; cover?: string | null }[];
+  books: SeriesCoverBook[];
 }
 
 export function LibrarySeriesEntries({ entries, onOpen }: {
@@ -13,10 +15,7 @@ export function LibrarySeriesEntries({ entries, onOpen }: {
   return (
     <ul aria-label="Series collection" data-view="grid" className="rj-collection-grid">
       {entries.map(entry => <li key={entry.id}>
-        <article className="rj-collection-card">
-          <LibraryMosaic books={entry.books} />
-          <button type="button" className="rj-book-title rj-library-title rj-collection-title" onClick={() => onOpen(entry.id)}>{entry.title}</button>
-        </article>
+        <SeriesCard title={entry.title} books={entry.books} onOpen={() => onOpen(entry.id)} />
       </li>)}
     </ul>
   );

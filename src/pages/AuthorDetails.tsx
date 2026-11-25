@@ -43,7 +43,7 @@ import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import HorizontalShelf from "@/pages/library/HorizontalShelf";
-import SeriesStackCard from "@/pages/library/SeriesStackCard";
+import { SeriesCard } from "@/components/redesign/SeriesCard";
 import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
 
 function formatNumber(value: number): string {
@@ -323,7 +323,8 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
             <div className="rj-home-shelf-frame">
               <HorizontalShelf title="Series">
                 {authorSeries.map((group) => (
-                  <SeriesStackCard key={group.seriesId} group={group} onSeries={(seriesId) => navigate(`/series/${encodeURIComponent(seriesId)}`)} />
+                  <SeriesCard key={group.seriesId} title={group.name} books={group.books} shelf favorite={group.isFavorite}
+                    onOpen={() => navigate(`/series/${encodeURIComponent(group.seriesId)}`)} />
                 ))}
               </HorizontalShelf>
             </div>

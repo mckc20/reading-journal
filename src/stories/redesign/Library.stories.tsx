@@ -13,8 +13,8 @@ import { LibrarySeriesEntries } from '@/components/redesign/LibrarySeriesEntries
 function SeriesReview({ onOpen }: { onOpen: (id: string) => void }) {
   const [query, setQuery] = useState('');
   const entries = [
-    { id: 'monk-robot', title: 'Monk & Robot', author: 'Becky Chambers', books: libraryBooks.slice(0, 1) },
-    { id: 'quiet-places', title: 'Quiet Places', author: 'Alex Rowan', books: libraryBooks.slice(2, 5) },
+    { id: 'monk-robot', title: 'Monk & Robot', author: 'Becky Chambers', books: libraryBooks.slice(0, 1).map(book => ({ ...book, cover_url: book.cover })) },
+    { id: 'quiet-places', title: 'Quiet Places', author: 'Alex Rowan', books: libraryBooks.slice(2, 5).map(book => ({ ...book, cover_url: book.cover })) },
   ].filter(entry => `${entry.title} ${entry.author}`.toLowerCase().includes(query.trim().toLowerCase()));
   return <CollectionSearch collection="Series" query={query} onQueryChange={setQuery}>
     {({ desktopSearch }) => <div className="rj-library-preview">
@@ -60,7 +60,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {};
-export const Sparse: Story = { args: { books: libraryBooks.slice(0, 1) } };
+export const Sparse: Story = { args: { books: libraryBooks.slice(0, 1).map(book => ({ ...book, cover_url: book.cover })) } };
 export const Empty: Story = { args: { books: [libraryBooks[7]] } };
 export const Loading: Story = { args: { loading: true } };
 export const LoadError: Story = { args: { error: 'Please check your connection and try again.' } };
@@ -90,7 +90,7 @@ export const BrowseCollections: Story = {
     await expect(canvas.queryByRole('button', { name: 'A Future Adventure' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole('tab', { name: 'Series' }));
     await expect(canvas.queryByRole('button', { name: 'Grid view' })).not.toBeInTheDocument();
-    await expect(canvas.getByRole('list', { name: 'Series collection' }).querySelectorAll('.rj-collection-art')).toHaveLength(2);
+    await expect(canvas.getByRole('list', { name: 'Series collection' }).querySelectorAll('.rj-series-cover-stack')).toHaveLength(2);
   },
 };
 export const SearchAndReset: Story = {

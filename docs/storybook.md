@@ -123,7 +123,7 @@ Below 768px, pull down at the top of the Library to reveal a search field just b
 
 At 768px and wider, search stays inline. Books matches titles and authors, Collections matches collection names or the books in an opened collection, and Series matches titles and authors. Each tab owns its own query.
 
-The Library story uses the signed-in app’s layouts. Series and Collections use the same rounded cover mosaic. The first cover takes three-fifths of the cover width when there is more than one cover. Books and opened collections use rows with a thumbnail, a title and author, a status badge, and a chevron. Their colored tab highlight slides between selections and respects reduced motion. **Library / Mobile Search** checks pull-down, focus, typing, empty results and dismissal. **Redesign / Collection Search** checks that a query stays in its current view.
+The Library story uses the signed-in app’s layouts. Series cards stack covers horizontally on a white square framed by the front cover’s tint. Collections use a rounded cover mosaic with three-fifths of the available width for the first cover. Books and opened collections use rows with a thumbnail, a title and author, a status badge, and a chevron. Their colored tab highlight slides between selections and respects reduced motion. **Library / Mobile Search** checks pull-down, focus, typing, empty results and dismissal. **Redesign / Collection Search** checks that a query stays in its current view.
 
 ### Collections page — 17 November
 
