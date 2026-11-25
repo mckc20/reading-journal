@@ -58,7 +58,7 @@ export function LibraryBooks({
   }, [books, query, sort]);
 
   return <CollectionSearch collection="Books" query={query} onQueryChange={setQuery}>
-    {({ desktopSearch }) => <div className="rj-library-preview">
+    {({ desktopSearch }) => <div className="rj-library-preview rj-library-books-panel">
     {loading ? <div className="rj-library-loading" role="status">Loading your library…<div aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <span key={index} />)}</div></div>
       : error ? <EmptyState title="Your library couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} />
       : library.length === 0 ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>
