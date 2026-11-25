@@ -82,6 +82,7 @@ export interface AddBookDialogLaunchOptions {
 type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "entity" | "initialBookId" | "initialTags" | "onSaved">;
 
 const phoneLayout = "(max-width: 767px)";
+const reducedMotion = "(prefers-reduced-motion: reduce)";
 
 type AppPage = {
   location: ReturnType<typeof useLocation>;
@@ -101,6 +102,19 @@ const detailRoutes = [
   ["/series/:seriesId", "Series details"],
   ["/genres/:genreId", "Genre details"],
 ] as const;
+
+function getDetailLabel(pathname: string) {
+  if (matchPath("/authors/explore", pathname)) return;
+  return detailRoutes.find(([path]) => matchPath(path, pathname))?.[1];
+}
+
+function transitionsBetweenPages(from: string, to: string) {
+  return from !== to && !(getLibraryTab(from) && getLibraryTab(to)) && !getDetailLabel(from) && !getDetailLabel(to);
+}
+
+function supportsPageTransition() {
+  return typeof document.startViewTransition === "function" && !window.matchMedia(reducedMotion).matches;
+}
 
 type NavLink = {
   to: string;
@@ -143,8 +157,7 @@ function AppLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
-  const isAuthorRedirect = Boolean(matchPath("/authors/explore", location.pathname));
-  const detailLabel = isAuthorRedirect ? undefined : detailRoutes.find(([path]) => matchPath(path, location.pathname))?.[1];
+  const detailLabel = getDetailLabel(location.pathname);
   const [isPhone, setIsPhone] = useState(() => window.matchMedia(phoneLayout).matches);
   const detailOverlayOpen = Boolean(detailLabel) && isPhone;
   const detailPages = useRef<DetailPage[]>([]);
@@ -152,6 +165,8 @@ function AppLayoutContent() {
   const underlayRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef<{ key: string; y: number; focus: HTMLElement | null } | null>(null);
   const previousScrollPath = useRef(location.pathname);
+  const previousTransitionPath = useRef(location.pathname);
+  const mainRef = useRef<HTMLElement>(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
@@ -267,6 +282,19 @@ function AppLayoutContent() {
     document.body.scrollTop = 0;
   }, [detailOverlayOpen, location.pathname, underlay]);
 
+  // Reserve the browser's crossfade for navigation links. Older engines still ease in the incoming page.
+  useLayoutEffect(() => {
+    const previousPath = previousTransitionPath.current;
+    previousTransitionPath.current = location.pathname;
+    if (typeof document.startViewTransition === "function" || window.matchMedia(reducedMotion).matches ||
+        !transitionsBetweenPages(previousPath, location.pathname)) return;
+    const motion = mainRef.current?.animate([{ opacity: .55 }, { opacity: 1 }], {
+      duration: 250,
+      easing: "cubic-bezier(.22, .61, .36, 1)",
+    });
+    return () => motion?.cancel();
+  }, [location.pathname]);
+
   useLayoutEffect(() => {
     // Portalled dialogs and menus inherit the same colors as the signed-in UI.
     const root = document.documentElement;
@@ -316,7 +344,7 @@ function AppLayoutContent() {
             <UNSAFE_LocationContext.Provider value={{ location: mainPage.location, navigationType: mainPage.navigationType }}>
               <a className="rj-skip-link" href="#app-content">Skip to content</a>
               <AppHeader pathname={mainPage.location.pathname} addLauncher={mainIsMessages ? addLauncher : undefined} />
-              <main id="app-content" tabIndex={-1} className={mainIsMessages ? "rj-app-messages" : "rj-app-content"}>
+              <main ref={mainRef} id="app-content" tabIndex={-1} className={cn("rj-transition-page", mainIsMessages ? "rj-app-messages" : "rj-app-content")}>
                 {mainPage.outlet}
               </main>
               {!mainIsMessages && (
@@ -440,6 +468,7 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
   const activeRoute = getPrimaryRoute(pathname);
   const isLibrary = Boolean(getLibraryTab(pathname));
   const menuLinks = isLibrary ? [...libraryNavLinks, ...moreNavLinks] : moreNavLinks;
+  const transitionTo = (to: string) => supportsPageTransition() && transitionsBetweenPages(pathname, to);
   const more = (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -453,7 +482,7 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
         <DropdownMenu.Content className="rj-add-menu" align="end" side={isLibrary ? "top" : "bottom"} sideOffset={8} collisionPadding={12}>
           {menuLinks.map(({ to, label, icon: Icon }) => (
             <DropdownMenu.Item key={to} asChild>
-              <Link to={to} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
+              <Link to={to} viewTransition={transitionTo(to)} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
                 <Icon size={18} aria-hidden="true" />
                 {label}
               </Link>
@@ -467,14 +496,14 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
   return (
     <div className="rj-app-header-wrap">
       <header className="rj-app-header">
-        {!isLibrary && <Link to="/" className="rj-brand" aria-label="Reading Journal home">
+        {!isLibrary && <Link to="/" viewTransition={transitionTo("/")} className="rj-brand" aria-label="Reading Journal home">
           <img src={readingJournalLogo} alt="" />
           <span>Reading Journal</span>
         </Link>}
         <nav className="rj-navigation rj-tab-track" aria-label="Primary navigation">
           <SlidingIndicator />
           {primaryNavLinks.map(({ to, label, icon: Icon }) => (
-            <Link key={to} to={to} aria-current={activeRoute === to ? "page" : undefined}>
+            <Link key={to} to={to} viewTransition={transitionTo(to)} aria-current={activeRoute === to ? "page" : undefined}>
               <Icon size={22} aria-hidden="true" />
               <span>{label}</span>
             </Link>

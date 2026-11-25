@@ -1,6 +1,7 @@
+import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Tabs } from "radix-ui";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useNavigation, useOutletContext } from "react-router-dom";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { getLibraryTab, libraryTabs, type LibrarySort } from "@/lib/libraryTabs";
 import { parseCollectionId } from "@/lib/libraryCollections";
@@ -51,4 +52,10 @@ export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pe
       </Tabs.Root>
     </LibraryPresentation.Provider>
   );
+}
+
+export function LibraryLayoutRoute() {
+  const appContext = useOutletContext<AppLayoutOutletContext>();
+  const navigation = useNavigation();
+  return <LibraryTabs pendingPath={navigation.location?.pathname}><Outlet context={appContext} /></LibraryTabs>;
 }

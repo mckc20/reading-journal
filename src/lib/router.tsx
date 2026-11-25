@@ -1,7 +1,6 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, Outlet, useLocation, useNavigation, useOutletContext, useParams } from "react-router-dom";
-import type { AppLayoutOutletContext } from "@/components/AppLayout";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 
@@ -10,45 +9,24 @@ const AppLayout = lazy(() => import("@/components/AppLayout"));
 
 const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const LibraryTabs = lazy(() => import("@/components/redesign/LibraryNavigation").then(module => ({ default: module.LibraryTabs })));
-const Wishlist = lazy(() => import("@/pages/Wishlist"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
-const ExploreLibrary = lazy(() => import("@/pages/ExploreLibrary"));
 const Authors = lazy(() => import("@/pages/Authors"));
-const AuthorsExplore = lazy(() => import("@/pages/AuthorsExplore"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
-const Search = lazy(() => import("@/pages/Search"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Discover = lazy(() => import("@/pages/Discover"));
-const ReadingHistory = lazy(() => import("@/pages/ReadingHistory"));
-const WrapUps = lazy(() => import("@/pages/WrapUps"));
-const LibraryJournal = lazy(() => import("@/pages/LibraryJournal"));
 const JournalEntryRedirect = lazy(() => import("@/pages/JournalEntryRedirect"));
-const Genres = lazy(() => import("@/pages/Genres"));
-const AllGenres = lazy(() => import("@/pages/AllGenres"));
 const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
 const BookDetails = lazy(() => import("@/pages/BookDetails"));
 const Changelog = lazy(() => import("@/pages/Changelog"));
 const Help = lazy(() => import("@/pages/Help"));
 const WrapUpsHelp = lazy(() => import("@/pages/WrapUpsHelp"));
-const Groups = lazy(() => import("@/pages/Groups"));
-const Profile = lazy(() => import("@/pages/Profile"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
-const Settings = lazy(() => import("@/pages/Settings"));
 
 function lazyRoute(element: ReactNode) {
   return <Suspense fallback={<LoadingIndicator variant="page" />}>{element}</Suspense>;
 }
 
-function animatedRoute(path: string, element: ReactNode) {
-  return { path, element: lazyRoute(<div key={path} className="rj-route-enter">{element}</div>) };
-}
-
-function LibraryLayoutRoute() {
-  const appContext = useOutletContext<AppLayoutOutletContext>();
-  const navigation = useNavigation();
-  return <LibraryTabs pendingPath={navigation.location?.pathname}><Outlet context={appContext} /></LibraryTabs>;
+function pageRoute(path: string, load: () => Promise<{ default: ComponentType }>) {
+  // Load the next page before the router captures its view-transition snapshot.
+  return { path, lazy: async () => ({ Component: (await load()).default }) };
 }
 
 function NotFound() {
@@ -104,14 +82,15 @@ export const router = createBrowserRouter([
   // Protected layout: ProtectedRoute → AppLayout → page
   {
     element: <ProtectedRoute />,
+    hydrateFallbackElement: <LoadingIndicator variant="page" />,
     children: [
       {
         element: lazyRoute(<AppLayout />),
         children: [
-          animatedRoute("/", <Dashboard />),
+          pageRoute("/", () => import("@/pages/Dashboard")),
           {
             path: "/library",
-            element: lazyRoute(<LibraryLayoutRoute />),
+            lazy: async () => ({ Component: (await import("@/components/redesign/LibraryNavigation")).LibraryLayoutRoute }),
             hydrateFallbackElement: <LoadingIndicator variant="page" />,
             // Resolve the next tab before swapping out the current panel.
             children: [
@@ -120,20 +99,20 @@ export const router = createBrowserRouter([
               { path: "series", lazy: async () => ({ Component: (await import("@/pages/Series")).default }) },
             ],
           },
-          { path: "/library/wishlist", element: lazyRoute(<Wishlist />) },
-          { path: "/library/books", element: lazyRoute(<ExploreLibrary />) },
-          { path: "/library/authors", element: lazyRoute(<AuthorsExplore />) },
-          { path: "/library/genres", element: lazyRoute(<Genres />) },
-          { path: "/library/genres/all", element: lazyRoute(<AllGenres />) },
-          animatedRoute("/library/journal", <LibraryJournal />),
+          pageRoute("/library/wishlist", () => import("@/pages/Wishlist")),
+          pageRoute("/library/books", () => import("@/pages/ExploreLibrary")),
+          pageRoute("/library/authors", () => import("@/pages/AuthorsExplore")),
+          pageRoute("/library/genres", () => import("@/pages/Genres")),
+          pageRoute("/library/genres/all", () => import("@/pages/AllGenres")),
+          pageRoute("/library/journal", () => import("@/pages/LibraryJournal")),
           { path: "/journal/:publicId", element: lazyRoute(<JournalEntryRedirect />) },
-          animatedRoute("/statistics", <Analytics />),
-          { path: "/reading-history", element: lazyRoute(<ReadingHistory />) },
-          { path: "/wrap-ups", element: lazyRoute(<WrapUps />) },
-          { path: "/wrap-ups/:monthKey", element: lazyRoute(<WrapUps />) },
-          { path: "/messages", element: lazyRoute(<Groups />) },
-          { path: "/discover/recommendations", element: lazyRoute(<Discover />) },
-          { path: "/discover", element: lazyRoute(<Discover />) },
+          pageRoute("/statistics", () => import("@/pages/Analytics")),
+          pageRoute("/reading-history", () => import("@/pages/ReadingHistory")),
+          pageRoute("/wrap-ups", () => import("@/pages/WrapUps")),
+          pageRoute("/wrap-ups/:monthKey", () => import("@/pages/WrapUps")),
+          pageRoute("/messages", () => import("@/pages/Groups")),
+          pageRoute("/discover/recommendations", () => import("@/pages/Discover")),
+          pageRoute("/discover", () => import("@/pages/Discover")),
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
           { path: "/series/:seriesId/journal", element: <RedirectEntityDetail entity="series" section="journal" /> },
@@ -147,7 +126,7 @@ export const router = createBrowserRouter([
           { path: "/authors/:authorId/journal", element: <RedirectEntityDetail entity="author" section="journal" /> },
           { path: "/authors/:authorId/books", element: <RedirectEntityDetail entity="author" section="books" /> },
           { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="journal" /> },
-          { path: "/search", element: lazyRoute(<Search />) },
+          pageRoute("/search", () => import("@/pages/Search")),
           { path: "/genres", element: <Navigate to="/library/genres" replace /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
@@ -163,10 +142,10 @@ export const router = createBrowserRouter([
           { path: "/chat", element: <Navigate to="/messages" replace /> },
           { path: "/group", element: <Navigate to="/messages" replace /> },
           { path: "/groups", element: <Navigate to="/messages" replace /> },
-          animatedRoute("/profile", <Profile />),
+          pageRoute("/profile", () => import("@/pages/Profile")),
           { path: "/profiles/:profileId", element: lazyRoute(<PublicProfile />) },
-          { path: "/settings", element: lazyRoute(<Settings />) },
-          { path: "/settings/:tab", element: lazyRoute(<Settings />) },
+          pageRoute("/settings", () => import("@/pages/Settings")),
+          pageRoute("/settings/:tab", () => import("@/pages/Settings")),
         ],
       },
     ],

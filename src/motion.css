@@ -44,9 +44,13 @@
 .rj-segmented-control { --tab-background: var(--primary); }
 .rj-segmented-control > [aria-pressed="true"] { color: var(--primary-foreground); background: transparent; }
 
-@keyframes rj-content-enter {
-  from { opacity: .35; }
-  to { opacity: 1; }
+@keyframes rj-page-out {
+  to { opacity: 0; }
+}
+
+@keyframes rj-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes rj-layout-enter {
@@ -76,7 +80,13 @@
 .rj-chart-bar-horizontal { transform-origin: left center; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .rj-route-enter { animation: rj-content-enter 240ms ease-out; }
+  .rj-transition-page { view-transition-name: rj-page; }
+  ::view-transition-group(root), ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  ::view-transition-old(root) { display: none; }
+  ::view-transition-group(rj-page) { animation-duration: 280ms; }
+  ::view-transition-old(rj-page) { animation: rj-page-out 190ms ease-out both; }
+  ::view-transition-new(rj-page) { animation: rj-page-in 280ms cubic-bezier(.22, .61, .36, 1) both; }
+
   .rj-layout-enter { animation: rj-layout-enter 240ms cubic-bezier(.2, .85, .25, 1); }
 
   :is(.rj-menu-motion, .rj-add-menu:not(.rj-create-menu), [data-slot="select-content"]):not([data-state="closed"]) {
@@ -143,4 +153,8 @@
     transition: translate 260ms cubic-bezier(.18, .72, .25, 1);
   }
   .rj-shelf-scroll[data-shelf-dragging] { transition: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
 }
