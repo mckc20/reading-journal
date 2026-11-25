@@ -40,8 +40,16 @@
 :is(.rj-detail-cover-stage, .rj-collection-art, .rj-series-cover-stack) {
   --rj-cover-surface: var(--book-detail-hero-color, var(--card));
 }
+:is(.rj-collection-art, .rj-series-cover-stack) {
+  --rj-cover-inset: white;
+  --rj-cover-inset-foreground: #3c3336;
+}
 .dark :is(.rj-detail-cover-stage, .rj-collection-art, .rj-series-cover-stack) {
   --rj-cover-surface: color-mix(in srgb, var(--book-detail-hero-color, var(--card)) 38%, #1e1720);
+}
+.dark :is(.rj-collection-art, .rj-series-cover-stack) {
+  --rj-cover-inset: var(--background);
+  --rj-cover-inset-foreground: var(--foreground);
 }
 .rj-redesign *, .rj-redesign *::before, .rj-redesign *::after { box-sizing: border-box; }
 .rj-redesign button { cursor: pointer; }

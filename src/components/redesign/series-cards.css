@@ -19,8 +19,8 @@
   display: grid;
   place-items: center;
   border-radius: 6px;
-  background: white;
-  color: #3c3336;
+  background: var(--rj-cover-inset);
+  color: var(--rj-cover-inset-foreground);
 }
 .rj-series-cover-layers {
   position: absolute;

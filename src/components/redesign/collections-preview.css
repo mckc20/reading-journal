@@ -15,13 +15,14 @@
   inset: var(--collection-frame-width);
   overflow: hidden;
   border-radius: var(--collection-inner-radius);
-  background: white;
+  background: var(--rj-cover-inset);
+  color: var(--rj-cover-inset-foreground);
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   gap: 3px;
   padding: 3px;
 }
-.rj-collection-covers > svg { place-self: center; color: #3c3336; }
+.rj-collection-covers > svg { place-self: center; }
 .rj-collection-covers:is([data-count="2"], [data-count="3"]) {
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
 }
