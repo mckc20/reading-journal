@@ -70,7 +70,7 @@ export default function VerticalBarChart({
     <div {...motion} className="rj-chart-surface">
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {title ? <AppHeading level={4}>{title}</AppHeading> : <span />}
+          {title ? <AppHeading level={4} className="italic">{title}</AppHeading> : <span />}
           {action}
         </div>
       )}

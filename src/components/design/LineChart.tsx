@@ -79,7 +79,7 @@ export default function LineChart({
 
   return (
     <div {...motion} className={cn("rj-chart-surface", timeline && "space-y-3")}>
-      {title ? timeline ? <h4 className="text-sm font-medium">{title}</h4> : <AppHeading level={4}>{title}</AppHeading> : null}
+      {title && <AppHeading level={4} className={cn("italic", timeline && "text-sm")}>{title}</AppHeading>}
       {data.length === 0 || maxValue <= 0 ? (
         <div className={timeline ? "rounded-md border bg-background/80 p-3 text-sm text-muted-foreground" : "mt-4 flex min-h-36 items-center justify-center rounded-lg bg-muted/20 px-4 text-center text-sm text-muted-foreground"}>
           {empty}

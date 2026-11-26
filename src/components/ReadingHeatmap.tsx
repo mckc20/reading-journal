@@ -192,7 +192,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
   return (
     <section className="space-y-4">
       <div>
-        <AppHeading level={4} as="h2">Reading activity</AppHeading>
+        <AppHeading level={4} as="h2" className="italic">Reading activity</AppHeading>
         <HeadingDescription>12-month view by day (minutes read)</HeadingDescription>
       </div>
 

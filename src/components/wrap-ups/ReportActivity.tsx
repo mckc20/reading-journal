@@ -28,7 +28,7 @@ export default function ReportActivity({ activity, monthKey }: {
   return (
     <section className="space-y-4 py-4 sm:space-y-5 sm:py-6">
       <div className="flex items-center justify-between gap-3">
-        <AppHeading level={2} className="min-w-0 text-xl sm:text-2xl">Reading activity</AppHeading>
+        <AppHeading level={2} className="min-w-0 text-xl italic sm:text-2xl">Reading activity</AppHeading>
         {activity !== undefined && (
           <SegmentedControl
             label="Activity chart metric"

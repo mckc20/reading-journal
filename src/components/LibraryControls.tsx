@@ -167,7 +167,7 @@ export function LibraryFilterChips({ chips, onClear }: {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
-        <Badge key={chip.label} variant="secondary" className="gap-1 pr-1">
+        <Badge key={chip.label} variant="secondary" className="h-6 gap-1 pr-1">
           {chip.label}
           <button type="button" className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground" aria-label={`Remove ${chip.label}`} onClick={chip.onRemove}>
             <X className="h-3 w-3" />
