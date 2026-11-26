@@ -79,6 +79,12 @@
   --app-header-height: 0px;
   --app-bottom-nav-space: calc(80px + env(safe-area-inset-bottom));
 }
+/* Give Safari a solid fixed top edge to extend into its browser chrome. */
+.rj-app--library .rj-app-header-wrap {
+  min-height: max(8px, env(safe-area-inset-top));
+  pointer-events: none;
+}
+.rj-app--library .rj-navigation { pointer-events: auto; }
 .rj-app--library .rj-app-header { display: block; min-height: 0; margin: 0; border: 0; }
 .rj-app--library .rj-app-content { padding-top: 0; }
 .rj-app--library .rj-navigation a { min-width: 42px; }

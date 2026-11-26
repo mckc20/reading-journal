@@ -35,12 +35,11 @@
   width: calc(200% / 3);
 }
 .rj-series-cover-layers[data-count="1"] .rj-series-cover-layer { inset-inline-start: calc(100% / 6); }
-.rj-series-cover-layer:nth-child(2) { opacity: .94; }
-.rj-series-cover-layer:nth-child(3) { opacity: .88; }
 .rj-series-cover-layer > div {
   height: 100%;
   border-radius: 5px;
-  box-shadow: 2px 2px 6px #21150f38;
+  opacity: 1;
+  box-shadow: 1px 0 2px rgb(0 0 0 / 20%), 3px 2px 6px rgb(0 0 0 / 18%);
 }
 .rj-series-cover-layer img { object-position: center top; }
 
