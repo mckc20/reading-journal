@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { recommendationCandidateKey } from "../../src/lib/recommendationIdentity.js";
 import type { RecommendationItem } from "../../src/types/recommendations.js";
 import type { BookMetadataSource } from "../../src/types/index.js";
 
@@ -215,11 +216,7 @@ export function normalizeTitle(value: string): string {
 }
 
 export interface RecommendationCandidate extends Omit<RecommendationItem, "score" | "reasons"> { }
-export function recommendationCandidateKey(item: Pick<RecommendationItem, "title" | "authors" | "isbn">): string {
-  const isbn = normalizeIsbn(item.isbn ?? "");
-  const title = norm(item.title).replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  return isbn ? `isbn:${isbn}` : `title:${title}|${item.authors.map(norm).sort().join("|")}`;
-}
+export { recommendationCandidateKey };
 
 export function rankCandidates(
   candidates: RecommendationCandidate[],

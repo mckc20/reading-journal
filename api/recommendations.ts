@@ -61,6 +61,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const preferences = normalizeDiscoverPreference(settingsResult.data?.discover);
     const feedback = (feedbackResult.data ?? []) as FeedbackRow[];
     const history = (historyResult.data ?? []) as RecommendationHistoryEntry[];
+    const visibleFeedback = feedback.filter(({ candidate_key }) => !dismissedKeys.has(candidate_key));
     const feedbackSignals = feedback.map(({ candidate_key, title, authors, genres }) => ({ candidate_key, title, authors, genres }));
     const books = (booksResult.data ?? []).map((book) => ({
       title: book.title,
@@ -87,7 +88,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
     let stale = isRecommendationSetStale(row, fingerprint);
     if (request.method === "GET") {
-      json(response, 200, { set: publicSet(row, dismissedKeys), stale, generating: hasActiveLease(row), feedback });
+      json(response, 200, { set: publicSet(row, dismissedKeys), stale, generating: hasActiveLease(row), feedback: visibleFeedback });
       return;
     }
 
@@ -146,7 +147,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       };
       const { error } = await admin.from("recommendation_sets").upsert(next, { onConflict: "user_id" });
       if (error) throw error;
-      json(response, 200, { set: { ...next, items: items.filter((item) => !dismissedKeys.has(recommendationCandidateKey(item))), user_id: undefined }, stale: false, generating: false, feedback });
+      json(response, 200, { set: { ...next, items: items.filter((item) => !dismissedKeys.has(recommendationCandidateKey(item))), user_id: undefined }, stale: false, generating: false, feedback: visibleFeedback });
     } catch (error) {
       console.error("Recommendation generation failed", describeError(error));
       await admin.from("recommendation_sets").update({ refresh_started_at: null, updated_at: new Date().toISOString() }).eq("user_id", userId);

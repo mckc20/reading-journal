@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type Ref } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import LoadingIndicator from "@/components/LoadingIndicator";
@@ -8,6 +8,9 @@ import { QuickProgress } from "@/components/redesign/RedesignHome";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/reading-journal";
 import { useBooksContext } from "@/context/BooksContext";
+import { useRecommendations } from "@/context/RecommendationsContext";
+import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
+import { recommendationCandidateKey, recommendationDetailPath } from "@/lib/recommendationIdentity";
 import { getTodayLocalDate } from "@/lib/utils";
 import type { Book } from "@/types";
 
@@ -63,9 +66,9 @@ function toHomeBook(book: Book): HomeBook {
   };
 }
 
-function HomeSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function HomeSection({ id, title, children, sectionRef }: { id: string; title: string; children: ReactNode; sectionRef?: Ref<HTMLElement> }) {
   return (
-    <section className="rj-home-section" aria-labelledby={id}>
+    <section ref={sectionRef} className="rj-home-section" aria-labelledby={id}>
       <h2 id={id}>{title}</h2>
       {children}
     </section>
@@ -74,11 +77,13 @@ function HomeSection({ id, title, children }: { id: string; title: string; child
 
 export default function Dashboard() {
   const { books, loading, error, reload, updateBook } = useBooksContext();
+  const recommendations = useRecommendations();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState("");
   const [progress, setProgress] = useState<{ book: Book; open: boolean } | null>(null);
   const progressTrigger = useRef<HTMLButtonElement | null>(null);
   const homeRef = useRef<HTMLDivElement>(null);
+  const recommendationsRef = useDetailSectionAnchor("recommendations", !loading && !recommendations.loading);
 
   const currentlyReading = books.filter(book => book.status === "Reading").map(toHomeBook);
   const paused = books.filter(book => book.status === "Paused").map(toHomeBook);
@@ -172,6 +177,26 @@ export default function Dashboard() {
           {recentlyFinished.length > 0
             ? <BookShelf books={recentlyFinished} onOpen={openBook} showStatus={false} />
             : <EmptyState compact message="No books finished in the last 4 weeks." />}
+        </HomeSection>
+
+        <HomeSection id="recommendations" title="Recommended for you" sectionRef={recommendationsRef}>
+          {recommendations.items.length > 0 && <BookShelf
+            label="Recommendations"
+            books={recommendations.items.map(item => ({
+              id: recommendationCandidateKey(item),
+              title: item.title,
+              author: item.authors.join(", "),
+              cover: item.coverUrl,
+            }))}
+            showStatus={false}
+            onOpen={book => navigate(recommendationDetailPath(book.id))}
+          />}
+          {recommendations.error ? <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
+            <p>{recommendations.error}</p>
+            <Button variant="outline" size="sm" onClick={recommendations.retry}>Try again</Button>
+          </div> : recommendations.items.length === 0 && (recommendations.loading
+            ? <LoadingIndicator label="Loading recommendations…" />
+            : <EmptyState compact message="No recommendations right now." />)}
         </HomeSection>
       </div>
 

@@ -33,6 +33,7 @@ import { AuthorsProvider } from "@/context/AuthorsContext";
 import { BooksProvider } from "@/context/BooksContext";
 import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
+import { RecommendationsProvider } from "@/context/RecommendationsContext";
 import { useAuth, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
 import { wishlistCollectionPath } from "@/lib/libraryCollections";
@@ -100,6 +101,7 @@ type DetailPage = AppPage & {
 
 const detailRoutes = [
   ["/books/:bookId", "Book details"],
+  ["/books/recommendation/:candidateKey", "Book details"],
   ["/authors/:authorId", "Author details"],
   ["/series/:seriesId", "Series details"],
   ["/genres/:genreId", "Genre details"],
@@ -149,6 +151,7 @@ const libraryNavLinks: NavLink[] = [
 ];
 
 function getPrimaryRoute(pathname: string) {
+  if (matchPath("/books/recommendation/:candidateKey", pathname)) return "/";
   if (pathname === "/" || pathname === "/statistics") return pathname;
   if (pathname === "/library/journal" || pathname.startsWith("/journal/")) return "/library/journal";
   if (pathname === "/profile" || pathname.startsWith("/profiles/")) return "/profile";
@@ -663,12 +666,15 @@ function NotificationsMenu() {
 }
 
 export default function AppLayout() {
+  const { user } = useAuth();
   return (
     <AuthorsProvider>
       <GenresProvider>
         <BooksProvider>
           <ProfileProvider>
-            <AppLayoutContent />
+            <RecommendationsProvider key={user?.id}>
+              <AppLayoutContent />
+            </RecommendationsProvider>
           </ProfileProvider>
         </BooksProvider>
       </GenresProvider>

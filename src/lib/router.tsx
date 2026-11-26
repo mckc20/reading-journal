@@ -5,6 +5,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 import { wishlistCollectionPath } from "@/lib/libraryCollections";
 import { legacyLibraryDestination } from "@/lib/libraryRedirects";
+import { recommendationShelfPath } from "@/lib/recommendationIdentity";
 
 // Load the signed-in app shell only after ProtectedRoute resolves the session.
 const AppLayout = lazy(() => import("@/components/AppLayout"));
@@ -113,7 +114,8 @@ export const router = createBrowserRouter([
           pageRoute("/wrap-ups", () => import("@/pages/WrapUps")),
           pageRoute("/wrap-ups/:monthKey", () => import("@/pages/WrapUps")),
           pageRoute("/messages", () => import("@/pages/Groups")),
-          pageRoute("/discover/recommendations", () => import("@/pages/Discover")),
+          { path: "/discover/recommendations", element: <Navigate to={recommendationShelfPath} replace /> },
+          { path: "/recommendations", element: <Navigate to={recommendationShelfPath} replace /> },
           pageRoute("/discover", () => import("@/pages/Discover")),
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
@@ -132,6 +134,7 @@ export const router = createBrowserRouter([
           { path: "/genres", element: <RedirectLegacyLibrary browseBy="genre" /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
+          pageRoute("/books/recommendation/:candidateKey", () => import("@/pages/RecommendationDetails")),
           { path: "/books/:bookId/analytics", element: <Navigate to=".." relative="path" replace /> },
           { path: "/books/:bookId/journal", element: <RedirectBookJournal /> },
           { path: "/books/:bookId/annotations", element: <RedirectBookJournal /> },

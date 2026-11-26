@@ -1041,12 +1041,10 @@ function DiscoverSettings() {
   const discover = settings?.discover ?? DEFAULT_DISCOVER_SETTINGS;
   const disabled = loading || saving;
   const [intervalInput, setIntervalInput] = useState(String(discover.reload_interval_number));
-  const [countInput, setCountInput] = useState(String(discover.recommendation_count));
 
   useEffect(() => {
     setIntervalInput(String(discover.reload_interval_number));
-    setCountInput(String(discover.recommendation_count));
-  }, [discover.reload_interval_number, discover.recommendation_count]);
+  }, [discover.reload_interval_number]);
 
   function intervalMaximum(unit: RecommendationIntervalUnit) {
     return unit === "day" ? 30 : unit === "week" ? 4 : 1;
@@ -1061,18 +1059,12 @@ function DiscoverSettings() {
     });
   }
 
-  async function saveCount() {
-    const value = Math.max(3, Math.min(12, Math.round(Number(countInput) || 6)));
-    setCountInput(String(value));
-    await saveSettingsSection("discover", { recommendation_count: value });
-  }
-
   return (
     <SettingsSection title="Discover" description="Control recommendation updates and feedback." icon={Compass}>
       <div className="space-y-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SettingsRows>
-          <SettingRow title="Reload interval" description="Refresh recommendations when you open Discover after this amount of time.">
+          <SettingRow title="Reload interval" description="Refresh recommendations when you open Home after this amount of time.">
             <div className="flex items-center gap-2">
               <Input
                 aria-label="Reload interval number"
@@ -1101,7 +1093,7 @@ function DiscoverSettings() {
           </SettingRow>
           <SettingRow
             title="Hide disliked"
-            description="When on, a thumbs-down removes that book from the page and fills its place with another suggestion when available. When off, it stays marked so you can undo the feedback."
+            description="When on, a thumbs-down removes that book from the Home shelf and fills its place with another suggestion when available. When off, it stays marked so you can undo the feedback."
           >
             <ToggleSetting
               checked={discover.hide_disliked_recommendations}
@@ -1109,19 +1101,6 @@ function DiscoverSettings() {
               onChange={(hide_disliked_recommendations) =>
                 void saveSettingsSection("discover", { hide_disliked_recommendations })
               }
-            />
-          </SettingRow>
-          <SettingRow title="Recommendations at once" description="Choose how many books to show when Discover loads.">
-            <Input
-              aria-label="Number of recommendations"
-              type="number"
-              min={3}
-              max={12}
-              className="w-20"
-              value={countInput}
-              disabled={disabled}
-              onChange={(event) => setCountInput(event.target.value)}
-              onBlur={() => void saveCount()}
             />
           </SettingRow>
         </SettingsRows>
