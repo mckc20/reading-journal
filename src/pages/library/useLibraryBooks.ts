@@ -34,7 +34,7 @@ export function useLibraryBooks() {
     error: error ?? undefined,
     onRetry: () => void reload(),
     onOpenBook: (book: LibraryPreviewBook) => navigate(
-      book.status === "Wishlist" ? "/library/wishlist" : `/books/${encodeURIComponent(book.id)}`,
+      `/books/${encodeURIComponent(book.id)}`,
     ),
   };
 }

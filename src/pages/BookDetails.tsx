@@ -18,13 +18,11 @@ import {
   RefreshCw,
   Star,
 } from "lucide-react";
-import { AboutSection, AppHeading } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import { DetailJournal } from "@/components/redesign/DetailJournal";
-import {
-  buildBookLibraryFilterPath,
-  MetadataLink,
-} from "@/components/LinkedMetadata";
+import { BookDetailAbout } from "@/components/redesign/BookDetailAbout";
+import { WishlistBookDetail, wishlistCollectionHref } from "@/components/redesign/WishlistBookDetail";
 import BookReadingProgress from "@/components/BookReadingProgress";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
@@ -39,7 +37,6 @@ import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import { useAuth } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { useGenresContext } from "@/context/GenresContext";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import { fetchBookJournalEntryRecords, sortBookJournalEntryRecords } from "@/lib/bookJournal";
@@ -47,16 +44,12 @@ import { fetchReadingLogsForBook } from "@/lib/books";
 import { moveBookToWishlist } from "@/lib/wishlist";
 import { buildBookAttachment } from "@/lib/chatAttachments";
 import { buildAuthorSummaries, findAuthorSummary } from "@/lib/authorShelf";
-import { buildGenreSlugLookup, formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
 import {
   bookJournalToJournalEntries,
   sortJournalEntries,
   type JournalTimelineEntry,
 } from "@/lib/journal";
 import { BOOK_JOURNAL_HASH } from "@/lib/journalLinks";
-import {
-  formatPublicationDateForDisplay,
-} from "@/lib/publicationDate";
 import {
   getTodayLocalDate,
 } from "@/lib/utils";
@@ -75,16 +68,14 @@ const STATUS_OPTIONS: BookStatus[] = [
   "DNF",
 ];
 
-function getPublicationYear(value?: string | null): string | null {
-  const [year] = (value ?? "").split("-");
-  return year && /^\d{4}$/.test(year) ? year : null;
-}
-
 export default function BookDetails() {
   const { bookId } = useParams<{ bookId: string }>();
 
+  const { wishlistBooks } = useBooksContext();
+  const isWish = wishlistBooks.some(book => book.id === bookId);
+
   return (
-    <DetailSheet key={bookId} label="Book details" fallbackTo="/library">
+    <DetailSheet key={bookId} label="Book details" fallbackTo={isWish ? wishlistCollectionHref : "/library"}>
       {(close) => <BookDetailsContent onClose={close} />}
     </DetailSheet>
   );
@@ -110,23 +101,14 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     deleteBook,
     reload,
   } = useBooksContext();
-  const { genres } = useGenresContext();
   const { series } = useSeries();
 
   const book = bookId ? books.find((item) => item.id === bookId) ?? null : null;
+  const wish = wishlistBooks.find(item => item.id === bookId);
   const coverColor = useBookHeroColor(book?.cover_url);
-  const { slugById } = useMemo(() => buildGenreSlugLookup(genres), [genres]);
-  const linkedGenres = useMemo(() => {
-    if (!book?.selected_genres?.length) return [];
-    return getSelectedGenreTags(book.selected_genres).map((genre) => ({
-      genre,
-      slug: slugById.get(genre.id) ?? genre.id,
-    }));
-  }, [book?.selected_genres, slugById]);
-  const seriesName = book?.series_id
-    ? series.find((item) => item.id === book.series_id)?.name
-    : undefined;
-  const publicationYear = getPublicationYear(book?.publication_date);
+  const seriesRecord = series.find(item => item.id === (book ?? wish)?.series_id);
+  const seriesName = seriesRecord?.name;
+  const libraryBookId = book?.id;
 
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
@@ -151,8 +133,8 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   }, [book]);
 
   useEffect(() => {
-    if (!bookId) return;
-    const currentBookId = bookId;
+    if (!libraryBookId) return;
+    const currentBookId = libraryBookId;
     let cancelled = false;
 
     async function run() {
@@ -172,11 +154,11 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [bookId, logsAttempt]);
+  }, [libraryBookId, logsAttempt]);
 
   useEffect(() => {
-    if (!bookId) return;
-    const currentBookId = bookId;
+    if (!libraryBookId) return;
+    const currentBookId = libraryBookId;
     let cancelled = false;
 
     async function run() {
@@ -202,7 +184,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [bookId]);
+  }, [libraryBookId]);
 
   const progressPercent = book ? getBookProgress(book.current_page, book.total_pages) : null;
   const authorSummaries = useMemo(
@@ -350,6 +332,8 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     );
   }
 
+  if (wish) return <WishlistBookDetail book={wish} series={seriesRecord} onClose={onClose} />;
+
   if (!book) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -368,8 +352,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const isPaused = book.status === "Paused";
   const isReading = book.status === "Reading";
   const readingActionLabel = book.status === "Finished" ? "Reread" : "Start Reading";
-  const hasSecondaryMetadata = Boolean(book.format || book.language || publicationYear || book.source || book.isbn);
-  const description = book.description?.trim() || "";
   return (
     <div className="rj-detail-page">
       <section className="rj-detail-hero" aria-labelledby={headingId}>
@@ -615,54 +597,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
         onSent={() => setShareStatus("Book sent to chat.")}
       />
       <div className="rj-detail-body">
-        <div>
-          <AboutSection
-            className="rj-detail-description"
-            title="About this book"
-            text={description}
-            titleContent={
-              <div className="rj-detail-tags">
-                {linkedGenres.length > 0
-                  ? linkedGenres.map(({ genre, slug }) => (
-                      <Link key={genre.id} to={`/genres/${slug}`}>{genre.name}</Link>
-                    ))
-                  : book.genre_paths?.map((path) => (
-                      <span key={path}>{formatGenrePathForDisplay(path)}</span>
-                    ))}
-              </div>
-            }
-          />
-          {hasSecondaryMetadata && (
-            <details className="rj-detail-metadata">
-              <summary>More book details</summary>
-              <dl>
-                {book.format && (
-                  <SecondaryMetadataRow label="Format" value={
-                    <MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>{book.format}</MetadataLink>
-                  } />
-                )}
-                {book.language && (
-                  <SecondaryMetadataRow label="Language" value={
-                    <MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>{book.language}</MetadataLink>
-                  } />
-                )}
-                {book.source && (
-                  <SecondaryMetadataRow label="Source" value={
-                    <MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>{book.source}</MetadataLink>
-                  } />
-                )}
-                {publicationYear && (
-                  <SecondaryMetadataRow label="Publication Date" value={
-                    <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
-                      {formatPublicationDateForDisplay(book.publication_date)}
-                    </MetadataLink>
-                  } />
-                )}
-                {book.isbn && <SecondaryMetadataRow label="ISBN" value={book.isbn} />}
-              </dl>
-            </details>
-          )}
-        </div>
+        <BookDetailAbout book={book} />
 
         <section aria-labelledby={`${headingId}-progress`}>
           <div className="rj-detail-section-heading">
@@ -696,21 +631,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
           addDisabled={!user}
         />
       </div>
-    </div>
-  );
-}
-
-function SecondaryMetadataRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
     </div>
   );
 }

@@ -41,10 +41,15 @@ function sortBooks(books: Book[], sort: BookSort): Book[] {
   return sortLibraryBooks(books, sort);
 }
 
-export function DetailBooks({ books, series = false }: { books: Book[]; series?: boolean }) {
+export function DetailBooks({ books, series = false, title = "Books", sectionId = "books" }: {
+  books: Book[];
+  series?: boolean;
+  title?: string;
+  sectionId?: string;
+}) {
   const navigate = useNavigate();
   const titleId = useId();
-  const sectionRef = useDetailSectionAnchor("books");
+  const sectionRef = useDetailSectionAnchor(sectionId);
   const [searchParams] = useSearchParams();
   const options = series ? seriesSortOptions : authorSortOptions;
   const requestedSort = searchParams.get("sort");
@@ -53,9 +58,9 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
   const visibleBooks = sortBooks(books, sort);
 
   return (
-    <section id="books" ref={sectionRef} aria-labelledby={titleId} className="min-w-0 space-y-4 scroll-mt-4">
+    <section id={sectionId} ref={sectionRef} aria-labelledby={titleId} className="min-w-0 space-y-4 scroll-mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id={titleId}>Books</h2>
+        <h2 id={titleId}>{title}</h2>
         {books.length > 0 && (
           <LibrarySortingControls
             nativeMenu
@@ -72,7 +77,7 @@ export function DetailBooks({ books, series = false }: { books: Book[]; series?:
       {visibleBooks.length > 0 ? (
         <BookShelf
           key={sort}
-          label="Books shelf"
+          label={`${title} shelf`}
           books={visibleBooks.map((book) => ({
             id: book.id,
             title: book.title,

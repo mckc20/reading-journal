@@ -152,7 +152,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     };
   }, []);
 
-  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks), [authorRecords, books, journalEntries, wishlistBooks]);
+  const authors = useMemo(() => buildAuthorSummaries(authorRecords, books, journalEntries, wishlistBooks, { includeWishlistAuthors: true }), [authorRecords, books, journalEntries, wishlistBooks]);
   const author = useMemo(() => findAuthorSummary(authors, authorId), [authors, authorId]);
   useEffect(() => {
     if (!author || location.state?.openEdit !== true) return;

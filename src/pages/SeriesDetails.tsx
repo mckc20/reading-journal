@@ -217,6 +217,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const { authors: authorRecords } = useAuthorsContext();
   const {
     books,
+    wishlistBooks,
     loading: booksLoading,
     error: booksError,
     updateBook,
@@ -258,7 +259,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     [books, seriesId],
   );
 
-  const featuredVolume = seriesBooks.find((book) => book.cover_url);
+  const seriesWishes = useMemo(() => sortSeriesBooks(wishlistBooks.filter(book => book.series_id === seriesId)), [wishlistBooks, seriesId]);
+  const seriesVolumes = useMemo(() => sortSeriesBooks([...seriesBooks, ...seriesWishes]), [seriesBooks, seriesWishes]);
+  const featuredVolume = seriesVolumes.find((book) => book.cover_url);
   const heroColor = useBookHeroColor(featuredVolume?.cover_url);
 
   const loadLogs = useCallback(async () => {
@@ -300,8 +303,8 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const seriesLogs = useMemo(() => filterSeriesLogs(seriesBooks, logs), [logs, seriesBooks]);
   const seriesBookIds = useMemo(() => new Set(seriesBooks.map((book) => book.id)), [seriesBooks]);
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
-  const authors = useMemo(() => getSeriesAuthors(seriesBooks), [seriesBooks]);
-  const genres = useMemo(() => getSeriesGenres(seriesBooks), [seriesBooks]);
+  const authors = useMemo(() => getSeriesAuthors(seriesVolumes), [seriesVolumes]);
+  const genres = useMemo(() => getSeriesGenres(seriesVolumes), [seriesVolumes]);
   const genreSlugByName = useMemo(() => {
     const { slugById } = buildGenreSlugLookup(availableGenres);
     return new Map(
@@ -455,7 +458,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         color={heroColor}
         banner={seriesRecord.cover_url}
         navigation={back}
-        artwork={<SeriesCoverStack books={seriesBooks} frameless />}
+        artwork={<SeriesCoverStack books={seriesVolumes} frameless />}
         actions={
           <DetailActionsMenu
             kind="series"
@@ -532,7 +535,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           />
         )}
 
-        <DetailBooks books={seriesBooks} series />
+        {(seriesBooks.length > 0 || seriesWishes.length === 0) && <DetailBooks books={seriesBooks} series />}
+        {seriesWishes.length > 0 && <DetailBooks books={seriesWishes} series title="In Wishlist"
+          sectionId={seriesBooks.length > 0 ? "wishlist-books" : "books"} />}
 
         {(seriesBooks.length > 0 || insightsAnchored) && (
           <section id="insights" ref={insightsRef} aria-labelledby={`${headingId}-insights`} className="space-y-4 scroll-mt-4">

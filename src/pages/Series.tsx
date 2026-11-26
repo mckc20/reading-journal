@@ -5,7 +5,7 @@ import { sortLibrarySeries, seriesSortOptions, defaultSeriesSortDirection } from
 import { useLibraryPresentation } from "@/components/redesign/LibraryNavigation";
 import { compareLibraryItems } from "@/lib/libraryTabs";
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,20 @@ function getSeriesAuthors(group: SeriesBookGroup): string[] {
 }
 
 export default function Series() {
-  const { books, loading: booksLoading, error: booksError } = useBooksContext();
+  const wishlistHeadingId = useId();
+  const { books, wishlistBooks, loading: booksLoading, error: booksError } = useBooksContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const { sort: librarySort, sortChanged } = useLibraryPresentation();
-  const librarySeries = useMemo(() => series.filter((item) => !item.is_wishlist_only), [series]);
-  const allGroups = useMemo(() => buildSeriesGroups(books, librarySeries, { includeEmpty: true }), [books, librarySeries]);
+  const wishlistGroups = useMemo(() => buildSeriesGroups(wishlistBooks, series), [wishlistBooks, series]);
+  const libraryGroups = useMemo(() => {
+    const wishedIds = new Set(wishlistGroups.map(group => group.seriesId));
+    const ownedIds = new Set(books.map(book => book.series_id));
+    const librarySeries = series.filter(item => ownedIds.has(item.id) || (!item.is_wishlist_only && !wishedIds.has(item.id)));
+    return buildSeriesGroups(books, librarySeries, { includeEmpty: true });
+  }, [books, series, wishlistGroups]);
   const loading = booksLoading || seriesLoading;
   const error = booksError || seriesError;
   const genreFilters = useMemo(() => searchParams.getAll("genre").filter(Boolean), [searchParams]);
@@ -43,7 +49,7 @@ export default function Series() {
   const [latestReadTimesByBook, setLatestReadTimesByBook] = useState<Map<string, number>>(new Map());
   const [readingLogsLoaded, setReadingLogsLoaded] = useState(false);
   const [readingLogsError, setReadingLogsError] = useState(false);
-  const seriesCreatedAtById = useMemo(() => new Map(librarySeries.map((item) => [item.id, item.created_at])), [librarySeries]);
+  const seriesCreatedAtById = useMemo(() => new Map(series.map((item) => [item.id, item.created_at])), [series]);
 
   useEffect(() => {
     if (sort !== "last-read" || readingLogsLoaded) return;
@@ -65,27 +71,30 @@ export default function Series() {
     return () => { cancelled = true; };
   }, [sort, readingLogsLoaded]);
   const activeFilterCount = genreFilters.length + statusFilters.length;
-  const groups = useMemo(() => {
-    const visible = allGroups.filter((group) => {
-      if (statusFilters.length && !statusFilters.includes(getDerivedSeriesStatus(group.books))) return false;
-      // Match whole series when any linked book has one of the selected genres.
-      return !genreFilters.length || group.books.some((book) => (book.genres ?? []).some((genre) => genreFilters.includes(genre)));
-    });
-    if (!legacySort && librarySort === "author") {
-      return visible.map(group => ({ group, title: group.name, author: getSeriesAuthors(group).sort().join(", ") }))
-        .sort((a, b) => compareLibraryItems(a, b, "author"))
-        .map(entry => entry.group);
+  const [groups, wishedGroups] = useMemo(() => {
+    function filterAndSort(allGroups: SeriesBookGroup[]) {
+      const visible = allGroups.filter((group) => {
+        if (statusFilters.length && !statusFilters.includes(getDerivedSeriesStatus(group.books))) return false;
+        return !genreFilters.length || group.books.some((book) => (book.genres ?? []).some((genre) => genreFilters.includes(genre)));
+      });
+      if (!legacySort && librarySort === "author") {
+        return visible.map(group => ({ group, title: group.name, author: getSeriesAuthors(group).sort().join(", ") }))
+          .sort((a, b) => compareLibraryItems(a, b, "author"))
+          .map(entry => entry.group);
+      }
+      return sortLibrarySeries(visible, sort, direction, { seriesCreatedAtById, latestReadTimesByBook });
     }
-    return sortLibrarySeries(visible, sort, direction, { seriesCreatedAtById, latestReadTimesByBook });
-  }, [allGroups, statusFilters, genreFilters, legacySort, librarySort, sort, direction, seriesCreatedAtById, latestReadTimesByBook]);
+    return [filterAndSort(libraryGroups), filterAndSort(wishlistGroups)];
+  }, [libraryGroups, wishlistGroups, statusFilters, genreFilters, legacySort, librarySort, sort, direction, seriesCreatedAtById, latestReadTimesByBook]);
 
   const needle = query.trim().toLocaleLowerCase();
-  const visibleEntries = groups.map(group => ({
-    id: group.seriesId,
-    title: group.name,
-    author: getSeriesAuthors(group).join(", "),
-    books: group.books,
-  })).filter(entry => `${entry.title} ${entry.author}`.toLocaleLowerCase().includes(needle));
+  function searchEntries(groups: SeriesBookGroup[]) {
+    return groups.filter(group => `${group.name} ${getSeriesAuthors(group).join(", ")}`.toLocaleLowerCase().includes(needle))
+      .map(group => ({ id: group.seriesId, title: group.name, books: group.books }));
+  }
+  const visibleEntries = searchEntries(groups);
+  const visibleWishes = searchEntries(wishedGroups);
+  const hasGroups = groups.length > 0 || wishedGroups.length > 0;
 
   function clearFilters() {
     setSearchParams((current) => {
@@ -97,7 +106,7 @@ export default function Series() {
   }
 
   function openSeries(seriesId: string) {
-    navigate(`/series/${seriesId}`);
+    navigate(`/series/${encodeURIComponent(seriesId)}`);
   }
 
   return (
@@ -116,19 +125,27 @@ export default function Series() {
           <p className="text-sm text-destructive">{error}</p>
         ) : loading ? (
           <LoadingIndicator variant="page" />
-        ) : groups.length === 0 && activeFilterCount > 0 ? (
+        ) : !hasGroups && activeFilterCount > 0 ? (
           <CollectionEmptyState title="No series match your filters"
             description="Clear the filters to see all your series." onShowAll={clearFilters} />
-        ) : groups.length === 0 ? (
+        ) : !hasGroups ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <BookOpen className="h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground">Series you add will appear here.</p>
           </div>
-        ) : visibleEntries.length === 0 ? (
+        ) : visibleEntries.length === 0 && visibleWishes.length === 0 ? (
           <EmptyState title="No series found" message="Try another series title or author."
             action={<Button variant="outline" onClick={() => setQuery("")}>Clear search</Button>} />
         ) : (
-          <LibrarySeriesEntries entries={visibleEntries} onOpen={openSeries} />
+          <>
+            {visibleEntries.length > 0 && <LibrarySeriesEntries entries={visibleEntries} onOpen={openSeries} />}
+            {visibleWishes.length > 0 && (
+              <section aria-labelledby={wishlistHeadingId} className={visibleEntries.length ? "mt-8 grid gap-4" : "grid gap-4"}>
+                <h2 id={wishlistHeadingId} className="text-base font-semibold">In Wishlist</h2>
+                <LibrarySeriesEntries entries={visibleWishes} onOpen={openSeries} label="Wishlist series" />
+              </section>
+            )}
+          </>
         )}
       </div>}
     </CollectionSearch>

@@ -180,12 +180,13 @@ export function buildAuthorSummaries(
   second: Book[] | BookJournalEntryRecord[] = [],
   third: BookJournalEntryRecord[] = [],
   wishlistBooks: Book[] = [],
+  { includeWishlistAuthors = false }: { includeWishlistAuthors?: boolean } = {},
 ): AuthorSummary[] {
   const firstItem = first[0] as Author | Book | undefined;
   const secondItem = second[0] as Book | BookJournalEntryRecord | undefined;
   const firstLooksLikeAuthor = Boolean(firstItem && !("title" in firstItem) && !("status" in firstItem));
   const secondLooksLikeBook = Boolean(secondItem && "title" in secondItem && "status" in secondItem);
-  const usesNewSignature = firstLooksLikeAuthor || third.length > 0 || secondLooksLikeBook;
+  const usesNewSignature = firstLooksLikeAuthor || third.length > 0 || secondLooksLikeBook || includeWishlistAuthors;
   const authorsInput = usesNewSignature ? (first as Author[]) : [];
   const inputBooks = usesNewSignature ? (second as Book[]) : (first as Book[]);
   const books = inputBooks.filter((book) => book.status !== "Wishlist");
@@ -199,10 +200,10 @@ export function buildAuthorSummaries(
   const authorGroups = new Map<string, { author: AuthorSummary; books: Book[] }>();
 
   authorsInput.forEach((author) => {
-    // Wishlist saves create author rows too; only library books make those rows visible.
+    // Keep wishlist-only authors out of author indexes while allowing their detail pages.
     // Keep standalone authors that the user added without linking any books.
     const key = authorKey(author.name);
-    if (wishlistAuthorKeys.has(key) && !libraryAuthorKeys.has(key)) return;
+    if (!includeWishlistAuthors && wishlistAuthorKeys.has(key) && !libraryAuthorKeys.has(key)) return;
 
     const summary: AuthorSummary = {
       ...author,
@@ -239,6 +240,15 @@ export function buildAuthorSummaries(
       authorGroups.set(key, { author: synthetic, books: [book] });
     });
   });
+
+  if (includeWishlistAuthors) {
+    for (const book of wishlistBooks) {
+      for (const name of uniqueAuthorNames(book)) {
+        const key = authorKey(name);
+        if (!authorGroups.has(key)) authorGroups.set(key, { author: makeSyntheticAuthorSummary(name), books: [] });
+      }
+    }
+  }
 
   const quoteJournalEntries = sortBookJournalEntryRecords(journalEntries.filter((note) => note.label === "quote"));
   const quotesByBookId = new Map<string, BookJournalEntryRecord[]>();
@@ -278,10 +288,10 @@ export function buildAuthorSummaries(
   );
 }
 
-export function findAuthorSummary(
-  authors: AuthorSummary[],
+export function findAuthorSummary<T extends Pick<Author, "id" | "name">>(
+  authors: readonly T[],
   identifier: string | undefined,
-): AuthorSummary | null {
+): T | null {
   if (!identifier) return null;
 
   let decoded = identifier;
