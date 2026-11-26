@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { useGenresContext } from "@/context/GenresContext";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { useSeries } from "@/hooks/useSeries";
 import {
@@ -37,7 +36,6 @@ import { fetchAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { getBookRankings } from "@/lib/bookRankings";
-import { buildGenreSlugLookup } from "@/lib/genreTree";
 import { authorJournalToJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
@@ -120,7 +118,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     reload: reloadAuthors,
   } = useAuthorsContext();
   const { books, wishlistBooks, loading: booksLoading, error: booksError, reload: reloadBooks } = useBooksContext();
-  const { genres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError } = useSeries();
   const [journalEntries, setJournalEntries] = useState<BookJournalEntryRecord[]>([]);
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(true);
@@ -168,12 +165,6 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     [authorBooks],
   );
   const authorRankings = useMemo(() => getBookRankings(authorBooks, journalEntries), [authorBooks, journalEntries]);
-  const genreSlugByName = useMemo(() => {
-    const { slugById } = buildGenreSlugLookup(genres);
-    return new Map(
-      genres.map((genre) => [genre.name.toLocaleLowerCase(), slugById.get(genre.id) ?? genre.id]),
-    );
-  }, [genres]);
   const loading = authorsLoading || booksLoading || journalEntriesLoading || seriesLoading;
   const authorJournal = useDetailJournalEntries(author?.id, fetchAuthorJournalEntryRecords, authorJournalToJournalEntries);
   const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
@@ -312,7 +303,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           className="rj-detail-description"
           title="About this author"
           text={bio}
-          titleContent={<DetailGenreTags genres={authorGenres} slugByName={genreSlugByName} />}
+          titleContent={<DetailGenreTags genres={authorGenres} />}
         />
 
         <DetailBooks books={authorBooks} />

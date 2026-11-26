@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { buildBookLibraryFilterPath, buildGenreDetailPath } from "@/components/LinkedMetadata";
+import { buildBookLibraryFilterPath } from "@/components/LinkedMetadata";
 import { cn } from "@/lib/utils";
 
 export function DetailHero({
@@ -39,21 +39,13 @@ export function DetailHero({
   );
 }
 
-export function DetailGenreTags({ genres, slugByName }: {
-  genres: string[];
-  slugByName: ReadonlyMap<string, string>;
-}) {
+export function DetailGenreTags({ genres }: { genres: string[] }) {
   if (genres.length === 0) return null;
   return (
     <div className="rj-detail-tags">
-      {genres.map((genre) => {
-        const slug = slugByName.get(genre.toLocaleLowerCase());
-        return (
-          <Link key={genre} to={slug ? buildGenreDetailPath(slug) : buildBookLibraryFilterPath("genre", genre)}>
-            {genre}
-          </Link>
-        );
-      })}
+      {genres.map(genre => (
+        <Link key={genre} to={buildBookLibraryFilterPath("genre", genre)}>{genre}</Link>
+      ))}
     </div>
   );
 }

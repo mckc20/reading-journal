@@ -1,3 +1,4 @@
+import { wishlistCollectionPath } from "@/lib/libraryCollections";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import {
   Fragment,
@@ -373,7 +374,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                 if (!confirm("Move this book to your wishlist? It will leave your library, but its journal and reading data will be kept.")) return;
                 void moveBookToWishlist(book).then(async () => {
                   await reload();
-                  navigate("/library/wishlist");
+                  navigate(wishlistCollectionPath);
                 }).catch((err) => setErrorMsg(err instanceof Error ? err.message : "Could not move to wishlist"));
               }}
               onDelete={handleDelete}

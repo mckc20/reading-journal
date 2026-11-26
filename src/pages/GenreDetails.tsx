@@ -16,6 +16,7 @@ import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
 import { buildGenreSlugLookup, getBooksForGenreSubtree, getGenrePath, resolveGenreSlug } from "@/lib/genres";
 import { filterAndSortGenreBooks, summarizeGenreBooks, type GenreBookSort } from "@/lib/genreCollection";
+import { libraryGenreFiltersPath } from "@/lib/libraryRedirects";
 import { getGenreArtwork, getGenreMetadata } from "@/lib/genreMetadata";
 import type { Book, BookStatus } from "@/types";
 
@@ -33,7 +34,7 @@ function BooksGrid({ books, onBook }: { books: Book[]; onBook: (book: Book) => v
 }
 
 const genreDetailLabel = "Genre details";
-const genreFallback = "/library/genres";
+const genreFallback = libraryGenreFiltersPath;
 export default function GenreDetails() {
   const { genreId } = useParams<{ genreId: string }>();
   return (
@@ -85,7 +86,7 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
       >
         <div className="space-y-3">
           <nav className="relative z-10 flex flex-wrap items-center gap-1 text-xs text-muted-foreground sm:text-sm" aria-label="Breadcrumb">
-            <Link to="/library/genres" className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Genres</Link>
+            <Link to={libraryGenreFiltersPath} className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Genres</Link>
             {path.map((item) => <span key={item.id} className="inline-flex items-center gap-1">
               <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
               {item.id === genre.id ? <span aria-current="page">{item.name}</span> :

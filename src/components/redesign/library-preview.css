@@ -92,3 +92,24 @@
   .rj-library-list-row:hover { background: color-mix(in oklab, var(--muted) 50%, transparent); }
   .rj-library-books-panel .rj-library-list-row:hover { background: var(--surface-hover); }
 }
+
+.rj-library-books-toolbar .rj-books-filter-trigger { position: relative; width: 44px; height: 44px; }
+.rj-books-filter-trigger[data-active] { background: var(--secondary); }
+.rj-books-filter-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  padding-inline: 3px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 10px;
+  line-height: 18px;
+}
+.rj-books-filter-dialog { grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.rj-books-filter-groups { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px; }
+.rj-books-filter-groups fieldset + fieldset { margin-top: 18px; }
+.rj-books-filter-groups legend { margin-bottom: 8px; font-weight: 600; }
+.rj-books-filter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rj-books-filter-fields select { width: 100%; }

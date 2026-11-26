@@ -3,7 +3,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { Tabs } from "radix-ui";
 import { Outlet, useLocation, useNavigate, useNavigation, useOutletContext } from "react-router-dom";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
-import { getLibraryTab, libraryTabs, type LibrarySort } from "@/lib/libraryTabs";
+import { getLibraryTab, librarySorts, libraryTabs, type LibrarySort } from "@/lib/libraryTabs";
 import { parseCollectionId } from "@/lib/libraryCollections";
 import "./library-navigation.css";
 import "./library-preview.css";
@@ -26,8 +26,9 @@ export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pe
   const collection = tab.label === "Collections" ? parseCollectionId(new URLSearchParams(search).get("collection")) : null;
   const highlighted = (pendingPath && getLibraryTab(pendingPath)) || tab;
   const [selectedSort, setSort] = useState<LibrarySort>();
-  const legacySeries = tab.label === "Series" ? new URLSearchParams(search) : null;
-  const sort = selectedSort ?? (legacySeries?.get("sort") === "name" ? "title" : "recent");
+  const sortParam = new URLSearchParams(search).get("sort");
+  const linkedSort = librarySorts.find(option => option.value === sortParam)?.value;
+  const sort = selectedSort ?? linkedSort ?? (tab.label === "Series" && sortParam === "name" ? "title" : "recent");
 
   return (
     <LibraryPresentation.Provider value={{ sort, setSort, sortChanged: selectedSort !== undefined }}>

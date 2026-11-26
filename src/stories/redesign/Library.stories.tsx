@@ -52,7 +52,7 @@ function LibraryReview(args: LibraryPreviewProps) {
 const noop = () => {};
 const meta = {
   title: 'Redesign/Library', component: LibraryPreview,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Books, Collections and Series views used by the signed-in Library overview. Storybook uses fictional data and reports intent for creating a book and opening book or series details. Wishlist entries appear under Collections. Advanced filters and bulk tools are available in the app’s separate All books page.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'The Books, Collections and Series views used by the signed-in Library overview. The Books tab offers book filters next to Sort by. Storybook uses fictional data and reports intent for creating a book and opening book or series details. Wishlist entries appear under Collections.' } } },
   args: { books: libraryBooks, onRetry: noop, onOpenBook: noop, onNavigate: noop, onCreate: noop, onNotifications: noop },
   render: args => <LibraryReview key={JSON.stringify([args.books, args.error, args.loading, args.initialQuery])} {...args} />,
 } satisfies Meta<typeof LibraryPreview>;
@@ -182,5 +182,22 @@ export const SortingAndLayout: Story = {
     await expect(canvas.queryByRole('group', { name: 'Library view' })).not.toBeInTheDocument();
     await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Sort by' }), 'recent');
     await expect(titles()[0]).toBe('A Psalm for the Wild-Built');
+  },
+};
+
+export const FilteringBooks: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Filter books' }));
+    const dialogElement = await within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'Filter books' });
+    const dialog = within(dialogElement);
+    await userEvent.selectOptions(dialog.getByRole('combobox', { name: 'Status' }), 'Currently Reading');
+    await userEvent.selectOptions(dialog.getByRole('combobox', { name: 'Source' }), 'Owned');
+    await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
+    const list = () => within(canvas.getByRole('list', { name: 'Library books' }));
+    await waitFor(() => expect(list().getAllByRole('listitem')).toHaveLength(1));
+    await expect(list().getByRole('button', { name: 'A Psalm for the Wild-Built' })).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear filters' }));
+    await expect(list().getAllByRole('listitem')).toHaveLength(7);
   },
 };

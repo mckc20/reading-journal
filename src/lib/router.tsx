@@ -3,6 +3,8 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
+import { wishlistCollectionPath } from "@/lib/libraryCollections";
+import { legacyLibraryDestination } from "@/lib/libraryRedirects";
 
 // Load the signed-in app shell only after ProtectedRoute resolves the session.
 const AppLayout = lazy(() => import("@/components/AppLayout"));
@@ -37,9 +39,9 @@ function NotFound() {
   );
 }
 
-function RedirectTo({ to, preserveSearch = false }: { to: string; preserveSearch?: boolean }) {
-  const location = useLocation();
-  return <Navigate to={`${to}${preserveSearch ? location.search : ""}`} replace />;
+function RedirectLegacyLibrary({ browseBy }: { browseBy?: "author" | "genre" }) {
+  const { search } = useLocation();
+  return <Navigate to={legacyLibraryDestination(search, browseBy)} replace />;
 }
 
 function RedirectBookJournal() {
@@ -99,11 +101,11 @@ export const router = createBrowserRouter([
               { path: "series", lazy: async () => ({ Component: (await import("@/pages/Series")).default }) },
             ],
           },
-          pageRoute("/library/wishlist", () => import("@/pages/Wishlist")),
-          pageRoute("/library/books", () => import("@/pages/ExploreLibrary")),
-          pageRoute("/library/authors", () => import("@/pages/AuthorsExplore")),
-          pageRoute("/library/genres", () => import("@/pages/Genres")),
-          pageRoute("/library/genres/all", () => import("@/pages/AllGenres")),
+          { path: "/library/wishlist", element: <Navigate to={wishlistCollectionPath} replace /> },
+          { path: "/library/books", element: <RedirectLegacyLibrary /> },
+          { path: "/library/authors", element: <RedirectLegacyLibrary browseBy="author" /> },
+          { path: "/library/genres", element: <RedirectLegacyLibrary browseBy="genre" /> },
+          { path: "/library/genres/all", element: <RedirectLegacyLibrary browseBy="genre" /> },
           pageRoute("/library/journal", () => import("@/pages/LibraryJournal")),
           { path: "/journal/:publicId", element: lazyRoute(<JournalEntryRedirect />) },
           pageRoute("/statistics", () => import("@/pages/Analytics")),
@@ -119,15 +121,15 @@ export const router = createBrowserRouter([
           { path: "/series/:seriesId/analytics", element: <RedirectEntityDetail entity="series" section="insights" /> },
           { path: "/series/:seriesId/books", element: <RedirectEntityDetail entity="series" section="books" /> },
           { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="journal" /> },
-          { path: "/library/explore", element: <RedirectTo to="/library/books" preserveSearch /> },
+          { path: "/library/explore", element: <RedirectLegacyLibrary /> },
           { path: "/authors", element: lazyRoute(<Authors />) },
-          { path: "/authors/explore", element: <RedirectTo to="/library/authors" preserveSearch /> },
+          { path: "/authors/explore", element: <RedirectLegacyLibrary browseBy="author" /> },
           { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
           { path: "/authors/:authorId/journal", element: <RedirectEntityDetail entity="author" section="journal" /> },
           { path: "/authors/:authorId/books", element: <RedirectEntityDetail entity="author" section="books" /> },
           { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="journal" /> },
           pageRoute("/search", () => import("@/pages/Search")),
-          { path: "/genres", element: <Navigate to="/library/genres" replace /> },
+          { path: "/genres", element: <RedirectLegacyLibrary browseBy="genre" /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },
           { path: "/books/:bookId/analytics", element: <Navigate to=".." relative="path" replace /> },

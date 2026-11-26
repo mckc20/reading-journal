@@ -4,7 +4,6 @@ export { default as Library } from "./Library";
 export { default as Series } from "./Series";
 export { default as SeriesDetails } from "./SeriesDetails";
 export { default as Authors } from "./Authors";
-export { default as AuthorsExplore } from "./AuthorsExplore";
 export { default as AuthorDetails } from "./AuthorDetails";
 export { default as Search } from "./Search";
 export { default as Analytics } from "./Analytics";

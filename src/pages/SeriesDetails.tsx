@@ -41,7 +41,6 @@ import { Button } from "@/components/ui/button";
 import { useAuth, useUserSettings } from "@/context";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { useGenresContext } from "@/context/GenresContext";
 import { useSeries } from "@/hooks/useSeries";
 import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
@@ -50,7 +49,6 @@ import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { fetchReadingLogs } from "@/lib/books";
 import { duplicateSeriesRecord } from "@/lib/duplication";
 import { buildSeriesAttachment } from "@/lib/chatAttachments";
-import { buildGenreSlugLookup } from "@/lib/genreTree";
 import { formatMediumDate } from "@/lib/dateDisplay";
 import {
   filterSeriesLogs,
@@ -223,7 +221,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     updateBook,
     reload: reloadBooks,
   } = useBooksContext();
-  const { genres: availableGenres } = useGenresContext();
   const { series, loading: seriesLoading, error: seriesError, editSeries, removeSeries, reload: reloadSeries } = useSeries();
   const { settings } = useUserSettings();
   const [logs, setLogs] = useState<ReadingLog[]>([]);
@@ -305,12 +302,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesVolumes), [seriesVolumes]);
   const genres = useMemo(() => getSeriesGenres(seriesVolumes), [seriesVolumes]);
-  const genreSlugByName = useMemo(() => {
-    const { slugById } = buildGenreSlugLookup(availableGenres);
-    return new Map(
-      availableGenres.map((genre) => [genre.name.toLocaleLowerCase(), slugById.get(genre.id) ?? genre.id]),
-    );
-  }, [availableGenres]);
   const averageRating = useMemo(() => getAverageSeriesRating(seriesBooks), [seriesBooks]);
   const currentBook = useMemo(() => getCurrentSeriesBook(seriesBooks), [seriesBooks]);
   const derivedStatus = useMemo(() => getDerivedSeriesStatus(seriesBooks), [seriesBooks]);
@@ -522,7 +513,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           className="rj-detail-description"
           title="About this series"
           text={seriesRecord.description}
-          titleContent={<DetailGenreTags genres={genres} slugByName={genreSlugByName} />}
+          titleContent={<DetailGenreTags genres={genres} />}
         />
 
         {seriesBooks.length > 0 && (

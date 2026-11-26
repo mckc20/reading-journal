@@ -16,6 +16,8 @@ function toLibraryBook(book: Book): LibraryPreviewBook {
     favorite: book.is_favorite,
     format: book.format,
     language: book.language,
+    source: book.source,
+    filterRecord: book,
     addedAt: book.created_at,
   };
 }

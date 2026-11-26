@@ -1,3 +1,4 @@
+import { wishlistCollectionPath } from "@/lib/libraryCollections";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext } from "react-router-dom";
@@ -236,7 +237,7 @@ export default function Discover() {
     setSelected(null);
     openAddBook({
       initialRecommendation: item,
-      onSaved: () => navigate("/library/books"),
+      onSaved: () => navigate("/library"),
       onWishlistSaved: () => { void refresh(false); },
     });
   }
@@ -249,7 +250,7 @@ export default function Discover() {
       initiallyAddToWishlist: true,
       onWishlistSaved: () => {
         setWishlistKeys((current) => new Set(current).add(key));
-        navigate("/library/wishlist");
+        navigate(wishlistCollectionPath);
       },
     });
   }

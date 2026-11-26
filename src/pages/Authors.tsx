@@ -15,6 +15,7 @@ import {
   sortAuthorsByMostRead,
   wasReadInRecentWindow,
 } from "@/lib/authorsView";
+import { libraryAuthorFiltersPath } from "@/lib/libraryRedirects";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import type { BookJournalEntryRecord } from "@/types";
 
@@ -47,10 +48,11 @@ function AuthorAvatar({ author }: { author: AuthorSummary }) {
   );
 }
 
-function buildExplorePath(sort: "top-rated" | "latest-read" | "most-read") {
-  const params = new URLSearchParams();
-  params.set("sort", sort);
-  return `/library/authors?${params.toString()}`;
+function authorBooksPath(authors: AuthorSummary[]) {
+  if (authors.length === 0) return libraryAuthorFiltersPath;
+  const params = new URLSearchParams({ sort: "author" });
+  authors.forEach(author => params.append("author", author.name));
+  return `/library?${params}`;
 }
 
 function AuthorShelfRow({
@@ -322,19 +324,19 @@ export default function Authors() {
               title="Top Authors"
               authors={topAuthors}
               emptyMessage="No favorite or highly rated authors yet."
-              viewAllPath={buildExplorePath("top-rated")}
+              viewAllPath={authorBooksPath(topAuthors)}
             />
             <AuthorShelfRow
               title="Recently Read"
               authors={recentlyReadAuthors}
               emptyMessage="Authors from recently finished books will appear here."
-              viewAllPath={buildExplorePath("latest-read")}
+              viewAllPath={authorBooksPath(recentlyReadAuthors)}
             />
             <AuthorShelfRow
               title="Most Read"
               authors={mostReadAuthors}
               emptyMessage="Authors with more than two finished books will appear here."
-              viewAllPath={buildExplorePath("most-read")}
+              viewAllPath={authorBooksPath(mostReadAuthors)}
             />
           </section>
 
@@ -344,7 +346,7 @@ export default function Authors() {
                 <AppHeading level={3} as="h2">All Authors</AppHeading>
               </div>
               <Button asChild variant="ghost" size="sm" className="text-sm text-muted-foreground">
-                <Link to="/library/authors">
+                <Link to={libraryAuthorFiltersPath}>
                   View all
                   <ChevronRight className="h-4 w-4" />
                 </Link>

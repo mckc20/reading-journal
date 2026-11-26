@@ -1,27 +1,11 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import type { LibraryFilterKey } from "@/lib/libraryBookFilters";
 import { cn } from "@/lib/utils";
 
-export type BookLibraryFilterKey =
-  | "author"
-  | "format"
-  | "genre"
-  | "language"
-  | "publicationYear"
-  | "series"
-  | "source"
-  | "status";
-
-export type AuthorLibraryFilterKey = "genre" | "language";
-
-export function buildBookLibraryFilterPath(key: BookLibraryFilterKey, value: string): string {
+export function buildBookLibraryFilterPath(key: LibraryFilterKey, value: string): string {
   const params = new URLSearchParams({ [key]: value });
-  return `/library/books?${params.toString()}`;
-}
-
-export function buildAuthorLibraryFilterPath(key: AuthorLibraryFilterKey, value: string): string {
-  const params = new URLSearchParams({ [key]: value });
-  return `/library/authors?${params.toString()}`;
+  return `/library?${params.toString()}`;
 }
 
 export function buildAuthorDetailPath(authorIdOrName: string): string {

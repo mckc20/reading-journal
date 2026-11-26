@@ -35,6 +35,8 @@ import { GenresProvider } from "@/context/GenresContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { useAuth, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
+import { wishlistCollectionPath } from "@/lib/libraryCollections";
+import { libraryAuthorFiltersPath, libraryGenreFiltersPath } from "@/lib/libraryRedirects";
 import { getLibraryTab } from "@/lib/libraryTabs";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
@@ -140,10 +142,10 @@ const moreNavLinks: NavLink[] = [
 ];
 
 const libraryNavLinks: NavLink[] = [
-  { to: "/library/books", label: "All books", icon: BookOpen },
-  { to: "/library/authors", label: "Authors", icon: UserRound },
-  { to: "/library/genres", label: "Genres", icon: Tags },
-  { to: "/library/wishlist", label: "Wishlist", icon: Bookmark },
+  { to: "/library", label: "All books", icon: BookOpen },
+  { to: libraryAuthorFiltersPath, label: "Authors", icon: UserRound },
+  { to: libraryGenreFiltersPath, label: "Genres", icon: Tags },
+  { to: wishlistCollectionPath, label: "Wishlist", icon: Bookmark },
 ];
 
 function getPrimaryRoute(pathname: string) {
@@ -317,7 +319,7 @@ function AppLayoutContent() {
     const launchOptions = addBookOptions;
     launchOptions?.onSaved?.(book);
     if (!launchOptions?.onSaved) {
-      if (book.status === "Wishlist") navigate("/library/wishlist");
+      if (book.status === "Wishlist") navigate(wishlistCollectionPath);
       else if (!launchOptions?.editBook) navigate(`/books/${book.id}`);
     }
   }
