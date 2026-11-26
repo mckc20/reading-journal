@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Library, Plus, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, Library, Plus, SlidersHorizontal } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -53,9 +53,13 @@ export function CollectionDetail({ collection, books, loading, error, onRetry, o
 
   return <section className="rj-redesign rj-library-preview rj-collection-detail">
     <header className="rj-collection-detail-header">
-      <Button type="button" variant="ghost" className="rj-collection-back" onClick={onBack}><ArrowLeft aria-hidden="true" />All collections</Button>
       <div className="rj-collection-title-row">
-        <h1 ref={heading} tabIndex={-1}>{collection}</h1>
+        <div className="rj-collection-title-group">
+          <Button type="button" variant="ghost" size="icon-lg" className="rj-collection-back" aria-label="All collections" onClick={onBack}>
+            <ChevronLeft className="size-5" aria-hidden="true" />
+          </Button>
+          <h1 ref={heading} tabIndex={-1}>{collection}</h1>
+        </div>
         <DropdownMenu.Root modal={false} onOpenChange={open => { if (open) menuAction.current = null; }}>
           <DropdownMenu.Trigger asChild><Button ref={addTrigger}><Plus aria-hidden="true" />Add book</Button></DropdownMenu.Trigger>
           <DropdownMenu.Content className="rj-add-menu" align="end" sideOffset={6}
