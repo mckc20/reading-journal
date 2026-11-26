@@ -39,13 +39,12 @@ export function DetailHero({
   );
 }
 
-export function DetailGenreTags({ genres }: { genres: string[] }) {
+export function DetailGenreTags({ genres, linked = true }: { genres: string[]; linked?: boolean }) {
   if (genres.length === 0) return null;
   return (
     <div className="rj-detail-tags">
-      {genres.map(genre => (
-        <Link key={genre} to={buildBookLibraryFilterPath("genre", genre)}>{genre}</Link>
-      ))}
+      {genres.map(genre => linked ? <Link key={genre} to={buildBookLibraryFilterPath("genre", genre)}>{genre}</Link>
+        : <span key={genre}>{genre}</span>)}
     </div>
   );
 }

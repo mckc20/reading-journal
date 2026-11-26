@@ -7,7 +7,7 @@ import {
   useState,
   useRef,
 } from "react";
-import { Link, useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   Calendar,
@@ -15,7 +15,6 @@ import {
   Flag,
   Loader2,
   NotebookPen,
-  Star,
 } from "lucide-react";
 import AddSeriesDialog from "@/components/AddSeriesDialog";
 import { AboutSection, AppHeading } from "@/components/design";
@@ -26,7 +25,8 @@ import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
 import { SeriesCoverStack } from "@/components/redesign/SeriesCoverStack";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
-import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
+import { useDetailJournalEditor } from "@/components/redesign/DetailJournal";
+import { WishlistBookActions } from "@/components/redesign/WishlistBookActions";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
 import {
@@ -53,7 +53,6 @@ import { formatMediumDate } from "@/lib/dateDisplay";
 import {
   filterSeriesLogs,
   estimateSeriesCompletionDate,
-  getAverageSeriesRating,
   getCurrentSeriesBook,
   getDerivedSeriesStatus,
   getJourneyBookDates,
@@ -64,11 +63,10 @@ import {
   sortSeriesBooks,
   type SeriesStats,
 } from "@/lib/seriesDetails";
-import { fetchSeriesJournalEntryRecords } from "@/lib/seriesJournal";
-import { seriesJournalToJournalEntries } from "@/lib/journal";
 import { getTodayLocalDate } from "@/lib/utils";
+import { entityJournalHref } from "@/lib/journalLinks";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
-import type { AuthorJournalEntryRecord, Book, BookJournalEntryRecord, ReadingLog, SeriesJournalEntryRecord } from "@/types";
+import type { Book, BookJournalEntryRecord, ReadingLog } from "@/types";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -209,6 +207,7 @@ export default function SeriesDetails() {
 function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClose: () => void }) {
   const headingId = useId();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { user } = useAuth();
@@ -241,11 +240,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     location.hash === "#analytics" ? "analytics" : "insights",
     !booksLoading && !seriesLoading && !editOpen,
   );
-  const seriesJournal = useDetailJournalEntries(seriesRecord?.id, fetchSeriesJournalEntryRecords, seriesJournalToJournalEntries);
-  const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
-    if ("series_id" in record && record.series_id === seriesRecord?.id) seriesJournal.save(record);
-  }, [seriesRecord?.id, seriesJournal.save]);
-  const journalEditor = useDetailJournalEditor("Series", !booksLoading && !seriesLoading && !editOpen && user ? seriesRecord?.id : undefined, saveJournalEntry);
   useEffect(() => {
     if (!seriesRecord || location.state?.openEdit !== true) return;
     setEditOpen(true);
@@ -257,6 +251,10 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   );
 
   const seriesWishes = useMemo(() => sortSeriesBooks(wishlistBooks.filter(book => book.series_id === seriesId)), [wishlistBooks, seriesId]);
+  const selectedWish = seriesWishes.find(book => book.id === searchParams.get("wishlistBook"))
+    ?? (seriesBooks.length === 0 ? seriesWishes[0] : undefined);
+  const journalEditor = useDetailJournalEditor("Series",
+    !booksLoading && !seriesLoading && !editOpen && !selectedWish && user ? seriesRecord?.id : undefined);
   const seriesVolumes = useMemo(() => sortSeriesBooks([...seriesBooks, ...seriesWishes]), [seriesBooks, seriesWishes]);
   const featuredVolume = seriesVolumes.find((book) => book.cover_url);
   const heroColor = useBookHeroColor(featuredVolume?.cover_url);
@@ -302,7 +300,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
   const progress = useMemo(() => getSeriesProgress(seriesBooks), [seriesBooks]);
   const authors = useMemo(() => getSeriesAuthors(seriesVolumes), [seriesVolumes]);
   const genres = useMemo(() => getSeriesGenres(seriesVolumes), [seriesVolumes]);
-  const averageRating = useMemo(() => getAverageSeriesRating(seriesBooks), [seriesBooks]);
   const currentBook = useMemo(() => getCurrentSeriesBook(seriesBooks), [seriesBooks]);
   const derivedStatus = useMemo(() => getDerivedSeriesStatus(seriesBooks), [seriesBooks]);
   const firstVolume = useMemo(() => sortSeriesBooks(seriesBooks)[0] ?? null, [seriesBooks]);
@@ -422,6 +419,10 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
     }
   }
 
+  if (seriesId && searchParams.get("new") !== "1" && (location.hash === "#journal" || searchParams.has("entry"))) {
+    return <Navigate to={entityJournalHref("series", seriesId, searchParams)} replace />;
+  }
+
   const back = <DetailBack label={seriesDetailLabel} fallbackTo={seriesFallback} onClose={onClose} />;
   if (booksLoading || seriesLoading) return <div className="rj-detail-page">{back}<PageLoading /></div>;
 
@@ -487,8 +488,8 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             <span>Unknown author</span>
           )}
         </p>
-        <div className="rj-detail-actions">
-          {progressDetail.kind === "not-started" && (
+        {selectedWish ? <WishlistBookActions key={selectedWish.id} book={selectedWish} /> : <div className="rj-detail-actions">
+          {progressDetail.kind === "not-started" && progressDetail.book && (
             <Button type="button" onClick={progressDetail.onStartReading} disabled={progressDetail.startDisabled}>
               {progressDetail.startDisabled && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
               {progressDetail.startDisabled ? "Starting…" : "Start Reading"}
@@ -498,22 +499,17 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
             <NotebookPen aria-hidden="true" />
             Add entry
           </Button>
-        </div>
+        </div>}
         {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
         {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
       </DetailHero>
 
       <div className="rj-detail-body">
-        <dl className="rj-reading-stats rj-detail-summary-stats">
-          <DetailStat icon={BookOpen} label="Books read" value={seriesBooks.length > 0 ? `${progress.finishedBooks} / ${seriesBooks.length}` : "0"} />
-          <DetailStat icon={Star} label="Average rating" value={averageRating === null ? "No rating" : averageRating.toFixed(1)} />
-        </dl>
-
         <AboutSection
           className="rj-detail-description"
           title="About this series"
           text={seriesRecord.description}
-          titleContent={<DetailGenreTags genres={genres} />}
+          titleContent={<DetailGenreTags genres={genres} linked={!selectedWish} />}
         />
 
         {seriesBooks.length > 0 && (
@@ -543,16 +539,6 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           </section>
         )}
 
-        <DetailJournal
-          sectionId="journal"
-          entries={seriesJournal.entries}
-          loading={seriesJournal.loading}
-          error={seriesJournal.error}
-          onAdd={journalEditor.launch}
-          onEntryUpdated={(entry) => { if (entry.source === "series_note") seriesJournal.save(entry.seriesJournalEntry); }}
-          onEntryDeleted={(entry) => { if (entry.source === "series_note") seriesJournal.remove(entry.sourceId); }}
-          addDisabled={!user}
-        />
       </div>
       {editOpen && (
         <AddSeriesDialog

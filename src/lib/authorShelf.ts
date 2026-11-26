@@ -60,6 +60,11 @@ function uniqueAuthorNames(book: Book): string[] {
   return authors.length > 0 ? authors : [AUTHORLESS_NAME];
 }
 
+export function getBooksByAuthor(books: Book[], name: string): Book[] {
+  const key = authorKey(name);
+  return books.filter(book => uniqueAuthorNames(book).some(author => authorKey(author) === key));
+}
+
 function getBookReadDate(book: Book): string | null {
   return book.date_finished ?? book.date_started ?? null;
 }

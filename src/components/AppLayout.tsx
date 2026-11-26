@@ -469,6 +469,7 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
   const isLibrary = Boolean(getLibraryTab(pathname));
+  const overflowLinks = pathname === "/" ? moreNavLinks : [...moreNavLinks, ...libraryNavLinks];
   const transitionTo = (to: string) => supportsPageTransition() && !window.matchMedia(reducedMotion).matches && transitionsBetweenPages(pathname, to);
   const more = (
     <DropdownMenu.Root>
@@ -477,7 +478,7 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="rj-add-menu rj-app-navigation-menu" align="end" sideOffset={8} collisionPadding={12}>
-          {[...moreNavLinks, ...libraryNavLinks].map(({ to, label, icon: Icon }) => (
+          {overflowLinks.map(({ to, label, icon: Icon }) => (
             <DropdownMenu.Item key={to} asChild>
               <Link to={to} viewTransition={transitionTo(to)} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
                 <Icon size={18} aria-hidden="true" />

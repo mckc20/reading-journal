@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 import { NotebookPen } from "lucide-react";
 import { useLocation, useOutletContext, useSearchParams } from "react-router-dom";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
@@ -6,64 +6,18 @@ import JournalTimeline from "@/components/JournalTimeline";
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { Button } from "@/components/ui/button";
 import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
-import { sortJournalEntries, type JournalTimelineEntry } from "@/lib/journal";
-import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
-
-type JournalRecord = AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord;
-
-export function useDetailJournalEntries<Record extends JournalRecord>(
-  entityId: string | undefined,
-  fetchEntries: (id: string) => Promise<Record[]>,
-  toEntries: (records: Record[]) => JournalTimelineEntry[],
-) {
-  const [records, setRecords] = useState<Record[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!entityId) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchEntries(entityId)
-      .then((fetched) => {
-        if (cancelled) return;
-        // A new entry can be saved while the initial request is in flight.
-        setRecords((current) => {
-          const knownIds = new Set(current.map((record) => record.id));
-          return [...current, ...fetched.filter((record) => !knownIds.has(record.id))];
-        });
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load journal entries.");
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [entityId, fetchEntries]);
-
-  const entries = useMemo(() => sortJournalEntries(toEntries(records)), [records, toEntries]);
-  const save = useCallback((record: Record) => {
-    setRecords((current) => {
-      const otherRecords = current.filter((entry) => entry.id !== record.id);
-      return record.parent_entry_id ? otherRecords : [record, ...otherRecords];
-    });
-  }, []);
-  const remove = useCallback((id: string) => setRecords((current) => current.filter((entry) => entry.id !== id)), []);
-
-  return { entries, loading, error, save, remove };
-}
+import type { JournalTimelineEntry } from "@/lib/journal";
 
 export function useDetailJournalEditor(
   type: "Author" | "Series",
   entityId: string | undefined,
-  onSaved: (entry: JournalRecord) => void,
 ) {
   const { openAddJournalEntry } = useOutletContext<AppLayoutOutletContext>();
   const [searchParams, setSearchParams] = useSearchParams();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const launch = useCallback((trigger?: HTMLElement) => {
-    if (entityId) openAddJournalEntry({ entity: { type, id: entityId }, onSaved }, trigger);
-  }, [entityId, onSaved, openAddJournalEntry, type]);
+    if (entityId) openAddJournalEntry({ entity: { type, id: entityId } }, trigger);
+  }, [entityId, openAddJournalEntry, type]);
 
   useEffect(() => {
     if (!entityId || searchParams.get("new") !== "1" || !triggerRef.current || triggerRef.current.closest("[inert]")) return;

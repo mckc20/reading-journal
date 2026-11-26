@@ -26,6 +26,7 @@ export function legacyLibraryDestination(search: string, browseBy?: "author" | "
   const view = legacy.get("view") ?? "";
   const value = legacy.get("value");
   if (view === "wishlist") return wishlistCollectionPath;
+  if (view === "favorites") return "/library/collections?collection=Favorites";
   if (view === "journalEntries") return "/library/journal";
   if (view === "series" && !value) return "/library/series";
 
@@ -40,7 +41,6 @@ export function legacyLibraryDestination(search: string, browseBy?: "author" | "
 
   const status = statusByView.get(view);
   if (status) next.set("status", status);
-  if (view === "favorites") next.set("favorite", "Yes");
   const key = filterByView.get(view);
   if (key) {
     if (value) next.set(key, value);

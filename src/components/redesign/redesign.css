@@ -67,6 +67,7 @@
 .rj-header-actions [data-slot='button'] svg { width: 20px; height: 20px; }
 .rj-home-shell main { padding: 20px; max-width: 1200px; margin-inline: auto; }
 .rj-home-section { margin-top: 26px; min-width: 0; }
+:is(.rj-redesign, .rj-app-theme) :where(h2, h3, h4, h5, h6) { font-family: var(--font-body); }
 :is(.rj-home-section, .rj-detail-body) h2 { font: 550 17px/1.2 var(--font-body); }
 .rj-home-section h2 { margin-bottom: 8px; }
 .rj-quick-container { container-type: inline-size; min-width: 0; }

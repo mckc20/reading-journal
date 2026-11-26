@@ -29,11 +29,11 @@ export function FilterSelect({ label, value, options, onChange, emptyLabel = "Al
         <NativeSelect
           id={id}
           disabled={disabled}
-          value=""
+          value={value.length ? "" : "clear"}
           className={triggerClassName}
           onChange={(event) => onChange(event.currentTarget.value === "clear" ? "" : event.currentTarget.value)}
         >
-          <option value="" hidden>{selectedLabel}</option>
+          {value.length > 0 && <option value="" hidden>{selectedLabel}</option>}
           <option value="clear">{emptyLabel}</option>
           {options.map((option) => (
             <option key={option} value={option}>{value.includes(option) ? `✓ ${option}` : option}</option>

@@ -340,12 +340,19 @@
   html {
     @apply font-sans;
     }
-  h1,
+  h1 {
+    font-family: var(--font-display);
+    font-style: italic;
+    letter-spacing: 0;
+  }
   h2,
   h3,
+  h4,
+  h5,
+  h6,
   [data-slot="card-title"],
   [data-slot="dialog-title"] {
-    font-family: var(--font-display);
+    font-family: var(--font-body);
     letter-spacing: 0;
   }
   ::selection {

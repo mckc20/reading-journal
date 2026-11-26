@@ -1,5 +1,4 @@
 import type { Book, BookStatus, Series } from "@/types";
-import { normalizedIsbn } from "@/lib/wishlistLogic";
 
 export type LibraryFilterKey =
   | "status"
@@ -7,17 +6,12 @@ export type LibraryFilterKey =
   | "rating"
   | "year"
   | "publicationYear"
-  | "progress"
   | "format"
   | "language"
   | "source"
   | "series"
   | "author"
-  | "favorite"
-  | "pages"
-  | "isbn"
-  | "catalogue"
-  | "price";
+  | "catalogue";
 
 export type LibraryFilters = Record<LibraryFilterKey, string[]>;
 
@@ -43,17 +37,12 @@ export const filterKeys: LibraryFilterKey[] = [
   "rating",
   "year",
   "publicationYear",
-  "progress",
   "format",
   "language",
   "source",
   "series",
   "author",
-  "favorite",
-  "pages",
-  "isbn",
   "catalogue",
-  "price",
 ];
 
 export const filterLabels: Record<LibraryFilterKey, string> = {
@@ -62,17 +51,12 @@ export const filterLabels: Record<LibraryFilterKey, string> = {
   rating: "Rating",
   year: "Year Read",
   publicationYear: "Publication Year",
-  progress: "Progress",
   format: "Format",
   language: "Language",
   source: "Source",
   series: "Series",
   author: "Author",
-  favorite: "Favorite",
-  pages: "Pages",
-  isbn: "ISBN",
   catalogue: "Catalogue",
-  price: "Price",
 };
 
 const statusFilterLabels: Record<BookStatus, string> = {
@@ -87,14 +71,7 @@ const statusFilterLabels: Record<BookStatus, string> = {
 
 const statusFilterOptions = filterableBookStatuses.map((status) => statusFilterLabels[status]);
 
-const progressFilterOptions = [
-  "Not started",
-  "In progress",
-  "Near completion",
-  "Finished",
-];
-
-export type LibraryFilterBook = Pick<Book, "authors" | "status" | "is_favorite" | "genres" | "rating" | "date_finished" | "date_started" | "created_at" | "publication_date" | "format" | "language" | "source" | "series_id" | "current_page" | "total_pages" | "isbn" | "metadata_source" | "price">;
+export type LibraryFilterBook = Pick<Book, "authors" | "status" | "genres" | "rating" | "date_finished" | "date_started" | "created_at" | "publication_date" | "format" | "language" | "source" | "series_id" | "metadata_source">;
 
 export function getCatalogueName(source: Book["metadata_source"]) {
   if (source === "open_library") return "Open Library";
@@ -129,7 +106,7 @@ export function getPublicationYear(book: LibraryFilterBook): string | undefined 
 
 function getFilterValues(searchParams: URLSearchParams, key: LibraryFilterKey): string[] {
   return Array.from(
-    new Set(searchParams.getAll(key).map((value) => value.trim()).filter(Boolean)),
+    new Set(searchParams.getAll(key).map((value) => value.trim()).filter(value => value && (key !== "rating" || value !== "Favorite"))),
   );
 }
 
@@ -140,17 +117,12 @@ export function getLibraryFilters(searchParams: URLSearchParams): LibraryFilters
     rating: getFilterValues(searchParams, "rating"),
     year: getFilterValues(searchParams, "year"),
     publicationYear: getFilterValues(searchParams, "publicationYear"),
-    progress: getFilterValues(searchParams, "progress"),
     format: getFilterValues(searchParams, "format"),
     language: getFilterValues(searchParams, "language"),
     source: getFilterValues(searchParams, "source"),
     series: getFilterValues(searchParams, "series"),
     author: getFilterValues(searchParams, "author"),
-    favorite: getFilterValues(searchParams, "favorite"),
-    pages: getFilterValues(searchParams, "pages"),
-    isbn: getFilterValues(searchParams, "isbn"),
     catalogue: getFilterValues(searchParams, "catalogue"),
-    price: getFilterValues(searchParams, "price"),
   };
 }
 
@@ -172,34 +144,18 @@ export function buildLibraryFilterOptions(books: LibraryFilterBook[], series: Se
   });
 
   return {
-    status: statusFilterOptions,
+    status: books.some(book => book.status === "Wishlist") ? ["Wishlist", ...statusFilterOptions] : statusFilterOptions,
     genre: uniqueSortedValues(books.flatMap((book) => book.genres ?? [])),
-    rating: ["Favorite", ...uniqueSortedValues(books.map((book) => book.rating?.toString()))],
+    rating: uniqueSortedValues(books.map((book) => book.rating?.toString())),
     year: Array.from(years).sort((a, b) => Number(b) - Number(a)),
     publicationYear: Array.from(publicationYears).sort((a, b) => Number(b) - Number(a)),
-    progress: progressFilterOptions,
     format: uniqueSortedValues(books.map((book) => book.format)),
     language: uniqueSortedValues(books.map((book) => book.language)),
     source: uniqueSortedValues(books.map((book) => book.source)),
     series: uniqueSortedValues(books.map((book) => (book.series_id ? seriesById.get(book.series_id) : null))),
     author: uniqueSortedValues(books.flatMap((book) => book.authors)),
-    favorite: ["Yes"],
-    pages: uniqueSortedValues(books.map(book => book.total_pages?.toString())),
-    isbn: uniqueSortedValues(books.map(book => book.isbn)),
     catalogue: uniqueSortedValues(books.map(book => getCatalogueName(book.metadata_source))),
-    price: uniqueSortedValues(books.map(book => book.price?.toString())),
   };
-}
-
-function bookMatchesProgressFilter(book: LibraryFilterBook, filter: string): boolean {
-  const progress = getBookProgress(book);
-
-  if (filter === "Not started") return progress === 0;
-  if (filter === "In progress") return progress > 0 && progress < 80;
-  if (filter === "Near completion") return progress >= 80 && progress < 100;
-  if (filter === "Finished") return progress === 100;
-
-  return true;
 }
 
 function matchesAnyFilterValue(values: string[], matches: (value: string) => boolean): boolean {
@@ -207,32 +163,23 @@ function matchesAnyFilterValue(values: string[], matches: (value: string) => boo
 }
 
 function bookMatchesLibraryFilters(book: LibraryFilterBook, filters: LibraryFilters, series: Series[]): boolean {
-  if (!matchesAnyFilterValue(filters.status, (filter) => {
-    const matchingStatus = filterableBookStatuses.find((status) => statusFilterLabels[status] === filter || status === filter);
-    return Boolean(matchingStatus && book.status === matchingStatus);
-  })) return false;
+  if (!matchesAnyFilterValue(filters.status, filter => statusFilterLabels[book.status] === filter || book.status === filter)) return false;
 
   if (!matchesAnyFilterValue(filters.genre, (filter) => (book.genres ?? []).includes(filter))) return false;
 
   if (!matchesAnyFilterValue(filters.rating, (filter) => {
-    if (filter === "Favorite") return book.is_favorite;
     const rating = Number(filter);
     return Number.isFinite(rating) && book.rating === rating;
   })) return false;
 
-  if (!matchesAnyFilterValue(filters.progress, (filter) => bookMatchesProgressFilter(book, filter))) return false;
   if (!matchesAnyFilterValue(filters.publicationYear, (filter) => getPublicationYear(book) === filter)) return false;
   if (!matchesAnyFilterValue(filters.format, (filter) => book.format === filter)) return false;
   if (!matchesAnyFilterValue(filters.language, (filter) => book.language === filter)) return false;
   if (!matchesAnyFilterValue(filters.source, (filter) => book.source === filter)) return false;
   if (!matchesAnyFilterValue(filters.series, (filter) => getSeriesName(book, series) === filter)) return false;
   if (!matchesAnyFilterValue(filters.author, (filter) => book.authors.includes(filter))) return false;
-  if (!matchesAnyFilterValue(filters.favorite, (filter) => filter === "Yes" && book.is_favorite)) return false;
 
-  if (!matchesAnyFilterValue(filters.pages, value => book.total_pages === Number(value))) return false;
-  if (!matchesAnyFilterValue(filters.isbn, value => Boolean(normalizedIsbn(value)) && normalizedIsbn(book.isbn) === normalizedIsbn(value))) return false;
   if (!matchesAnyFilterValue(filters.catalogue, value => getCatalogueName(book.metadata_source) === value)) return false;
-  if (!matchesAnyFilterValue(filters.price, value => book.price === Number(value))) return false;
 
   if (filters.year.length > 0) {
     const { year } = getBookFilterDateParts(book);
@@ -261,17 +208,6 @@ export function buildActiveFilterChips(filters: LibraryFilters): ActiveFilterChi
   });
 
   return chips;
-}
-
-function getBookProgress(book: LibraryFilterBook): number {
-  if (book.status === "Finished") return 100;
-  if (["To Read", "Up Next"].includes(book.status)) return 0;
-
-  const currentPage = Math.max(0, book.current_page ?? 0);
-  const totalPages = Math.max(0, book.total_pages ?? 0);
-
-  if (totalPages <= 0) return 0;
-  return Math.min(100, Math.max(0, Math.round((currentPage / totalPages) * 100)));
 }
 
 function getSeriesName(book: LibraryFilterBook, series: Series[]): string {

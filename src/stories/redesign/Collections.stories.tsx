@@ -121,7 +121,7 @@ export const AddAndFilterBooks: Story = {
     await userEvent.click(picker.getByRole('button', { name: 'Add 2 books' }));
     await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
     await expect(canvas.getByRole('list', { name: 'Library books' }).children).toHaveLength(3);
-    await userEvent.click(canvas.getByRole('button', { name: 'Filter' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Filter books' }));
     const filter = within(await body.findByRole('dialog', { name: 'Filter books' }));
     await userEvent.selectOptions(filter.getByRole('combobox', { name: 'Format' }), 'Paperback');
     await userEvent.click(filter.getByRole('button', { name: 'Done' }));

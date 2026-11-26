@@ -1,23 +1,22 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import {
-  useCallback,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, NotebookPen, Star } from "lucide-react";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { NotebookPen } from "lucide-react";
 import AddAuthorDialog from "@/components/AddAuthorDialog";
 import { AboutSection } from "@/components/design";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import DuplicateOptionsDialog, { resolveDuplicateOptions, type DuplicateOptions } from "@/components/DuplicateOptionsDialog";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
 import { BookHighlights } from "@/components/redesign/BookHighlights";
-import { DetailGenreTags, DetailHero, DetailStat } from "@/components/redesign/DetailHero";
+import { DetailGenreTags, DetailHero } from "@/components/redesign/DetailHero";
 import { DetailBooks } from "@/components/redesign/DetailBooks";
-import { DetailJournal, useDetailJournalEditor, useDetailJournalEntries } from "@/components/redesign/DetailJournal";
+import { useDetailJournalEditor } from "@/components/redesign/DetailJournal";
 import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import { Button } from "@/components/ui/button";
@@ -29,28 +28,19 @@ import { useSeries } from "@/hooks/useSeries";
 import {
   buildAuthorSummaries,
   findAuthorSummary,
-  getAuthorAverageRating,
+  getBooksByAuthor,
   getAuthorInitials,
 } from "@/lib/authorShelf";
-import { fetchAuthorJournalEntryRecords } from "@/lib/authorJournal";
 import { buildAuthorAttachment } from "@/lib/chatAttachments";
 import { fetchAllBookJournalEntryRecords } from "@/lib/bookJournal";
 import { getBookRankings } from "@/lib/bookRankings";
-import { authorJournalToJournalEntries } from "@/lib/journal";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
+import { entityJournalHref } from "@/lib/journalLinks";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import HorizontalShelf from "@/pages/library/HorizontalShelf";
 import { SeriesCard } from "@/components/redesign/SeriesCard";
-import type { AuthorJournalEntryRecord, BookJournalEntryRecord, SeriesJournalEntryRecord } from "@/types";
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatAverageRating(value: number | null): string {
-  return value === null ? "No rating" : value.toFixed(2);
-}
+import type { BookJournalEntryRecord } from "@/types";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -106,6 +96,7 @@ export default function AuthorDetails() {
 function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClose: () => void }) {
   const headingId = useId();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { settings } = useUserSettings();
@@ -158,19 +149,18 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   }, [author, location, navigate]);
   const heroColor = useBookHeroColor(author?.photo_url);
   const authorBooks = author?.books ?? [];
-  const authorSeries = useMemo(() => buildSeriesGroups(authorBooks, series), [authorBooks, series]);
-  const averageRating = useMemo(() => getAuthorAverageRating(author ?? { books: [] }), [author]);
+  const authorWishes = useMemo(() => author ? getBooksByAuthor(wishlistBooks, author.name) : [], [author, wishlistBooks]);
+  const wishlistView = authorWishes.length > 0 && (authorBooks.length === 0
+    || authorWishes.some(book => book.id === searchParams.get("wishlistBook")));
+  const authorSeries = useMemo(() => buildSeriesGroups([...authorBooks, ...authorWishes], series), [authorBooks, authorWishes, series]);
+  const genreBooks = wishlistView ? authorWishes : authorBooks;
   const authorGenres = useMemo(
-    () => getTopValues(authorBooks.flatMap((book) => book.genres ?? []), 6),
-    [authorBooks],
+    () => getTopValues(genreBooks.flatMap((book) => book.genres ?? []), 6),
+    [genreBooks],
   );
   const authorRankings = useMemo(() => getBookRankings(authorBooks, journalEntries), [authorBooks, journalEntries]);
   const loading = authorsLoading || booksLoading || journalEntriesLoading || seriesLoading;
-  const authorJournal = useDetailJournalEntries(author?.id, fetchAuthorJournalEntryRecords, authorJournalToJournalEntries);
-  const saveJournalEntry = useCallback((record: AuthorJournalEntryRecord | BookJournalEntryRecord | SeriesJournalEntryRecord) => {
-    if ("author_id" in record && record.author_id === author?.id) authorJournal.save(record);
-  }, [author?.id, authorJournal.save]);
-  const journalEditor = useDetailJournalEditor("Author", !loading && !editOpen && user ? author?.id : undefined, saveJournalEntry);
+  const journalEditor = useDetailJournalEditor("Author", !loading && !editOpen && !wishlistView && user ? author?.id : undefined);
 
   function openAttachmentPicker() {
     setSendAttachmentOpen(true);
@@ -228,6 +218,10 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     }
   }
 
+  if (authorId && searchParams.get("new") !== "1" && (location.hash === "#journal" || searchParams.has("entry"))) {
+    return <Navigate to={entityJournalHref("author", authorId, searchParams)} replace />;
+  }
+
   const back = <DetailBack label={authorDetailLabel} fallbackTo={authorFallback} onClose={onClose} />;
   if (loading) {
     return <div className="rj-detail-page">{back}<LoadingIndicator variant="page" /></div>;
@@ -283,30 +277,27 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           favorite={author.isFavorite}
           onToggleFavorite={() => void handleToggleFavorite()}
         />
-        <div className="rj-detail-actions">
+        {!wishlistView && <div className="rj-detail-actions">
           <Button ref={journalEditor.triggerRef} type="button" variant="outline" disabled={!user} onClick={(event) => journalEditor.launch(event.currentTarget)}>
             <NotebookPen aria-hidden="true" />
             Add entry
           </Button>
-        </div>
+        </div>}
         {actionError && <p role="alert" className="rj-detail-notice text-sm text-destructive">{actionError}</p>}
         {shareStatus && <p role="status" className="rj-detail-notice text-sm">{shareStatus}</p>}
       </DetailHero>
 
       <div className="rj-detail-body">
-        <dl className="rj-reading-stats rj-detail-summary-stats">
-          <DetailStat icon={BookOpen} label="Books written" value={formatNumber(author.bookCount)} />
-          <DetailStat icon={Star} label="Average rating" value={formatAverageRating(averageRating)} />
-        </dl>
-
         <AboutSection
           className="rj-detail-description"
           title="About this author"
           text={bio}
-          titleContent={<DetailGenreTags genres={authorGenres} />}
+          titleContent={<DetailGenreTags genres={authorGenres} linked={!wishlistView} />}
         />
 
-        <DetailBooks books={authorBooks} />
+        {(authorBooks.length > 0 || authorWishes.length === 0) && <DetailBooks books={authorBooks} />}
+        {authorWishes.length > 0 && <DetailBooks books={authorWishes} title="In Wishlist"
+          sectionId={authorBooks.length > 0 ? "wishlist-books" : "books"} />}
 
         {authorSeries.length > 0 && (
           <section aria-labelledby={`${headingId}-series`} className="min-w-0 space-y-4">
@@ -322,21 +313,10 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           </section>
         )}
 
-        <section aria-labelledby={`${headingId}-insights`} className="space-y-4">
+        {!wishlistView && <section aria-labelledby={`${headingId}-insights`} className="space-y-4">
           <h2 id={`${headingId}-insights`}>Insights</h2>
           <BookHighlights rankings={authorRankings} label="Author book highlights" />
-        </section>
-
-        <DetailJournal
-          sectionId="journal"
-          entries={authorJournal.entries}
-          loading={authorJournal.loading}
-          error={authorJournal.error}
-          onAdd={journalEditor.launch}
-          onEntryUpdated={(entry) => { if (entry.source === "author_note") authorJournal.save(entry.authorJournalEntry); }}
-          onEntryDeleted={(entry) => { if (entry.source === "author_note") authorJournal.remove(entry.sourceId); }}
-          addDisabled={!user}
-        />
+        </section>}
       </div>
 
       {editOpen && (

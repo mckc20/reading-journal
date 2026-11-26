@@ -1,6 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { NotebookPen } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { AppHeading, HeadingDescription } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
 import { useBooksContext } from "@/context/BooksContext";
@@ -16,6 +17,9 @@ import { fetchAllSeriesJournalEntryRecords } from "@/lib/seriesJournal";
 import type { JournalTimelineEntry } from "@/lib/journal";
 
 export default function LibraryJournal() {
+  const [searchParams] = useSearchParams();
+  const authorId = searchParams.get("author");
+  const seriesId = searchParams.get("series");
   const { books, loading: booksLoading } = useBooksContext();
   const [entries, setEntries] = useState<JournalTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,15 +63,18 @@ export default function LibraryJournal() {
   }, []);
 
   const sortedEntries = useMemo(() => {
+    if (authorId) return entries.filter(entry => entry.entityType === "Author" && entry.entityId === authorId);
+    if (seriesId) return entries.filter(entry => entry.entityType === "Series" && entry.entityId === seriesId);
     const libraryIds = new Set(books.map((book) => book.id));
     return sortJournalEntries(entries.filter((entry) => entry.entityType !== "Book" || libraryIds.has(entry.entityId)));
-  }, [entries, books]);
+  }, [entries, books, authorId, seriesId]);
 
   return (
     <div className="space-y-8">
       <div className="space-y-1">
         <AppHeading level={1}>Journal</AppHeading>
-        <HeadingDescription>All book, series, and author journal entries, newest first.</HeadingDescription>
+        <HeadingDescription>{authorId ? "Entries for this author." : seriesId ? "Entries for this series."
+          : "All book, series, and author journal entries, newest first."}</HeadingDescription>
       </div>
 
       {error && (
@@ -82,7 +89,8 @@ export default function LibraryJournal() {
         <JournalTimeline
           entries={sortedEntries}
           layout="list"
-          emptyMessage="Journal entries from books, series, and authors will appear here."
+          selectedEntryId={searchParams.get("entry")}
+          emptyMessage={authorId || seriesId ? "No journal entries yet." : "Journal entries from books, series, and authors will appear here."}
           onEntryCreated={(entry) => setEntries((current) => sortJournalEntries([entry, ...current]))}
           onEntryUpdated={(entry) =>
             setEntries((current) => sortJournalEntries([entry, ...current.filter((item) => item.id !== entry.id)]))

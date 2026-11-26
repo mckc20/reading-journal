@@ -1,8 +1,11 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { ChevronLeft, Library, Plus, SlidersHorizontal } from 'lucide-react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, Library, Plus } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { LibraryFilterChips } from '@/components/LibraryControls';
+import type { Series } from '@/types';
+import { LibraryBookFilters } from './LibraryBookFilters';
+import { useLibraryBookFilters } from './useLibraryBookFilters';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
 import { belongsToCollection, type CollectionId } from '@/lib/libraryCollections';
 import { compareLibraryItems, type LibrarySort } from '@/lib/libraryTabs';
@@ -12,35 +15,28 @@ import { LibraryBookList } from './LibraryBookList';
 import { LibrarySortControl } from './LibrarySortControl';
 import type { LibraryContentProps } from './LibraryPreview';
 
-const filterFields = [{ key: 'format', label: 'Format' }, { key: 'language', label: 'Language' }, { key: 'status', label: 'Reading status' }] as const;
-type Filters = Partial<Record<(typeof filterFields)[number]['key'], string>>;
-
 export interface CollectionActions {
   onCreateBook: (collection: CollectionId, trigger: HTMLElement) => void;
   onAddBook: (collection: CollectionId, bookId: string) => Promise<void>;
 }
 
-export function CollectionDetail({ collection, books, loading, error, onRetry, onOpenBook, onBack, initialSort, actions }: {
+export function CollectionDetail({ collection, books, loading, error, onRetry, onOpenBook, onBack, initialSort, actions, series }: {
   collection: CollectionId;
   onBack: () => void;
   initialSort: LibrarySort;
   actions: CollectionActions;
+  series?: Series[];
 } & Omit<LibraryContentProps, 'initialQuery'>) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState(initialSort);
-  const [filters, setFilters] = useState<Filters>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const addTrigger = useRef<HTMLButtonElement>(null);
   const menuAction = useRef<(() => void) | null>(null);
   const needle = query.trim().toLocaleLowerCase();
-  const members = books.filter(book => belongsToCollection(collection, book));
-  const fields = filterFields.filter(field => field.key !== 'status' || collection === 'Favorites').map(field => ({
-    ...field, options: Array.from(new Set(members.flatMap(book => book[field.key] ?? []))).sort(),
-  }));
-  const filterCount = filterFields.filter(field => filters[field.key]).length;
-  const visible = members.filter(book => `${book.title} ${book.author}`.toLocaleLowerCase().includes(needle) &&
-    filterFields.every(field => !filters[field.key] || filters[field.key] === book[field.key]))
+  const members = useMemo(() => books.filter(book => belongsToCollection(collection, book)), [collection, books]);
+  const { filters, chips, options, filteredBooks, toggleFilter, clearFilters } = useLibraryBookFilters(members, series);
+  const visible = filteredBooks.filter(book => `${book.title} ${book.author}`.toLocaleLowerCase().includes(needle))
     .sort((a, b) => compareLibraryItems(a, b, sort));
   const candidates = pickerOpen
     ? books.filter(book => book.status !== 'Wishlist' && !belongsToCollection(collection, book)).sort((a, b) => compareLibraryItems(a, b, 'title'))
@@ -88,35 +84,18 @@ export function CollectionDetail({ collection, books, loading, error, onRetry, o
         <div className="rj-library-books-toolbar rj-collection-book-tools">
           <div className="rj-library-search-toolbar">{desktopSearch}</div>
           <LibrarySortControl value={sort} onChange={setSort} />
-          <Dialog>
-            <DialogTrigger asChild><Button type="button" variant="outline">
-              <SlidersHorizontal aria-hidden="true" />Filter{filterCount ? ` (${filterCount})` : ''}
-            </Button></DialogTrigger>
-            <DialogContent className="rj-redesign rj-collection-filter-dialog">
-              <DialogHeader>
-                <DialogTitle>Filter books</DialogTitle>
-                <DialogDescription>Filter the books in {collection}.</DialogDescription>
-              </DialogHeader>
-              {fields.map(field => <label className="rj-library-sort" key={field.key}>
-                <span>{field.label}</span>
-                <select value={filters[field.key] ?? ''} onChange={event => setFilters({ ...filters, [field.key]: event.target.value })}>
-                  <option value="">Any</option>
-                  {Array.from(new Set([...field.options, ...(filters[field.key] ? [filters[field.key]] : [])]))
-                    .map(option => <option key={option}>{option}</option>)}
-                </select>
-              </label>)}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setFilters({})}>Clear filters</Button>
-                <DialogClose asChild><Button>Done</Button></DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <LibraryBookFilters filters={filters} options={options} count={chips.length} onToggle={toggleFilter}
+            onClear={() => clearFilters()} />
         </div>
+        {chips.length > 0 && <div className="mb-4">
+          <LibraryFilterChips chips={chips.map(chip => ({ label: chip.label, onRemove: () => clearFilters(chip.keys) }))}
+            onClear={() => clearFilters()} />
+        </div>}
         {loading ? <p role="status">Loading books…</p>
           : error ? <EmptyState title="Your collection couldn’t load" message={error} action={<Button onClick={onRetry}>Try again</Button>} />
           : visible.length ? <LibraryBookList books={visible} onOpenBook={onOpenBook} />
-          : needle || filterCount ? <EmptyState title="No books found" message="Try another search or clear the filters."
-            action={<Button variant="outline" onClick={() => { setQuery(''); setFilters({}); }}>Clear search and filters</Button>} />
+          : needle || chips.length > 0 ? <EmptyState title="No books found" message="Try another search or clear the filters."
+            action={<Button variant="outline" onClick={() => { setQuery(''); clearFilters(); }}>Clear search and filters</Button>} />
           : <EmptyState title="No books here yet" message="Use Add book to add to this collection." />}
       </>}
     </CollectionSearch>

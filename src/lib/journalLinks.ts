@@ -67,8 +67,13 @@ export function bookJournalHref(bookId: string, params?: URLSearchParams): strin
 }
 
 export function entityJournalHref(entity: "author" | "series", id: string, params?: URLSearchParams): string {
-  const path = `/${entity === "author" ? "authors" : "series"}/${encodeURIComponent(id)}`;
-  return params?.size ? `${path}?${params}` : `${path}#journal`;
+  if (params?.get("new") === "1") {
+    const path = entity === "author" ? "authors" : "series";
+    return `/${path}/${encodeURIComponent(id)}?${params}`;
+  }
+  const search = new URLSearchParams(params);
+  search.set(entity, id);
+  return `/library/journal?${search}`;
 }
 
 export function extractJournalEntryPublicIds(markdown: string): string[] {

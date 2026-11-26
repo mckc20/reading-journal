@@ -5,8 +5,8 @@
 .rj-insights-heading label { display: grid; gap: 6px; font-size: 12px; }
 .rj-insights-heading select { max-width: 100%; min-height: 44px; border: 1px solid var(--input); border-radius: 12px; padding: 10px 14px; background: var(--surface); color: var(--foreground); }
 .rj-insights-heading select:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-.rj-insights-preview h2 { font: 500 24px/1.4 var(--font-display); margin-bottom: 12px; }
-.rj-insights-preview h3 { font: 500 20px/1.4 var(--font-display); margin-bottom: 12px; }
+.rj-insights-preview h2 { font: 500 24px/1.4 var(--font-body); margin-bottom: 12px; }
+.rj-insights-preview h3 { font: 500 20px/1.4 var(--font-body); margin-bottom: 12px; }
 .rj-insights-rhythm { background: #fbf5e9; border-radius: 22px; padding: 24px; }
 .rj-insights-section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
 .rj-insights-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 26px 0; }
@@ -44,9 +44,9 @@
 .rj-insights-preview section, .rj-insights-preview article { overflow-wrap: anywhere; }
 .rj-insights-dialog.rj-redesign { display: flex; flex-direction: column; gap: 0; padding: 0; width: calc(100% - 24px); max-width: 660px; max-height: calc(100dvh - 24px); border-radius: 22px; overflow: hidden; }
 .rj-insights-dialog header { padding: 24px 24px 18px; flex-shrink: 0; }
-.rj-insights-dialog h2 { font: 500 25px/1.4 var(--font-display); margin-bottom: 8px; overflow-wrap: anywhere; }
+.rj-insights-dialog h2 { font: 500 25px/1.4 var(--font-body); margin-bottom: 8px; overflow-wrap: anywhere; }
 .rj-insights-detail { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 8px 24px 24px; line-height: 1.8; }
-.rj-insights-detail h3 { font: 500 20px/1.4 var(--font-display); margin: 20px 0 10px; }
+.rj-insights-detail h3 { font: 500 20px/1.4 var(--font-body); margin: 20px 0 10px; }
 .rj-insights-detail p { margin-bottom: 14px; }
 .rj-insights-compare > div { padding-block: 14px; border-bottom: 1px solid var(--border); }
 .rj-insights-compare dt { font-weight: 600; }

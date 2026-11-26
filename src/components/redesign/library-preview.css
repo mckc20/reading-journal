@@ -93,7 +93,7 @@
   .rj-library-books-panel .rj-library-list-row:hover { background: var(--surface-hover); }
 }
 
-.rj-library-books-toolbar .rj-books-filter-trigger { position: relative; width: 44px; height: 44px; }
+.rj-library-books-toolbar .rj-books-filter-trigger { position: relative; width: 44px; height: 44px; border-radius: 50%; }
 .rj-books-filter-trigger[data-active] { background: var(--secondary); }
 .rj-books-filter-count {
   position: absolute;
@@ -108,6 +108,8 @@
   line-height: 18px;
 }
 .rj-books-filter-dialog { grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.rj-books-filter-dialog [data-slot="dialog-title"] { font-family: var(--font-body); }
+.rj-books-filter-dialog .rj-books-filter-footer { flex-direction: row; justify-content: space-between; align-items: center; }
 .rj-books-filter-groups { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 4px; }
 .rj-books-filter-groups fieldset + fieldset { margin-top: 18px; }
 .rj-books-filter-groups legend { margin-bottom: 8px; font-weight: 600; }

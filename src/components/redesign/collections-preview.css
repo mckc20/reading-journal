@@ -51,16 +51,6 @@
 .rj-collection-title-row h1:focus { outline: none; }
 .rj-collection-title-row > button { flex-shrink: 0; min-height: 44px; }
 .rj-collection-book-tools > button { min-height: 44px; }
-.rj-collection-filter-dialog select {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--input);
-  border-radius: 10px;
-  background: var(--surface);
-  padding: 9px 12px;
-  font-size: 14px;
-  font-weight: 400;
-}
 .rj-collection-picker { grid-template-rows: auto auto minmax(0, 1fr); }
 .rj-collection-picker-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .rj-collection-picker-list li + li { border-top: 1px solid var(--border); }
@@ -70,9 +60,6 @@
 .rj-collection-picker-list .rj-collection-picker-cover { width: 32px; flex-shrink: 0; }
 .rj-collection-picker-list .rj-book-title { overflow-wrap: anywhere; }
 
-@media (max-width: 767px) {
-  .rj-collection-filter-dialog label { display: grid; }
-}
 @media (max-width: 359px) {
   .rj-collection-title-row h1 { font-size: 28px; }
 }

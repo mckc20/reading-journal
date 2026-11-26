@@ -9,9 +9,9 @@ import {
 import { filterLabels, type LibraryFilterKey, type LibraryFilterOptions, type LibraryFilters } from '@/lib/libraryBookFilters';
 
 const groups = [
-  { title: 'Reading', keys: ['status', 'favorite', 'rating', 'progress', 'year'] },
+  { title: 'Reading', keys: ['status', 'rating', 'year'] },
   { title: 'Browse by', keys: ['genre', 'author', 'series'] },
-  { title: 'Edition and source', keys: ['format', 'language', 'source', 'publicationYear', 'pages', 'isbn', 'catalogue', 'price'] },
+  { title: 'Edition and source', keys: ['format', 'language', 'source', 'publicationYear', 'catalogue'] },
 ] as const satisfies readonly { title: string; keys: readonly LibraryFilterKey[] }[];
 
 export function LibraryBookFilters({ filters, options, count, onToggle, onClear, focusedFilter, onCloseLink }: {
@@ -21,14 +21,14 @@ export function LibraryBookFilters({ filters, options, count, onToggle, onClear,
   onToggle: (key: LibraryFilterKey, value: string) => void;
   onClear: () => void;
   focusedFilter?: 'author' | 'genre';
-  onCloseLink: () => void;
+  onCloseLink?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const fields = useRef<HTMLDivElement>(null);
 
   return <Dialog open={open || Boolean(focusedFilter)} onOpenChange={next => {
     setOpen(next);
-    if (!next) onCloseLink();
+    if (!next) onCloseLink?.();
   }}>
     <DialogTrigger asChild>
       <Button type="button" variant="outline" size="icon-lg" className="rj-books-filter-trigger"
@@ -62,9 +62,9 @@ export function LibraryBookFilters({ filters, options, count, onToggle, onClear,
           </div>
         </fieldset>)}
       </div>
-      <DialogFooter>
+      <DialogFooter className="rj-books-filter-footer">
         <Button type="button" variant="outline" onClick={onClear} disabled={count === 0}>Clear filters</Button>
-        <DialogClose asChild><Button type="button">Done</Button></DialogClose>
+        <DialogClose asChild><Button type="button" className="rounded-full">Done</Button></DialogClose>
       </DialogFooter>
     </DialogContent>
   </Dialog>;

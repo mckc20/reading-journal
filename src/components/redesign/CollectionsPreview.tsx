@@ -13,8 +13,12 @@ import './redesign.css';
 import './library-preview.css';
 import './collections-preview.css';
 
+import type { Series } from '@/types';
+import { filterKeys } from '@/lib/libraryBookFilters';
+
 interface LibraryCollectionsProps extends Omit<LibraryContentProps, 'initialQuery'> {
   actions: CollectionActions;
+  series?: Series[];
 }
 
 export interface CollectionsPreviewProps extends Omit<LibraryPreviewProps, 'initialQuery'> {
@@ -26,7 +30,7 @@ export function CollectionsPreview(props: CollectionsPreviewProps & LibraryColle
 }
 
 /** Default collections derive their membership from the existing book records. */
-export function LibraryCollections({ books, loading, error, onRetry, onOpenBook, actions }: LibraryCollectionsProps) {
+export function LibraryCollections({ books, loading, error, onRetry, onOpenBook, actions, series }: LibraryCollectionsProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selected = parseCollectionId(searchParams.get('collection'));
   const [query, setQuery] = useState('');
@@ -44,6 +48,7 @@ export function LibraryCollections({ books, loading, error, onRetry, onOpenBook,
   function selectCollection(id: CollectionId | null) {
     setQuery('');
     const next = new URLSearchParams(searchParams);
+    filterKeys.forEach(key => next.delete(key));
     if (id) next.set('collection', id);
     else next.delete('collection');
     setSearchParams(next);
@@ -51,7 +56,7 @@ export function LibraryCollections({ books, loading, error, onRetry, onOpenBook,
 
   if (selected) {
     return <CollectionDetail key={selected} collection={selected} books={books} loading={loading} error={error}
-      onRetry={onRetry} onOpenBook={onOpenBook} onBack={() => selectCollection(null)} initialSort={sort} actions={actions} />;
+      onRetry={onRetry} onOpenBook={onOpenBook} onBack={() => selectCollection(null)} initialSort={sort} actions={actions} series={series} />;
   }
 
   const needle = query.trim().toLocaleLowerCase();

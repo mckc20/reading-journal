@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AboutSection } from "@/components/design";
 import { buildBookLibraryFilterPath, MetadataLink } from "@/components/LinkedMetadata";
 import { formatGenrePathForDisplay, getSelectedGenreTags } from "@/lib/genreTree";
-import { getCatalogueName, getPublicationYear } from "@/lib/libraryBookFilters";
+import { getCatalogueName, getPublicationYear, type LibraryFilterKey } from "@/lib/libraryBookFilters";
 import { formatPublicationDateForDisplay } from "@/lib/publicationDate";
 import type { Book } from "@/types";
 
@@ -31,20 +31,18 @@ export function BookDetailAbout({ book }: { book: Book }) {
   const catalogue = isWishlist ? getCatalogueName(book.metadata_source) : undefined;
   const catalogueUrl = isWishlist ? externalBookUrl(book.metadata_source_url) : undefined;
   const purchaseUrl = isWishlist ? externalBookUrl(book.purchase_url) : undefined;
+  function editionValue(key: LibraryFilterKey, value: string, label = value) {
+    return isWishlist ? label : <MetadataLink to={buildBookLibraryFilterPath(key, value)}>{label}</MetadataLink>;
+  }
+
   const publication = publicationYear && <MetadataRow key="publication" label="Publication Date" value={
-    <MetadataLink to={buildBookLibraryFilterPath("publicationYear", publicationYear)}>
-      {formatPublicationDateForDisplay(book.publication_date)}
-    </MetadataLink>
+    editionValue("publicationYear", publicationYear, formatPublicationDateForDisplay(book.publication_date))
   } />;
-  const format = book.format && <MetadataRow key="format" label="Format" value={<MetadataLink to={buildBookLibraryFilterPath("format", book.format)}>{book.format}</MetadataLink>} />;
-  const language = book.language && <MetadataRow key="language" label="Language" value={<MetadataLink to={buildBookLibraryFilterPath("language", book.language)}>{book.language}</MetadataLink>} />;
-  const source = book.source && <MetadataRow key="source" label="Source" value={<MetadataLink to={buildBookLibraryFilterPath("source", book.source)}>{book.source}</MetadataLink>} />;
-  const isbn = book.isbn && <MetadataRow key="isbn" label="ISBN" value={
-    <MetadataLink to={buildBookLibraryFilterPath("isbn", book.isbn)}>{book.isbn}</MetadataLink>
-  } />;
-  const pages = book.total_pages != null && <MetadataRow key="pages" label="Pages" value={
-    <MetadataLink to={buildBookLibraryFilterPath("pages", String(book.total_pages))}>{book.total_pages}</MetadataLink>
-  } />;
+  const format = book.format && <MetadataRow key="format" label="Format" value={editionValue("format", book.format)} />;
+  const language = book.language && <MetadataRow key="language" label="Language" value={editionValue("language", book.language)} />;
+  const source = book.source && <MetadataRow key="source" label="Source" value={editionValue("source", book.source)} />;
+  const isbn = book.isbn && <MetadataRow key="isbn" label="ISBN" value={book.isbn} />;
+  const pages = book.total_pages != null && <MetadataRow key="pages" label="Pages" value={book.total_pages} />;
   const details = isWishlist ? [
     publication,
     pages,
@@ -52,22 +50,18 @@ export function BookDetailAbout({ book }: { book: Book }) {
     isbn,
     source,
     (catalogue || catalogueUrl) && <MetadataRow key="catalogue" label={book.source ? "Catalogue" : "Source"} value={
-      catalogue ? <MetadataLink to={buildBookLibraryFilterPath("catalogue", catalogue)}>{catalogue}</MetadataLink>
-        : catalogueUrl && new URL(catalogueUrl).hostname
+      catalogue ?? (catalogueUrl && new URL(catalogueUrl).hostname)
     } />,
     format,
-    book.price != null && <MetadataRow key="price" label="Price" value={
-      <MetadataLink to={buildBookLibraryFilterPath("price", String(book.price))}>{book.price}</MetadataLink>
-    } />,
-    purchaseUrl && <MetadataRow key="purchase" label="Purchase" value={<a href={purchaseUrl} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">Purchase link</a>} />,
+    book.price != null && <MetadataRow key="price" label="Price" value={book.price} />,
+    purchaseUrl && <MetadataRow key="purchase" label="Purchase" value={purchaseUrl} />,
   ] : [format, language, source, publication, pages, isbn];
 
   return <div>
     <AboutSection className="rj-detail-description" title="About this book" text={book.description}
       titleContent={<div className="rj-detail-tags">
-        {genres.map(genre => (
-          <Link key={genre.key} to={buildBookLibraryFilterPath("genre", genre.name)}>{genre.label}</Link>
-        ))}
+        {genres.map(genre => isWishlist ? <span key={genre.key}>{genre.label}</span>
+          : <Link key={genre.key} to={buildBookLibraryFilterPath("genre", genre.name)}>{genre.label}</Link>)}
       </div>} />
     {details.some(Boolean) && <details className="rj-detail-metadata">
       <summary>More book details</summary>

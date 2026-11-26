@@ -191,7 +191,13 @@ export const FilteringBooks: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Filter books' }));
     const dialogElement = await within(canvasElement.ownerDocument.body).findByRole('dialog', { name: 'Filter books' });
     const dialog = within(dialogElement);
-    await userEvent.selectOptions(dialog.getByRole('combobox', { name: 'Status' }), 'Currently Reading');
+    const status = dialog.getByRole('combobox', { name: 'Status' });
+    await expect(within(status).getAllByRole('option', { name: 'All' })).toHaveLength(1);
+    await expect(dialog.queryByRole('combobox', { name: 'Favorite' })).not.toBeInTheDocument();
+    await userEvent.selectOptions(status, 'Currently Reading');
+    await userEvent.selectOptions(status, 'clear');
+    await waitFor(() => expect(status).toHaveValue('clear'));
+    await userEvent.selectOptions(status, 'Currently Reading');
     await userEvent.selectOptions(dialog.getByRole('combobox', { name: 'Source' }), 'Owned');
     await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
     const list = () => within(canvas.getByRole('list', { name: 'Library books' }));

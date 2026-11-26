@@ -5,12 +5,12 @@
 .rj-profile-identity > div:last-child { min-width: 0; }
 .rj-profile-avatar { display: grid; place-items: center; flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; background: var(--rj-rose-light); font: 22px var(--font-display); }
 .rj-profile-kicker { font-size: 11px; color: var(--muted-foreground); margin-bottom: 6px !important; }
-.rj-profile-identity h2 { font: 500 27px/1.4 var(--font-display); }
+.rj-profile-identity h2 { font: 500 27px/1.4 var(--font-body); }
 .rj-profile-bio { margin-top: 10px !important; max-width: 55ch; white-space: pre-wrap; line-height: 1.8; }
 .rj-profile-owner-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 10px 0 26px; }
 .rj-profile-owner-tools [data-slot='button'] { font-size: 12px; }
 .rj-profile-favorites { margin-top: 28px; }
-.rj-profile-favorites h2, .rj-profile-reading h2 { font: 500 23px/1.4 var(--font-display); }
+.rj-profile-favorites h2, .rj-profile-reading h2 { font: 500 23px/1.4 var(--font-body); }
 .rj-profile-intro { color: var(--muted-foreground); margin-top: 6px !important; }
 .rj-profile-favorite-grid { display: grid; gap: 14px; margin: 18px 0 0; }
 .rj-profile-favorite { padding: 22px; min-height: 130px; border-radius: 18px; background: var(--rj-warm); }
@@ -37,7 +37,7 @@
 .rj-profile-notice { margin-top: 16px !important; font-size: 13px; }
 .rj-profile-dialog.rj-redesign { display: flex; flex-direction: column; gap: 0; padding: 0; width: calc(100% - 24px); max-width: 680px; max-height: calc(100dvh - 24px); overflow: hidden; border-radius: 22px; }
 .rj-profile-dialog > header { padding: 24px 24px 18px; flex-shrink: 0; }
-.rj-profile-dialog h2[data-slot='dialog-title'] { font: 500 25px/1.4 var(--font-display); margin-bottom: 8px; }
+.rj-profile-dialog h2[data-slot='dialog-title'] { font: 500 25px/1.4 var(--font-body); margin-bottom: 8px; }
 .rj-profile-dialog form { display: flex; flex-direction: column; min-height: 0; }
 .rj-profile-form-scroll, .rj-profile-public-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 4px 24px 24px; }
 .rj-profile-form-scroll fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }

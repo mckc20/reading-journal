@@ -15,7 +15,7 @@
 .rj-journal-card[data-type='review'] { background: #f4edf0; }
 .rj-journal-meta { display: flex; width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted-foreground); }
 .rj-journal-meta > span { font-weight: 600; color: var(--foreground); }
-.rj-journal-card h2 { font: 500 21px/1.4 var(--font-display); }
+.rj-journal-card h2 { font: 500 21px/1.4 var(--font-body); }
 .rj-journal-excerpt { font-size: 15px; line-height: 1.85; white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
 .rj-journal-card blockquote, .rj-journal-writing blockquote { margin: 0; font-family: var(--font-display); font-style: italic; }
 .rj-journal-attribution { font-size: 12px; color: var(--muted-foreground); }
@@ -32,7 +32,7 @@
 .rj-journal-state { padding-block: 40px; }
 .rj-journal-dialog.rj-redesign { display: flex; flex-direction: column; gap: 0; padding: 0; width: calc(100% - 24px); max-width: 700px; max-height: calc(100dvh - 24px); border-radius: 22px; overflow: hidden; }
 .rj-journal-dialog header { padding: 24px 24px 18px; flex-shrink: 0; }
-.rj-journal-dialog h2 { font: 500 25px/1.4 var(--font-display); overflow-wrap: anywhere; margin-bottom: 8px; }
+.rj-journal-dialog h2 { font: 500 25px/1.4 var(--font-body); overflow-wrap: anywhere; margin-bottom: 8px; }
 .rj-journal-reader { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 8px 24px 24px; }
 .rj-journal-writing { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.9; margin-bottom: 28px; }
 .rj-journal-dialog footer { border-top: 1px solid var(--border); padding: 16px 24px; flex-shrink: 0; }
