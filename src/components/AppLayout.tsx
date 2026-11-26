@@ -469,7 +469,9 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
   const isLibrary = Boolean(getLibraryTab(pathname));
-  const overflowLinks = pathname === "/" ? moreNavLinks : [...moreNavLinks, ...libraryNavLinks];
+  const overflowLinks = pathname === "/"
+    ? moreNavLinks.filter(({ to }) => to !== "/search")
+    : [...moreNavLinks, ...libraryNavLinks];
   const transitionTo = (to: string) => supportsPageTransition() && !window.matchMedia(reducedMotion).matches && transitionsBetweenPages(pathname, to);
   const more = (
     <DropdownMenu.Root>
