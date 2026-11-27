@@ -61,7 +61,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const preferences = normalizeDiscoverPreference(settingsResult.data?.discover);
     const feedback = (feedbackResult.data ?? []) as FeedbackRow[];
     const history = (historyResult.data ?? []) as RecommendationHistoryEntry[];
-    const visibleFeedback = feedback.filter(({ candidate_key }) => !dismissedKeys.has(candidate_key));
+    const visibleFeedback = feedback.map(row => ({
+      ...row,
+      item: !dismissedKeys.has(row.candidate_key) && isRecommendationItem(row.item) ? row.item : null,
+    }));
     const feedbackSignals = feedback.map(({ candidate_key, title, authors, genres }) => ({ candidate_key, title, authors, genres }));
     const books = (booksResult.data ?? []).map((book) => ({
       title: book.title,

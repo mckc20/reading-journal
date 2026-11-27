@@ -1,15 +1,18 @@
 import { Fragment, useId, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import type { AppLayoutOutletContext } from "@/components/AppLayout";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
 import { buildAuthorDetailPath, MetadataLink } from "@/components/LinkedMetadata";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
+import { useRecommendations } from "@/context/RecommendationsContext";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { findAuthorSummary } from "@/lib/authorShelf";
+import { recommendationCandidateKey } from "@/lib/recommendationIdentity";
 import type { Book, Series } from "@/types";
-import { BookDetailAbout } from "./BookDetailAbout";
+import { BookDetailAbout, externalBookUrl } from "./BookDetailAbout";
+import { BookDislikeButton } from "./BookDislikeButton";
 import { WishlistBookActions } from "./WishlistBookActions";
 import { DetailHero } from "./DetailHero";
 import { DetailBack } from "./DetailSheet";
@@ -22,17 +25,34 @@ export function WishlistBookDetail({ book, series, onClose }: {
   onClose: () => void;
 }) {
   const headingId = useId();
+  const navigate = useNavigate();
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { authors } = useAuthorsContext();
   const { deleteBook } = useBooksContext();
+  const { disliked, feedbackReady, toggleDislike } = useRecommendations();
   const color = useBookHeroColor(book.cover_url);
   const wishlistQuery = new URLSearchParams({ wishlistBook: book.id });
   const [error, setError] = useState<string | null>(null);
+  const [savingDislike, setSavingDislike] = useState(false);
+  const source = externalBookUrl(book.metadata_source_url) ?? externalBookUrl(book.purchase_url);
+
+  async function saveDislike() {
+    if (savingDislike) return;
+    setSavingDislike(true);
+    setError(null);
+    try {
+      await toggleDislike(book);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update the dislike.");
+    } finally {
+      setSavingDislike(false);
+    }
+  }
 
   async function removeBook() {
     try {
       await deleteBook(book.id);
-      onClose();
+      navigate(wishlistCollectionHref, { replace: true });
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not delete this book.");
     }
@@ -45,7 +65,10 @@ export function WishlistBookDetail({ book, series, onClose }: {
       actions={<DetailActionsMenu kind="book" label={book.title}
         onEdit={trigger => openAddBook({ editBook: book }, trigger)}
         onDuplicate={trigger => openAddBook({ duplicateBooks: [book] }, trigger)}
-        onDelete={removeBook} deleteTitle="Delete this book?"
+        beforeMore={<BookDislikeButton pressed={disliked.has(recommendationCandidateKey(book))}
+          disabled={!feedbackReady || savingDislike} onClick={() => void saveDislike()} />}
+        sourceUrl={source}
+        onDelete={removeBook} deleteTitle="Remove this book?" deleteMenuLabel="Remove book" deleteConfirmLabel="Remove book"
         deleteDescription="This removes the book and any saved journal and reading data." />}>
       {series && <p className="mb-2 break-words text-lg text-muted-foreground sm:text-xl">
         <MetadataLink to={`/series/${encodeURIComponent(series.id)}?${wishlistQuery}`}>{series.name}</MetadataLink>
@@ -58,7 +81,7 @@ export function WishlistBookDetail({ book, series, onClose }: {
           <MetadataLink to={`${buildAuthorDetailPath(findAuthorSummary(authors, author)?.id ?? author)}?${wishlistQuery}`}>{author}</MetadataLink>
         </Fragment>)}
       </p>}
-      <WishlistBookActions book={book} />
+      <WishlistBookActions book={book} showSource={false} />
       {error && <p className="rj-detail-notice text-sm text-destructive" role="alert">{error}</p>}
     </DetailHero>
     <div className="rj-detail-body"><BookDetailAbout book={book} /></div>

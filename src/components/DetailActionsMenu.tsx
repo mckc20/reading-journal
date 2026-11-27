@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Bookmark, Copy, MoreHorizontal, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Bookmark, Copy, ExternalLink, MoreHorizontal, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ interface DetailActionsMenuProps {
   label: string;
   shareLinkLabel?: string;
   shareAttachmentLabel?: string;
+  showShare?: boolean;
+  beforeMore?: ReactNode;
+  sourceUrl?: string;
+  onRemove?: () => void;
   onPause?: () => void;
   pauseTitle?: string;
   pauseDescription?: string;
@@ -31,6 +35,7 @@ interface DetailActionsMenuProps {
   deleteTitle?: string;
   deleteDescription?: string;
   deleteConfirmLabel?: string;
+  deleteMenuLabel?: string;
   className?: string;
 }
 
@@ -39,6 +44,10 @@ export default function DetailActionsMenu({
   label,
   shareLinkLabel = "Copy link to this page",
   shareAttachmentLabel,
+  showShare = true,
+  beforeMore,
+  sourceUrl,
+  onRemove,
   onPause,
   pauseTitle = "Pause this book?",
   pauseDescription = "Are you sure you want to pause this book? Reading time will stop until you resume it.",
@@ -51,6 +60,7 @@ export default function DetailActionsMenu({
   deleteTitle,
   deleteDescription,
   deleteConfirmLabel = "Delete",
+  deleteMenuLabel = "Delete",
   className,
 }: DetailActionsMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -61,7 +71,7 @@ export default function DetailActionsMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const hasMoreActions = Boolean(onPause || onResume || onDuplicate || onWishlist || onDelete);
+  const hasMoreActions = Boolean(onPause || onResume || onDuplicate || onWishlist || onDelete || sourceUrl || onRemove);
 
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
@@ -103,9 +113,10 @@ export default function DetailActionsMenu({
           <Pencil aria-hidden="true" />
         </Button>
       )}
-      <Button ref={shareTriggerRef} type="button" variant="ghost" size="icon-lg" className="size-11" aria-label={`Share ${kind}`} aria-haspopup="dialog" onClick={() => setShareOpen(true)}>
+      {showShare && <Button ref={shareTriggerRef} type="button" variant="ghost" size="icon-lg" className="size-11" aria-label={`Share ${kind}`} aria-haspopup="dialog" onClick={() => setShareOpen(true)}>
         <Share2 aria-hidden="true" />
-      </Button>
+      </Button>}
+      {beforeMore}
       {hasMoreActions && (
         <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger asChild>
@@ -148,21 +159,27 @@ export default function DetailActionsMenu({
                   Move to Wishlist
                 </DropdownMenu.Item>
               )}
-              {onDelete && (
-                <DropdownMenu.Item className="text-destructive" onSelect={() => openDialog(() => {
+              {sourceUrl && <DropdownMenu.Item asChild>
+                <a href={sourceUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink aria-hidden="true" className="size-4" />
+                  View source
+                </a>
+              </DropdownMenu.Item>}
+              {onRemove || onDelete ? (
+                <DropdownMenu.Item className="text-destructive" onSelect={onRemove ?? (() => openDialog(() => {
                   setDeleteLinkedBooks(false);
                   setDeleteOpen(true);
-                })}>
+                }))}>
                   <Trash2 aria-hidden="true" className="size-4" />
-                  Delete
+                  {deleteMenuLabel}
                 </DropdownMenu.Item>
-              )}
+              ) : null}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       )}
 
-      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+      {showShare && <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-md" onCloseAutoFocus={(event) => {
           event.preventDefault();
           shareTriggerRef.current?.focus({ preventScroll: true });
@@ -186,7 +203,7 @@ export default function DetailActionsMenu({
             {copyStatus && <p className="text-xs text-muted-foreground">{copyStatus}</p>}
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
 
       {onPause && (
         <Dialog open={pauseOpen} onOpenChange={setPauseOpen}>

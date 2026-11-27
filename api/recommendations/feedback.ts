@@ -29,19 +29,22 @@ export default async function handler(request: VercelRequest, response: VercelRe
         .delete().eq("user_id", userId).eq("candidate_key", candidateKey);
       if (error) throw error;
     } else {
-      const item = request.body?.item as RecommendationItem | undefined;
-      if (!isRecommendationItem(item)) {
-        json(response, 400, { error: "A valid recommendation is required." });
+      const item: unknown = request.body?.item;
+      const wishlistBook: unknown = request.body?.wishlistBook;
+      const catalogItem = isRecommendationItem(item) ? item : null;
+      const book = catalogItem ?? (isBookFeedback(wishlistBook) ? wishlistBook : null);
+      if (!book) {
+        json(response, 400, { error: "A valid book is required." });
         return;
       }
-      const candidateKey = recommendationCandidateKey(item);
+      const candidateKey = recommendationCandidateKey(book);
       const { error } = await admin.from("recommendation_feedback").upsert({
         user_id: userId,
         candidate_key: candidateKey,
-        title: item.title.slice(0, 500),
-        authors: item.authors.slice(0, 20),
-        genres: item.genres.slice(0, 40),
-        item,
+        title: book.title.slice(0, 500),
+        authors: book.authors.slice(0, 20),
+        genres: book.genres.slice(0, 40),
+        item: catalogItem ?? { wishlistBookId: book.id },
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id,candidate_key" });
       if (error) throw error;
@@ -59,11 +62,17 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
 }
 
-function isRecommendationItem(value: unknown): value is RecommendationItem {
+function isBookFeedback(value: unknown): value is Pick<RecommendationItem, "id" | "title" | "authors" | "genres" | "isbn"> {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<RecommendationItem>;
   return typeof item.id === "string" && typeof item.title === "string" &&
     Array.isArray(item.authors) && item.authors.every((author) => typeof author === "string") &&
     Array.isArray(item.genres) && item.genres.every((genre) => typeof genre === "string") &&
-    typeof item.sourceUrl === "string" && typeof item.source === "string";
+    (item.isbn == null || typeof item.isbn === "string");
+}
+
+function isRecommendationItem(value: unknown): value is RecommendationItem {
+  if (!isBookFeedback(value)) return false;
+  const item = value as Partial<RecommendationItem>;
+  return typeof item.sourceUrl === "string" && typeof item.source === "string";
 }
