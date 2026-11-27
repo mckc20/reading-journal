@@ -4,7 +4,7 @@ import { createBrowserRouter, Navigate, useLocation, useParams } from "react-rou
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 import { wishlistCollectionPath } from "@/lib/libraryCollections";
-import { legacyLibraryDestination } from "@/lib/libraryRedirects";
+import { legacyLibraryDestination, libraryAuthorFiltersPath } from "@/lib/libraryRedirects";
 import { recommendationShelfPath } from "@/lib/recommendationIdentity";
 
 // Load the signed-in app shell only after ProtectedRoute resolves the session.
@@ -13,7 +13,6 @@ const AppLayout = lazy(() => import("@/components/AppLayout"));
 const Login = lazy(() => import("@/pages/Login"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const SeriesDetails = lazy(() => import("@/pages/SeriesDetails"));
-const Authors = lazy(() => import("@/pages/Authors"));
 const AuthorDetails = lazy(() => import("@/pages/AuthorDetails"));
 const JournalEntryRedirect = lazy(() => import("@/pages/JournalEntryRedirect"));
 const GenreDetails = lazy(() => import("@/pages/GenreDetails"));
@@ -59,7 +58,7 @@ function RedirectEntityDetail({ entity, section }: {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const id = entity === "author" ? authorId : seriesId;
-  const collection = entity === "author" ? "/authors" : "/library/series";
+  const collection = entity === "author" ? libraryAuthorFiltersPath : "/library/series";
   if (!id) return <Navigate to={collection} replace />;
   if (section === "journal") return <Navigate to={entityJournalHref(entity, id, params)} replace />;
 
@@ -116,7 +115,7 @@ export const router = createBrowserRouter([
           pageRoute("/messages", () => import("@/pages/Groups")),
           { path: "/discover/recommendations", element: <Navigate to={recommendationShelfPath} replace /> },
           { path: "/recommendations", element: <Navigate to={recommendationShelfPath} replace /> },
-          pageRoute("/discover", () => import("@/pages/Discover")),
+          { path: "/discover", element: <Navigate to={recommendationShelfPath} replace /> },
           { path: "/series", element: <Navigate to="/library/series" replace /> },
           { path: "/series/:seriesId", element: lazyRoute(<SeriesDetails />) },
           { path: "/series/:seriesId/journal", element: <RedirectEntityDetail entity="series" section="journal" /> },
@@ -124,13 +123,13 @@ export const router = createBrowserRouter([
           { path: "/series/:seriesId/books", element: <RedirectEntityDetail entity="series" section="books" /> },
           { path: "/series/:seriesId/quotes", element: <RedirectEntityDetail entity="series" section="journal" /> },
           { path: "/library/explore", element: <RedirectLegacyLibrary /> },
-          { path: "/authors", element: lazyRoute(<Authors />) },
+          { path: "/authors", element: <RedirectLegacyLibrary browseBy="author" /> },
           { path: "/authors/explore", element: <RedirectLegacyLibrary browseBy="author" /> },
           { path: "/authors/:authorId", element: lazyRoute(<AuthorDetails />) },
           { path: "/authors/:authorId/journal", element: <RedirectEntityDetail entity="author" section="journal" /> },
           { path: "/authors/:authorId/books", element: <RedirectEntityDetail entity="author" section="books" /> },
           { path: "/authors/:authorId/quotes", element: <RedirectEntityDetail entity="author" section="journal" /> },
-          pageRoute("/search", () => import("@/pages/Search")),
+          { path: "/search", element: <RedirectLegacyLibrary /> },
           { path: "/genres", element: <RedirectLegacyLibrary browseBy="genre" /> },
           { path: "/genres/:genreId", element: lazyRoute(<GenreDetails />) },
           { path: "/books/:bookId", element: lazyRoute(<BookDetails />) },

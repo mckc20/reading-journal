@@ -4,21 +4,16 @@ import { Link, matchPath, UNSAFE_LocationContext, useLocation, useNavigate, useN
 import {
   BarChart3,
   Bell,
-  Bookmark,
-  BookOpen,
   BookPlus,
   Clock3,
-  Compass,
   Home,
   Library,
   Layers,
   Menu,
   MessageSquare,
   NotebookPen,
-  Search,
   Settings,
   Sparkles,
-  Tags,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -37,7 +32,6 @@ import { RecommendationsProvider } from "@/context/RecommendationsContext";
 import { useAuth, useUserSettings } from "@/context";
 import { getChatNotifications, markChatNotificationRead } from "@/lib/chatNotifications";
 import { wishlistCollectionPath } from "@/lib/libraryCollections";
-import { libraryAuthorFiltersPath, libraryGenreFiltersPath } from "@/lib/libraryRedirects";
 import { getLibraryTab } from "@/lib/libraryTabs";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/userSettings";
 import { supabase } from "@/lib/supabase";
@@ -135,19 +129,10 @@ const primaryNavLinks: NavLink[] = [
 ];
 
 const moreNavLinks: NavLink[] = [
-  { to: "/search", label: "Search", icon: Search },
-  { to: "/discover", label: "Discover", icon: Compass },
   { to: "/reading-history", label: "Reading History", icon: Clock3 },
   { to: "/wrap-ups", label: "Wrap-Ups", icon: Sparkles },
   { to: "/messages", label: "Messages", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
-];
-
-const libraryNavLinks: NavLink[] = [
-  { to: "/library", label: "All books", icon: BookOpen },
-  { to: libraryAuthorFiltersPath, label: "Authors", icon: UserRound },
-  { to: libraryGenreFiltersPath, label: "Genres", icon: Tags },
-  { to: wishlistCollectionPath, label: "Wishlist", icon: Bookmark },
 ];
 
 function getPrimaryRoute(pathname: string) {
@@ -472,9 +457,6 @@ function DetailOverlay({ detail, active }: { detail: DetailPage; active: boolean
 function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: ReactNode }) {
   const activeRoute = getPrimaryRoute(pathname);
   const isLibrary = Boolean(getLibraryTab(pathname));
-  const overflowLinks = pathname === "/"
-    ? moreNavLinks.filter(({ to }) => to !== "/search")
-    : [...moreNavLinks, ...libraryNavLinks];
   const transitionTo = (to: string) => supportsPageTransition() && !window.matchMedia(reducedMotion).matches && transitionsBetweenPages(pathname, to);
   const more = (
     <DropdownMenu.Root>
@@ -483,7 +465,7 @@ function AppHeader({ pathname, addLauncher }: { pathname: string; addLauncher?: 
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="rj-add-menu rj-app-navigation-menu" align="end" sideOffset={8} collisionPadding={12}>
-          {overflowLinks.map(({ to, label, icon: Icon }) => (
+          {moreNavLinks.map(({ to, label, icon: Icon }) => (
             <DropdownMenu.Item key={to} asChild>
               <Link to={to} viewTransition={transitionTo(to)} aria-current={pathname === to || pathname.startsWith(`${to}/`) ? "page" : undefined}>
                 <Icon size={18} aria-hidden="true" />

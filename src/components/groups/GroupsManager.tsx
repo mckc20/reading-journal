@@ -85,6 +85,7 @@ import { createAuthorJournalEntryRecord, fetchAllAuthorJournalEntryRecords } fro
 import { useSeries } from "@/hooks/useSeries";
 import { cn } from "@/lib/utils";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
+import { libraryAuthorFiltersPath } from "@/lib/libraryRedirects";
 import type {
   Book,
   AuthorJournalEntryRecord,
@@ -1816,7 +1817,7 @@ export function GroupsManager() {
       const matchingAuthor = authorRecords.find(
         (author) => author.id === attachment.author.id || author.name.trim().toLocaleLowerCase() === attachment.author.name.trim().toLocaleLowerCase(),
       );
-      return matchingAuthor ? `/authors/${encodeURIComponent(matchingAuthor.id)}` : "/authors";
+      return matchingAuthor ? `/authors/${encodeURIComponent(matchingAuthor.id)}` : libraryAuthorFiltersPath;
     }
 
     if (attachment.type === "series") {
@@ -1838,7 +1839,7 @@ export function GroupsManager() {
 
     if (attachment.note.source_type === "author") {
       const matchingAuthor = authorRecords.find((author) => author.id === attachment.note.source_id);
-      return matchingAuthor ? entityJournalHref("author", matchingAuthor.id) : "/authors";
+      return matchingAuthor ? entityJournalHref("author", matchingAuthor.id) : libraryAuthorFiltersPath;
     }
 
     return "/library";

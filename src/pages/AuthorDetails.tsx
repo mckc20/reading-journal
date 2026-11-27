@@ -37,6 +37,7 @@ import { getBookRankings } from "@/lib/bookRankings";
 import { buildSeriesGroups } from "@/lib/libraryShelves";
 import { duplicateAuthorRecord } from "@/lib/duplication";
 import { entityJournalHref } from "@/lib/journalLinks";
+import { libraryAuthorFiltersPath } from "@/lib/libraryRedirects";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
 import HorizontalShelf from "@/pages/library/HorizontalShelf";
 import { SeriesCard } from "@/components/redesign/SeriesCard";
@@ -82,7 +83,7 @@ function getTopValues(values: Array<string | null | undefined>, limit: number): 
 }
 
 const authorDetailLabel = "Author details";
-const authorFallback = "/authors";
+const authorFallback = libraryAuthorFiltersPath;
 
 export default function AuthorDetails() {
   const { authorId } = useParams();
@@ -196,7 +197,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
     try {
       setActionError(null);
       await removeAuthor(author.id);
-      navigate("/authors", { replace: true });
+      navigate(authorFallback, { replace: true });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Failed to delete author");
     }

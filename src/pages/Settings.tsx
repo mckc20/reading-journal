@@ -102,7 +102,7 @@ type SettingsTab =
   | "profile"
   | "appearance"
   | "reading"
-  | "discover"
+  | "recommendations"
   | "genres"
   | "notifications"
   | "privacy"
@@ -132,7 +132,7 @@ const settingsTabs: Array<{
   { value: "profile", label: "Profile", icon: UserRound },
   { value: "appearance", label: "Appearance", icon: Monitor },
   { value: "reading", label: "Reading", icon: BookOpen },
-  { value: "discover", label: "Discover", icon: Compass },
+  { value: "recommendations", label: "Recommendations", icon: Compass },
   { value: "genres", label: "Genres", icon: ListTree },
   { value: "notifications", label: "Notifications", icon: Bell },
   { value: "privacy", label: "Privacy", icon: Lock },
@@ -142,6 +142,7 @@ const settingsTabs: Array<{
 ];
 
 const legacyTabRedirects: Record<string, SettingsTab> = {
+  discover: "recommendations",
   notification: "notifications",
 };
 
@@ -1036,7 +1037,7 @@ function NotificationSettings() {
   );
 }
 
-function DiscoverSettings() {
+function RecommendationsSettings() {
   const { settings, loading, saving, error, saveSettingsSection } = useUserSettings();
   const discover = settings?.discover ?? DEFAULT_DISCOVER_SETTINGS;
   const disabled = loading || saving;
@@ -1060,7 +1061,7 @@ function DiscoverSettings() {
   }
 
   return (
-    <SettingsSection title="Discover" description="Control recommendation updates and feedback." icon={Compass}>
+    <SettingsSection title="Recommendations" description="Control recommendation updates and feedback." icon={Compass}>
       <div className="space-y-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SettingsRows>
@@ -1669,7 +1670,7 @@ function SettingsTabContent({ tab }: { tab: SettingsTab }) {
   const { loading: profileLoading } = useProfile();
   const waiting = tab === "profile"
     ? profileLoading
-    : settingsLoading && ["appearance", "reading", "discover", "notifications", "privacy"].includes(tab);
+    : settingsLoading && ["appearance", "reading", "recommendations", "notifications", "privacy"].includes(tab);
   if (waiting) {
     const section = settingsTabs.find((item) => item.value === tab)!;
     return (
@@ -1681,7 +1682,7 @@ function SettingsTabContent({ tab }: { tab: SettingsTab }) {
   if (tab === "profile") return <ProfileSettings />;
   if (tab === "appearance") return <AppearanceSettings />;
   if (tab === "reading") return <ReadingSettings />;
-  if (tab === "discover") return <DiscoverSettings />;
+  if (tab === "recommendations") return <RecommendationsSettings />;
   if (tab === "genres") return <GenreSettings />;
   if (tab === "notifications") return <NotificationSettings />;
   if (tab === "privacy") return <PrivacySettings />;
