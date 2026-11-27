@@ -6,6 +6,7 @@ import {
   type CalendarSpan,
 } from "@/lib/bookAnalytics";
 import type { Book, BookJournalEntryRecord, ReadingLog, Series } from "@/types";
+import { readingPageDeltas } from "./readingPageDeltas";
 import { getBookRankings, type BookRankings } from "@/lib/bookRankings";
 
 export type SeriesProgress = {
@@ -287,14 +288,17 @@ export function estimateSeriesCompletionDate(
     1,
     Math.round((lastDate.getTime() - firstDate.getTime()) / (24 * 60 * 60 * 1000)),
   );
-  const pageDelta = last.current_page - first.current_page;
+  const hasSavedBaselines = sortedLogs.some(log => log.starting_page != null);
+  const pageDelta = hasSavedBaselines
+    ? readingPageDeltas(sortedLogs).reduce((total, { log, pages }, index) => index > 0 || log.starting_page != null ? total + pages : total, 0)
+    : last.current_page - first.current_page;
   if (pageDelta <= 0) return null;
 
   const pagesPerDay = pageDelta / elapsedDays;
   const remainingPages = sortSeriesBooks(books).reduce((total, book) => {
     const totalPages = book.total_pages ?? 0;
     if (book.status === "Finished" || totalPages <= 0) return total;
-    const currentPage = book.id === activeBook.id ? last.current_page : book.current_page ?? 0;
+    const currentPage = book.id === activeBook.id && !hasSavedBaselines ? last.current_page : book.current_page ?? 0;
     return total + Math.max(0, totalPages - currentPage);
   }, 0);
   if (remainingPages <= 0) return null;

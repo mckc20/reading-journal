@@ -9,17 +9,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { notifyBookFinished } from "@/lib/confetti";
-import type { Book, BookJournalEntryRecord } from "@/types";
+import type { Book, ReadingActivityKind } from "@/types";
 import "@/components/redesign/redesign.css";
 
-// The panel includes the journal editor; fetch it only when the dialog opens.
 const ReadingProgressPanel = lazy(() => import("@/components/ReadingProgressPanel"));
+
+export type ReadingProgressMode = ReadingActivityKind | "change_date";
 
 interface ReadingProgressDialogProps {
   book: Book;
   trigger?: ReactNode;
-  onProgressSaved: (newCurrentPage: number) => Promise<void> | void;
-  onJournalEntrySaved?: (entry: BookJournalEntryRecord) => void;
+  mode?: ReadingProgressMode;
+  onProgressSaved?: () => Promise<void> | void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
@@ -28,8 +29,8 @@ interface ReadingProgressDialogProps {
 export default function ReadingProgressDialog({
   book,
   trigger,
+  mode = "progress_update",
   onProgressSaved,
-  onJournalEntrySaved,
   open,
   onOpenChange,
   onCloseAutoFocus,
@@ -38,14 +39,13 @@ export default function ReadingProgressDialog({
   const bookDetail = useMatch("/books/:bookId");
   const bookPath = `/books/${encodeURIComponent(book.id)}`;
   const destinationAfterClose = useRef<string | null>(null);
+  const finishedAfterClose = useRef<string | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
-  const [entryComposerOpen, setEntryComposerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const isControlled = typeof open === "boolean";
   const resolvedOpen = isControlled ? open : internalOpen;
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) setEntryComposerOpen(false);
     if (!isControlled) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   }
@@ -60,27 +60,36 @@ export default function ReadingProgressDialog({
   function handleCloseAutoFocus(event: Event) {
     onCloseAutoFocus?.(event);
     const destination = destinationAfterClose.current;
-    if (!destination) return;
     destinationAfterClose.current = null;
-    // Let the dialog restore focus before the phone sheet remembers the page behind it.
-    queueMicrotask(() => void navigate(destination));
+    const finishedBookId = finishedAfterClose.current;
+    finishedAfterClose.current = null;
+    // Let the dialog restore focus before opening another dialog or the phone sheet.
+    if (destination) queueMicrotask(() => void navigate(destination));
+    if (finishedBookId) queueMicrotask(() => notifyBookFinished(finishedBookId));
   }
 
   return (
     <Dialog open={resolvedOpen} onOpenChange={next => { if (!saving) handleOpenChange(next); }}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
-        className={entryComposerOpen ? "rj-progress-dialog rj-progress-dialog-wide" : "rj-progress-dialog"}
+        className="rj-progress-dialog"
         showCloseButton={!saving}
         onClick={(event) => event.stopPropagation()}
         onCloseAutoFocus={handleCloseAutoFocus}
       >
-        <DialogTitle>Update Progress</DialogTitle>
-        <DialogDescription className="sr-only">Record the page you reached in {book.title} and, optionally, your reading time.</DialogDescription>
+        <DialogTitle>{mode === "session" ? "Log session" : "Update Progress"}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {mode === "session"
+            ? `Record the page you reached and the start and end times for a session with ${book.title}.`
+            : `Record the page you reached in ${book.title} and, optionally, your reading time.`}
+          {" "}Scroll the wheels, tap a nearby value, or use the arrow keys or number keys.
+          {mode === "session" && " Page Up and Page Down move the time by an hour."}
+        </DialogDescription>
         <Suspense fallback={<LoadingIndicator variant="section" label="Loading progress form…" />}>
           <ReadingProgressPanel
-            key={book.id}
+            key={`${book.id}:${mode}`}
             book={book}
+            mode={mode}
             titleLink={saving ? undefined : (
               <Link
                 to={bookPath}
@@ -91,19 +100,14 @@ export default function ReadingProgressDialog({
               </Link>
             )}
             onSavingChange={setSaving}
-            onEntryComposerOpenChange={setEntryComposerOpen}
-            onJournalEntrySaved={onJournalEntrySaved}
             onCancel={() => handleOpenChange(false)}
-            onProgressSaved={async (newPage) => {
+            onProgressSaved={async (log) => {
               const totalPages = book.total_pages ?? 0;
-              const finishedBook = totalPages > 0 && newPage >= totalPages;
+              const finishedBook = totalPages > 0 && log.current_page >= totalPages;
 
-              await onProgressSaved(newPage);
+              await onProgressSaved?.();
+              if (finishedBook) finishedAfterClose.current = book.id;
               handleOpenChange(false);
-
-              if (finishedBook) {
-                notifyBookFinished(book.id);
-              }
             }}
           />
         </Suspense>

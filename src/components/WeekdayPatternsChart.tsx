@@ -49,7 +49,7 @@ export default function WeekdayPatternsChart({ weekdays }: WeekdayPatternsChartP
   if (!highest || !lowest) {
     return (
       <p className="mt-2 text-sm text-muted-foreground">
-        Add more reading sessions to establish weekday trends.
+        Log reading time to establish weekday trends.
       </p>
     );
   }

@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context";
 import {
+  fetchBookById,
   fetchBooks,
   createBook,
   updateBook as updateBookDb,
@@ -85,6 +86,12 @@ export function useBooks() {
     [user]
   );
 
+  const refreshBook = useCallback(async (id: string) => {
+    const updated = await fetchBookById(id);
+    setBooks((prev) => prev.map((book) => (book.id === id ? updated : book)));
+    return updated;
+  }, []);
+
   const updateBook = useCallback(
     async (id: string, payload: BookUpdate): Promise<void> => {
       const updated = await updateBookDb(id, payload);
@@ -152,6 +159,7 @@ export function useBooks() {
     error,
     addBook,
     updateBook,
+    refreshBook,
     updateBookSeriesPlacement,
     updateBookVolumeNumber,
     updateCover,

@@ -201,7 +201,10 @@ export function buildGeneratedBookJournalEntries(
 ): GeneratedBookJournalEntry[] {
   const entries: GeneratedBookJournalEntry[] = [];
   const sortedLogs = [...logs].sort((a, b) => a.logged_at.localeCompare(b.logged_at));
-  const uncompressedReadingLogIds = options.uncompressedReadingLogIds ?? new Set<string>();
+  const uncompressedReadingLogIds = new Set(options.uncompressedReadingLogIds);
+  for (const log of sortedLogs) {
+    if (log.kind === "progress_update" || log.kind === "session") uncompressedReadingLogIds.add(log.id);
+  }
   const sessionBarrierDateKeys = options.sessionBarrierDateKeys ?? new Set<string>();
   const sessionBarrierPages = options.sessionBarrierPages ?? new Set<number>();
 
@@ -335,6 +338,7 @@ export function buildGeneratedBookJournalEntries(
       (total, log) => total + Math.max(0, log.reading_time_minutes ?? 0),
       0,
     );
+    const isProgressUpdate = finalLog.kind === "progress_update";
     const sessionCount = groupedLogs.length;
     const dayCount = group.length;
     const isSingleSession = sessionCount === 1;
@@ -349,9 +353,10 @@ export function buildGeneratedBookJournalEntries(
         type: "reading_session",
         sourceId,
         createdAt: finalLog.logged_at,
-        label: sessionCount === 1 ? "Reading session" : "Reading sessions",
-        description:
-          totalReadingMinutes > 0
+        label: isProgressUpdate ? "Progress update" : sessionCount === 1 ? "Reading session" : "Reading sessions",
+        description: isProgressUpdate
+          ? `Reached page ${finalLog.current_page}${totalReadingMinutes > 0 ? ` · ${totalReadingMinutes} min` : ""}`
+          : totalReadingMinutes > 0
             ? `${sessionCount} ${sessionCount === 1 ? "session" : "sessions"} over ${dayCount} ${dayCount === 1 ? "day" : "days"} · ${totalReadingMinutes} min total`
             : `${sessionCount} ${sessionCount === 1 ? "session" : "sessions"} over ${dayCount} ${dayCount === 1 ? "day" : "days"}`,
         metadata: {
@@ -359,12 +364,12 @@ export function buildGeneratedBookJournalEntries(
           totalPages: book.total_pages,
           progressPercent: progressPercent ?? undefined,
           readingMinutes: totalReadingMinutes,
-          sessionCount,
+          sessionCount: isProgressUpdate ? undefined : sessionCount,
           sessions: groupedLogs.map((log) => ({
             id: log.id,
             loggedAt: log.logged_at,
             currentPage: log.current_page,
-            readingMinutes: log.reading_time_minutes,
+            readingMinutes: log.reading_time_minutes ?? undefined,
           })),
         },
       }),
@@ -377,7 +382,7 @@ export function buildGeneratedBookJournalEntries(
       currentPage: log.current_page,
       totalPages: book.total_pages,
       progressPercent: progressPercent ?? undefined,
-      readingMinutes: log.reading_time_minutes,
+      readingMinutes: log.reading_time_minutes ?? undefined,
     };
 
     if (progressPercent === null) return;

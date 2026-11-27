@@ -45,6 +45,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       .select(LAST_SESSION_FIELDS)
       .eq("book_id", book.id)
       .eq("user_id", userId)
+      .in("kind", ["legacy", "session"])
       .order("logged_at", { ascending: false })
       .limit(1)
       .maybeSingle();

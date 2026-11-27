@@ -25,7 +25,8 @@ import { BookDetailAbout } from "@/components/redesign/BookDetailAbout";
 import { WishlistBookDetail, wishlistCollectionHref } from "@/components/redesign/WishlistBookDetail";
 import BookReadingProgress from "@/components/BookReadingProgress";
 import SendAttachmentDialog from "@/components/SendAttachmentDialog";
-import ReadingProgressDialog from "@/components/ReadingProgressDialog";
+import ReadingProgressDialog, { type ReadingProgressMode } from "@/components/ReadingProgressDialog";
+import { MoreReadingActions } from "@/components/redesign/MoreReadingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HeadingInfo } from "@/components/ui/heading-info";
@@ -91,6 +92,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const wantsJournalEditor = searchParams.get("new") === "1";
   const addEntryButtonRef = useRef<HTMLButtonElement>(null);
+  const progressTriggerRef = useRef<HTMLButtonElement | null>(null);
   const {
     books,
     wishlistBooks,
@@ -114,6 +116,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
+  const [progressMode, setProgressMode] = useState<ReadingProgressMode>("progress_update");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
   const [logsAttempt, setLogsAttempt] = useState(0);
@@ -216,7 +219,8 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
   }
 
   async function handleStatusChange(nextStatus: BookStatus) {
-    if (!book || nextStatus === book.status) return;
+    if (!book) return false;
+    if (nextStatus === book.status) return true;
     const payload: Partial<Book> = { status: nextStatus };
     if (nextStatus === "Reading" && !book.date_started) payload.date_started = getTodayLocalDate();
     if (nextStatus === "Finished" && !book.date_finished) payload.date_finished = getTodayLocalDate();
@@ -224,9 +228,17 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
     try {
       setErrorMsg(null);
       await updateBook(book.id, payload);
+      return true;
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to update status");
+      return false;
     }
+  }
+
+  function openReadingActivity(mode: ReadingProgressMode, trigger: HTMLButtonElement) {
+    progressTriggerRef.current = trigger;
+    setProgressMode(mode);
+    setIsProgressDialogOpen(true);
   }
 
   async function handlePause() {
@@ -508,43 +520,36 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                 Resume
               </Button>
             ) : isReading ? (
-              <ReadingProgressDialog
-                book={book}
-                onJournalEntrySaved={rememberSavedEntry}
-                open={isProgressDialogOpen}
-                onOpenChange={setIsProgressDialogOpen}
-                onProgressSaved={async (newPage) => {
-                  const shouldFinish =
-                    typeof book.total_pages === "number" &&
-                    book.total_pages > 0 &&
-                    newPage >= book.total_pages;
-
-                  await updateBook(book.id, {
-                    current_page: newPage,
-                    ...(shouldFinish
-                      ? {
-                          status: "Finished",
-                          ...(book.date_finished ? {} : { date_finished: getTodayLocalDate() }),
-                        }
-                      : {}),
-                  });
-                  const data = await fetchReadingLogsForBook(book.id);
-                  setReadingLogs(data);
-                }}
-                trigger={<Button type="button"><BookOpen aria-hidden="true" />Update Progress</Button>}
+              <MoreReadingActions
+                onUpdateProgress={trigger => openReadingActivity("progress_update", trigger)}
+                onChangeDate={trigger => openReadingActivity("change_date", trigger)}
+                onSession={trigger => openReadingActivity("session", trigger)}
               />
             ) : (
               <Button
                 type="button"
-                onClick={async () => {
-                  await handleStatusChange("Reading");
-                  setIsProgressDialogOpen(true);
+                onClick={async (event) => {
+                  const trigger = event.currentTarget;
+                  if (await handleStatusChange("Reading")) openReadingActivity("progress_update", trigger);
                 }}
               >
                 <BookOpen aria-hidden="true" />
                 {readingActionLabel}
               </Button>
             )}
+            <ReadingProgressDialog
+              book={book}
+              mode={progressMode}
+              open={isProgressDialogOpen}
+              onOpenChange={setIsProgressDialogOpen}
+              onProgressSaved={async () => setReadingLogs(await fetchReadingLogsForBook(book.id))}
+              onCloseAutoFocus={event => {
+                event.preventDefault();
+                const trigger = progressTriggerRef.current;
+                if (trigger?.isConnected && !trigger.disabled) trigger.focus({ preventScroll: true });
+                else addEntryButtonRef.current?.focus({ preventScroll: true });
+              }}
+            />
             <Button
               ref={addEntryButtonRef}
               type="button"

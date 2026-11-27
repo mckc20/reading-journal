@@ -244,13 +244,22 @@ export interface JournalEntryVisibility {
   created_at: string;
 }
 
+export type ReadingActivityKind = "progress_update" | "session";
+export type ReadingLogKind = "legacy" | ReadingActivityKind;
+
 export interface ReadingLog {
   id: string;
   book_id: string;
   user_id: string;
   current_page: number;
-  reading_time_minutes?: number;
+  reading_time_minutes?: number | null;
   logged_at: string;
+  kind?: ReadingLogKind;
+  starting_page?: number | null;
+  local_day?: string | null;
+  time_zone?: string | null;
+  window_started_at?: string | null;
+  session_started_at?: string | null;
 }
 
 export interface Profile {

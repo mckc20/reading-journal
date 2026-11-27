@@ -1,6 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { CalendarDays, Clock3, ClipboardPen, MoreHorizontal } from 'lucide-react';
-import { DropdownMenu } from 'radix-ui';
+import { MoreReadingActions } from './MoreReadingActions';
 import { Button } from '@/components/ui/button';
 import { QuickBookCarousel } from './QuickBookCarousel';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
@@ -16,21 +15,22 @@ function HomeSection({ title, children }: { title: string; children: ReactNode }
 export function QuickProgress({ books, selectedId, onSelect, onRead, onChangeDate, onSession, onEditLogs }: {
   books: HomeBook[]; selectedId: string; onSelect: (id: string) => void;
   onRead: (book: HomeBook, trigger: HTMLButtonElement) => void;
-  onChangeDate?: (book: HomeBook) => void;
-  onSession?: (book: HomeBook) => void;
+  onChangeDate?: (book: HomeBook, trigger: HTMLButtonElement) => void;
+  onSession?: (book: HomeBook, trigger: HTMLButtonElement) => void;
   onEditLogs?: (book: HomeBook) => void;
 }) {
   const selected = books.find(book => book.id === selectedId) ?? books[0];
   return <div className="rj-quick-container"><section className="rj-quick-progress" aria-label="Quick reading progress">
     <div className="rj-quick-copy"><h1 className="rj-quick-title">How’s your<br />reading going?</h1>
       <div className="rj-quick-actions"><Button onClick={event => selected && onRead(selected, event.currentTarget)} disabled={!selected}><span className="rj-read-label">Update Progress</span></Button>
-        {(onChangeDate || onSession || onEditLogs) && <DropdownMenu.Root><DropdownMenu.Trigger asChild><Button className="rj-more-reading-trigger" variant="outline" size="icon-lg" aria-label="More reading actions" disabled={!selected}><MoreHorizontal /></Button></DropdownMenu.Trigger>
-          <DropdownMenu.Content className="rj-add-menu" sideOffset={8} align="start" collisionPadding={12}>
-            {onChangeDate && <DropdownMenu.Item onSelect={() => selected && onChangeDate(selected)}><CalendarDays size={16} />Change date</DropdownMenu.Item>}
-            {onSession && <DropdownMenu.Item onSelect={() => selected && onSession(selected)}><Clock3 size={16} />Log a session</DropdownMenu.Item>}
-            {onEditLogs && <DropdownMenu.Item onSelect={() => selected && onEditLogs(selected)}><ClipboardPen size={16} />Edit logs</DropdownMenu.Item>}
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>}
+        {(onChangeDate || onSession || onEditLogs) && (
+          <MoreReadingActions
+            disabled={!selected}
+            onChangeDate={onChangeDate && (trigger => selected && onChangeDate(selected, trigger))}
+            onSession={onSession && (trigger => selected && onSession(selected, trigger))}
+            onEditLogs={onEditLogs && (() => selected && onEditLogs(selected))}
+          />
+        )}
       </div>
     </div>
     <QuickBookCarousel books={books} selectedId={selected?.id} onSelect={onSelect} onActivate={(id, trigger) => { const book = books.find(item => item.id === id); if (book) onRead(book, trigger); }} />

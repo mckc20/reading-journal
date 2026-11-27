@@ -1,5 +1,5 @@
 import { bookJournalHref } from "@/lib/journalLinks";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import { BOOK_FINISHED_EVENT, launchBookFinishedConfetti } from "@/lib/confetti"
 
 export default function BookFinishedCelebration() {
   const [open, setOpen] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [bookId, setBookId] = useState<string | null>(null);
   const [savingRating, setSavingRating] = useState(false);
   const [ratingError, setRatingError] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export default function BookFinishedCelebration() {
   useEffect(() => {
     function handleBookFinished(event: Event) {
       const finishedEvent = event as CustomEvent<{ bookId?: string }>;
+      returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setBookId(finishedEvent.detail?.bookId ?? null);
       setRatingError(null);
       setOpen(true);
@@ -53,13 +55,21 @@ export default function BookFinishedCelebration() {
 
   function addReview() {
     if (!bookId) return;
+    returnFocusRef.current = null;
     setOpen(false);
     navigate(bookJournalHref(bookId, new URLSearchParams({ new: "1", tag: "review" })));
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" onCloseAutoFocus={event => {
+        const target = returnFocusRef.current;
+        returnFocusRef.current = null;
+        if (target?.isConnected) {
+          event.preventDefault();
+          target.focus({ preventScroll: true });
+        }
+      }}>
         <DialogHeader>
           <DialogTitle>Yeah! You've finished the book!</DialogTitle>
           <DialogDescription>

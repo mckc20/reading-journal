@@ -12,6 +12,7 @@ import {
   getPagesPerHour,
 } from "@/lib/bookAnalytics";
 import type { ProgressTimelinePoint } from "@/lib/bookAnalytics";
+import { readingPageDeltas } from "@/lib/readingPageDeltas";
 import type { BookPausePeriod, ReadingLog } from "@/types";
 
 export type ProgressOverTimeChartMode = "progress" | "speed" | "pages";
@@ -68,17 +69,10 @@ function toLocalDayKey(date: Date): string {
 }
 
 function buildSpeedTimeline(logs: ReadingLog[]): { points: SpeedTimelinePoint[]; average: number | null } {
-  let previousPage = 0;
   let timedPages = 0;
   let timedMinutes = 0;
   const dailyTotals = new Map<string, { pages: number; minutes: number }>();
-  const sortedLogs = [...logs].sort(
-    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
-  );
-
-  for (const log of sortedLogs) {
-    const pagesRead = Math.max(0, log.current_page - previousPage);
-    previousPage = log.current_page;
+  for (const { log, pages: pagesRead } of readingPageDeltas(logs, "previous")) {
     if (!log.reading_time_minutes || log.reading_time_minutes <= 0) continue;
 
     timedPages += pagesRead;

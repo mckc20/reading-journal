@@ -84,7 +84,7 @@ export const SaveProgress: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Update Progress' }));
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /To what page/ }));
+    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ }));
     await userEvent.keyboard('80');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
@@ -100,7 +100,7 @@ export const CancelStartReading: Story = {
     await userEvent.click(trigger);
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /To what page/ }));
+    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ }));
     await userEvent.keyboard('20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
@@ -128,7 +128,7 @@ export const CompletionReview: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Update Progress' }));
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /To what page/ }));
+    await userEvent.click(within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ }));
     await userEvent.keyboard('160');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
@@ -141,7 +141,7 @@ export const SaveError: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Update Progress' }));
     const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
-    const page = within(dialog).getByRole('spinbutton', { name: /To what page/ });
+    const page = within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ });
     await userEvent.click(page); await userEvent.keyboard('80');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await expect(await within(dialog).findByRole('alert')).toHaveTextContent('Your draft is still here');

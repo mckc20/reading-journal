@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
 
 const ROW_HEIGHT = 32;
+const ROW_BUFFER = 50;
 
 interface ProgressWheelPickerProps {
   label: string;
@@ -8,49 +9,50 @@ interface ProgressWheelPickerProps {
   min: number;
   max?: number;
   step?: number;
+  pageJump?: number;
   disabled?: boolean;
   describedBy?: string;
   formatValue?: (value: number) => string;
+  parseTypedValue?: (digits: string) => number | null;
   onChange: (value: number) => void;
 }
 
 /** Three visible rows with native touch/wheel scrolling and spinbutton keyboard support. */
 export function ProgressWheelPicker({
-  label, value, min, max, step = 1, disabled = false, describedBy,
-  formatValue = String, onChange,
+  label, value, min, max, step = 1, pageJump = step * 10, disabled = false, describedBy,
+  formatValue = String, parseTypedValue = Number, onChange,
 }: ProgressWheelPickerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const controlRef = useRef<HTMLDivElement>(null);
   const typedDigits = useRef({ text: '', lastTyped: 0 });
-  // Keep a small window of choices even for very large or unknown page counts.
-  // Recenter as the reader moves; this does not impose a maximum page count.
-  const firstValue = min + Math.max(0, Math.round((value - min) / step) - 50) * step;
-  const lastValue = Math.min(max ?? value + 50 * step, value + 50 * step);
-  const count = Math.floor((lastValue - firstValue) / step) + 1;
+  const selectedIndex = Math.round((value - min) / step);
+  const maxIndex = max === undefined ? undefined : Math.floor((max - min) / step);
+  // Leave the scroll positions fixed as rows are added and removed around the selection.
+  const firstIndex = Math.max(0, selectedIndex - ROW_BUFFER);
+  const lastIndex = Math.min(maxIndex ?? Infinity, selectedIndex + ROW_BUFFER);
+  const remainingRows = (maxIndex ?? lastIndex) - lastIndex;
 
   useLayoutEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    const target = (value - firstValue) / step * ROW_HEIGHT;
-    // Let touch scrolling finish naturally when it is already in this row.
-    if (Math.abs(scroller.scrollTop - target) > ROW_HEIGHT / 2) {
-      scroller.scrollTop = target;
+    // User scrolling already selected the nearest row. Only move the scroll position
+    // for picks made by keyboard, by tapping a row, or by changes to the form.
+    if (Math.round(scroller.scrollTop / ROW_HEIGHT) !== selectedIndex) {
+      scroller.scrollTop = selectedIndex * ROW_HEIGHT;
     }
-  }, [value, firstValue, step]);
+  }, [selectedIndex]);
 
   function choose(nextValue: number) {
-    const rounded = min + Math.round((nextValue - min) / step) * step;
-    const next = Math.max(min, Math.min(max ?? rounded, rounded));
-    onChange(next);
+    const index = Math.max(0, Math.min(maxIndex ?? Infinity, Math.round((nextValue - min) / step)));
+    onChange(min + index * step);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (disabled) return;
     const changes: Record<string, number> = {
       ArrowUp: value + step, ArrowDown: value - step,
-      PageUp: value + step * 10, PageDown: value - step * 10, Home: min,
+      PageUp: value + pageJump, PageDown: value - pageJump, Home: min,
     };
-    if (event.key === 'End' && max !== undefined) changes.End = max;
+    if (max !== undefined) changes.End = max;
     if (event.key in changes) {
       event.preventDefault();
       typedDigits.current.text = '';
@@ -60,13 +62,13 @@ export function ProgressWheelPicker({
       const now = Date.now();
       const text = ((now - typedDigits.current.lastTyped < 800 ? typedDigits.current.text : '') + event.key).slice(0, 10);
       typedDigits.current = { text, lastTyped: now };
-      choose(Number(text));
+      const parsed = parseTypedValue(text);
+      if (parsed !== null) choose(parsed);
     }
   }
 
   return (
     <div
-      ref={controlRef}
       className="rj-wheel"
       role="spinbutton"
       tabIndex={disabled ? -1 : 0}
@@ -78,7 +80,12 @@ export function ProgressWheelPicker({
       aria-disabled={disabled}
       aria-describedby={describedBy}
       onKeyDown={handleKeyDown}
-      onPointerDown={() => { if (!disabled) controlRef.current?.focus({ preventScroll: true }); }}
+      onBlur={() => { typedDigits.current.text = ''; }}
+      onPointerDown={event => {
+        if (disabled) return;
+        typedDigits.current.text = '';
+        event.currentTarget.focus({ preventScroll: true });
+      }}
     >
       <div className="rj-wheel-selection" aria-hidden="true" />
       <div
@@ -88,15 +95,14 @@ export function ProgressWheelPicker({
         style={{ overflowY: disabled ? 'hidden' : 'auto' }}
         onScroll={event => {
           if (disabled) return;
-          const index = Math.max(0, Math.min(count - 1, Math.round(event.currentTarget.scrollTop / ROW_HEIGHT)));
-          const next = firstValue + index * step;
-          // Commit the centered row immediately, so Save never races a scroll debounce.
-          if (next !== value) onChange(next);
+          const index = Math.round(event.currentTarget.scrollTop / ROW_HEIGHT);
+          const next = min + index * step;
+          if (next !== value) choose(next);
         }}
       >
-        <div className="rj-wheel-spacer" />
-        {Array.from({ length: count }, (_, index) => {
-          const itemValue = firstValue + index * step;
+        <div style={{ height: (firstIndex + 1) * ROW_HEIGHT }} />
+        {Array.from({ length: lastIndex - firstIndex + 1 }, (_, offset) => {
+          const itemValue = min + (firstIndex + offset) * step;
           return <div
             key={itemValue}
             className="rj-wheel-row"
@@ -104,7 +110,7 @@ export function ProgressWheelPicker({
             onClick={() => { if (!disabled) choose(itemValue); }}
           >{formatValue(itemValue)}</div>;
         })}
-        <div className="rj-wheel-spacer" />
+        <div style={{ height: (remainingRows + 1) * ROW_HEIGHT }} />
       </div>
     </div>
   );

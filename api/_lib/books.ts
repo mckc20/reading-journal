@@ -20,21 +20,6 @@ export type ReadingLogPayload = {
   logged_at?: string;
 };
 
-export type ReadingLogBook = {
-  status: ApiBookStatus;
-  current_page: number | null;
-  total_pages: number | null;
-  date_started: string | null;
-  date_finished: string | null;
-};
-
-export type ReadingLogBookUpdate = {
-  current_page: number;
-  status?: ApiBookStatus;
-  date_started?: string;
-  date_finished?: string;
-};
-
 export const API_JOURNAL_LABELS = ["note", "review", "quote"] as const;
 
 export type ApiJournalLabel = (typeof API_JOURNAL_LABELS)[number];
@@ -182,28 +167,6 @@ export function parseReadingLogPayload(body: unknown): ReadingLogPayload {
     reading_time_minutes: hasOwn(body, "reading_time_minutes") ? (body.reading_time_minutes as number) : null,
     ...(hasOwn(body, "logged_at") ? { logged_at: body.logged_at as string } : {}),
   };
-}
-
-export function getReadingLogBookUpdate(
-  book: ReadingLogBook,
-  requestedPage: number,
-  today: string,
-): ReadingLogBookUpdate {
-  const currentPage = Math.max(book.current_page ?? 0, requestedPage);
-  const update: ReadingLogBookUpdate = { current_page: currentPage };
-  const startsReading = book.status !== "Reading" && book.status !== "Finished";
-  const hasReachedEnd = typeof book.total_pages === "number" && book.total_pages > 0 && currentPage >= book.total_pages;
-
-  if (startsReading) {
-    update.status = "Reading";
-    if (!book.date_started) update.date_started = today;
-  }
-  if (hasReachedEnd) {
-    update.status = "Finished";
-    if (!book.date_finished) update.date_finished = today;
-  }
-
-  return update;
 }
 
 export function parseBookJournalPayload(body: unknown): BookJournalPayload {

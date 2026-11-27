@@ -1,4 +1,5 @@
 import type { BookPausePeriod, BookStatus, ReadingLog } from "@/types";
+import { readingPageDeltas } from "./readingPageDeltas";
 
 export interface CalendarSpan {
   months: number;
@@ -45,25 +46,18 @@ export interface ProgressTimelineResult {
 export const MIN_READING_LOGS_FOR_ESTIMATED_FINISH = 3;
 
 export function buildPagesTimeline(logs: ReadingLog[]): { dayKey: string; pages: number }[] {
-  const sortedLogs = logs
-    .filter((log) => isValidDate(new Date(log.logged_at)) && Number.isFinite(log.current_page))
-    .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime());
-  if (sortedLogs.length === 0) return [];
+  const entries = readingPageDeltas(logs.map(log => log.current_page < 0 ? { ...log, current_page: 0 } : log));
+  if (entries.length === 0) return [];
 
   const pagesByDay = new Map<string, number>();
-  let highestPage = 0;
-  for (const log of sortedLogs) {
+  for (const { log, pages } of entries) {
     const dayKey = toLocalDayKey(new Date(log.logged_at));
-    const currentPage = Math.max(0, log.current_page);
-    // A backward correction must not count previously read pages a second time.
-    const pages = Math.max(0, currentPage - highestPage);
     pagesByDay.set(dayKey, (pagesByDay.get(dayKey) ?? 0) + pages);
-    highestPage = Math.max(highestPage, currentPage);
   }
 
   const points: { dayKey: string; pages: number }[] = [];
-  const cursor = startOfLocalDay(new Date(sortedLogs[0].logged_at));
-  const lastDay = startOfLocalDay(new Date(sortedLogs[sortedLogs.length - 1].logged_at));
+  const cursor = startOfLocalDay(new Date(entries[0].log.logged_at));
+  const lastDay = startOfLocalDay(new Date(entries[entries.length - 1].log.logged_at));
   while (cursor <= lastDay) {
     const dayKey = toLocalDayKey(cursor);
     points.push({ dayKey, pages: pagesByDay.get(dayKey) ?? 0 });
@@ -500,7 +494,10 @@ export function getEstimatedFinish(params: {
     params.pausePeriods,
     params.now ?? new Date(),
   );
-  const loggedProgress = lastLog.current_page - firstLog.current_page;
+  const activity = readingPageDeltas(sortedLogs, "previous");
+  const loggedProgress = sortedLogs.some(log => log.starting_page != null)
+    ? activity.reduce((total, { log, pages }, index) => index > 0 || log.starting_page != null ? total + pages : total, 0)
+    : lastLog.current_page - firstLog.current_page;
 
   if (!isValidDate(firstLogDate) || !isValidDate(lastLogDate) || loggedDays <= 0 || loggedProgress <= 0) {
     return {
@@ -519,18 +516,15 @@ export function getEstimatedFinish(params: {
   const finishDate = new Date(now);
   finishDate.setDate(finishDate.getDate() + daysRemaining);
 
-  let previousPage = 0;
   let pagesWithTime = 0;
   let minutesWithProgress = 0;
 
-  for (const log of sortedLogs) {
-    const pagesRead = Math.max(0, log.current_page - previousPage);
+  for (const { log, pages: pagesRead } of activity) {
     const minutes = log.reading_time_minutes ?? 0;
     if (pagesRead > 0 && minutes > 0) {
       pagesWithTime += pagesRead;
       minutesWithProgress += minutes;
     }
-    previousPage = log.current_page;
   }
 
   const remainingMinutes =

@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   bookJournalEntryErrorToError,
   formatBookJournalEntryRecordPageRange,
-  getProgressNoteDate,
   normalizeBookJournalEntryRecordFields,
   normalizeBookJournalEntryRecordInput,
   sortBookJournalEntryRecords,
@@ -221,15 +220,6 @@ test("converts Supabase-shaped note errors to readable Error objects", () => {
 test("formats source page labels", () => {
   assert.equal(formatBookJournalEntryRecordPageRange({ page_start: null }), null);
   assert.equal(formatBookJournalEntryRecordPageRange({ page_start: 42 }), "p. 42");
-});
-
-test("uses the selected progress date for journalEntries created from progress updates", () => {
-  assert.equal(getProgressNoteDate(true, "2026-05-05T23:45"), "2026-05-05");
-});
-
-test("lets progress journalEntries default to today when no progress date is edited", () => {
-  assert.equal(getProgressNoteDate(false, "2026-05-05T23:45"), null);
-  assert.equal(getProgressNoteDate(true, ""), null);
 });
 
 test("sorts journalEntries by visible note date newest first", () => {

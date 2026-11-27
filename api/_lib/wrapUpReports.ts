@@ -41,7 +41,7 @@ export function reportRepository(admin: SupabaseClient): ReportRepository {
     },
     async sources(userId) {
       const books = await all<BookRow>('books', 'id,user_id,title,genres,total_pages,cover_url,rating,is_favorite,format,language,date_started,date_finished,book_authors(position,authors(name,user_id)),book_genres(genres(name,user_id,is_system))', userId);
-      const logs = await all<ReportLog>('reading_logs', 'id,user_id,book_id,current_page,reading_time_minutes,logged_at', userId);
+      const logs = await all<ReportLog>('reading_logs', 'id,user_id,book_id,current_page,reading_time_minutes,logged_at,starting_page,kind', userId);
       const journalEntries = await all<ReportJournalEntry>('book_journal', 'id,user_id,book_id,label,content,attribution,entry_date,is_favorite', userId);
       return { logs, journalEntries, books: books.map(({ book_authors, book_genres, ...book }) => {
         // Service-role joins bypass RLS too: never trust a cross-owner relationship.

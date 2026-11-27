@@ -1,3 +1,4 @@
+import { isReadingSession } from "./readingActivity";
 import { readingPageDeltas } from "./readingPageDeltas";
 import type { Book, ReadingLog } from "@/types";
 import { getActiveDaysBetween } from "@/lib/bookAnalytics";
@@ -229,45 +230,13 @@ function buildPageDeltas(logs: ReadingLog[]): PageDelta[] {
 }
 
 function buildReadingSpeedSamples(logs: ReadingLog[]): ReadingSpeedSample[] {
-  const logsByBook = new Map<string, ReadingLog[]>();
-
-  for (const log of logs) {
-    const list = logsByBook.get(log.book_id) ?? [];
-    list.push(log);
-    logsByBook.set(log.book_id, list);
-  }
-
   const samples: ReadingSpeedSample[] = [];
-
-  for (const bookLogs of logsByBook.values()) {
-    const sortedLogs = [...bookLogs].sort(
-      (left, right) => new Date(left.logged_at).getTime() - new Date(right.logged_at).getTime()
-    );
-    let previousPage = 0;
-
-    for (const log of sortedLogs) {
-      const loggedAt = parseDate(log.logged_at);
-      if (!loggedAt) continue;
-
-      const minutes = Math.max(0, log.reading_time_minutes ?? 0);
-      if (minutes <= 0) {
-        previousPage = Math.max(previousPage, log.current_page);
-        continue;
-      }
-
-      const currentPage = Math.max(0, log.current_page);
-      const pages = Math.max(0, currentPage - previousPage);
-      previousPage = Math.max(previousPage, currentPage);
-      if (pages <= 0) continue;
-
-      samples.push({
-        monthKey: toMonthKey(loggedAt),
-        pages,
-        minutes,
-      });
-    }
+  for (const { log, pages } of readingPageDeltas(logs)) {
+    const loggedAt = parseDate(log.logged_at);
+    const minutes = Math.max(0, log.reading_time_minutes ?? 0);
+    if (!loggedAt || pages <= 0 || minutes <= 0) continue;
+    samples.push({ monthKey: toMonthKey(loggedAt), pages, minutes });
   }
-
   return samples;
 }
 
@@ -486,7 +455,7 @@ function buildHallOfFame(books: Book[], logs: ReadingLog[], pageDeltas: PageDelt
     .filter((entry): entry is { book: Book; days: number } => entry.days !== null);
 
   const longestSessionLog = [...logs]
-    .filter((log) => (log.reading_time_minutes ?? 0) > 0)
+    .filter((log) => isReadingSession(log) && (log.reading_time_minutes ?? 0) > 0)
     .sort((left, right) => (right.reading_time_minutes ?? 0) - (left.reading_time_minutes ?? 0))[0];
 
   const pagesByDay = new Map<string, { pages: number; bookId: string }>();
@@ -752,7 +721,7 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[], n
     yearComparisonMap.set(year, current);
   }
 
-  const sessionsWithTime = logs.filter((log) => (log.reading_time_minutes ?? 0) > 0);
+  const sessionsWithTime = logs.filter((log) => isReadingSession(log) && (log.reading_time_minutes ?? 0) > 0);
   const pagesByDay = new Map<string, number>();
   for (const delta of pageDeltas) {
     pagesByDay.set(delta.dayKey, (pagesByDay.get(delta.dayKey) ?? 0) + delta.pages);
@@ -780,7 +749,8 @@ export function buildAnalyticsDashboardData(books: Book[], logs: ReadingLog[], n
   const weekdayMinutes = new Map<string, number>();
   const weekendMinutes = new Map<string, number>();
 
-  for (const log of sessionsWithTime) {
+  for (const log of logs) {
+    if ((log.reading_time_minutes ?? 0) <= 0) continue;
     const loggedAt = parseDate(log.logged_at);
     if (!loggedAt) continue;
     const key = toDayKey(loggedAt);

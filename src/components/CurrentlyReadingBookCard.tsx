@@ -2,8 +2,6 @@ import BookCardContent, { bookCardBaseClassName, bookCardInteractiveClassName } 
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Button } from "@/components/ui/button";
 import { BookProgress, getBookProgress } from "@/components/reading-journal";
-import { useBooksContext } from "@/context/BooksContext";
-import { getTodayLocalDate } from "@/lib/utils";
 import type { Book } from "@/types";
 
 interface CurrentlyReadingBookCardProps {
@@ -23,7 +21,6 @@ export default function CurrentlyReadingBookCard({
   textSize = "default",
   cornerLabel,
 }: CurrentlyReadingBookCardProps) {
-  const { updateBook } = useBooksContext();
   const handleBook = onBook ?? onClick;
 
   const currentPage = Math.max(0, book.current_page ?? 0);
@@ -69,19 +66,6 @@ export default function CurrentlyReadingBookCard({
             </p>
             <ReadingProgressDialog
               book={book}
-              onProgressSaved={async (newPage) => {
-                const shouldFinish = hasTotalPages && newPage >= totalPages;
-
-                await updateBook(book.id, {
-                  current_page: newPage,
-                  ...(shouldFinish
-                    ? {
-                        status: "Finished",
-                        ...(book.date_finished ? {} : { date_finished: getTodayLocalDate() }),
-                      }
-                    : {}),
-                });
-              }}
               trigger={
                 <Button
                   type="button"

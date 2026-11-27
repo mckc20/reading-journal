@@ -5,7 +5,6 @@ import {
   addAutomaticStatusDates,
   getBookId,
   getProgressPercent,
-  getReadingLogBookUpdate,
   parseBookJournalPayload,
   parseBookListOptions,
   parseBookSearchQuery,
@@ -170,41 +169,6 @@ test("rejects invalid reading log input", () => {
   assert.throws(() => parseReadingLogPayload({ current_page: 3, reading_time_minutes: -1 }), /reading_time_minutes must be/);
   assert.throws(() => parseReadingLogPayload({ current_page: 3, reading_time_minutes: null }), /reading_time_minutes must be/);
   assert.throws(() => parseReadingLogPayload({ current_page: 3, logged_at: "2026-07-23" }), /logged_at must be/);
-});
-
-test("advances reading progress and applies the matching status transitions", () => {
-  assert.deepEqual(
-    getReadingLogBookUpdate(
-      { status: "To Read", current_page: 20, total_pages: 240, date_started: null, date_finished: null },
-      48,
-      "2026-07-23",
-    ),
-    { current_page: 48, status: "Reading", date_started: "2026-07-23" },
-  );
-  assert.deepEqual(
-    getReadingLogBookUpdate(
-      { status: "Reading", current_page: 214, total_pages: 240, date_started: "2026-07-01", date_finished: null },
-      240,
-      "2026-07-23",
-    ),
-    { current_page: 240, status: "Finished", date_finished: "2026-07-23" },
-  );
-  assert.deepEqual(
-    getReadingLogBookUpdate(
-      { status: "Reading", current_page: 214, total_pages: 240, date_started: "2026-07-01", date_finished: null },
-      48,
-      "2026-07-23",
-    ),
-    { current_page: 214 },
-  );
-  assert.deepEqual(
-    getReadingLogBookUpdate(
-      { status: "Paused", current_page: 48, total_pages: 240, date_started: "2026-07-01", date_finished: null },
-      60,
-      "2026-07-23",
-    ),
-    { current_page: 60, status: "Reading" },
-  );
 });
 
 test("normalizes a book journal quote using the app's storage conventions", () => {

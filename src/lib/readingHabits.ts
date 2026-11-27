@@ -1,4 +1,6 @@
 import type { ReadingLog } from "@/types";
+import { isReadingSession } from "./readingActivity";
+import { readingPageDeltas } from "./readingPageDeltas";
 
 const DAY_PARTS = [
   { label: "Morning", startHour: 6, endHour: 11 },
@@ -234,73 +236,68 @@ export function calculateReadingHabits(
   const weekdayWeeklyMinutes = Array.from({ length: 7 }, () => new Map<string, number>());
   const weekdayWeeklySessions = Array.from({ length: 7 }, () => new Map<string, number>());
 
-  const logsByBook = new Map<string, ReadingLog[]>();
+  let totalSessions = 0;
+
+  function addWeekdayMinutes(at: Date, minutes: number) {
+    const index = toMondayFirstWeekdayIndex(at.getDay());
+    const weekKey = getWeekKey(at);
+    weekdayMinutesTotal[index] += minutes;
+    weekdayWeeklyMinutes[index].set(weekKey, (weekdayWeeklyMinutes[index].get(weekKey) ?? 0) + minutes);
+  }
+
+  function addTimedMinutes(at: Date, minutes: number) {
+    const hour = at.getHours();
+    const dayPart = getDayPartLabel(hour);
+    dayPartMinutes.set(dayPart, (dayPartMinutes.get(dayPart) ?? 0) + minutes);
+    hourMinutes[hour] += minutes;
+    addWeekdayMinutes(at, minutes);
+  }
 
   for (const log of sortedLogs) {
     const loggedAt = new Date(log.logged_at);
+    const readingMinutes = log.reading_time_minutes ?? 0;
+    if (!isReadingSession(log)) {
+      if (readingMinutes > 0) addWeekdayMinutes(loggedAt, readingMinutes);
+      continue;
+    }
+
+    totalSessions += 1;
     const weekdayIndex = toMondayFirstWeekdayIndex(loggedAt.getDay());
     const loggedAtWeekKey = getWeekKey(loggedAt);
-
     weekdaySessionsTotal[weekdayIndex] += 1;
     weekdayWeeklySessions[weekdayIndex].set(
       loggedAtWeekKey,
       (weekdayWeeklySessions[weekdayIndex].get(loggedAtWeekKey) ?? 0) + 1
     );
+    if (readingMinutes <= 0) continue;
 
-    const readingMinutes = log.reading_time_minutes ?? 0;
-    if (readingMinutes > 0) {
-      durationMinutesTotal += readingMinutes;
-      durationSessions += 1;
+    durationMinutesTotal += readingMinutes;
+    durationSessions += 1;
 
-      allocateMinutesByHour(loggedAt, readingMinutes, (chunkStart, chunkMinutes) => {
-        const chunkHour = chunkStart.getHours();
-        const chunkDayPart = getDayPartLabel(chunkHour);
-        const chunkWeekdayIndex = toMondayFirstWeekdayIndex(chunkStart.getDay());
-        const chunkWeekKey = getWeekKey(chunkStart);
-
-        dayPartMinutes.set(chunkDayPart, (dayPartMinutes.get(chunkDayPart) ?? 0) + chunkMinutes);
-        hourMinutes[chunkHour] += chunkMinutes;
-        weekdayMinutesTotal[chunkWeekdayIndex] += chunkMinutes;
-        weekdayWeeklyMinutes[chunkWeekdayIndex].set(
-          chunkWeekKey,
-          (weekdayWeeklyMinutes[chunkWeekdayIndex].get(chunkWeekKey) ?? 0) + chunkMinutes
-        );
-      });
+    if (log.kind === "session" && log.session_started_at) {
+      const end = loggedAt.getTime();
+      // Step through the actual elapsed time so repeated clock hours remain distinct.
+      for (let cursor = Date.parse(log.session_started_at); cursor < end;) {
+        const next = Math.min(end, (Math.floor(cursor / 60_000) + 1) * 60_000);
+        addTimedMinutes(new Date(cursor), (next - cursor) / 60_000);
+        cursor = next;
+      }
+    } else {
+      allocateMinutesByHour(loggedAt, readingMinutes, addTimedMinutes);
     }
-
-    const list = logsByBook.get(log.book_id) ?? [];
-    list.push(log);
-    logsByBook.set(log.book_id, list);
   }
 
   let speedTotalPages = 0;
   let speedTotalHours = 0;
   let speedSessions = 0;
-
-  for (const bookLogs of logsByBook.values()) {
-    const sortedBookLogs = [...bookLogs].sort(
-      (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
-    );
-
-    for (let index = 0; index < sortedBookLogs.length; index += 1) {
-      const current = sortedBookLogs[index];
-      const previousPage = index > 0 ? sortedBookLogs[index - 1].current_page : 0;
-      const readingMinutes = current.reading_time_minutes ?? 0;
-      if (readingMinutes <= 0) continue;
-
-      const pagesReadDelta = current.current_page - previousPage;
-      if (pagesReadDelta <= 0) continue;
-
-      const hours = readingMinutes / 60;
-      if (hours <= 0) continue;
-
-      speedTotalPages += pagesReadDelta;
-      speedTotalHours += hours;
-      speedSessions += 1;
-    }
+  for (const { log, pages } of readingPageDeltas(sortedLogs, "previous")) {
+    const readingMinutes = log.reading_time_minutes ?? 0;
+    if (!isReadingSession(log) || readingMinutes <= 0 || pages <= 0) continue;
+    speedTotalPages += pages;
+    speedTotalHours += readingMinutes / 60;
+    speedSessions += 1;
   }
 
-  const totalSessions = sortedLogs.length;
   const totalTrackedMinutes = dayPartMinutes.size
     ? [...dayPartMinutes.values()].reduce((sum, minutes) => sum + minutes, 0)
     : 0;
@@ -340,7 +337,7 @@ export function calculateReadingHabits(
     };
   });
 
-  const hasWeekdayActivity = weekdayStats.some((weekday) => weekday.totalSessions > 0);
+  const hasWeekdayActivity = weekdayStats.some((weekday) => weekday.totalSessions > 0 || weekday.totalMinutes > 0);
 
   const highest = hasWeekdayActivity
     ? [...weekdayStats].sort((left, right) => {

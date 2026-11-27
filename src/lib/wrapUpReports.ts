@@ -1,4 +1,6 @@
 import { readingPageDeltas } from './readingPageDeltas.js';
+import { isReadingSession } from './readingActivity.js';
+import type { ReadingLogKind } from '../types/index.js';
 
 export type ReportPeriodType = 'monthly' | 'yearly';
 export interface ReportPeriod {
@@ -15,6 +17,7 @@ export interface ReportBook {
 export interface ReportLog {
   id: string; user_id: string; book_id: string; current_page: number;
   reading_time_minutes: number | null; logged_at: string;
+  starting_page?: number | null; kind?: ReadingLogKind;
 }
 export interface ReportJournalEntry {
   id: string; user_id: string; book_id: string; label: 'note' | 'quote' | 'review';
@@ -146,7 +149,7 @@ function calculate(period: ReportPeriod, books: ReportBook[], logs: ReportLog[],
   const highestRatedBook = finishedBooks.filter(book => book.is_favorite === true || ratingValue(book) > 0)
     .sort((a, b) => Number(b.is_favorite === true) - Number(a.is_favorite === true)
       || ratingValue(b) - ratingValue(a) || a.id.localeCompare(b.id))[0];
-  const longest = [...timed].filter(e => e.log.reading_time_minutes! > 0).sort((a,b) => b.log.reading_time_minutes! - a.log.reading_time_minutes! || a.log.id.localeCompare(b.log.id))[0];
+  const longest = [...timed].filter(e => isReadingSession(e.log) && e.log.reading_time_minutes! > 0).sort((a,b) => b.log.reading_time_minutes! - a.log.reading_time_minutes! || a.log.id.localeCompare(b.log.id))[0];
   const bestDay = [...days].filter(([,pages]) => pages > 0).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]))[0];
   const highlights: MonthlyReport['highlights'] = {};
   if (highestRatedBook) highlights.highestRatedBook = highestRatedBook;

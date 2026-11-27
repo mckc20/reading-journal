@@ -1,11 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticate } from "../../_lib/auth.js";
-import { getBookId, getProgressPercent, getReadingLogBookUpdate, parseReadingLogPayload } from "../../_lib/books.js";
+import { getBookId, getProgressPercent, parseReadingLogPayload } from "../../_lib/books.js";
 import { json, methodNotAllowed } from "../../_lib/http.js";
 import { getSupabaseAdmin } from "../../_lib/supabaseAdmin.js";
-
-const BOOK_FIELDS = "id, status, current_page, total_pages, date_started, date_finished";
-const LOG_FIELDS = "id, current_page, reading_time_minutes, logged_at";
 
 function getTodayLocalDate(): string {
   const now = new Date();
@@ -50,77 +47,26 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
 
-    const admin = getSupabaseAdmin();
-    const { data: existingBook, error: bookError } = await admin
-      .from("books")
-      .select(BOOK_FIELDS)
-      .eq("id", bookId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    const { data, error } = await getSupabaseAdmin().rpc("save_legacy_reading_log", {
+      owner_id: userId,
+      target_book: bookId,
+      requested_page: payload.current_page,
+      minutes: payload.reading_time_minutes,
+      activity_at: payload.logged_at ?? null,
+      today: getTodayLocalDate(),
+    });
 
-    if (bookError) throw bookError;
-    if (!existingBook) {
-      json(response, 404, { error: "Book not found." });
+    if (error?.code === "P0002" || error?.code === "22023") {
+      json(response, error.code === "P0002" ? 404 : 400, { error: error.message });
       return;
     }
-
-    if (existingBook.status === "Wishlist") {
-      json(response, 400, { error: "Add this book to your library before logging reading." });
-      return;
-    }
-
-    const { data: log, error: insertError } = await admin
-      .from("reading_logs")
-      .insert({
-        book_id: bookId,
-        user_id: userId,
-        current_page: payload.current_page,
-        reading_time_minutes: payload.reading_time_minutes,
-        ...(payload.logged_at ? { logged_at: payload.logged_at } : {}),
-      })
-      .select(LOG_FIELDS)
-      .single();
-
-    if (insertError) throw insertError;
-
-    if (existingBook.status === "Paused") {
-      const { error: resumeError } = await admin
-        .from("book_pause_periods")
-        .update({ resumed_at: new Date().toISOString() })
-        .eq("book_id", bookId)
-        .eq("user_id", userId)
-        .is("resumed_at", null);
-
-      if (resumeError) {
-        console.error("POST /api/books/:id/reading-logs could not resume paused book", resumeError);
-        json(response, 500, { error: "Reading session was saved, but the paused book could not be resumed." });
-        return;
-      }
-    }
-
-    const bookUpdate = getReadingLogBookUpdate(existingBook, payload.current_page, getTodayLocalDate());
-    const { data: updatedBook, error: updateError } = await admin
-      .from("books")
-      .update(bookUpdate)
-      .eq("id", bookId)
-      .eq("user_id", userId)
-      .select(BOOK_FIELDS)
-      .maybeSingle();
-
-    if (updateError || !updatedBook) {
-      if (updateError) console.error("POST /api/books/:id/reading-logs could not update book", updateError);
-      json(response, 500, { error: "Reading session was saved, but the book progress could not be updated." });
-      return;
-    }
+    if (error) throw error;
 
     json(response, 201, {
-      log,
+      log: data.log,
       book: {
-        id: updatedBook.id,
-        status: updatedBook.status,
-        current_page: updatedBook.current_page,
-        total_pages: updatedBook.total_pages,
-        percent: getProgressPercent(updatedBook.current_page, updatedBook.total_pages),
+        ...data.book,
+        percent: getProgressPercent(data.book.current_page, data.book.total_pages),
       },
     });
   } catch (error) {

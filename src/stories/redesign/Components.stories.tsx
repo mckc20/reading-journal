@@ -113,7 +113,7 @@ export const ProgressSaveError: Story = {
     const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await expect(within(dialog).getByRole('alert')).toHaveTextContent('Unable to save progress');
-    await expect(within(dialog).getByRole('spinbutton', { name: /To what page/ })).toHaveAttribute('aria-valuenow', '246');
+    await expect(within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ })).toHaveAttribute('aria-valuenow', '246');
   },
 };
 export const ProgressSaving: Story = { render: () => <ProgressDialog book={books[1]} onSave={() => new Promise<void>(() => {})} /> };

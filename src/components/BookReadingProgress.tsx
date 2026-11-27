@@ -14,6 +14,7 @@ import {
   sumReadingMinutes,
 } from "@/lib/bookAnalytics";
 import { formatMediumDate } from "@/lib/dateDisplay";
+import { readingPageDeltas } from "@/lib/readingPageDeltas";
 import type { Book, ReadingLog } from "@/types";
 
 const chartModes = [
@@ -26,32 +27,33 @@ function formatDate(date: Date | null, fallback = "Not available") {
   return date ? formatMediumDate(date) : fallback;
 }
 
+function getEntryHeading(log: ReadingLog) {
+  const end = new Date(log.logged_at);
+  const start = log.kind === "session" ? log.session_started_at : log.window_started_at;
+  if (!start) return formatMediumDate(end, "short");
+  const timeZone = log.time_zone ?? undefined;
+  const date = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone }).format(end);
+  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone });
+  const activity = log.kind === "session" ? "Reading session" : "Progress update";
+  return `${activity} · ${date}, ${time.format(new Date(start))}–${time.format(end)}`;
+}
+
 function ReadingLogDetails({ logs }: { logs: ReadingLog[] }) {
   const [showAll, setShowAll] = useState(false);
-  const entries = useMemo(() => {
-    let previousPage = 0;
-    return [...logs]
-      .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime())
-      .map((log) => {
-        const pagesRead = Math.max(0, log.current_page - previousPage);
-        previousPage = log.current_page;
-        return { ...log, pagesRead };
-      })
-      .reverse();
-  }, [logs]);
+  const entries = useMemo(() => readingPageDeltas(logs, "previous").reverse(), [logs]);
 
   if (entries.length === 0) return null;
   return (
     <div className="space-y-2">
       <h3 className="sr-only">Reading progress entries</h3>
       <ul className="divide-y rounded-lg border px-3">
-        {(showAll ? entries : entries.slice(0, 3)).map((entry) => (
+        {(showAll ? entries : entries.slice(0, 3)).map(({ log: entry, pages }) => (
           <li key={entry.id || `${entry.logged_at}-${entry.current_page}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
             <span>
               <span className="block text-xs text-muted-foreground">
-                {formatMediumDate(new Date(entry.logged_at), "short")}
+                {getEntryHeading(entry)}
               </span>
-              Page {entry.current_page} <span className="text-muted-foreground">(+{entry.pagesRead})</span>
+              Page {entry.current_page} <span className="text-muted-foreground">(+{pages})</span>
             </span>
             <span className="text-muted-foreground">
               {entry.reading_time_minutes ? formatTotalReadingTime(entry.reading_time_minutes) : "No reading time"}
@@ -91,7 +93,7 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
   const showEstimate = estimate.shouldShow || book.status === "Paused";
 
   if (!book.date_started && !book.date_finished && !logs.length && !showEstimate) {
-    return <p className="rj-detail-quiet">Your reading sessions will appear here.</p>;
+    return <p className="rj-detail-quiet">Your reading activity will appear here.</p>;
   }
 
   return (
@@ -133,13 +135,13 @@ export default function BookReadingProgress({ book, logs }: { book: Book; logs: 
             </dl>
             {estimate.finishDate ? (
               <p className="text-xs text-muted-foreground">
-                Based on {estimate.readingSessionCount} progress updates. Reading time left uses timed progress updates.
+                Based on {estimate.readingSessionCount} reading entries. Reading time left uses entries with pages and minutes.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
                 {book.status === "Paused"
                   ? "Resume the book to see an estimate."
-                  : `An estimate needs a page total and at least ${MIN_READING_LOGS_FOR_ESTIMATED_FINISH} progress updates with pages read across multiple days.`}
+                  : `An estimate needs a page total and at least ${MIN_READING_LOGS_FOR_ESTIMATED_FINISH} reading entries across multiple days.`}
               </p>
             )}
           </ReadingStat>

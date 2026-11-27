@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode, type Ref } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import LoadingIndicator from "@/components/LoadingIndicator";
-import ReadingProgressDialog from "@/components/ReadingProgressDialog";
+import ReadingProgressDialog, { type ReadingProgressMode } from "@/components/ReadingProgressDialog";
 import { BookShelf, ReadingBookCard, type HomeBook } from "@/components/redesign/HomeCards";
 import { QuickProgress } from "@/components/redesign/RedesignHome";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { useBooksContext } from "@/context/BooksContext";
 import { useRecommendations } from "@/context/RecommendationsContext";
 import { useDetailSectionAnchor } from "@/hooks/useDetailSectionAnchor";
 import { recommendationCandidateKey, recommendationDetailPath } from "@/lib/recommendationIdentity";
-import { getTodayLocalDate } from "@/lib/utils";
 import type { Book } from "@/types";
 
 const RECENTLY_FINISHED_DAYS = 28;
@@ -76,11 +75,11 @@ function HomeSection({ id, title, children, sectionRef }: { id: string; title: s
 }
 
 export default function Dashboard() {
-  const { books, loading, error, reload, updateBook } = useBooksContext();
+  const { books, loading, error, reload } = useBooksContext();
   const recommendations = useRecommendations();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState("");
-  const [progress, setProgress] = useState<{ book: Book; open: boolean } | null>(null);
+  const [progress, setProgress] = useState<{ book: Book; open: boolean; mode: ReadingProgressMode } | null>(null);
   const progressTrigger = useRef<HTMLButtonElement | null>(null);
   const homeRef = useRef<HTMLDivElement>(null);
   const recommendationsRef = useDetailSectionAnchor("recommendations", !loading && !recommendations.loading);
@@ -98,22 +97,11 @@ export default function Dashboard() {
     navigate(`/books/${book.id}`);
   }
 
-  function openProgress(book: HomeBook, trigger: HTMLButtonElement) {
+  function openProgress(book: HomeBook, trigger: HTMLButtonElement, mode: ReadingProgressMode = "progress_update") {
     const record = books.find(item => item.id === book.id);
     if (!record) return;
     progressTrigger.current = trigger;
-    setProgress({ book: record, open: true });
-  }
-
-  async function saveProgress(book: Book, newPage: number) {
-    const total = book.total_pages ?? 0;
-    await updateBook(book.id, {
-      current_page: newPage,
-      ...(total > 0 && newPage >= total ? {
-        status: "Finished",
-        ...(book.date_finished ? {} : { date_finished: getTodayLocalDate() }),
-      } : {}),
-    });
+    setProgress({ book: record, open: true, mode });
   }
 
   if (loading) {
@@ -139,6 +127,8 @@ export default function Dashboard() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onRead={openProgress}
+          onChangeDate={(book, trigger) => openProgress(book, trigger, "change_date")}
+          onSession={(book, trigger) => openProgress(book, trigger, "session")}
         />
       ) : (
         <h1 className="rj-app-home-title">Home</h1>
@@ -206,10 +196,10 @@ export default function Dashboard() {
 
       {progress && (
         <ReadingProgressDialog
-          book={progress.book}
+          book={books.find(book => book.id === progress.book.id) ?? progress.book}
+          mode={progress.mode}
           open={progress.open}
           onOpenChange={(open) => setProgress(current => current && { ...current, open })}
-          onProgressSaved={(page) => saveProgress(progress.book, page)}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             const trigger = progressTrigger.current;

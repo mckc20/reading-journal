@@ -22,7 +22,7 @@ function HomeReview(args: RedesignHomeProps) {
   return <>
     <RedesignHome {...args} reading={reading} posts={community}
       onRead={book => { returnFocus.current = document.activeElement as HTMLElement; setActiveBook(book); }}
-      onChangeDate={book => preview(`Change date for ${book.title}`)}
+      onChangeDate={book => preview(`Change date/time for ${book.title}`)}
       onSession={book => preview(`Timed session for ${book.title}`)} onEditLogs={book => preview(`Edit logs for ${book.title}`)}
       onOpenBook={book => preview(`Book details: ${book.title}`)} onGoal={() => preview('Goals and plans')}
       onNavigate={destination => preview(destination)} onCreate={destination => preview(`Create ${destination}`)}
@@ -98,7 +98,7 @@ export const SaveProgress: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Update Progress' }));
     const body = within(canvasElement.ownerDocument.body);
     const dialog = await body.findByRole('dialog');
-    const page = within(dialog).getByRole('spinbutton', { name: /To what page/ });
+    const page = within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ });
     await userEvent.click(page); await userEvent.keyboard('80');
     await userEvent.click(within(dialog).getByRole('spinbutton', { name: 'Hours' }));
     await userEvent.keyboard('1');
@@ -116,7 +116,7 @@ export const CancelProgress: Story = {
     const trigger = canvas.getByRole('button', { name: 'Update Progress' });
     await userEvent.click(trigger);
     const dialog = await within(canvasElement.ownerDocument.body).findByRole('dialog');
-    const page = within(dialog).getByRole('spinbutton', { name: /To what page/ });
+    const page = within(dialog).getByRole('spinbutton', { name: /What page did you read up to/ });
     await userEvent.click(page); await userEvent.keyboard('80');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await expect(canvas.getByText('You’re 40% through the book')).toBeVisible();

@@ -449,7 +449,7 @@ export async function resumeBook(id: string): Promise<Book> {
   return runPauseBookMutation("resume_book", id);
 }
 
-async function fetchBookById(id: string): Promise<Book> {
+export async function fetchBookById(id: string): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
     .select("*, book_genres(genre:genres(*)), book_authors(position, author:authors(*)), book_pause_periods(*)")
@@ -665,40 +665,42 @@ export async function deleteSeries(seriesId: string, deleteLinkedBooks = false):
 
 // ── Reading Logs ──────────────────────────────────────────────────────────
 
-export async function createReadingLog(
-  bookId: string,
-  userId: string,
-  currentPage: number,
-  readingTimeMinutes?: number,
-  loggedAt?: string
-): Promise<ReadingLog> {
-  const { data, error } = await supabase
-    .from("reading_logs")
-    .insert({
-      book_id: bookId,
-      user_id: userId,
-      current_page: currentPage,
-      reading_time_minutes: readingTimeMinutes,
-      ...(loggedAt ? { logged_at: loggedAt } : {}),
-    })
-    .select()
-    .single();
+export type ReadingActivityDraft = {
+  bookId: string;
+  id: string;
+  startingPage: number;
+  currentPage: number;
+  timeZone: string;
+} & (
+  | { kind: "progress_update"; minutes: number | null; loggedAt: string | null }
+  | { kind: "session"; start: string; loggedAt: string }
+);
+
+export async function saveReadingActivity(draft: ReadingActivityDraft): Promise<ReadingLog> {
+  const { data, error } = await supabase.rpc("save_reading_activity", {
+    target_book: draft.bookId,
+    log_id: draft.id,
+    activity_kind: draft.kind,
+    expected_page: draft.startingPage,
+    target_page: draft.currentPage,
+    minutes: draft.kind === "progress_update" ? draft.minutes : null,
+    activity_at: draft.loggedAt,
+    session_start: draft.kind === "session" ? draft.start : null,
+    reader_zone: draft.timeZone,
+  }).single();
   if (error) throw error;
   return data as ReadingLog;
 }
 
-export async function fetchLastReadingLog(
-  bookId: string
-): Promise<ReadingLog | null> {
+export async function fetchProgressWindowLogs(bookId: string, localDay: string, start: string, end: string) {
   const { data, error } = await supabase
     .from("reading_logs")
     .select("*")
     .eq("book_id", bookId)
-    .order("logged_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .or(`and(kind.eq.progress_update,local_day.eq.${localDay},logged_at.lte.${end}),and(kind.eq.session,logged_at.gt.${start},session_started_at.lt.${end})`)
+    .order("logged_at", { ascending: true });
   if (error) throw error;
-  return data as ReadingLog | null;
+  return (data ?? []) as ReadingLog[];
 }
 
 export async function fetchReadingLogsForBook(

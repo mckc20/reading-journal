@@ -1,113 +1,149 @@
-import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import type { ReadingProgressMode } from "@/components/ReadingProgressDialog";
 import LoadingIndicator from "@/components/LoadingIndicator";
-import { ProgressBookSummary, ProgressWheels } from "@/components/redesign/ProgressFields";
+import { ProgressBookSummary, ProgressPageWheel, ProgressWheelField, ProgressWheels } from "@/components/redesign/ProgressFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getProgressNoteDate, updateBookJournalEntryRecord } from "@/lib/bookJournal";
-import { createReadingLog, fetchLastReadingLog } from "@/lib/books";
-import { useAuth } from "@/context/AuthContext";
-import { READING_LOG_NOTE_TAG_PREFIX, normalizeJournalTags } from "@/lib/journalTags";
-import type { Book, BookJournalEntryRecord, ReadingLog } from "@/types";
-
-const JournalEntryForm = lazy(() => import("@/components/AddJournalEntryDialog").then(module => ({ default: module.JournalEntryForm })));
+import { fetchProgressWindowLogs, saveReadingActivity, type ReadingActivityDraft } from "@/lib/books";
+import { useBooksContext } from "@/context/BooksContext";
+import { getLocalReadingDay, getLoggedSessionMinutes, getSessionTimes, toDateTimeLocalValue } from "@/lib/readingActivity";
+import type { Book, ReadingLog } from "@/types";
 
 interface ReadingProgressPanelProps {
   book: Book;
+  mode: ReadingProgressMode;
   titleLink?: ReactNode;
-  onProgressSaved: (newCurrentPage: number) => Promise<void>;
-  onJournalEntrySaved?: (entry: BookJournalEntryRecord) => void;
+  onProgressSaved: (log: ReadingLog) => Promise<void>;
   onCancel: () => void;
-  onEntryComposerOpenChange: (open: boolean) => void;
   onSavingChange: (saving: boolean) => void;
 }
 
-function toDateTimeLocalValue(date: Date): string {
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return localDate.toISOString().slice(0, 16);
+const clockFormatter = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+
+function formatClockMinute(minute: number) {
+  return clockFormatter.format(new Date(minute * 60_000));
 }
 
-async function attachNoteToReadingLog(note: BookJournalEntryRecord, readingLog: ReadingLog): Promise<BookJournalEntryRecord> {
-  const readingLogTag = `${READING_LOG_NOTE_TAG_PREFIX}${readingLog.id}`;
-  const tags = normalizeJournalTags([...(note.tags ?? []), readingLogTag]);
-
-  return updateBookJournalEntryRecord({
-    noteId: note.id,
-    label: note.label,
-    attribution: note.attribution ?? undefined,
-    content: note.content,
-    tags,
-    pageStart: note.page_start ?? undefined,
-    noteDate: note.entry_date,
-    isFavorite: note.is_favorite,
-  });
+function parseClockDigits(digits: string) {
+  const hours = Number(digits.length > 2 ? digits.slice(0, -2) : digits);
+  const minutes = digits.length > 2 ? Number(digits.slice(-2)) : 0;
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
 }
 
 export default function ReadingProgressPanel({
-  book, titleLink, onProgressSaved, onJournalEntrySaved, onCancel, onEntryComposerOpenChange, onSavingChange,
+  book, mode, titleLink, onProgressSaved, onCancel, onSavingChange,
 }: ReadingProgressPanelProps) {
-  const { user } = useAuth();
+  const { refreshBook } = useBooksContext();
   const errorId = useId();
-  const optionsId = useId();
   const dateId = useId();
-  const [lastLog, setLastLog] = useState<ReadingLog | null>();
+  const timeId = useId();
+  const [openedAt] = useState(() => new Date());
+  const initialEnd = openedAt.getHours() * 60 + openedAt.getMinutes();
   const [pendingLog, setPendingLog] = useState<ReadingLog | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<ReadingActivityDraft | null>(null);
   const [draftPage, setDraftPage] = useState<number | null>(null);
+  const [startMinute, setStartMinute] = useState(Math.max(0, initialEnd - 15));
+  const [endMinute, setEndMinute] = useState(initialEnd);
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(0);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [showOptions, setShowOptions] = useState(false);
-  const [showLoggedAtEditor, setShowLoggedAtEditor] = useState(false);
-  const [loggedAt, setLoggedAt] = useState(() => toDateTimeLocalValue(new Date()));
-  const [showNoteEditor, setShowNoteEditor] = useState(false);
-  const [savedProgressNote, setSavedProgressNote] = useState<BookJournalEntryRecord | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => getLocalReadingDay(openedAt).day);
+  const [selectedTime, setSelectedTime] = useState(() => toDateTimeLocalValue(openedAt).slice(11));
+  const loggedAt = `${selectedDate}T${selectedTime}`;
+  const [windowAttempt, setWindowAttempt] = useState(0);
+  const [windowInfo, setWindowInfo] = useState<{ end: Date; minutes: number | null }>();
+  const isSession = mode === "session";
+  const isChangingDate = mode === "change_date";
   const currentPage = Math.max(0, book.current_page ?? 0);
   const totalPages = Math.max(0, book.total_pages ?? 0);
-  const minPage = Math.min(Math.max(currentPage, lastLog?.current_page ?? 0) + 1, totalPages);
-  const selectedPage = draftPage ?? minPage;
-  const loading = totalPages > 0 && lastLog === undefined;
-  const fieldsDisabled = saving || pendingLog !== null;
+  const remainingPages = Math.max(0, totalPages - currentPage);
+  const minPage = Math.min(currentPage + 1, totalPages);
+  const selectedPage = Math.min(totalPages, Math.max(minPage, draftPage ?? minPage));
+  const windowEnd = useMemo(
+    () => isChangingDate ? new Date(loggedAt) : new Date(),
+    [isChangingDate, loggedAt, windowAttempt, currentPage],
+  );
+  const fieldsDisabled = saving || pendingLog !== null || pendingDraft !== null;
+  const needsWindow = !isSession && !pendingLog && !pendingDraft && remainingPages > 0
+    && Number.isFinite(windowEnd.getTime());
+  const loading = needsWindow && windowInfo?.end !== windowEnd;
+  const windowLoadFailed = needsWindow && !loading && windowInfo?.minutes === null;
+  const loggedMinutes = !loading ? windowInfo?.minutes ?? 0 : 0;
 
   useEffect(() => {
-    if (totalPages === 0) return;
+    if (!needsWindow) return;
     let cancelled = false;
-    void fetchLastReadingLog(book.id)
-      .then(log => { if (!cancelled) setLastLog(log); })
-      .catch(() => { if (!cancelled) setLastLog(null); });
+    const { day, start } = getLocalReadingDay(windowEnd);
+    void fetchProgressWindowLogs(book.id, day, start.toISOString(), windowEnd.toISOString())
+      .then(logs => {
+        if (!cancelled) setWindowInfo({ end: windowEnd, minutes: getLoggedSessionMinutes(logs, start, windowEnd) });
+      })
+      .catch(() => {
+        if (!cancelled) setWindowInfo({ end: windowEnd, minutes: null });
+      });
     return () => { cancelled = true; };
-  }, [book.id, totalPages]);
+  }, [book.id, needsWindow, windowEnd]);
 
-  function toggleNoteEditor(open: boolean) {
-    setShowNoteEditor(open);
-    onEntryComposerOpenChange(open);
+  function makeDraft(): ReadingActivityDraft {
+    const base = {
+      bookId: book.id,
+      id: crypto.randomUUID(),
+      startingPage: currentPage,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+    if (isSession) {
+      const { start, end } = getSessionTimes(openedAt, startMinute, endMinute);
+      return { ...base, kind: "session", currentPage: selectedPage, start: start.toISOString(), loggedAt: end.toISOString() };
+    }
+    let adjustedTime: string | null = null;
+    if (isChangingDate) {
+      const value = new Date(loggedAt);
+      if (!Number.isFinite(value.getTime()) || toDateTimeLocalValue(value) !== loggedAt || value > new Date()) {
+        throw new Error("Choose a valid update date and time at or before now.");
+      }
+      adjustedTime = value.toISOString();
+    }
+    return { ...base, kind: "progress_update", currentPage: selectedPage, minutes: hours * 60 + minutes || null, loggedAt: adjustedTime };
   }
 
   async function handleSave() {
-    if (!user || saving || loading) return;
+    if (savingRef.current || loading) return;
+    setError(null);
+    savingRef.current = true;
     setSaving(true);
     onSavingChange(true);
-    setError(null);
+    let readingLog = pendingLog;
     try {
-      let readingLog = pendingLog;
       if (!readingLog) {
-        const timestamp = showLoggedAtEditor && loggedAt ? new Date(loggedAt) : undefined;
-        if (timestamp && Number.isNaN(timestamp.getTime())) throw new Error("Invalid date/time for progress entry");
-        readingLog = await createReadingLog(
-          book.id, user.id, selectedPage, hours * 60 + minutes || undefined, timestamp?.toISOString(),
-        );
-        // If a later step fails, retry it with the log already written.
+        const draft = pendingDraft ?? makeDraft();
+        setPendingDraft(draft);
+        readingLog = await saveReadingActivity(draft);
         setPendingLog(readingLog);
+        setPendingDraft(null);
       }
-      if (savedProgressNote) {
-        const updatedNote = await attachNoteToReadingLog(savedProgressNote, readingLog);
-        onJournalEntrySaved?.(updatedNote);
-        setSavedProgressNote(null);
-      }
-      await onProgressSaved(readingLog.current_page);
+      await refreshBook(book.id);
+      await onProgressSaved(readingLog);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Progress could not be saved. Try again.");
+      const code = cause && typeof cause === "object" && "code" in cause ? cause.code : null;
+      const message = cause && typeof cause === "object" && "message" in cause ? String(cause.message) : null;
+      if (!readingLog && (code === "PT409" || code === "22023" || code === "P0002")) setPendingDraft(null);
+      if (!readingLog && code === "PT409") {
+        try {
+          await refreshBook(book.id);
+          setDraftPage(null);
+          setWindowAttempt(attempt => attempt + 1);
+        } catch {
+          setError("The book changed. Reopen this form to get its current position.");
+          return;
+        }
+      }
+      const fallback = isSession ? "The session could not be saved. Try again." : "Progress could not be saved. Try again.";
+      setError(readingLog ? "Reading activity was saved. Retry to finish updating this screen." : message || fallback);
     } finally {
+      savingRef.current = false;
       setSaving(false);
       onSavingChange(false);
     }
@@ -123,16 +159,64 @@ export default function ReadingProgressPanel({
         }}
       />
 
-      {loading && <LoadingIndicator variant="inline" label="Loading reading progress…" />}
       {totalPages === 0 && <p className="rj-muted">Set the total pages to track progress.</p>}
-      {!loading && totalPages > 0 && (
+      {totalPages > 0 && remainingPages === 0 && !pendingLog && !pendingDraft && (
+        <p className="rj-muted">You’ve reached the last page of this book.</p>
+      )}
+      {remainingPages > 0 && isSession && (
         <>
+          <p className="rj-muted text-sm">Choose times from today. Include reading you haven’t already logged.</p>
+          <ProgressPageWheel min={minPage} max={totalPages} value={selectedPage}
+            onChange={setDraftPage} disabled={fieldsDisabled} describedBy={error ? errorId : undefined} />
+          <div className="grid grid-cols-2 gap-3">
+            <ProgressWheelField label="Start time" value={startMinute} min={0} max={1439} pageJump={60}
+              formatValue={formatClockMinute} parseTypedValue={parseClockDigits} onChange={setStartMinute}
+              disabled={fieldsDisabled} describedBy={error ? errorId : undefined} />
+            <ProgressWheelField label="End time" value={endMinute} min={0} max={1439} pageJump={60}
+              formatValue={formatClockMinute} parseTypedValue={parseClockDigits} onChange={setEndMinute}
+              disabled={fieldsDisabled} describedBy={error ? errorId : undefined} />
+          </div>
+        </>
+      )}
+      {remainingPages > 0 && !isSession && (
+        <>
+          {isChangingDate && (
+            <fieldset className="space-y-2">
+              <legend className="rj-picker-label">Date and time</legend>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0 space-y-1.5">
+                  <Label htmlFor={dateId} className="text-xs">Date</Label>
+                  <Input id={dateId} type="date" value={selectedDate} max={getLocalReadingDay(new Date()).day}
+                    disabled={fieldsDisabled} aria-describedby={error ? errorId : undefined}
+                    onChange={event => setSelectedDate(event.target.value)} />
+                </div>
+                <div className="min-w-0 space-y-1.5">
+                  <Label htmlFor={timeId} className="text-xs">Time</Label>
+                  <Input id={timeId} type="time" value={selectedTime} disabled={fieldsDisabled}
+                    aria-describedby={error ? errorId : undefined} onChange={event => setSelectedTime(event.target.value)} />
+                </div>
+              </div>
+            </fieldset>
+          )}
+          {loading && <LoadingIndicator variant="inline" label="Checking for logged sessions…" />}
+          {windowLoadFailed && (
+            <div className="flex flex-wrap items-center gap-2" role="status">
+              <p>Couldn’t check for sessions in this window.</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => setWindowAttempt(attempt => attempt + 1)}>Try again</Button>
+            </div>
+          )}
+          {loggedMinutes > 0 && (
+            <p className="rj-muted text-sm" role="status">
+              {loggedMinutes < 1 ? "Less than 1 minute is" : `${Number.isInteger(loggedMinutes) ? "" : "About "}${Math.round(loggedMinutes)} ${Math.round(loggedMinutes) === 1 ? "minute is" : "minutes are"}`} already logged in this window.
+            </p>
+          )}
           <ProgressWheels
             page={selectedPage}
             minPage={minPage}
             maxPage={totalPages}
             hours={hours}
             maxHours={6}
+            additionalTime={loggedMinutes > 0}
             minutes={minutes}
             disabled={fieldsDisabled}
             errorId={error ? errorId : undefined}
@@ -140,63 +224,14 @@ export default function ReadingProgressPanel({
             onHoursChange={setHours}
             onMinutesChange={setMinutes}
           />
-
-          <div className="rj-progress-options">
-            <Button type="button" size="sm" variant="ghost" aria-expanded={showOptions} aria-controls={showOptions ? optionsId : undefined}
-              disabled={fieldsDisabled || showNoteEditor} onClick={() => setShowOptions(!showOptions)}>
-              More options
-            </Button>
-            {showOptions && (
-              <div id={optionsId} className="grid gap-3">
-                {showLoggedAtEditor ? (
-                  <div className="space-y-1.5">
-                    <Label htmlFor={dateId} className="text-xs">Finished at (optional)</Label>
-                    <Input id={dateId} type="datetime-local" value={loggedAt} disabled={fieldsDisabled} onChange={event => setLoggedAt(event.target.value)} />
-                  </div>
-                ) : (
-                  <Button type="button" size="sm" variant="outline" className="justify-self-start" disabled={fieldsDisabled} onClick={() => setShowLoggedAtEditor(true)}>
-                    Change Finished Time
-                  </Button>
-                )}
-
-                {showNoteEditor ? (
-                  <Suspense fallback={<LoadingIndicator variant="inline" label="Loading entry editor…" />}>
-                    <JournalEntryForm
-                      active
-                      initialBookId={book.id}
-                      entity={{ type: "Book", id: book.id }}
-                      initialPageStart={selectedPage}
-                      initialNoteDate={getProgressNoteDate(showLoggedAtEditor, loggedAt)}
-                      preferInitialPageAndDate
-                      variant="inline"
-                      heading="Add entry"
-                      hideEntitySelector
-                      onCancel={() => toggleNoteEditor(false)}
-                      onSaved={note => {
-                        if ("book_id" in note) {
-                          setSavedProgressNote(note);
-                          onJournalEntrySaved?.(note);
-                        }
-                      }}
-                      onSubmitSaved={() => toggleNoteEditor(false)}
-                    />
-                  </Suspense>
-                ) : (
-                  <Button type="button" size="sm" variant="outline" className="justify-self-start" disabled={fieldsDisabled} onClick={() => toggleNoteEditor(true)}>
-                    Add Entry
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
       {error && <p role="alert" id={errorId}>{error}</p>}
       <div className="rj-progress-footer">
         <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>Cancel</Button>
-        {totalPages > 0 && (
-          <Button type="button" disabled={loading || saving || showNoteEditor} onClick={() => void handleSave()}>
-            {saving ? "Saving…" : pendingLog ? "Retry" : "Save"}
+        {(remainingPages > 0 || pendingLog || pendingDraft) && (
+          <Button type="button" disabled={loading || windowLoadFailed || saving} onClick={() => void handleSave()}>
+            {saving ? "Saving…" : pendingLog || pendingDraft ? "Retry" : "Save"}
           </Button>
         )}
       </div>
