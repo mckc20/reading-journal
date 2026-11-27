@@ -7,6 +7,7 @@ export const RECOMMENDATION_STRATEGY_VERSION = "deterministic-v3";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WISHLIST_ITEM_STRENGTH = 0.25;
 const MAX_WISHLIST_STRENGTH = 1;
+const LIBRARY_FINGERPRINT_PREFIX = "library-v1:";
 const STOP_WORDS = /\b(workbook|study guide|exam|examination|revision|answer key|test prep|practice questions|teacher edition|student edition)\b/i;
 
 export interface LibraryBook {
@@ -80,23 +81,26 @@ export function tasteForBooks(books: LibraryBook[]): Taste {
   return { authors: [...authors.values()].sort(sort), genres: [...genres.values()].sort(sort) };
 }
 
-export function recommendationFingerprint(books: LibraryBook[], feedback: RecommendationFeedback[] = []): string {
+export function recommendationFingerprint(books: LibraryBook[]): string {
   const relevant = books.map((book) => ({
     title: normalizeTitle(book.title), authors: [...(book.authors ?? [])].map(norm).sort(),
     genres: [...(book.genres ?? []), ...(book.book_genres ?? []).map((item) => item.genres?.name ?? "")].map(norm).sort(),
     isbn: normalizeIsbn(book.isbn ?? ""), status: book.status, rating: book.rating, favorite: book.is_favorite,
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-  const negativeSignals = feedback.map((item) => ({
-    candidate_key: item.candidate_key,
-    authors: item.authors.map(norm).sort(),
-    genres: item.genres.map(norm).sort(),
-  })).sort((a, b) => a.candidate_key.localeCompare(b.candidate_key));
-  return createHash("sha256").update(JSON.stringify({ books: relevant, feedback: negativeSignals })).digest("hex");
+  return LIBRARY_FINGERPRINT_PREFIX + createHash("sha256").update(JSON.stringify(relevant)).digest("hex");
 }
 
-export function isRecommendationSetStale(row: any, fingerprint: string, now = Date.now()): boolean {
-  return !row?.generated_at || !row?.expires_at || new Date(row.expires_at).getTime() <= now ||
-    row.strategy_version !== RECOMMENDATION_STRATEGY_VERSION || row.taste_fingerprint !== fingerprint;
+export function isRecommendationSetStale(row: {
+  generated_at: string | null;
+  expires_at: string | null;
+  strategy_version: string | null;
+  taste_fingerprint: string | null;
+} | null, fingerprint: string, now = Date.now()): boolean {
+  if (!row?.generated_at || !row.expires_at || Date.parse(row.expires_at) <= now ||
+    row.strategy_version !== RECOMMENDATION_STRATEGY_VERSION) return true;
+  // Older hashes include dislikes. Let those sets expire on their regular schedule.
+  const savedFingerprint = row.taste_fingerprint;
+  return Boolean(savedFingerprint?.startsWith(LIBRARY_FINGERPRINT_PREFIX) && savedFingerprint !== fingerprint);
 }
 
 export async function generateRecommendations(

@@ -10,7 +10,6 @@ import type { RecommendationItem, RecommendationSet } from "@/types/recommendati
 
 interface RecommendationFeedback {
   candidate_key: string;
-  item: RecommendationItem | null;
 }
 
 interface RecommendationResponse {
@@ -58,14 +57,13 @@ const RecommendationsContext = createContext<Recommendations | null>(null);
 export function RecommendationsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const token = session?.access_token;
-  const { settings, loading: settingsLoading } = useUserSettings();
+  const { loading: settingsLoading } = useUserSettings();
   const { books, wishlistBooks, loading: booksLoading } = useBooksContext();
   const { pathname } = useLocation();
   const onHome = pathname === "/";
   const enabled = onHome || pathname.startsWith("/books/recommendation/");
   const detailBookId = matchPath("/books/:bookId", pathname)?.params.bookId;
   const onWishlistDetail = wishlistBooks.some(book => book.id === detailBookId);
-  const hideDisliked = settings?.discover.hide_disliked_recommendations ?? false;
   const [set, setRecommendations] = useState<RecommendationSet | null>(null);
   const [feedback, setFeedback] = useState<RecommendationFeedback[]>([]);
   const [feedbackReady, setFeedbackReady] = useState(false);
@@ -73,7 +71,6 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
-  const refreshAfterFeedback = useRef(false);
   const revision = useRef(0);
   const retry = useCallback(() => setRequestVersion(version => version + 1), []);
 
@@ -83,7 +80,6 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
     const { signal } = controller;
     const initialRevision = revision.current;
     let poll: number | undefined;
-    let forceRefresh = refreshAfterFeedback.current;
     setLoading(true);
 
     function apply(result: RecommendationResponse) {
@@ -104,11 +100,9 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
         apply(current);
         if (signal.aborted) return;
         let result = current;
-        if (enabled && !current.generating && (current.stale || forceRefresh)) {
-          result = await requestRecommendations(token, "", "POST", forceRefresh ? { force: true, feedbackRefresh: true } : {}, signal);
+        if (enabled && !current.generating && current.stale) {
+          result = await requestRecommendations(token, "", "POST", {}, signal);
           if (signal.aborted) return;
-          forceRefresh = false;
-          refreshAfterFeedback.current = false;
           apply(result);
         }
         if (signal.aborted) return;
@@ -129,7 +123,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
       controller.abort();
       window.clearTimeout(poll);
     };
-  }, [enabled, onWishlistDetail, token, requestVersion]);
+  }, [enabled, onHome, onWishlistDetail, token, requestVersion]);
 
   useEffect(() => {
     if (!onHome || !set?.expires_at) return;
@@ -143,16 +137,17 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
   const savedBooks = useMemo(() => [...books, ...wishlistBooks], [books, wishlistBooks]);
   const disliked = useMemo(() => new Set(feedback.map(row => row.candidate_key)), [feedback]);
   const detailItems = useMemo(() => {
-    const candidates = [...(set?.items ?? []), ...feedback.flatMap(row => row.item ? [row.item] : [])];
-    return [...new Map(candidates.flatMap(item => {
+    return [...new Map((set?.items ?? []).flatMap(item => {
       if (!item) return [];
       const key = recommendationCandidateKey(item);
       return !dismissed.has(key) && findWishlistDuplicates(savedBooks, item).length === 0 ? [[key, item] as const] : [];
     })).values()];
-  }, [set, feedback, savedBooks, dismissed]);
-  const items = hideDisliked ? detailItems.filter(item => !disliked.has(recommendationCandidateKey(item))) : detailItems;
+  }, [set, savedBooks, dismissed]);
+  const items = useMemo(() => [...detailItems].sort((a, b) =>
+    Number(disliked.has(recommendationCandidateKey(a))) - Number(disliked.has(recommendationCandidateKey(b)))
+  ), [detailItems, disliked]);
 
-  const shelfKeys = onHome && !booksLoading && !settingsLoading ? items.map(recommendationCandidateKey).join("\n") : "";
+  const shelfKeys = onHome && !booksLoading && !settingsLoading ? detailItems.map(recommendationCandidateKey).join("\n") : "";
   useEffect(() => {
     if (token && shelfKeys) {
       void requestRecommendations(token, "/history", "POST", { candidate_keys: shelfKeys.split("\n") }).catch(() => {});
@@ -177,14 +172,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
     await requestRecommendations(token, "/feedback", existing ? "DELETE" : "POST", existing ? { candidate_key: key } : feedbackBody);
     revision.current += 1;
     setFeedback(current => existing ? current.filter(row => row.candidate_key !== key)
-      : [{ candidate_key: key, item: catalogItem }, ...current]);
-    if (existing && catalogItem) {
-      setRecommendations(current => current && !current.items.some(candidate => recommendationCandidateKey(candidate) === key)
-        ? { ...current, items: [...current.items, catalogItem] } : current);
-    } else if (!existing && hideDisliked) {
-      refreshAfterFeedback.current = true;
-      retry();
-    }
+      : [{ candidate_key: key }, ...current]);
   }
 
   return <RecommendationsContext.Provider value={{ items,

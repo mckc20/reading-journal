@@ -1061,7 +1061,7 @@ function RecommendationsSettings() {
   }
 
   return (
-    <SettingsSection title="Recommendations" description="Control recommendation updates and feedback." icon={Compass}>
+    <SettingsSection title="Recommendations" description="Choose when Home recommendations refresh." icon={Compass}>
       <div className="space-y-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SettingsRows>
@@ -1091,18 +1091,6 @@ function RecommendationsSettings() {
                 </SelectContent>
               </Select>
             </div>
-          </SettingRow>
-          <SettingRow
-            title="Hide disliked"
-            description="When on, a thumbs-down removes that book from the Home shelf and fills its place with another suggestion when available. When off, it stays marked so you can undo the feedback."
-          >
-            <ToggleSetting
-              checked={discover.hide_disliked_recommendations}
-              disabled={disabled}
-              onChange={(hide_disliked_recommendations) =>
-                void saveSettingsSection("discover", { hide_disliked_recommendations })
-              }
-            />
           </SettingRow>
         </SettingsRows>
       </div>

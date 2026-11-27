@@ -182,12 +182,16 @@ export default function Dashboard() {
         <HomeSection id="recommendations" title="Recommended for you" sectionRef={recommendationsRef}>
           {recommendations.items.length > 0 && <BookShelf
             label="Recommendations"
-            books={recommendations.items.map(item => ({
-              id: recommendationCandidateKey(item),
-              title: item.title,
-              author: item.authors.join(", "),
-              cover: item.coverUrl,
-            }))}
+            books={recommendations.items.map(item => {
+              const id = recommendationCandidateKey(item);
+              return {
+                id,
+                title: item.title,
+                author: item.authors.join(", "),
+                cover: item.coverUrl,
+                disliked: recommendations.disliked.has(id),
+              };
+            })}
             showStatus={false}
             onOpen={book => navigate(recommendationDetailPath(book.id))}
           />}

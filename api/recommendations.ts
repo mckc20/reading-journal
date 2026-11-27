@@ -83,13 +83,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
       book_genres: book.book_genres,
     })) as LibraryBook[];
 
-    const fingerprint = recommendationFingerprint(books, feedbackSignals);
+    const fingerprint = recommendationFingerprint(books);
     let row = setResult.data;
     const storedExpiresAt = row?.expires_at;
     if (row?.generated_at) {
       row = { ...row, expires_at: expiresAt(new Date(row.generated_at), preferences) };
     }
-    let stale = isRecommendationSetStale(row, fingerprint);
+    const stale = isRecommendationSetStale(row, fingerprint);
     if (request.method === "GET") {
       json(response, 200, { set: publicSet(row, dismissedKeys), stale, generating: hasActiveLease(row), feedback: visibleFeedback });
       return;
@@ -103,8 +103,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
 
     const body = request.body && typeof request.body === "object" ? request.body as { force?: unknown; feedbackRefresh?: unknown } : {};
-    const force = body.force === true;
-    const feedbackRefresh = body.feedbackRefresh === true;
+    const force = body.force === true && body.feedbackRefresh !== true;
     if (!force && !stale) {
       json(response, 200, { set: publicSet(row, dismissedKeys), stale: false, generating: false });
       return;
@@ -117,7 +116,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       p_strategy_version: RECOMMENDATION_STRATEGY_VERSION,
       p_now: new Date().toISOString(),
       p_lease_seconds: 90,
-      p_cooldown_seconds: feedbackRefresh ? 0 : 900,
+      p_cooldown_seconds: 900,
     });
     if (claimError) throw claimError;
     if (claimed !== true) {
@@ -126,7 +125,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         .eq("user_id", userId).maybeSingle<RecommendationRow>();
       if (error) throw error;
       row = current;
-      const coolingDown = force && !feedbackRefresh && row?.generated_at && Date.now() - new Date(row.generated_at).getTime() < 15 * 60 * 1000 && !hasActiveLease(row);
+      const coolingDown = force && row?.generated_at && Date.now() - new Date(row.generated_at).getTime() < 15 * 60 * 1000 && !hasActiveLease(row);
       json(response, coolingDown ? 429 : 200, {
         set: publicSet(row, dismissedKeys), stale: isRecommendationSetStale(row, fingerprint),
         generating: hasActiveLease(row), ...(coolingDown ? { error: "Please wait before refreshing again." } : {}),

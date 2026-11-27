@@ -38,6 +38,7 @@ type ShelfBook = Pick<HomeBook, 'id' | 'title' | 'cover' | 'status'> & {
   favorite?: boolean;
   paused?: boolean;
   cornerLabel?: string;
+  disliked?: boolean;
 };
 
 export function BookShelf<T extends ShelfBook>({ books, onOpen, showStatus = true, label = 'Books' }: {
@@ -51,7 +52,7 @@ export function BookShelf<T extends ShelfBook>({ books, onOpen, showStatus = tru
   return (
     <div className="rj-shelf-frame rj-home-shelf-frame">
       <div {...drag} className="rj-shelf rj-shelf-scroll" tabIndex={0} role="group" aria-label={label}>
-        {books.map(book => <button key={book.id} type="button" className="rj-shelf-book" onClick={() => onOpen(book)}>
+        {books.map(book => <button key={book.id} type="button" className="rj-shelf-book" data-disliked={book.disliked || undefined} onClick={() => onOpen(book)}>
           <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} favorite={book.favorite}
             paused={book.paused} cornerLabel={book.cornerLabel} cornerLabelPosition="right" showFallbackTitle decorative />
           <span className="rj-book-title">{book.title}</span>
@@ -59,6 +60,7 @@ export function BookShelf<T extends ShelfBook>({ books, onOpen, showStatus = tru
           {showStatus && book.status && <span className="sr-only">{book.status}</span>}
           {book.cornerLabel && <span className="sr-only">Volume {book.cornerLabel}</span>}
           {book.favorite && <span className="sr-only">Favorite</span>}
+          {book.disliked && <span className="sr-only">Disliked</span>}
         </button>)}
       </div>
     </div>

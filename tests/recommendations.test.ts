@@ -178,13 +178,18 @@ test("fingerprint tracks ownership, status, rating, favorite, author, and genre 
   assert.notEqual(recommendationFingerprint([{ ...library[0], status: "To Read" }, ...library.slice(1)]), original);
   assert.notEqual(recommendationFingerprint([{ ...library[0], rating: 4 }, ...library.slice(1)]), original);
   assert.notEqual(recommendationFingerprint([{ ...library[0], authors: ["Other"] }, ...library.slice(1)]), original);
-  assert.notEqual(recommendationFingerprint(library, [{ candidate_key: "isbn:123", title: "No", authors: ["Someone"], genres: ["Horror"] }]), original);
 });
 
 test("set expires on time or when strategy or taste changes", () => {
-  const set = { generated_at: "2026-09-01T00:00:00.000Z", expires_at: "2026-09-03T00:00:00.000Z", strategy_version: RECOMMENDATION_STRATEGY_VERSION, taste_fingerprint: "abc" };
-  assert.equal(isRecommendationSetStale(set, "abc", Date.parse("2026-09-02T00:00:00.000Z")), false);
-  assert.equal(isRecommendationSetStale(set, "abc", Date.parse("2026-09-04T00:00:00.000Z")), true);
-  assert.equal(isRecommendationSetStale(set, "def", Date.parse("2026-09-02T00:00:00.000Z")), true);
-  assert.equal(isRecommendationSetStale({ ...set, strategy_version: "deterministic-v2" }, "abc", Date.parse("2026-09-02T00:00:00.000Z")), true);
+  const fingerprint = recommendationFingerprint(library);
+  const set = { generated_at: "2026-09-01T00:00:00.000Z", expires_at: "2026-09-03T00:00:00.000Z", strategy_version: RECOMMENDATION_STRATEGY_VERSION, taste_fingerprint: fingerprint };
+  const beforeExpiry = Date.parse("2026-09-02T00:00:00.000Z");
+  const afterExpiry = Date.parse("2026-09-04T00:00:00.000Z");
+  assert.equal(isRecommendationSetStale(set, fingerprint, beforeExpiry), false);
+  assert.equal(isRecommendationSetStale(set, fingerprint, afterExpiry), true);
+  assert.equal(isRecommendationSetStale(set, recommendationFingerprint([]), beforeExpiry), true);
+  assert.equal(isRecommendationSetStale({ ...set, strategy_version: "deterministic-v2" }, fingerprint, beforeExpiry), true);
+  const legacySet = { ...set, taste_fingerprint: "0".repeat(64) };
+  assert.equal(isRecommendationSetStale(legacySet, fingerprint, beforeExpiry), false);
+  assert.equal(isRecommendationSetStale(legacySet, fingerprint, afterExpiry), true);
 });
