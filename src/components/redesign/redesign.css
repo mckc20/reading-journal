@@ -57,6 +57,11 @@
 .rj-redesign button:focus-visible, .rj-redesign [tabindex]:focus-visible, .rj-redesign [role='menuitem']:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
 .rj-redesign [data-slot='button'] { border-radius: 999px; min-height: 44px; box-shadow: none; }
 .rj-redesign h1, .rj-redesign h2, .rj-redesign p { margin: 0; }
+.rj-detail-title, .rj-collection-title-row h1 { font: 500 28px/1.2 var(--font-display); overflow-wrap: anywhere; margin: 0; }
+.rj-detail-title-italic, .rj-collection-title-row h1 { font-style: italic; }
+@media (min-width: 768px) {
+  .rj-detail-title, .rj-collection-title-row h1 { font-size: 36px; }
+}
 .rj-home-shell { position: relative; min-height: 100svh; background: var(--background); padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .rj-app-header { display: flex; align-items: center; justify-content: space-between; min-height: 82px; margin: 0 20px; border-bottom: 1px solid var(--input); }
 .rj-brand { display: flex; gap: 10px; align-items: center; padding: 12px 0; }

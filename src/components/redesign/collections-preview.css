@@ -47,7 +47,6 @@
 .rj-collection-title-group { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .rj-collection-title-group .rj-collection-back { width: 44px; height: 44px; flex: 0 0 44px; margin-inline-start: -8px; }
 .rj-collection-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; }
-.rj-collection-title-row h1 { font: italic 34px/1.15 var(--font-display); overflow-wrap: anywhere; }
 .rj-collection-title-row h1:focus { outline: none; }
 .rj-collection-title-row > button { flex-shrink: 0; min-height: 44px; }
 .rj-collection-book-tools > button { min-height: 44px; }
@@ -59,7 +58,3 @@
 .rj-collection-picker-list label > input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--primary); }
 .rj-collection-picker-list .rj-collection-picker-cover { width: 32px; flex-shrink: 0; }
 .rj-collection-picker-list .rj-book-title { overflow-wrap: anywhere; }
-
-@media (max-width: 359px) {
-  .rj-collection-title-row h1 { font-size: 28px; }
-}
