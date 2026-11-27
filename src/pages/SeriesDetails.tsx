@@ -450,7 +450,9 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
         color={heroColor}
         banner={seriesRecord.cover_url}
         navigation={back}
-        artwork={<SeriesCoverStack books={seriesVolumes} frameless />}
+        artwork={seriesVolumes.length === 1
+          ? <BookCover src={seriesVolumes[0].cover_url} title={seriesVolumes[0].title} className="rj-detail-cover" showFallbackTitle />
+          : <SeriesCoverStack books={seriesVolumes} frameless />}
         actions={
           <DetailActionsMenu
             kind="series"
