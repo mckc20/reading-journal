@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 interface SaveCancelBarProps {
   onCancel: () => void;
   onSave?: () => void;
+  cancelLabel?: string;
   cancelDisabled?: boolean;
   saveDisabled?: boolean;
   saving?: boolean;
@@ -18,6 +19,7 @@ interface SaveCancelBarProps {
 export default function SaveCancelBar({
   onCancel,
   onSave,
+  cancelLabel = "Cancel",
   cancelDisabled = false,
   saveDisabled = false,
   saving = false,
@@ -39,12 +41,12 @@ export default function SaveCancelBar({
     >
       <div className="rj-save-cancel-layout mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-muted-foreground">{children}</div>
-        <div className="rj-save-cancel-buttons flex w-full flex-row-reverse gap-2 sm:w-auto">
+        <div className="rj-save-cancel-buttons flex w-full justify-end gap-2 sm:w-auto">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={cancelDisabled || saving}>
+            {cancelLabel}
+          </Button>
           <Button type={onSave ? "button" : "submit"} onClick={onSave} disabled={saveDisabled || saving}>
             {saving ? savingLabel : saveLabel}
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={cancelDisabled || saving}>
-            Cancel
           </Button>
         </div>
       </div>

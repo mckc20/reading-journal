@@ -219,14 +219,14 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
-        title={initialSeries ? "Edit series" : "Add Series"}
+        title={initialSeries ? "Edit series" : "Add book series"}
         description={initialSeries ? "Update the series details shown in your library." : "Create a series entry with a description and optional banner image."}
         icon={Layers}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <form onSubmit={handleSubmit} className="rj-book-form">
           <div className="rj-book-form-scroll">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="series-cover">Banner image</Label>
@@ -264,7 +264,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
                 </div>
               </div>
 
-              <section className="space-y-3">
+              <section className="min-w-0 space-y-3">
                 <AppHeading level={4} as="h2" className="font-semibold"
                   info="Search for books, drag by the handle, edit volume numbers, or remove books from this series.">
                   Books in this series
@@ -291,7 +291,7 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
             onCancel={() => handleOpenChange(false)}
             saving={saving}
             saveDisabled={!name.trim()}
-            saveLabel={initialSeries ? "Save changes" : "Add Series"}
+            saveLabel={initialSeries ? "Save changes" : "Add book series"}
           />
         </form>
       </CreationDialogContent>

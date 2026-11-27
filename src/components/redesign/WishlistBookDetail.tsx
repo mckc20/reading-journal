@@ -44,7 +44,7 @@ export function WishlistBookDetail({ book, series, onClose }: {
     <DetailHero titleId={headingId} color={color}
       navigation={<DetailBack label="Book details" fallbackTo={wishlistCollectionHref} onClose={onClose} />}
       artwork={<BookCover src={book.cover_url} title={book.title} className="rj-detail-cover" showFallbackTitle />}
-      actions={<DetailActionsMenu kind="book" label={book.title}
+      actions={<DetailActionsMenu kind="book" label={book.title} collectionsBook={book}
         onEdit={trigger => openAddBook({ editBook: book }, trigger)}
         onDuplicate={trigger => openAddBook({ duplicateBooks: [book] }, trigger)}
         sourceUrl={source}

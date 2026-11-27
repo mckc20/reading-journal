@@ -1,25 +1,26 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Bell, Book, BookPlus, Compass, Feather, Home, NotebookPen, Plus, UserRound, Layers, type LucideIcon } from 'lucide-react';
+import { Bell, Book, BookPlus, Compass, Feather, Home, LibraryBig, NotebookPen, Plus, UserRound, Layers, type LucideIcon } from 'lucide-react';
 import { DropdownMenu } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/rj-logo-transparent.png';
 
 export type HomeDestination = 'Home' | 'Library' | 'Journal' | 'Insights' | 'Profile';
-export type CreateDestination = 'book' | 'entry' | 'series';
+export type CreateDestination = 'book' | 'entry' | 'series' | 'collection';
 const destinations = [
   { name: 'Home', icon: Home }, { name: 'Library', icon: Book },
   { name: 'Journal', icon: Feather }, { name: 'Insights', icon: Compass },
   { name: 'Profile', icon: UserRound },
 ] as const;
 
-const createOptions = [
-  { value: 'book', label: 'Add a book', icon: BookPlus },
-  { value: 'entry', label: 'Add a journal entry', icon: NotebookPen },
-  { value: 'series', label: 'Add a book series', icon: Layers },
+export const addMenuOptions = [
+  { value: 'collection', label: 'New collection', icon: LibraryBig },
+  { value: 'series', label: 'New series', icon: Layers },
+  { value: 'entry', label: 'New journal entry', icon: NotebookPen },
+  { value: 'book', label: 'New book', icon: BookPlus },
 ] as const;
 
 export function AddLauncher({ onCreate }: { onCreate: (destination: CreateDestination) => void }) {
-  return <CreateLauncher options={createOptions} onCreate={onCreate} />;
+  return <CreateLauncher options={addMenuOptions} onCreate={onCreate} />;
 }
 
 export function CreateLauncher<Action extends string>({ options, onCreate, opensDialog = false }: {

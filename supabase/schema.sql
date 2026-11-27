@@ -2252,3 +2252,84 @@ GRANT SELECT ON public.wrap_up_reports TO authenticated;
 GRANT SELECT, INSERT ON public.wrap_up_reports TO service_role;
 CREATE POLICY "wrap_up_reports: owner select" ON public.wrap_up_reports
   FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+-- Private custom collections
+CREATE TABLE public.collections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL CHECK (name = regexp_replace(name, '^\s+|\s+$', '', 'g') AND char_length(name) BETWEEN 1 AND 80),
+  description text CHECK (char_length(description) <= 500)
+);
+
+CREATE UNIQUE INDEX collections_owner_name_idx ON public.collections (user_id, lower(name));
+
+CREATE TABLE public.collection_books (
+  collection_id uuid NOT NULL REFERENCES public.collections(id) ON DELETE CASCADE,
+  book_id uuid NOT NULL REFERENCES public.books(id) ON DELETE CASCADE,
+  PRIMARY KEY (collection_id, book_id)
+);
+
+CREATE INDEX collection_books_book_id_idx ON public.collection_books (book_id);
+
+ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.collection_books ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.collections, public.collection_books FROM anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON public.collections TO authenticated;
+GRANT UPDATE (name, description) ON public.collections TO authenticated;
+GRANT SELECT, INSERT, DELETE ON public.collection_books TO authenticated;
+
+CREATE POLICY collections_owner ON public.collections
+  FOR ALL TO authenticated
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+CREATE POLICY collection_books_owner ON public.collection_books
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_books.collection_id AND c.user_id = (SELECT auth.uid()))
+    AND EXISTS (SELECT 1 FROM public.books b WHERE b.id = collection_books.book_id AND b.user_id = (SELECT auth.uid()))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_books.collection_id AND c.user_id = (SELECT auth.uid()))
+    AND EXISTS (SELECT 1 FROM public.books b WHERE b.id = collection_books.book_id AND b.user_id = (SELECT auth.uid()))
+  );
+
+-- Custom collection book order
+ALTER TABLE public.collection_books
+  ADD COLUMN position integer CHECK (position > 0),
+  ADD COLUMN added_at timestamptz NOT NULL DEFAULT now();
+
+GRANT UPDATE (position) ON public.collection_books TO authenticated;
+
+-- Apply membership changes and the draft order in one transaction under the caller's RLS policies.
+CREATE FUNCTION public.save_collection_books(
+  target_collection uuid, ordered_books uuid[], added_books uuid[], removed_books uuid[]
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM 1 FROM public.collections WHERE id = target_collection FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Collection unavailable' USING ERRCODE = '42501';
+  END IF;
+
+  DELETE FROM public.collection_books
+  WHERE collection_id = target_collection AND book_id = ANY(removed_books);
+
+  INSERT INTO public.collection_books (collection_id, book_id)
+  SELECT target_collection, id FROM unnest(added_books) AS ids(id)
+  ON CONFLICT (collection_id, book_id) DO NOTHING;
+
+  UPDATE public.collection_books AS membership
+  SET position = ordered.position
+  FROM unnest(ordered_books) WITH ORDINALITY AS ordered(book_id, position)
+  WHERE membership.collection_id = target_collection AND membership.book_id = ordered.book_id
+    AND membership.position IS DISTINCT FROM ordered.position;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.save_collection_books(uuid, uuid[], uuid[], uuid[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.save_collection_books(uuid, uuid[], uuid[], uuid[]) TO authenticated;

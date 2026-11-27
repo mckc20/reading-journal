@@ -9,6 +9,12 @@ export async function fetchWishlist(): Promise<Book[]> {
   return (await fetchBooks()).filter((book) => book.status === "Wishlist");
 }
 
+export class WishlistCoverError extends Error {
+  constructor(public readonly item: Book, error: unknown) {
+    super(`Book saved, but cover upload failed: ${error instanceof Error ? error.message : "Upload failed."}`);
+  }
+}
+
 async function saveCover(book: Book, file?: File): Promise<Book> {
   if (!file) return book;
   try {
@@ -16,7 +22,7 @@ async function saveCover(book: Book, file?: File): Promise<Book> {
     const cover_url = await uploadCover(book.user_id, crypto.randomUUID(), file);
     return await updateBook(book.id, { cover_url });
   } catch (error) {
-    throw Object.assign(new Error(`Book saved, but cover upload failed: ${error instanceof Error ? error.message : "Upload failed."}`), { item: book });
+    throw new WishlistCoverError(book, error);
   }
 }
 

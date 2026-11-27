@@ -1,26 +1,10 @@
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { AlignJustify, ChevronDown, ChevronUp, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BookSearchPicker } from "@/components/BookSearchPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sortSeriesBooks } from "@/lib/seriesDetails";
-import { cn } from "@/lib/utils";
+import { ReorderableBookList } from "@/components/ReorderableBookList";
 import { formatVolumeNumber, parseVolumeNumberInput } from "@/lib/volumeNumbers";
 import type { Book } from "@/types";
 
@@ -75,20 +59,13 @@ function getNextVolumeInput(rows: EditableSeriesBook[]): string {
   return formatEditableVolume(largestVolume + 1 || visibleRows.length + 1);
 }
 
-function matchesBookSearch(book: Book, searchTerm: string): boolean {
-  const normalized = searchTerm.trim().toLowerCase();
-  if (!normalized) return false;
-  return [book.title, ...book.authors].some((value) => value.toLowerCase().includes(normalized));
-}
-
-function SortableSeriesBookRow({
+function SeriesVolumeControl({
   row,
   saving,
   editingVolumeId,
   setEditingVolumeId,
   onVolumeChange,
   onVolumeStep,
-  onRemove,
 }: {
   row: EditableSeriesBook;
   saving: boolean;
@@ -96,107 +73,60 @@ function SortableSeriesBookRow({
   setEditingVolumeId: (bookId: string | null) => void;
   onVolumeChange: (bookId: string, value: string) => void;
   onVolumeStep: (bookId: string, direction: 1 | -1) => void;
-  onRemove: (bookId: string) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: row.book.id, disabled: saving });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
   const isEditingVolume = editingVolumeId === row.book.id;
   const volumeLabel = row.volumeInput.trim() || "--";
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "grid grid-cols-[2rem_2rem_minmax(0,1fr)_7rem] items-center gap-2 rounded-lg border bg-card p-2 shadow-sm transition-shadow",
-        isDragging && "relative z-10 shadow-lg",
-      )}
-    >
-      <button
-        type="button"
-        className="flex h-8 w-8 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
-        aria-label={`Reorder ${row.book.title}`}
+  return isEditingVolume ? (
+    <div className="flex w-24 shrink-0 items-center overflow-hidden rounded-md border bg-background">
+      <Input
+        autoFocus
+        inputMode="decimal"
+        value={row.volumeInput}
         disabled={saving}
-        {...attributes}
-        {...listeners}
-      >
-        <AlignJustify className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10"
-        aria-label={`Remove ${row.book.title} from this series`}
-        disabled={saving}
-        onClick={() => onRemove(row.book.id)}
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{row.book.title}</p>
-        <p className="truncate text-xs text-muted-foreground">{row.book.authors.join(", ") || "Unknown author"}</p>
-      </div>
-      {isEditingVolume ? (
-        <div className="flex items-center overflow-hidden rounded-md border bg-background">
-          <Input
-            autoFocus
-            inputMode="decimal"
-            value={row.volumeInput}
-            disabled={saving}
-            aria-label={`Volume number for ${row.book.title}`}
-            onChange={(event) => onVolumeChange(row.book.id, event.target.value)}
-            onBlur={() => setEditingVolumeId(null)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === "Escape") {
-                event.preventDefault();
-                setEditingVolumeId(null);
-              }
-            }}
-            className="h-8 border-0 text-sm shadow-none focus-visible:ring-0"
-          />
-          <div className="grid h-8 w-7 shrink-0 border-l">
-            <button
-              type="button"
-              className="flex items-center justify-center hover:bg-muted"
-              disabled={saving}
-              aria-label={`Increase volume number for ${row.book.title}`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onVolumeStep(row.book.id, 1)}
-            >
-              <ChevronUp className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              className="flex items-center justify-center border-t hover:bg-muted"
-              disabled={saving}
-              aria-label={`Decrease volume number for ${row.book.title}`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onVolumeStep(row.book.id, -1)}
-            >
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      ) : (
+        aria-label={`Volume number for ${row.book.title}`}
+        onChange={(event) => onVolumeChange(row.book.id, event.target.value)}
+        onBlur={() => setEditingVolumeId(null)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === "Escape") {
+            event.preventDefault();
+            setEditingVolumeId(null);
+          }
+        }}
+        className="h-8 border-0 text-sm shadow-none focus-visible:ring-0"
+      />
+      <div className="grid h-8 w-7 shrink-0 border-l">
         <button
           type="button"
-          className="h-8 rounded-md px-2 text-left text-sm tabular-nums hover:bg-muted"
+          className="flex items-center justify-center hover:bg-muted"
           disabled={saving}
-          onClick={() => setEditingVolumeId(row.book.id)}
+          aria-label={`Increase volume number for ${row.book.title}`}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onVolumeStep(row.book.id, 1)}
         >
-          Vol. {volumeLabel}
+          <ChevronUp className="h-3 w-3" />
         </button>
-      )}
+        <button
+          type="button"
+          className="flex items-center justify-center border-t hover:bg-muted"
+          disabled={saving}
+          aria-label={`Decrease volume number for ${row.book.title}`}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onVolumeStep(row.book.id, -1)}
+        >
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </div>
     </div>
+  ) : (
+    <button
+      type="button"
+      className="h-8 shrink-0 rounded-md px-2 text-left text-sm tabular-nums hover:bg-muted"
+      disabled={saving}
+      onClick={() => setEditingVolumeId(row.book.id)}
+    >
+      Vol. {volumeLabel}
+    </button>
   );
 }
 
@@ -206,7 +136,6 @@ export default function SeriesBooksEditor({
   saving,
   emptyLabel,
   removedLabel,
-  searchPlaceholder = "Search books",
   enableSearch = false,
   createBookLabel = "Create new book",
   onRowsChange,
@@ -217,7 +146,6 @@ export default function SeriesBooksEditor({
   saving: boolean;
   emptyLabel: string;
   removedLabel?: (count: number) => string;
-  searchPlaceholder?: string;
   enableSearch?: boolean;
   createBookLabel?: string;
   onRowsChange: (rows: EditableSeriesBook[]) => void;
@@ -225,20 +153,16 @@ export default function SeriesBooksEditor({
 }) {
   const [search, setSearch] = useState("");
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
   const visibleRows = useMemo(() => rows.filter((row) => !row.removed).sort(compareEditableSeriesBooks), [rows]);
   const removedCount = rows.length - visibleRows.length;
   const visibleBookIds = useMemo(() => new Set(visibleRows.map((row) => row.book.id)), [visibleRows]);
-  const searchResults = useMemo(() => {
-    if (!enableSearch || !search.trim()) return [];
-    return allBooks
-      .filter((book) => !visibleBookIds.has(book.id) && matchesBookSearch(book, search))
-      .sort((left, right) => left.title.localeCompare(right.title, undefined, { sensitivity: "base", numeric: true }))
-      .slice(0, 6);
-  }, [allBooks, enableSearch, search, visibleBookIds]);
+  const pickerBooks = useMemo(() => allBooks.map(book => ({
+    id: book.id,
+    title: book.title,
+    author: book.authors.join(", "),
+    cover: book.cover_url,
+    status: book.status,
+  })), [allBooks]);
 
   function changeRows(updater: (currentRows: EditableSeriesBook[]) => EditableSeriesBook[]) {
     onRowsChange(updater(rows));
@@ -254,7 +178,6 @@ export default function SeriesBooksEditor({
       }
       return [...currentRows, { book, volumeInput: nextVolumeInput, removed: false }];
     });
-    setSearch("");
   }
 
   function handleVolumeChange(bookId: string, value: string) {
@@ -279,70 +202,31 @@ export default function SeriesBooksEditor({
     );
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    changeRows((currentRows) => {
-      const currentVisibleRows = currentRows.filter((row) => !row.removed).sort(compareEditableSeriesBooks);
-      const oldIndex = currentVisibleRows.findIndex((row) => row.book.id === active.id);
-      const newIndex = currentVisibleRows.findIndex((row) => row.book.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return currentRows;
-
-      const reorderedVisibleRows = arrayMove(currentVisibleRows, oldIndex, newIndex);
-      const volumeInputsByPosition = getSortedVolumeInputs(currentVisibleRows);
-      const volumeInputByBookId = new Map(
-        reorderedVisibleRows.map((row, index) => [row.book.id, volumeInputsByPosition[index]]),
-      );
-
-      return currentRows.map((row) =>
-        volumeInputByBookId.has(row.book.id)
-          ? { ...row, volumeInput: volumeInputByBookId.get(row.book.id) ?? row.volumeInput }
-          : row,
-      );
-    });
+  function handleReorder(bookIds: string[]) {
+    const volumeInputs = getSortedVolumeInputs(visibleRows);
+    const volumeInputsByBook = new Map(bookIds.map((id, index) => [id, volumeInputs[index]]));
+    changeRows(currentRows => currentRows.map(row => ({
+      ...row,
+      volumeInput: volumeInputsByBook.get(row.book.id) ?? row.volumeInput,
+    })));
   }
 
   return (
     <div className="space-y-3">
       {(enableSearch || onCreateBook) && (
         <div className="space-y-2">
-          {enableSearch && (
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                disabled={saving}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="pl-9"
-              />
-            </div>
-          )}
-          {searchResults.length > 0 && (
-            <div className="max-h-48 overflow-y-auto rounded-lg border bg-popover p-1 shadow-sm">
-              {searchResults.map((book) => (
-                <button
-                  key={book.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-muted"
-                  disabled={saving}
-                  onClick={() => handleAddBook(book)}
-                >
-                  <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{book.title}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {book.authors.join(", ") || "Unknown author"}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          {enableSearch && <BookSearchPicker books={pickerBooks} selected={visibleBookIds} query={search} onQueryChange={setSearch}
+            disabled={saving} onToggle={(id, checked) => {
+              if (!checked) {
+                handleRemoveBook(id);
+                return;
+              }
+              const book = allBooks.find(item => item.id === id);
+              if (book) handleAddBook(book);
+            }} />}
           {onCreateBook && (
-            <Button type="button" variant="outline" size="sm" disabled={saving} onClick={(event) => onCreateBook(event.currentTarget)}>
-              <Plus className="h-4 w-4" />
+            <Button type="button" variant="outline" disabled={saving} onClick={(event) => onCreateBook(event.currentTarget)}>
+              <Plus aria-hidden="true" />
               {createBookLabel}
             </Button>
           )}
@@ -354,24 +238,12 @@ export default function SeriesBooksEditor({
           {emptyLabel}
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={visibleRows.map((row) => row.book.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
-              {visibleRows.map((row) => (
-                <SortableSeriesBookRow
-                  key={row.book.id}
-                  row={row}
-                  saving={saving}
-                  editingVolumeId={editingVolumeId}
-                  setEditingVolumeId={setEditingVolumeId}
-                  onVolumeChange={handleVolumeChange}
-                  onVolumeStep={handleVolumeStep}
-                  onRemove={handleRemoveBook}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+        <ReorderableBookList books={visibleRows.map(({ book }) => ({
+          id: book.id, title: book.title, author: book.authors.join(", "), cover: book.cover_url,
+        }))} disabled={saving} onReorder={handleReorder} onRemove={handleRemoveBook}
+          renderDetails={index => <SeriesVolumeControl row={visibleRows[index]} saving={saving}
+            editingVolumeId={editingVolumeId} setEditingVolumeId={setEditingVolumeId}
+            onVolumeChange={handleVolumeChange} onVolumeStep={handleVolumeStep} />} />
       )}
       {removedCount > 0 && removedLabel && (
         <p className="text-xs text-muted-foreground">{removedLabel(removedCount)}</p>

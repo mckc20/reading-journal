@@ -4,7 +4,7 @@ import type { LibraryPreviewBook } from "@/components/redesign/LibraryPreview";
 import { useBooksContext } from "@/context/BooksContext";
 import type { Book } from "@/types";
 
-function toLibraryBook(book: Book): LibraryPreviewBook {
+export function toLibraryBook(book: Book): LibraryPreviewBook {
   return {
     id: book.id,
     title: book.title,

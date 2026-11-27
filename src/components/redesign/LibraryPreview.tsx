@@ -8,7 +8,7 @@ import type { BookFormat, BookLanguage, BookSource, BookStatus, Series } from '@
 import { CollectionSearch } from './CollectionSearch';
 import { LibraryBookList } from './LibraryBookList';
 import { useLibraryPresentation } from './LibraryNavigation';
-import { compareLibraryItems } from '@/lib/libraryTabs';
+import { compareLibraryItems, librarySorts } from '@/lib/libraryTabs';
 import type { LibraryFilterBook } from '@/lib/libraryBookFilters';
 import { useLibraryBookFilters } from './useLibraryBookFilters';
 import { LibraryBookFilters } from './LibraryBookFilters';
@@ -70,7 +70,7 @@ export function LibraryBooks({
       : library.length === 0 && chips.length === 0 && !focusedFilter ? <EmptyState title="Your shelves are waiting" message="Add your first book to begin your collection. Find your wishes under Collections." action={<Button onClick={event => onAddBook(event.currentTarget)}>Add your first book</Button>} /> : <>
         <div className="rj-library-books-toolbar">
           <div className="rj-library-search-toolbar">{desktopSearch}</div>
-          <LibrarySortControl value={sort} onChange={setSort} />
+          <LibrarySortControl value={sort} onChange={setSort} options={librarySorts} />
           <LibraryBookFilters filters={filters} options={options} count={chips.length} onToggle={toggleFilter}
             onClear={() => clearFilters()} focusedFilter={focusedFilter} onCloseLink={closeLinkedFilters} />
         </div>

@@ -4,7 +4,6 @@ import { Tabs } from "radix-ui";
 import { Outlet, useLocation, useNavigate, useNavigation, useOutletContext } from "react-router-dom";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { getLibraryTab, librarySorts, libraryTabs, type LibrarySort } from "@/lib/libraryTabs";
-import { parseCollectionId } from "@/lib/libraryCollections";
 import "./library-navigation.css";
 import "./library-preview.css";
 
@@ -23,17 +22,20 @@ export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pe
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const tab = getLibraryTab(pathname) ?? libraryTabs[0];
-  const collection = tab.label === "Collections" ? parseCollectionId(new URLSearchParams(search).get("collection")) : null;
+  const params = new URLSearchParams(search);
+  const collectionPage = tab.label === "Collections" && params.has("collection");
   const highlighted = (pendingPath && getLibraryTab(pendingPath)) || tab;
   const [selectedSort, setSort] = useState<LibrarySort>();
-  const sortParam = new URLSearchParams(search).get("sort");
+  const sortParam = params.get("sort");
   const linkedSort = librarySorts.find(option => option.value === sortParam)?.value;
-  const sort = selectedSort ?? linkedSort ?? (tab.label === "Series" && sortParam === "name" ? "title" : "recent");
+  const isSeries = tab.label === "Series";
+  const activeSort = isSeries ? undefined : selectedSort;
+  const sort = activeSort ?? linkedSort ?? (isSeries ? "title" : "recent");
 
   return (
-    <LibraryPresentation.Provider value={{ sort, setSort, sortChanged: selectedSort !== undefined }}>
+    <LibraryPresentation.Provider value={{ sort, setSort, sortChanged: activeSort !== undefined }}>
       <Tabs.Root className="rj-library-tab-layout" value={tab.to} activationMode="manual" onValueChange={to => navigate(to)}>
-        {!collection && <>
+        {!collectionPage && <>
           <header className="rj-redesign rj-library-heading" data-library-header>
             <h1>Library</h1>
           </header>
@@ -49,7 +51,7 @@ export function LibraryTabs({ children, pendingPath }: { children: ReactNode; pe
             </Tabs.List>
           </div>
         </>}
-        <Tabs.Content value={tab.to} {...(collection ? { role: "region", "aria-label": collection, "aria-labelledby": undefined } : {})}>{children}</Tabs.Content>
+        <Tabs.Content value={tab.to} {...(collectionPage ? { role: "presentation", "aria-labelledby": undefined, tabIndex: undefined } : {})}>{children}</Tabs.Content>
       </Tabs.Root>
     </LibraryPresentation.Provider>
   );

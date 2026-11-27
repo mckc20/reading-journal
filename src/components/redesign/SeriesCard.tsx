@@ -3,15 +3,16 @@ import { SeriesCoverStack, type SeriesCoverBook } from "./SeriesCoverStack";
 import { cn } from "@/lib/utils";
 import "./library-preview.css";
 
-export function SeriesCard({ title, books, onOpen, shelf = false, favorite }: {
+export function SeriesCard({ title, books, onOpen, shelf = false, favorite, muted }: {
   title: string;
   books: SeriesCoverBook[];
   onOpen: () => void;
   shelf?: boolean;
   favorite?: boolean;
+  muted?: boolean;
 }) {
   return (
-    <article className={cn("rj-series-card", shelf && "rj-series-shelf-card")} data-shelf-item={shelf || undefined}>
+    <article className={cn("rj-series-card", shelf && "rj-series-shelf-card")} data-shelf-item={shelf || undefined} data-muted={muted || undefined}>
       <SeriesCoverStack books={books} showPaused={shelf} />
       <button type="button" className="rj-book-title rj-library-title rj-series-card-title" onClick={onOpen}>
         {title}

@@ -363,6 +363,7 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
             <DetailBack label="Book details" fallbackTo="/library" onClose={onClose} />
             <DetailActionsMenu
               kind="book"
+              collectionsBook={book}
               label={book.title}
               shareAttachmentLabel="Send the book as attachment in a chat"
               onPause={isReading ? () => void handlePause() : undefined}

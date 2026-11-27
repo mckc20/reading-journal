@@ -4,11 +4,9 @@ import { Link, matchPath, UNSAFE_LocationContext, useLocation, useNavigate, useN
 import {
   BarChart3,
   Bell,
-  BookPlus,
   Clock3,
   Home,
   Library,
-  Layers,
   Menu,
   MessageSquare,
   NotebookPen,
@@ -19,7 +17,7 @@ import {
 } from "lucide-react";
 import readingJournalLogo from "@/assets/rj-logo-transparent.png";
 import { DropdownMenu } from "radix-ui";
-import { CreateLauncher } from "@/components/redesign/HomeShell";
+import { addMenuOptions, CreateLauncher, type CreateDestination } from "@/components/redesign/HomeShell";
 import "@/components/redesign/redesign.css";
 import "@/components/redesign/app-theme.css";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
@@ -43,16 +41,9 @@ import type { Book, ChatMessageNotification } from "@/types";
 import type { RecommendationItem } from "@/types/recommendations";
 
 const AddBookDialog = lazy(() => import("./AddBookDialog"));
+const AddCollectionDialog = lazy(() => import("./AddCollectionDialog"));
 const AddSeriesDialog = lazy(() => import("./AddSeriesDialog"));
 const AddJournalEntryDialog = lazy(() => import("./AddJournalEntryDialog"));
-
-type AddAction = "book" | "series" | "entry";
-
-const addActions = [
-  { value: "book", label: "Add a book", icon: BookPlus },
-  { value: "entry", label: "Add a journal entry", icon: NotebookPen },
-  { value: "series", label: "Add a book series", icon: Layers },
-] as const;
 
 export interface AppLayoutOutletContext {
   onAddBookClick: () => void;
@@ -74,6 +65,7 @@ export interface AddBookDialogLaunchOptions {
   onCancel?: () => void;
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
+  onCreated?: (book: Book, coverWarning?: string) => void;
 }
 
 type AddJournalEntryLaunchOptions = Pick<ComponentProps<typeof AddJournalEntryDialog>, "entity" | "initialBookId" | "initialTags" | "onSaved">;
@@ -160,7 +152,7 @@ function AppLayoutContent() {
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [addBookOptions, setAddBookOptions] = useState<AddBookDialogLaunchOptions | undefined>();
   const [journalEntryOptions, setJournalEntryOptions] = useState<AddJournalEntryLaunchOptions | undefined>();
-  const [activeAddAction, setActiveAddAction] = useState<Exclude<AddAction, "book"> | null>(null);
+  const [activeAddAction, setActiveAddAction] = useState<Exclude<CreateDestination, "book"> | null>(null);
   const addDialogStillOpen = useRef(false);
   const dialogReturnFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -187,7 +179,10 @@ function AppLayoutContent() {
   function restoreAddDialogFocus(event: Event) {
     // The loaded form must return to the original opener, not the removed loading shell.
     event.preventDefault();
-    if (!addDialogStillOpen.current) dialogReturnFocus.current?.focus();
+    if (addDialogStillOpen.current) return;
+    const trigger = dialogReturnFocus.current;
+    if (trigger?.isConnected) trigger.focus();
+    else mainRef.current?.focus();
   }
 
   const outlet = useOutlet({
@@ -312,7 +307,7 @@ function AppLayoutContent() {
     }
   }
 
-  function openAddDialog(action: AddAction, trigger: HTMLButtonElement) {
+  function openAddDialog(action: CreateDestination, trigger: HTMLButtonElement) {
     dialogReturnFocus.current = trigger;
     if (action === "book") {
       setAddBookOptions(undefined);
@@ -324,7 +319,10 @@ function AppLayoutContent() {
     }
   }
 
-  const addLauncher = <CreateLauncher options={addActions} onCreate={openAddDialog} opensDialog />;
+  const addDialogTitle = addBookOpen ? (addBookOptions?.editBook ? "Edit book" : "Add book")
+    : activeAddAction === "entry" ? "Add journal entry"
+      : activeAddAction === "collection" ? "Add collection" : "Add book series";
+  const addLauncher = <CreateLauncher options={addMenuOptions} onCreate={openAddDialog} opensDialog />;
 
   return (
     <>
@@ -354,9 +352,14 @@ function AppLayoutContent() {
 
       <Suspense fallback={
         <LoadingDialog
-          title={addBookOpen ? (addBookOptions?.editBook ? "Edit book" : "Add book") : activeAddAction === "entry" ? "Add Journal Entry" : "Add Series"}
+          title={addDialogTitle}
           onOpenChange={(open) => {
             if (!open) {
+              if (addBookOpen && activeAddAction === "collection") {
+                addBookOptions?.onCancel?.();
+                closeAddBook(false);
+                return;
+              }
               addDialogStillOpen.current = false;
               addBookOptions?.onCancel?.();
               closeAddBook(false);
@@ -384,8 +387,13 @@ function AppLayoutContent() {
             initialSeriesId={addBookOptions?.initialSeriesId}
             initialVolumeNumber={addBookOptions?.initialVolumeNumber}
             onSaved={handleAddedBook}
+            onCreated={addBookOptions?.onCreated}
             onWishlistSaved={addBookOptions?.onWishlistSaved}
           />
+        )}
+        {activeAddAction === "collection" && (
+          <AddCollectionDialog openAddBook={options => openAddBook(options, dialogReturnFocus.current ?? undefined)}
+            onClose={() => setActiveAddAction(null)} onCloseAutoFocus={restoreAddDialogFocus} />
         )}
         {activeAddAction === "series" && (
           <AddSeriesDialog

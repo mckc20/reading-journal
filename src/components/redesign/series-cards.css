@@ -1,5 +1,7 @@
 .rj-series-card { position: relative; min-width: 0; }
 .rj-series-card-title { padding: 8px 2px 2px; }
+.rj-series-card[data-muted] .rj-series-card-title { color: var(--muted-foreground); }
+.rj-series-card[data-muted] .rj-series-cover-stack { filter: saturate(.4); opacity: .7; }
 .rj-series-card-count { padding-inline: 2px; }
 .rj-series-shelf-card { width: 122px; flex-shrink: 0; }
 .rj-series-card-favorite { position: absolute; inset: 9px 9px auto auto; width: 15px; height: 15px; fill: var(--favorite); color: var(--favorite); pointer-events: none; }

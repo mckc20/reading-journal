@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBooksContext } from "@/context/BooksContext";
 import { useAuth, useAuthorsContext, useUserSettings } from "@/context";
-import { createWishlistItem } from "@/lib/wishlist";
+import { createWishlistItem, WishlistCoverError } from "@/lib/wishlist";
 import { deleteUnreferencedCover, updateBook, uploadCover } from "@/lib/books";
 import { BookCopyCleanupError, saveBookCopies, type BookCopyDraft } from "@/lib/duplication";
 import { DEFAULT_LIBRARY_SETTINGS } from "@/lib/userSettings";
@@ -83,6 +83,7 @@ interface AddBookDialogProps {
   onCancel?: () => void;
   onSaved?: (book: Book) => void;
   onWishlistSaved?: () => void;
+  onCreated?: (book: Book, coverWarning?: string) => void;
 }
 
 type ImportMethod = "isbn" | "title";
@@ -169,6 +170,7 @@ export default function AddBookDialog({
   onCancel,
   onSaved,
   onWishlistSaved,
+  onCreated,
 }: AddBookDialogProps) {
   const { addBook, reload: reloadBooks } = useBooksContext();
   const { user } = useAuth();
@@ -694,14 +696,23 @@ export default function AddBookDialog({
           price: parsedPrice, purchase_url: values.purchase_url.trim() || null,
           cover_url: coverFile ? null : coverPreview,
         };
+        let saved: Book;
+        let coverWarning: string | undefined;
         try {
-          await createWishlistItem(user.id, wishlistInput, coverFile ?? undefined);
+          saved = await createWishlistItem(user.id, wishlistInput, coverFile ?? undefined);
         } catch (error) {
-          if (error && typeof error === "object" && "item" in error) { await reloadBooks(); onWishlistSaved?.(); }
-          throw error;
+          if (!(error instanceof WishlistCoverError)) throw error;
+          if (!onCreated) {
+            await reloadBooks();
+            onWishlistSaved?.();
+            throw error;
+          }
+          saved = error.item;
+          coverWarning = error.message;
         }
         await reloadBooks();
-        onWishlistSaved?.();
+        if (onCreated) onCreated(saved, coverWarning);
+        else onWishlistSaved?.();
         reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
         setAddToWishlist(false);
         onOpenChange(false);
@@ -732,7 +743,8 @@ export default function AddBookDialog({
         coverFile ?? undefined
       );
 
-      if (result.warning) {
+      if (onCreated) onCreated(result.book, result.warning);
+      if (result.warning && !onCreated) {
         onSaved?.(result.book);
         reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
         setCoverFile(null);
@@ -760,7 +772,7 @@ export default function AddBookDialog({
         return;
       }
 
-      onSaved?.(result.book);
+      if (!onCreated) onSaved?.(result.book);
       reset(getInitialFormValues(initialSeriesId, initialVolumeNumber));
       setCoverFile(null);
       setCoverPreview(null);
@@ -842,6 +854,7 @@ export default function AddBookDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <CreationDialogContent
         className="rj-add-book-dialog"
+        fitVisualViewport={Boolean(onCreated)}
         title={editBook ? "Edit book" : "Add book"}
         description={description}
         icon={BookOpen}

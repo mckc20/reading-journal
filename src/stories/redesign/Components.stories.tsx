@@ -31,9 +31,11 @@ export const AddMenuOpen: Story = {
     await expect(body.queryByRole('menu')).not.toBeInTheDocument();
     await pointer.pointer({ keys: '[/MouseLeft]', target: trigger });
     const menu = await body.findByRole('menu');
-    await waitFor(() => expect(within(menu).getByText('Add a book', { exact: true })).toBeVisible());
+    await waitFor(() => expect(within(menu).getByText('New book', { exact: true })).toBeVisible());
     await Promise.all(menu.getAnimations({ subtree: true }).map(animation => animation.finished));
-    await expect(within(menu).getAllByRole('menuitem')).toHaveLength(3);
+    await expect(within(menu).getAllByRole('menuitem').map(item => item.textContent?.trim())).toEqual([
+      'New collection', 'New series', 'New journal entry', 'New book',
+    ]);
   },
 };
 function ProgressWidget({ reference = false }: { reference?: boolean }) {

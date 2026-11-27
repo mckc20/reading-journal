@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bookmark, Copy, ExternalLink, MoreHorizontal, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
+import { Bookmark, Copy, ExternalLink, ListPlus, MoreHorizontal, PauseCircle, Pencil, Play, Send, Share2, Trash2 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import DeleteSeriesBooksOption from "@/components/DeleteSeriesBooksOption";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ManageCollectionsDialog } from "@/components/redesign/ManageCollectionsDialog";
+import type { Book } from "@/types";
 import { cn } from "@/lib/utils";
 
 type DetailKind = "book" | "author" | "series" | "genre";
@@ -30,6 +32,7 @@ interface DetailActionsMenuProps {
   onEdit?: (trigger?: HTMLElement) => void;
   onDuplicate?: (trigger?: HTMLElement) => void;
   onWishlist?: () => void;
+  collectionsBook?: Pick<Book, "id" | "title">;
   onDelete?: (deleteLinkedBooks?: boolean) => void | Promise<void>;
   onSendAttachment?: () => void;
   deleteTitle?: string;
@@ -55,6 +58,7 @@ export default function DetailActionsMenu({
   onEdit,
   onDuplicate,
   onWishlist,
+  collectionsBook,
   onDelete,
   onSendAttachment,
   deleteTitle,
@@ -67,11 +71,12 @@ export default function DetailActionsMenu({
   const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const openingDialog = useRef(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLinkedBooks, setDeleteLinkedBooks] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const hasMoreActions = Boolean(onPause || onResume || onDuplicate || onWishlist || onDelete || sourceUrl || onRemove);
+  const hasMoreActions = Boolean(onPause || onResume || onDuplicate || onWishlist || collectionsBook || onDelete || sourceUrl || onRemove);
 
   useEffect(() => {
     if (!shareOpen) setCopyStatus(null);
@@ -159,6 +164,12 @@ export default function DetailActionsMenu({
                   Move to Wishlist
                 </DropdownMenu.Item>
               )}
+              {collectionsBook && (
+                <DropdownMenu.Item onSelect={() => openDialog(() => setCollectionsOpen(true))}>
+                  <ListPlus aria-hidden="true" className="size-4" />
+                  Manage collections
+                </DropdownMenu.Item>
+              )}
               {sourceUrl && <DropdownMenu.Item asChild>
                 <a href={sourceUrl} target="_blank" rel="noreferrer">
                   <ExternalLink aria-hidden="true" className="size-4" />
@@ -178,6 +189,9 @@ export default function DetailActionsMenu({
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       )}
+
+      {collectionsOpen && collectionsBook && <ManageCollectionsDialog book={collectionsBook}
+        onClose={() => setCollectionsOpen(false)} onCloseAutoFocus={restoreTriggerFocus} />}
 
       {showShare && <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-md" onCloseAutoFocus={(event) => {
