@@ -13,7 +13,6 @@ import {
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
-  Info,
   NotebookPen,
   PauseCircle,
   RefreshCw,
@@ -29,6 +28,7 @@ import SendAttachmentDialog from "@/components/SendAttachmentDialog";
 import ReadingProgressDialog from "@/components/ReadingProgressDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { HeadingInfo } from "@/components/ui/heading-info";
 import { NativeSelect } from "@/components/ui/native-select";
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { BookDetailTitle } from "@/components/redesign/BookDetailTitle";
@@ -113,7 +113,6 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
 
   const [isFavorite, setIsFavorite] = useState(false);
   const [localRating, setLocalRating] = useState<number | null>(null);
-  const [showRatingGuide, setShowRatingGuide] = useState(false);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [readingLogs, setReadingLogs] = useState<ReadingLog[]>([]);
@@ -463,52 +462,34 @@ function BookDetailsContent({ onClose }: { onClose: () => void }) {
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    aria-label="Show rating guide"
-                    aria-expanded={showRatingGuide}
-                    aria-describedby={showRatingGuide ? `${headingId}-rating-guide` : undefined}
-                    onClick={() => setShowRatingGuide((current) => !current)}
-                    className="rounded-full p-0.5 text-muted-foreground/65 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  >
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                  {showRatingGuide && (
-                    <div
-                      id={`${headingId}-rating-guide`}
-                      role="tooltip"
-                      className="absolute left-0 top-full z-20 mt-2 w-72 max-w-full rounded-lg border bg-popover p-3 text-xs text-muted-foreground shadow-sm"
-                    >
-                      <div className="space-y-1.5">
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">♥︎</span>
-                          <span>One of the best books I’ve ever read</span>
-                        </p>
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">★★★★★</span>
-                          <span>Loved it</span>
-                        </p>
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">★★★★☆</span>
-                          <span>Really enjoyed it</span>
-                        </p>
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">★★★☆☆</span>
-                          <span>Liked it, but didn’t wow me</span>
-                        </p>
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">★★☆☆☆</span>
-                          <span>Meh, had issues</span>
-                        </p>
-                        <p className="flex gap-2">
-                          <span className="shrink-0 text-muted-foreground/70">★☆☆☆☆</span>
-                          <span>Not for me</span>
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <HeadingInfo label="Show rating guide">
+                  <div className="space-y-1.5">
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">♥︎</span>
+                      <span>One of the best books I’ve ever read</span>
+                    </p>
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">★★★★★</span>
+                      <span>Loved it</span>
+                    </p>
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">★★★★☆</span>
+                      <span>Really enjoyed it</span>
+                    </p>
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">★★★☆☆</span>
+                      <span>Liked it, but didn’t wow me</span>
+                    </p>
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">★★☆☆☆</span>
+                      <span>Meh, had issues</span>
+                    </p>
+                    <p className="flex gap-2">
+                      <span className="shrink-0 text-muted-foreground/70">★☆☆☆☆</span>
+                      <span>Not for me</span>
+                    </p>
+                  </div>
+                </HeadingInfo>
               </div>
             </div>
           </div>
