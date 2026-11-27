@@ -1,6 +1,6 @@
 import type { BookStatus, BookUpdate } from "@/types";
 
-export const libraryCollections = ["To Read", "Finished", "DNF", "Wishlist", "Favorites"] as const;
+export const libraryCollections = ["To Read", "DNF", "Wishlist", "Favorites"] as const;
 export type CollectionId = (typeof libraryCollections)[number];
 export const wishlistCollectionPath = "/library/collections?collection=Wishlist";
 

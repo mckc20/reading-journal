@@ -1,6 +1,6 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
+import { createBrowserRouter, Navigate, replace, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { bookJournalHref, entityJournalHref } from "@/lib/journalLinks";
 import { wishlistCollectionPath } from "@/lib/libraryCollections";
@@ -97,7 +97,17 @@ export const router = createBrowserRouter([
             // Resolve the next tab before swapping out the current panel.
             children: [
               { index: true, lazy: async () => ({ Component: (await import("@/pages/Library")).default }) },
-              { path: "collections", lazy: async () => ({ Component: (await import("@/pages/LibraryCollections")).default }) },
+              {
+                path: "collections",
+                loader: ({ request }) => {
+                  const params = new URL(request.url).searchParams;
+                  if (params.get("collection") !== "Finished") return null;
+                  params.delete("collection");
+                  params.set("status", "Finished");
+                  return replace(`/library?${params}`);
+                },
+                lazy: async () => ({ Component: (await import("@/pages/LibraryCollections")).default }),
+              },
               { path: "series", lazy: async () => ({ Component: (await import("@/pages/Series")).default }) },
             ],
           },
