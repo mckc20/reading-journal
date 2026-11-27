@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import "./book-form-dialog.css";
 
@@ -17,8 +17,7 @@ export function CreationDialogContent({ title, description, icon: Icon, classNam
       <header className="rj-book-form-heading">
         <span className="rj-book-form-icon" aria-hidden="true"><Icon size={24} /></span>
         <div>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle info={description}>{title}</DialogTitle>
         </div>
         <DialogClose asChild>
           <Button type="button" variant="ghost" size="icon" className="rj-book-form-close" aria-label="Close">

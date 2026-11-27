@@ -1,3 +1,4 @@
+import { AppHeading } from "@/components/design";
 import { useEffect, useState, type FormEvent } from "react";
 import { Layers, Trash2 } from "lucide-react";
 import { CreationDialogContent } from "@/components/redesign/CreationDialogContent";
@@ -264,12 +265,10 @@ export default function AddSeriesDialog({ open, onOpenChange, onCloseAutoFocus, 
               </div>
 
               <section className="space-y-3">
-                <div>
-                  <h2 className="text-base font-semibold">Books in this series</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Search for books, drag by the handle, edit volume numbers, or remove books from this series.
-                  </p>
-                </div>
+                <AppHeading level={4} as="h2" className="font-semibold"
+                  info="Search for books, drag by the handle, edit volume numbers, or remove books from this series.">
+                  Books in this series
+                </AppHeading>
                 <SeriesBooksEditor
                   rows={rows}
                   allBooks={books}

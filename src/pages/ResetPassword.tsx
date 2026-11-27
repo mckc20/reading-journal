@@ -2,7 +2,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,8 +48,7 @@ export default function ResetPassword() {
     <main className="login-fallback flex min-h-svh items-center justify-center px-4 py-8">
       <div className="w-full max-w-sm space-y-6 rounded-lg border border-border/70 bg-background/95 p-6 shadow-[var(--shadow-popover)] backdrop-blur-md sm:p-7">
         <div className="space-y-1">
-          <AppHeading level={1} as="h1" className="tracking-tight">Reading Journal</AppHeading>
-          <HeadingDescription>Choose a new password</HeadingDescription>
+          <AppHeading level={1} as="h1" className="tracking-tight" info="Choose a new password">Reading Journal</AppHeading>
         </div>
 
         {!session ? (

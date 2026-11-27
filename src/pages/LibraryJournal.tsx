@@ -2,7 +2,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { NotebookPen } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import JournalTimeline from "@/components/JournalTimeline";
 import { useBooksContext } from "@/context/BooksContext";
 import { fetchAllAuthorJournalEntryRecords } from "@/lib/authorJournal";
@@ -72,9 +72,8 @@ export default function LibraryJournal() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <AppHeading level={1}>Journal</AppHeading>
-        <HeadingDescription>{authorId ? "Entries for this author." : seriesId ? "Entries for this series."
-          : "All book, series, and author journal entries, newest first."}</HeadingDescription>
+        <AppHeading level={1} info={authorId ? "Entries for this author." : seriesId ? "Entries for this series."
+          : "All book, series, and author journal entries, newest first."}>Journal</AppHeading>
       </div>
 
       {error && (

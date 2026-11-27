@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { FilterSelect } from '@/components/LibraryControls';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter,
+  Dialog, DialogClose, DialogContent, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { filterLabels, type LibraryFilterKey, type LibraryFilterOptions, type LibraryFilters } from '@/lib/libraryBookFilters';
@@ -45,8 +45,7 @@ export function LibraryBookFilters({ filters, options, count, onToggle, onClear,
       field.focus();
     }}>
       <DialogHeader>
-        <DialogTitle>Filter books</DialogTitle>
-        <DialogDescription>You can select multiple values in each field.</DialogDescription>
+        <DialogTitle info="You can select multiple values in each field.">Filter books</DialogTitle>
       </DialogHeader>
       <div className="rj-books-filter-groups" ref={fields}>
         {groups.map(group => <fieldset key={group.title}>

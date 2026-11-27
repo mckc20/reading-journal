@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { HeadingInfo } from "@/components/ui/heading-info";
 import type { ElementType, HTMLAttributes, ReactNode } from "react";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
@@ -14,6 +15,7 @@ interface AppHeadingProps extends HTMLAttributes<HTMLHeadingElement> {
   level: HeadingLevel;
   as?: ElementType;
   children: ReactNode;
+  info?: ReactNode;
 }
 
 export function AppHeading({
@@ -21,14 +23,23 @@ export function AppHeading({
   as,
   className,
   children,
+  info,
   ...props
 }: AppHeadingProps) {
   const Component = as ?? (`h${level}` as ElementType);
 
-  return (
+  const title = (
     <Component className={cn(headingClasses[level], className)} {...props}>
       {children}
     </Component>
+  );
+  if (!info) return title;
+
+  return (
+    <div className="inline-flex max-w-full items-center gap-1 align-middle">
+      {title}
+      <HeadingInfo>{info}</HeadingInfo>
+    </div>
   );
 }
 

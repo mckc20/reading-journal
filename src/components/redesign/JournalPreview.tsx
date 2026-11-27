@@ -1,3 +1,4 @@
+import { HeadingInfo } from '@/components/ui/heading-info';
 import { useId, useRef, useState } from 'react';
 import { NotebookPen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export function JournalPreview({ entries, loading, error, initialQuery = '', ...
   function reset() { setQuery(''); setType('all'); setRelationship('all'); }
 
   return <div className="rj-redesign rj-journal-preview"><HomeShell {...actions} activeDestination="Journal">
-    <header className="rj-journal-heading"><div><p className="rj-journal-eyebrow">Thoughts to return to</p><h1>Journal</h1><p>Your books, your words. And everything in between.</p></div><Button onClick={() => actions.onCreate('entry')}><NotebookPen aria-hidden="true" />Write an entry</Button></header>
+    <header className="rj-journal-heading"><div><p className="rj-journal-eyebrow">Thoughts to return to</p><div className="flex items-center gap-1"><h1>Journal</h1><HeadingInfo>Your books, your words. And everything in between.</HeadingInfo></div></div><Button onClick={() => actions.onCreate('entry')}><NotebookPen aria-hidden="true" />Write an entry</Button></header>
     {loading ? <div className="rj-journal-state" role="status">Loading your journal…</div>
       : error ? <div className="rj-journal-state"><EmptyState title="Your journal couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /></div>
       : entries.length === 0 ? <div className="rj-journal-state"><EmptyState title="A little room for your thoughts" message="A line from a book, a reflection, or something entirely your own." action={<Button onClick={() => actions.onCreate('entry')}>Write your first entry</Button>} /></div>

@@ -2410,8 +2410,7 @@ export function GroupsManager() {
       <Dialog open={noteImportMessage !== null} onOpenChange={(open) => !open && setNoteImportMessage(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add journal entry to library</DialogTitle>
-            <DialogDescription>Choose where this shared entry should be saved.</DialogDescription>
+            <DialogTitle info="Choose where this shared entry should be saved.">Add journal entry to library</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2">

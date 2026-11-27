@@ -24,7 +24,8 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
+import { HeadingInfo } from "@/components/ui/heading-info";
 import SetPasswordDialog from "@/components/SetPasswordDialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
@@ -32,7 +33,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -303,9 +303,9 @@ function SettingsSection({
               <Icon className="h-4 w-4" aria-hidden="true" />
             </div>
           )}
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1">
             <CardTitle>{title}</CardTitle>
-            {description && <CardDescription>{description}</CardDescription>}
+            {description && <HeadingInfo label={`More information about ${title}`}>{description}</HeadingInfo>}
           </div>
         </div>
       </CardHeader>
@@ -1257,10 +1257,7 @@ function ApiKeysSettings() {
       <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create API key</DialogTitle>
-            <DialogDescription>
-              Give this key a recognizable name, such as “Phone shortcut” or “Desktop script”.
-            </DialogDescription>
+            <DialogTitle info="Give this key a recognizable name, such as “Phone shortcut” or “Desktop script”.">Create API key</DialogTitle>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitCreateKey}>
             <div className="space-y-2">
@@ -1727,14 +1724,11 @@ export default function Settings() {
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <AppHeading level={1} as="h1">Settings</AppHeading>
+          <AppHeading level={1} as="h1" info="Manage your profile, app preferences, reading defaults, notifications, privacy, and account.">Settings</AppHeading>
           <Button asChild variant="outline" size="sm">
             <Link to="/help"><CircleHelp aria-hidden="true" />Help</Link>
           </Button>
         </div>
-        <HeadingDescription className="max-w-2xl">
-          Manage your profile, app preferences, reading defaults, notifications, privacy, and account.
-        </HeadingDescription>
       </div>
 
       <SettingsTabs activeTab={activeTab} />

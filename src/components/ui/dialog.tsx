@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { HeadingInfo, HeadingInfoDismissContext } from "@/components/ui/heading-info"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -65,8 +66,19 @@ const DialogContent = React.forwardRef<
   children,
   showCloseButton = true,
   overlayClassName,
+  onPointerDownOutside,
+  onEscapeKeyDown,
   ...props
 }, ref) {
+  const dismissHeadingInfo = React.useRef<(() => void) | null>(null)
+
+  function dismissInfo(event: Event) {
+    if (!dismissHeadingInfo.current) return
+    // Dismiss the open tooltip before an outside tap or Escape can dismiss the dialog.
+    event.preventDefault()
+    dismissHeadingInfo.current()
+  }
+
   return (
     <DialogPortal>
       <DialogOverlay className={overlayClassName} />
@@ -78,8 +90,18 @@ const DialogContent = React.forwardRef<
           className
         )}
         {...props}
+        onPointerDownOutside={event => {
+          dismissInfo(event)
+          onPointerDownOutside?.(event)
+        }}
+        onEscapeKeyDown={event => {
+          dismissInfo(event)
+          onEscapeKeyDown?.(event)
+        }}
       >
-        {children}
+        <HeadingInfoDismissContext.Provider value={dismissHeadingInfo}>
+          {children}
+        </HeadingInfoDismissContext.Provider>
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
@@ -137,12 +159,14 @@ function DialogFooter({
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title> & { info?: React.ReactNode; infoLabel?: string }
 >(function DialogTitle({
   className,
+  info,
+  infoLabel,
   ...props
 }, ref) {
-  return (
+  const title = (
     <DialogPrimitive.Title
       ref={ref}
       data-slot="dialog-title"
@@ -152,6 +176,15 @@ const DialogTitle = React.forwardRef<
       )}
       {...props}
     />
+  )
+  if (!info) return title
+
+  return (
+    <div className="flex min-w-0 items-center gap-1" data-slot="dialog-title-with-info">
+      {title}
+      <HeadingInfo label={infoLabel}>{info}</HeadingInfo>
+      <DialogDescription className="sr-only">{info}</DialogDescription>
+    </div>
   )
 })
 

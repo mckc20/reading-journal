@@ -2,7 +2,7 @@ import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ChevronRight, Sparkles } from 'lucide-react';
-import { AppHeading, HeadingDescription } from '@/components/design';
+import { AppHeading } from '@/components/design';
 import { Button } from '@/components/ui/button';
 import { fetchWrapUpArchive } from '@/lib/wrapUpClient';
 import { monthLabel } from '@/lib/wrapUpArchive';
@@ -109,7 +109,7 @@ function WrapUpViews({ preferenceKey }: { preferenceKey: string }) {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Sparkles className="h-8 w-8 shrink-0 text-primary" aria-hidden="true" />
-            <AppHeading level={1} className="text-[1.625rem] sm:text-3xl">Wrap-ups</AppHeading>
+            <AppHeading level={1} className="text-[1.625rem] sm:text-3xl" info="Your reading, remembered.">Wrap-ups</AppHeading>
           </div>
           <OverflowMenu label="Wrap-up view options">
             {close => <>
@@ -134,7 +134,6 @@ function WrapUpViews({ preferenceKey }: { preferenceKey: string }) {
             </>}
           </OverflowMenu>
         </div>
-        <HeadingDescription>Your reading, remembered.</HeadingDescription>
       </header>
       {view === 'sliding' ? <SlidingWrapUps /> : monthKey ? <WrapUpDetails /> : <WrapUpArchiveList />}
     </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { runBulkOperation } from '@/lib/bulkManagement';
 import type { CollectionId } from '@/lib/libraryCollections';
@@ -41,12 +41,11 @@ export function CollectionBookPicker({ collection, books, onAdd, onClose, onClos
     <DialogContent className="rj-redesign rj-collection-picker sm:max-w-lg" showCloseButton={!pending}
       onCloseAutoFocus={onCloseAutoFocus}>
       <DialogHeader>
-        <DialogTitle asChild><h2>Choose from library</h2></DialogTitle>
-        <DialogDescription>{collection === 'Favorites'
+        <DialogTitle asChild info={collection === 'Favorites'
           ? 'Selected books will be marked as favorites.'
           : collection === 'Wishlist'
             ? 'Selected books will move to your Wishlist and leave the Books list. Their journal and reading data will be kept.'
-            : `Selected books will have their reading status set to ${collection}.`}</DialogDescription>
+            : `Selected books will have their reading status set to ${collection}.`}><h2>Choose from library</h2></DialogTitle>
       </DialogHeader>
       <Input aria-label="Search library books" type="search" placeholder="Search by title or author" value={query}
         onChange={event => setQuery(event.target.value)} />

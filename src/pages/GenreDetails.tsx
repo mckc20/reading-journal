@@ -10,7 +10,7 @@ import { DetailBack, DetailSheet } from "@/components/redesign/DetailSheet";
 import { ReadingStat, StatRow } from "@/components/redesign/ReadingStat";
 import BookCard from "@/components/BookCard";
 import DetailActionsMenu from "@/components/DetailActionsMenu";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { GenreIllustration } from "@/components/genres/GenreVisuals";
 import { useBooksContext } from "@/context/BooksContext";
 import { useGenresContext } from "@/context/GenresContext";
@@ -93,8 +93,7 @@ function GenreDetailsContent({ genreId, onClose }: { genreId?: string; onClose: 
                 <Link to={`/genres/${slugById.get(item.id) ?? item.id}`} className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>}
             </span>)}
           </nav>
-          <h1 id={headingId} className="rj-detail-title rj-detail-title-italic">{genre.name}</h1>
-          <HeadingDescription className="pt-2">{metadata.description}</HeadingDescription>
+          <AppHeading level={1} id={headingId} className="rj-detail-title rj-detail-title-italic" info={metadata.description}>{genre.name}</AppHeading>
         </div>
       </DetailHero>
 

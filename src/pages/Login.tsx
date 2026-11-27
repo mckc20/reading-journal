@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/context/AuthContext";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -495,8 +495,7 @@ export default function Login() {
       <div className="pointer-events-none relative z-20 flex min-h-svh items-center justify-center px-4 py-8 sm:px-8">
         <div className="pointer-events-auto w-full max-w-sm space-y-6 rounded-lg border border-border/70 bg-background/95 p-6 shadow-[var(--shadow-popover)] backdrop-blur-md sm:p-7">
           <div className="space-y-1">
-            <AppHeading level={1} as="h1" className="tracking-tight">Reading Journal</AppHeading>
-            <HeadingDescription>{showForgotPassword ? "Reset your password" : "Sign in to your account"}</HeadingDescription>
+            <AppHeading level={1} as="h1" className="tracking-tight" info={showForgotPassword ? "Reset your password" : "Sign in to your account"}>Reading Journal</AppHeading>
           </div>
           {showForgotPassword ? (
             resetEmailSent ? (

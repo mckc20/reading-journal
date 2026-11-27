@@ -6,13 +6,10 @@ import { buildAuthorDetailPath, MetadataLink } from "@/components/LinkedMetadata
 import { BookCover } from "@/components/reading-journal/BookCover";
 import { useAuthorsContext } from "@/context/AuthorsContext";
 import { useBooksContext } from "@/context/BooksContext";
-import { useRecommendations } from "@/context/RecommendationsContext";
 import { useBookHeroColor } from "@/hooks/useDominantImageColor";
 import { findAuthorSummary } from "@/lib/authorShelf";
-import { recommendationCandidateKey } from "@/lib/recommendationIdentity";
 import type { Book, Series } from "@/types";
 import { BookDetailAbout, externalBookUrl } from "./BookDetailAbout";
-import { BookDislikeButton } from "./BookDislikeButton";
 import { WishlistBookActions } from "./WishlistBookActions";
 import { DetailHero } from "./DetailHero";
 import { DetailBack } from "./DetailSheet";
@@ -29,25 +26,10 @@ export function WishlistBookDetail({ book, series, onClose }: {
   const { openAddBook } = useOutletContext<AppLayoutOutletContext>();
   const { authors } = useAuthorsContext();
   const { deleteBook } = useBooksContext();
-  const { disliked, feedbackReady, toggleDislike } = useRecommendations();
   const color = useBookHeroColor(book.cover_url);
   const wishlistQuery = new URLSearchParams({ wishlistBook: book.id });
   const [error, setError] = useState<string | null>(null);
-  const [savingDislike, setSavingDislike] = useState(false);
   const source = externalBookUrl(book.metadata_source_url) ?? externalBookUrl(book.purchase_url);
-
-  async function saveDislike() {
-    if (savingDislike) return;
-    setSavingDislike(true);
-    setError(null);
-    try {
-      await toggleDislike(book);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update the dislike.");
-    } finally {
-      setSavingDislike(false);
-    }
-  }
 
   async function removeBook() {
     try {
@@ -65,8 +47,6 @@ export function WishlistBookDetail({ book, series, onClose }: {
       actions={<DetailActionsMenu kind="book" label={book.title}
         onEdit={trigger => openAddBook({ editBook: book }, trigger)}
         onDuplicate={trigger => openAddBook({ duplicateBooks: [book] }, trigger)}
-        beforeMore={<BookDislikeButton pressed={disliked.has(recommendationCandidateKey(book))}
-          disabled={!feedbackReady || savingDislike} onClick={() => void saveDislike()} />}
         sourceUrl={source}
         onDelete={removeBook} deleteTitle="Remove this book?" deleteMenuLabel="Remove book" deleteConfirmLabel="Remove book"
         deleteDescription="This removes the book and any saved journal and reading data." />}>

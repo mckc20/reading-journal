@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -86,10 +85,7 @@ export default function DuplicateOptionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{selectedCount === undefined ? `Duplicate this ${kind}?` : selectedCount === 1 ? `Duplicate selected ${kind}?` : `Duplicate ${selectionLabel(kind, selectedCount)}?`}</DialogTitle>
-          <DialogDescription>
-            Choose which related content should be copied.
-          </DialogDescription>
+          <DialogTitle info="Choose which related content should be copied.">{selectedCount === undefined ? `Duplicate this ${kind}?` : selectedCount === 1 ? `Duplicate selected ${kind}?` : `Duplicate ${selectionLabel(kind, selectedCount)}?`}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

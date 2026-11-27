@@ -1,7 +1,7 @@
 import LoadingIndicator from "@/components/LoadingIndicator";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import SaveCancelBar from "@/components/SaveCancelBar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,10 +133,7 @@ export default function AddChatDialog({ open, onOpenChange, onCreated }: AddChat
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto pb-24 sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Chat</DialogTitle>
-          <DialogDescription>
-            Choose one person for a direct chat or several people for a group chat.
-          </DialogDescription>
+          <DialogTitle info="Choose one person for a direct chat or several people for a group chat.">Add Chat</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

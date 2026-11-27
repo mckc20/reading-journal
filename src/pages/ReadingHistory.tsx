@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, RefreshCw } from "lucide-react";
 import BookTimeline, { type BookTimelineItem } from "@/components/BookTimeline";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { useBooksContext } from "@/context/BooksContext";
 import { parseLocalDateOnly } from "@/lib/bookAnalytics";
@@ -116,8 +116,7 @@ export default function ReadingHistory() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <AppHeading level={1}>Reading History</AppHeading>
-        <HeadingDescription>Books you started or finished, newest first.</HeadingDescription>
+        <AppHeading level={1} info="Books you started or finished, newest first.">Reading History</AppHeading>
       </div>
 
       {timelineItems.length > 0 ? (

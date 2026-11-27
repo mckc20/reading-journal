@@ -3,7 +3,7 @@ import { BookOpen, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { formatPublicationDateInput, parsePublicationDateInput } from '@/lib/publicationDate';
 import type { BookFormat, BookLanguage, BookSource, BookStatus } from '@/types';
@@ -123,7 +123,7 @@ export function BookFormPreview({ open, mode = 'add', initialBook, onOpenChange,
   }
   return <Dialog open={open} onOpenChange={value => { if (!value) close(); }}>
     <DialogContent className="rj-redesign rj-book-form-dialog" showCloseButton={false} onCloseAutoFocus={event => { if (returnFocusTo) { event.preventDefault(); returnFocusTo.focus(); } }} onEscapeKeyDown={event => { if (savingRef.current) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()}>
-      <header className="rj-book-form-heading"><span className="rj-book-form-icon"><BookOpen size={24} /></span><div><DialogTitle>{mode === 'edit' ? 'Edit book' : 'Add a book'}</DialogTitle><DialogDescription>{mode === 'edit' ? 'Update the book details.' : 'Find a book or fill in the details yourself.'}</DialogDescription></div><Button className="rj-book-form-close" type="button" variant="ghost" size="icon" aria-label="Close book form" onClick={close} disabled={saving}><X aria-hidden="true" /></Button></header>
+      <header className="rj-book-form-heading"><span className="rj-book-form-icon"><BookOpen size={24} /></span><div><DialogTitle info={mode === 'edit' ? 'Update the book details.' : 'Find a book or fill in the details yourself.'}>{mode === 'edit' ? 'Edit book' : 'Add a book'}</DialogTitle></div><Button className="rj-book-form-close" type="button" variant="ghost" size="icon" aria-label="Close book form" onClick={close} disabled={saving}><X aria-hidden="true" /></Button></header>
       <form ref={form} onSubmit={submit} noValidate className="rj-book-form" aria-busy={saving}>
         <div className="rj-book-form-scroll"><fieldset disabled={saving} className="rj-book-form-fields"><legend className="sr-only">Book information</legend>
           {mode !== 'edit' && <BookLookupPreview onLookup={onLookup} onScanISBN={onScanISBN} onApply={applyBook} onBusyChange={setLookupBusy} />}

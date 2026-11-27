@@ -1,7 +1,7 @@
 import { Search, Unlink } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { JournalLinkTarget } from "@/lib/journalLinks";
 import { cn } from "@/lib/utils";
 
@@ -54,8 +54,7 @@ export default function JournalEntryLinkPicker({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <div className="space-y-1">
-            <DialogTitle>Insert journal entry link</DialogTitle>
-            <DialogDescription>Choose an entry from your journal.</DialogDescription>
+            <DialogTitle info="Choose an entry from your journal.">Insert journal entry link</DialogTitle>
           </div>
           {canRemoveLink && (
             <button

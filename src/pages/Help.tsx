@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, CircleHelp } from 'lucide-react';
-import { AppHeading, HeadingDescription } from '@/components/design';
+import { AppHeading } from '@/components/design';
 
 export default function Help() {
   return (
@@ -11,9 +11,8 @@ export default function Help() {
       <header className="space-y-3">
         <div className="flex items-center gap-3">
           <CircleHelp className="h-8 w-8 shrink-0 text-primary" aria-hidden="true" />
-          <AppHeading level={1}>Help</AppHeading>
+          <AppHeading level={1} info="A guide to your reading journal.">Help</AppHeading>
         </div>
-        <HeadingDescription>A guide to your reading journal.</HeadingDescription>
       </header>
       <nav aria-label="Help topics">
         <Link

@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -64,10 +63,7 @@ export default function ReleaseNotesDialog() {
             New release note
           </div>
 
-          <DialogTitle className="text-2xl">{releaseNote.title}</DialogTitle>
-          <DialogDescription className="max-w-lg text-base">
-            {releaseNote.summary}
-          </DialogDescription>
+          <DialogTitle className="text-2xl" info={releaseNote.summary}>{releaseNote.title}</DialogTitle>
           <p className="text-xs text-muted-foreground">
             Published {formatReleaseNoteDate(releaseNote.published_at)} · {releaseNote.version}
           </p>

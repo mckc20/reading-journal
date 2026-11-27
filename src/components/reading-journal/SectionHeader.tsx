@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { cn } from "@/lib/utils";
 
 interface SectionHeaderProps {
@@ -14,8 +14,7 @@ export function SectionHeader({ title, description, action, level = 3, className
   return (
     <div className={cn("flex items-center justify-between gap-3", className)}>
       <div className="min-w-0">
-        <AppHeading level={level} as={`h${level}`}>{title}</AppHeading>
-        {description && <HeadingDescription className="text-xs">{description}</HeadingDescription>}
+        <AppHeading level={level} as={`h${level}`} info={description}>{title}</AppHeading>
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

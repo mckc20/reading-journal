@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,7 @@ export default function GenreHistory({ books, genres }: GenreHistoryProps) {
     <section aria-labelledby={headingId} className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <AppHeading level={4} id={headingId}>Your reading through the years</AppHeading>
-          <HeadingDescription>Explore your enjoyment and the books you finished.</HeadingDescription>
+          <AppHeading level={4} id={headingId} info="Explore your enjoyment and the books you finished.">Your reading through the years</AppHeading>
         </div>
         {options.length > 0 && <div className="space-y-1">
           <label htmlFor={selectorId} className="block text-xs text-muted-foreground">Genre</label>

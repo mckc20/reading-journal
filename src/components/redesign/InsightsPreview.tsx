@@ -1,8 +1,9 @@
+import { HeadingInfo } from '@/components/ui/heading-info';
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { useHorizontalChartTransition } from "@/hooks/useHorizontalChartTransition";
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { EmptyState } from '@/components/reading-journal/EmptyState';
 import { HomeShell, type HomeDestination, type CreateDestination } from './HomeShell';
@@ -44,7 +45,7 @@ export function InsightsPreview({ periods, goal, milestone, wrapUp, loading, err
   const detailTitle = detail === 'rhythm' ? 'Behind your reading rhythm' : detail === 'enjoyment' ? 'Most read, or most enjoyed?' : `${wrapUp?.label} wrap-up`;
   const maxDays = Math.max(1, ...period?.buckets.map(bucket => bucket.available) ?? []);
   return <div className="rj-redesign rj-insights-preview"><HomeShell {...actions} activeDestination="Insights">
-    <header className="rj-insights-heading"><div><p className="rj-insights-kicker">A little more about you</p><h1>Insights</h1><p>Find the shape of your reading life.</p></div>
+    <header className="rj-insights-heading"><div><p className="rj-insights-kicker">A little more about you</p><div className="flex items-center gap-1"><h1>Insights</h1><HeadingInfo>Find the shape of your reading life.</HeadingInfo></div></div>
       {period && <label>Explore a period<select value={period.id} onChange={event => { transition.capture(); setPeriodId(event.target.value); }}>{periods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
     </header>
     {loading ? <p className="rj-insights-state" role="status">Gathering your reading story…</p> : error ? <EmptyState title="Your insights couldn’t load" message={error} action={<Button onClick={actions.onRetry}>Try again</Button>} /> : <>
@@ -79,7 +80,7 @@ export function InsightsPreview({ periods, goal, milestone, wrapUp, loading, err
     </>}
   </HomeShell>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="rj-redesign rj-insights-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); title.current?.focus(); }} onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}>
-      <header><DialogTitle ref={title} tabIndex={-1}>{detailTitle}</DialogTitle><DialogDescription>{detail === 'wrap-up' ? 'A saved chapter, separate from the live period above.' : `${period?.label} · The records behind the observation`}</DialogDescription></header>
+      <header><DialogTitle ref={title} tabIndex={-1} info={detail === 'wrap-up' ? 'A saved chapter, separate from the live period above.' : `${period?.label} · The records behind the observation`}>{detailTitle}</DialogTitle></header>
       <div className="rj-insights-detail" role="region" aria-label="Supporting records" tabIndex={0}>
         {detail === 'rhythm' && period && <><h3>Days with recorded activity</h3><p>{period.days} distinct days · {period.logs} reading logs.</p>{period.buckets.map(bucket => <p key={bucket.label}>{bucket.label}: {bucket.days} of {bucket.available} calendar days.</p>)}<h3>Time coverage</h3><p>{period.timedLogs} of {period.logs} logs include reading minutes. {period.averageMinutes === null ? 'No average is available.' : `Average: ${period.averageMinutes} minutes across timed logs only.`}</p><p>A log is a recorded update, not necessarily a full reading session. Untimed logs are excluded from the average, never filled with zero.</p>{period.previous && <><h3>Comparison: {period.previous.label}</h3><p>{period.previous.days} recorded days. {period.previous.averageMinutes === null ? 'No timed-log average available.' : `${period.previous.averageMinutes} minutes per timed log.`}</p></>}<p>Calendar dates use Europe/Vienna. Only positive page activity or minutes counts toward reading days; duplicate logs on a date count as one day.</p></>}
         {detail === 'enjoyment' && period && <><p>Finished books dated within {period.range}. Ratings are their supplied current ratings, not a historical rating snapshot.</p>{period.genres.length ? <dl className="rj-insights-compare">{period.genres.map(genre => <div key={genre.name}><dt>{genre.name}</dt><dd>{genre.count} finished · {genre.rated} rated · {genre.rating === null ? 'No average' : `${genre.rating.toFixed(1)} / 5 average`}</dd></div>)}</dl> : <p>No finished-book categories in this period.</p>}<p>Each genre includes the same book at most once. A book may belong to several genres; counts do not form parts of a whole. Unrated books do not lower the average. Even a high average from one book offers little evidence of a stable preference.</p><p>These observations never fill or change your Profile favorites.</p></>}

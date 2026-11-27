@@ -3254,10 +3254,7 @@ export default function JournalTimeline({
         }}
       >
         <DialogContent className="sm:max-w-lg">
-          <DialogTitle>Attach to entry</DialogTitle>
-          <DialogDescription>
-            Choose the entry this should become attached to.
-          </DialogDescription>
+          <DialogTitle info="Choose the entry this should become attached to.">Attach to entry</DialogTitle>
           <div className="max-h-[22rem] space-y-2 overflow-y-auto pr-1">
             {availableAttachTargets.length === 0 ? (
               <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
@@ -3292,10 +3289,7 @@ export default function JournalTimeline({
 
       <Dialog open={Boolean(pendingRelationshipAction)} onOpenChange={(open) => !open && setPendingRelationshipAction(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogTitle>Unattach this note?</DialogTitle>
-          <DialogDescription>
-            This will remove the note from its parent entry and turn it into a normal journal entry.
-          </DialogDescription>
+          <DialogTitle info="This will remove the note from its parent entry and turn it into a normal journal entry.">Unattach this note?</DialogTitle>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPendingRelationshipAction(null)}>
               Cancel

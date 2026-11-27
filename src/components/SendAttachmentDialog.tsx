@@ -112,8 +112,8 @@ export default function SendAttachmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description ?? attachmentTitle(attachment)}</DialogDescription>
+          <DialogTitle info={description}>{title}</DialogTitle>
+          {!description && <DialogDescription>{attachmentTitle(attachment)}</DialogDescription>}
         </DialogHeader>
 
         <div className="space-y-5">

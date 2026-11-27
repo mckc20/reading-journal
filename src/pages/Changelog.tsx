@@ -85,14 +85,9 @@ export default function Changelog() {
             Changelog
           </div>
           <div className="space-y-2">
-            <AppHeading level={1}>
+            <AppHeading level={1} info="This archive keeps the important releases, feature drops, and notable fixes in reverse chronological order. Very small maintenance changes are intentionally left out.">
               Notable updates over time
             </AppHeading>
-            <HeadingDescription className="max-w-2xl">
-              This archive keeps the important releases, feature drops, and notable fixes in
-              reverse chronological order. Very small maintenance changes are intentionally left
-              out.
-            </HeadingDescription>
           </div>
         </div>
 

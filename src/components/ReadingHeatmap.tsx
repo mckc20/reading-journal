@@ -1,7 +1,7 @@
 import { useChartEntrance } from "@/hooks/useChartEntrance";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import type { ReadingLog } from "@/types";
 import { cn } from "@/lib/utils";
@@ -192,8 +192,7 @@ export default function ReadingHeatmap({ logs }: ReadingHeatmapProps) {
   return (
     <section className="space-y-4">
       <div>
-        <AppHeading level={4} as="h2" className="italic">Reading activity</AppHeading>
-        <HeadingDescription>12-month view by day (minutes read)</HeadingDescription>
+        <AppHeading level={4} as="h2" className="italic" info="12-month view by day (minutes read)">Reading activity</AppHeading>
       </div>
 
       {hasAnyReading ? (

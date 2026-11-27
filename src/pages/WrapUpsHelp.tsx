@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CircleHelp } from 'lucide-react';
-import { AppHeading, HeadingDescription } from '@/components/design';
+import { AppHeading } from '@/components/design';
 
 export default function WrapUpsHelp() {
   return (
@@ -11,9 +11,8 @@ export default function WrapUpsHelp() {
       <header className="space-y-3">
         <div className="flex items-center gap-3">
           <CircleHelp className="h-8 w-8 shrink-0 text-primary" aria-hidden="true" />
-          <AppHeading level={1} id="wrap-ups">Wrap-ups</AppHeading>
+          <AppHeading level={1} id="wrap-ups" info="A guide to your monthly reading story.">Wrap-ups</AppHeading>
         </div>
-        <HeadingDescription>A guide to your monthly reading story.</HeadingDescription>
       </header>
 
       <section aria-labelledby="wrap-ups" className="space-y-6">

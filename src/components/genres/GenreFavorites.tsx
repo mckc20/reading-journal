@@ -1,7 +1,7 @@
 import { useId, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Star } from "lucide-react";
-import { AppHeading, HeadingDescription } from "@/components/design";
+import { AppHeading } from "@/components/design";
 import { buildGenreSlugLookup } from "@/lib/genres";
 import type { GenreCollectionEntry } from "@/lib/genreCollection";
 import type { Genre } from "@/types";
@@ -16,8 +16,7 @@ export default function GenreFavorites({ favorites, genres }: {
   return (
     <section className="space-y-3" aria-labelledby={headingId}>
       <div className="space-y-1">
-        <AppHeading level={4} id={headingId}>Your favorite genres</AppHeading>
-        <HeadingDescription>Based on how much you read and enjoy each genre.</HeadingDescription>
+        <AppHeading level={4} id={headingId} info="Based on how much you read and enjoy each genre.">Your favorite genres</AppHeading>
         <Link to="/help" className="inline-block rounded text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">How the ranking works</Link>
       </div>
       {favorites.length ? (

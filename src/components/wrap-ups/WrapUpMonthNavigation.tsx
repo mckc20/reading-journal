@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AppHeading } from '@/components/design';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { monthLabel } from '@/lib/wrapUpArchive';
@@ -35,7 +35,7 @@ export default function WrapUpMonthNavigation({ monthKey, months }: { monthKey: 
           </DialogTrigger>
         </AppHeading>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Choose a wrap-up</DialogTitle><DialogDescription>Select a month and year from your reading history.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle info="Select a month and year from your reading history.">Choose a wrap-up</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="wrap-up-month">Month</Label>

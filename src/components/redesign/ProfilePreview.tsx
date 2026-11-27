@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type MouseEvent } from 'react';
 import { Eye, MessageCircle, Pencil, Settings, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { BookCover } from '@/components/reading-journal/BookCover';
 import { HomeShell, type CreateDestination, type HomeDestination } from './HomeShell';
 import './redesign.css';
@@ -99,7 +99,7 @@ export function ProfilePreview({ profile: initialProfile, catalog, mode = 'owner
         onOpenAutoFocus={event => { event.preventDefault(); title.current?.focus(); }}
         onCloseAutoFocus={event => { event.preventDefault(); (editorReturnFocus.current?.isConnected ? editorReturnFocus.current : editTrigger.current || heading.current)?.focus(); }}
         onEscapeKeyDown={event => { if (saving.current) event.preventDefault(); }} onInteractOutside={event => event.preventDefault()}>
-        <header><DialogTitle ref={title} tabIndex={-1}>{editor === 'setup' ? 'Make this profile yours' : 'Edit your profile'}</DialogTitle><DialogDescription>{editor === 'setup' ? 'Choose a few reading favorites. Every choice is optional, and you can change them later.' : 'A little about you, and the favorites you choose yourself.'}</DialogDescription></header>
+        <header><DialogTitle ref={title} tabIndex={-1} info={editor === 'setup' ? 'Choose a few reading favorites. Every choice is optional, and you can change them later.' : 'A little about you, and the favorites you choose yourself.'}>{editor === 'setup' ? 'Make this profile yours' : 'Edit your profile'}</DialogTitle></header>
         <form onSubmit={event => { event.preventDefault(); void save(); }} aria-busy={pending}>
           <div className="rj-profile-form-scroll"><fieldset disabled={pending}>
             {editor !== 'setup' && <div className="rj-profile-identity-fields"><label htmlFor={`${id}-name`}>Display name<input id={`${id}-name`} required maxLength={100} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} pattern=".*\S.*" /></label><label htmlFor={`${id}-bio`}>Bio <span>(optional)</span><textarea id={`${id}-bio`} maxLength={400} rows={3} value={draft.bio} onChange={event => setDraft({ ...draft, bio: event.target.value })} /></label></div>}
@@ -121,7 +121,7 @@ export function ProfilePreview({ profile: initialProfile, catalog, mode = 'owner
     </Dialog>
     <Dialog open={publicOpen} onOpenChange={setPublicOpen}>
       <DialogContent className="rj-redesign rj-profile-dialog rj-profile-public-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); publicTitle.current?.focus(); }} onCloseAutoFocus={event => { event.preventDefault(); previewTrigger.current?.focus(); }}>
-        <header><DialogTitle ref={publicTitle} tabIndex={-1}>Public profile preview</DialogTitle><DialogDescription>A look at your reader introduction and chosen favorites.</DialogDescription></header><div className="rj-profile-public-scroll" tabIndex={0} role="region" aria-label="Public profile"><Identity profile={profile} /><Favorites profile={profile} /></div><footer><Button variant="outline" onClick={() => setPublicOpen(false)}>Back to your profile</Button></footer>
+        <header><DialogTitle ref={publicTitle} tabIndex={-1} info="A look at your reader introduction and chosen favorites.">Public profile preview</DialogTitle></header><div className="rj-profile-public-scroll" tabIndex={0} role="region" aria-label="Public profile"><Identity profile={profile} /><Favorites profile={profile} /></div><footer><Button variant="outline" onClick={() => setPublicOpen(false)}>Back to your profile</Button></footer>
       </DialogContent>
     </Dialog>
   </div>;
