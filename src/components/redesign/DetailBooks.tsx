@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import CollectionEmptyState from "@/components/CollectionEmptyState";
 import { LibrarySortingControls } from "@/components/LibraryControls";
 import { BookShelf } from "@/components/redesign/HomeCards";
@@ -41,15 +41,14 @@ function sortBooks(books: Book[], sort: BookSort): Book[] {
   return sortLibraryBooks(books, sort);
 }
 
-export function DetailBooks({ books, series = false, title = "Books", sectionId = "books" }: {
+export function DetailBooks({ books, series = false }: {
   books: Book[];
   series?: boolean;
-  title?: string;
-  sectionId?: string;
 }) {
   const navigate = useNavigate();
   const titleId = useId();
-  const sectionRef = useDetailSectionAnchor(sectionId);
+  const { hash } = useLocation();
+  const sectionRef = useDetailSectionAnchor(hash === "#wishlist-books" ? "wishlist-books" : "books");
   const [searchParams] = useSearchParams();
   const options = series ? seriesSortOptions : authorSortOptions;
   const requestedSort = searchParams.get("sort");
@@ -58,9 +57,9 @@ export function DetailBooks({ books, series = false, title = "Books", sectionId 
   const visibleBooks = sortBooks(books, sort);
 
   return (
-    <section id={sectionId} ref={sectionRef} aria-labelledby={titleId} className="min-w-0 space-y-4 scroll-mt-4">
+    <section id="books" ref={sectionRef} aria-labelledby={titleId} className="min-w-0 space-y-4 scroll-mt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id={titleId}>{title}</h2>
+        <h2 id={titleId}>Books</h2>
         {books.length > 0 && (
           <LibrarySortingControls
             nativeMenu
@@ -77,7 +76,7 @@ export function DetailBooks({ books, series = false, title = "Books", sectionId 
       {visibleBooks.length > 0 ? (
         <BookShelf
           key={sort}
-          label={`${title} shelf`}
+          label="Books shelf"
           books={visibleBooks.map((book) => ({
             id: book.id,
             title: book.title,

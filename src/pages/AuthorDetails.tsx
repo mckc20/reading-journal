@@ -153,7 +153,8 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
   const authorWishes = useMemo(() => author ? getBooksByAuthor(wishlistBooks, author.name) : [], [author, wishlistBooks]);
   const wishlistView = authorWishes.length > 0 && (authorBooks.length === 0
     || authorWishes.some(book => book.id === searchParams.get("wishlistBook")));
-  const authorSeries = useMemo(() => buildSeriesGroups([...authorBooks, ...authorWishes], series), [authorBooks, authorWishes, series]);
+  const authorVolumes = useMemo(() => [...authorBooks, ...authorWishes], [authorBooks, authorWishes]);
+  const authorSeries = useMemo(() => buildSeriesGroups(authorVolumes, series), [authorVolumes, series]);
   const genreBooks = wishlistView ? authorWishes : authorBooks;
   const authorGenres = useMemo(
     () => getTopValues(genreBooks.flatMap((book) => book.genres ?? []), 6),
@@ -296,9 +297,7 @@ function AuthorDetailsContent({ authorId, onClose }: { authorId?: string; onClos
           titleContent={<DetailGenreTags genres={authorGenres} linked={!wishlistView} />}
         />
 
-        {(authorBooks.length > 0 || authorWishes.length === 0) && <DetailBooks books={authorBooks} />}
-        {authorWishes.length > 0 && <DetailBooks books={authorWishes} title="In Wishlist"
-          sectionId={authorBooks.length > 0 ? "wishlist-books" : "books"} />}
+        <DetailBooks books={authorVolumes} />
 
         {authorSeries.length > 0 && (
           <section aria-labelledby={`${headingId}-series`} className="min-w-0 space-y-4">

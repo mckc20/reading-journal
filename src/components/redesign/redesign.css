@@ -114,8 +114,8 @@
 .rj-shelf-book > div { box-shadow: none; margin-bottom: 10px; border-radius: 5px; }
 .rj-shelf-book .rj-book-title { font-size: 12px; }
 .rj-shelf-book .rj-muted { margin-top: 5px; font-size: 10px; }
-.rj-shelf-book[data-disliked] > div { opacity: .65; filter: saturate(.5); }
-.rj-shelf-book[data-disliked] .rj-book-title { color: var(--muted-foreground); }
+.rj-shelf-book:is([data-disliked], [data-wishlist]) > div { opacity: .65; filter: saturate(.5); }
+.rj-shelf-book:is([data-disliked], [data-wishlist]) .rj-book-title { color: var(--muted-foreground); }
 .rj-goal-card, .rj-plan-card { width: 100%; text-align: left; background: var(--rj-blue); color: white; border-radius: 16px; position: relative; isolation: isolate; overflow: hidden; min-height: 146px; padding: 14px; display: flex; flex-direction: column; }
 .rj-eyebrow { display: block; text-transform: uppercase; letter-spacing: .16em; font-size: 10px; }
 .rj-card-band { position: absolute; left: 14px; right: 14px; bottom: 16px; height: 42px; border-radius: 16px; background: #ffffff29; z-index: -1; }

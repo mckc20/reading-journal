@@ -52,7 +52,8 @@ export function BookShelf<T extends ShelfBook>({ books, onOpen, showStatus = tru
   return (
     <div className="rj-shelf-frame rj-home-shelf-frame">
       <div {...drag} className="rj-shelf rj-shelf-scroll" tabIndex={0} role="group" aria-label={label}>
-        {books.map(book => <button key={book.id} type="button" className="rj-shelf-book" data-disliked={book.disliked || undefined} onClick={() => onOpen(book)}>
+        {books.map(book => <button key={book.id} type="button" className="rj-shelf-book"
+          data-disliked={book.disliked || undefined} data-wishlist={book.status === "Wishlist" || undefined} onClick={() => onOpen(book)}>
           <BookCover src={book.cover} title={book.title} status={showStatus ? book.status : undefined} favorite={book.favorite}
             paused={book.paused} cornerLabel={book.cornerLabel} cornerLabelPosition="right" showFallbackTitle decorative />
           <span className="rj-book-title">{book.title}</span>

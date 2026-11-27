@@ -78,6 +78,7 @@
 .rj-series-cover-stack--frameless .rj-series-cover-layers[data-count="2"] {
   --hero-cover-step: 90px;
 }
+.rj-series-cover-stack--frameless .rj-series-cover-layers[data-count="5"] { --hero-cover-step: 40px; }
 .rj-series-cover-stack--frameless .rj-series-cover-layer {
   position: relative;
   inset: auto;
@@ -103,4 +104,5 @@
   .rj-series-cover-layer > div { border-radius: 8px; }
   .rj-series-cover-stack--frameless { --hero-cover-width: 136px; --hero-cover-step: 52px; border-radius: 0; }
   .rj-series-cover-stack--frameless .rj-series-cover-layers[data-count="2"] { --hero-cover-step: 104px; }
+  .rj-series-cover-stack--frameless .rj-series-cover-layers[data-count="5"] { --hero-cover-step: 47px; }
 }

@@ -522,9 +522,7 @@ function SeriesDetailsContent({ seriesId, onClose }: { seriesId?: string; onClos
           />
         )}
 
-        {(seriesBooks.length > 0 || seriesWishes.length === 0) && <DetailBooks books={seriesBooks} series />}
-        {seriesWishes.length > 0 && <DetailBooks books={seriesWishes} series title="In Wishlist"
-          sectionId={seriesBooks.length > 0 ? "wishlist-books" : "books"} />}
+        <DetailBooks books={seriesVolumes} series />
 
         {(seriesBooks.length > 0 || insightsAnchored) && (
           <section id="insights" ref={insightsRef} aria-labelledby={`${headingId}-insights`} className="space-y-4 scroll-mt-4">

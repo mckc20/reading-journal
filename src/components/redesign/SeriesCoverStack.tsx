@@ -20,8 +20,7 @@ export function SeriesCoverStack({ books, className, fallback, showPaused, frame
   showPaused?: boolean;
   frameless?: boolean;
 }) {
-  const availableCovers = books.filter(book => book.cover_url);
-  const covers = frameless ? availableCovers : availableCovers.slice(0, 3);
+  const covers = books.filter(book => book.cover_url).slice(0, frameless ? 5 : 3);
   if (covers.length === 0 && fallback?.cover_url) covers.push(fallback);
   const color = useBookHeroColor(frameless ? undefined : covers[0]?.cover_url);
   const coverStrip = frameless && covers.length > 1;
